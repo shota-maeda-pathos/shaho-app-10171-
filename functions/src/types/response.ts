@@ -150,6 +150,53 @@ export interface BonusResponse {
   updatedAt: string;
 }
 
+export interface InsurancePremiumBreakdownResponse {
+  employeeAmount: number;
+  employerAmount: number;
+}
+
+export interface MonthlyInsuranceResponse {
+  id: string;
+  employeeId: string;
+  yearMonth: string;
+  officeId: string;
+  healthGradeNumber: number;
+  healthStandardRemuneration: number;
+  pensionGradeNumber: number;
+  pensionStandardRemuneration: number;
+  healthInsurance: InsurancePremiumBreakdownResponse;
+  longTermCareInsurance: InsurancePremiumBreakdownResponse | null;
+  pensionInsurance: InsurancePremiumBreakdownResponse;
+  childSupportContribution: InsurancePremiumBreakdownResponse;
+  totalEmployeeAmount: number;
+  totalEmployerAmount: number;
+  isExempted: boolean;
+  isConfirmed: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BonusInsuranceResponse {
+  id: string;
+  employeeId: string;
+  yearMonth: string;
+  officeId: string;
+  healthCappedAmount: number;
+  pensionCappedAmount: number;
+  healthInsurance: InsurancePremiumBreakdownResponse;
+  longTermCareInsurance: InsurancePremiumBreakdownResponse | null;
+  pensionInsurance: InsurancePremiumBreakdownResponse;
+  childSupportContribution: InsurancePremiumBreakdownResponse;
+  totalEmployeeAmount: number;
+  totalEmployerAmount: number;
+  isExempted: boolean;
+  isConfirmed: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;

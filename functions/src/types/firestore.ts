@@ -146,6 +146,49 @@ export interface BonusDoc {
   updatedAt: Timestamp;
 }
 
+export interface InsurancePremiumBreakdown {
+  employeeAmount: number;
+  employerAmount: number;
+}
+
+export interface MonthlyInsuranceDoc {
+  yearMonth: string;
+  officeId: string;
+  healthGradeNumber: number;
+  healthStandardRemuneration: number;
+  pensionGradeNumber: number;
+  pensionStandardRemuneration: number;
+  healthInsurance: InsurancePremiumBreakdown;
+  longTermCareInsurance: InsurancePremiumBreakdown | null;
+  pensionInsurance: InsurancePremiumBreakdown;
+  childSupportContribution: InsurancePremiumBreakdown;
+  totalEmployeeAmount: number;
+  totalEmployerAmount: number;
+  isExempted: boolean;
+  isConfirmed: boolean;
+  version: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface BonusInsuranceDoc {
+  yearMonth: string;
+  officeId: string;
+  healthCappedAmount: number;
+  pensionCappedAmount: number;
+  healthInsurance: InsurancePremiumBreakdown;
+  longTermCareInsurance: InsurancePremiumBreakdown | null;
+  pensionInsurance: InsurancePremiumBreakdown;
+  childSupportContribution: InsurancePremiumBreakdown;
+  totalEmployeeAmount: number;
+  totalEmployerAmount: number;
+  isExempted: boolean;
+  isConfirmed: boolean;
+  version: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface AuditLogDoc {
   entity: 'employee' | 'dependent';
   entityId: string;
