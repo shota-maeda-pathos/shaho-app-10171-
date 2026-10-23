@@ -1,5 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -52,7 +53,9 @@ interface SalaryRow {
           <table mat-table [dataSource]="salaries()" class="full-width-table">
             <ng-container matColumnDef="employeeName">
               <th mat-header-cell *matHeaderCellDef>従業員</th>
-              <td mat-cell *matCellDef="let row">{{ row.employeeName }}</td>
+              <td mat-cell *matCellDef="let row">
+                <a class="link" (click)="editSalary(row.employeeId)">{{ row.employeeName }}</a>
+              </td>
             </ng-container>
 
             <ng-container matColumnDef="baseSalary">
@@ -100,10 +103,13 @@ interface SalaryRow {
     .empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; color: #ccc; }
     .status-chip { padding: 4px 12px; border-radius: 16px; font-size: 12px; background: #f5f5f5; }
     .status-chip.confirmed { background: #e8f5e9; color: #2e7d32; }
+    .link { color: #1976d2; cursor: pointer; text-decoration: none; }
+    .link:hover { text-decoration: underline; }
   `],
 })
 export class SalaryListComponent implements OnInit {
   private functions = inject(Functions);
+  private router = inject(Router);
 
   salaries = signal<SalaryRow[]>([]);
   loading = signal(false);
@@ -114,6 +120,10 @@ export class SalaryListComponent implements OnInit {
 
   ngOnInit() {
     this.loadSalaries();
+  }
+
+  editSalary(employeeId: string) {
+    this.router.navigate(['/salary', employeeId], { queryParams: { month: this.selectedMonth() } });
   }
 
   onMonthChange(month: string) {

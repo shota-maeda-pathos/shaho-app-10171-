@@ -1,5 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -88,7 +89,9 @@ const SUBMISSION_LABELS: Record<string, string> = {
           <table mat-table [dataSource]="filteredFilings()" class="full-width-table">
             <ng-container matColumnDef="filingType">
               <th mat-header-cell *matHeaderCellDef>届出種別</th>
-              <td mat-cell *matCellDef="let row">{{ filingTypeLabel(row.filingType) }}</td>
+              <td mat-cell *matCellDef="let row">
+                <a class="link" (click)="viewDetail(row)">{{ filingTypeLabel(row.filingType) }}</a>
+              </td>
             </ng-container>
 
             <ng-container matColumnDef="employeeName">
@@ -147,10 +150,13 @@ const SUBMISSION_LABELS: Record<string, string> = {
     .status-chip[data-status="approved"], .status-chip[data-status="accepted"] { background: #e8f5e9; color: #2e7d32; }
     .status-chip[data-status="pending"], .status-chip[data-status="submitted"] { background: #fff3e0; color: #e65100; }
     .status-chip[data-status="rejected"], .status-chip[data-status="returned"] { background: #ffebee; color: #c62828; }
+    .link { color: #1976d2; cursor: pointer; text-decoration: none; }
+    .link:hover { text-decoration: underline; }
   `],
 })
 export class FilingListComponent implements OnInit {
   private functions = inject(Functions);
+  private router = inject(Router);
 
   filings = signal<FilingRow[]>([]);
   loading = signal(false);
@@ -169,6 +175,10 @@ export class FilingListComponent implements OnInit {
       if (this.submissionFilter() !== 'all' && f.submissionStatus !== this.submissionFilter()) return false;
       return true;
     });
+  }
+
+  viewDetail(row: FilingRow) {
+    this.router.navigate(['/filings', row.id], { queryParams: { employeeId: row.employeeId } });
   }
 
   filingTypeLabel(type: string): string { return FILING_TYPE_LABELS[type] ?? type; }
