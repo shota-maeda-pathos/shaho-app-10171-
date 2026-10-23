@@ -219,10 +219,35 @@ export interface ApprovalRequestDoc {
   updatedAt: Timestamp;
 }
 
+export interface UserDoc {
+  email: string;
+  displayName: string;
+  roles: ('admin' | 'approver' | 'operator' | 'viewer' | 'employee')[];
+  officeIds: string[];
+  employeeId: string | null;
+  isSuspended: boolean;
+  isLoginDisabled: boolean;
+  lastLoginAt: Timestamp | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface InvitationDoc {
+  email: string;
+  roles: ('admin' | 'approver' | 'operator' | 'viewer' | 'employee')[];
+  officeIds: string[];
+  employeeId: string | null;
+  status: 'pending' | 'accepted' | 'expired';
+  invitedBy: string;
+  expiresAt: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface AuditLogDoc {
-  entity: 'employee' | 'dependent' | 'approvalRequest';
+  entity: 'employee' | 'dependent' | 'approvalRequest' | 'user' | 'invitation';
   entityId: string;
-  action: 'create' | 'update' | 'delete' | 'transfer' | 'resign' | 'approve' | 'reject';
+  action: 'create' | 'update' | 'delete' | 'transfer' | 'resign' | 'approve' | 'reject' | 'invite';
   changes: Record<string, { from: unknown; to: unknown }>;
   performedBy: string;
   performedAt: Timestamp;

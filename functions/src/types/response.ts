@@ -231,6 +231,19 @@ export interface ApprovalRequestResponse {
   updatedAt: string;
 }
 
+export interface InvitationResponse {
+  id: string;
+  email: string;
+  roles: string[];
+  officeIds: string[];
+  employeeId: string | null;
+  status: 'pending' | 'accepted' | 'expired';
+  invitedBy: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;

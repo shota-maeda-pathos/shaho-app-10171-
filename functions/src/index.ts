@@ -41,6 +41,10 @@ export { approvalRequestCreate } from './approvals/approval-request-create/funct
 export { approvalRequestApprove } from './approvals/approval-request-approve/functions';
 export { approvalRequestReject } from './approvals/approval-request-reject/functions';
 
+// ユーザー管理API
+export { userInvite } from './users/user-invite/functions';
+export { userUpdateRole } from './users/user-update-role/functions';
+
 // 扶養家族API
 export { dependentCreate } from './dependents/dependent-create/functions';
 export { dependentList } from './dependents/dependent-list/functions';
