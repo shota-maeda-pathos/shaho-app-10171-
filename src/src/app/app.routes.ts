@@ -5,6 +5,26 @@ import { LayoutComponent } from './shared/layout/layout';
 
 export const routes: Routes = [
   {
+    path: 'onboard/:token',
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/onboard/onboard-form').then((m) => m.OnboardFormComponent),
+      },
+      {
+        path: 'confirm',
+        loadComponent: () =>
+          import('./features/onboard/onboard-confirm').then((m) => m.OnboardConfirmComponent),
+      },
+      {
+        path: 'complete',
+        loadComponent: () =>
+          import('./features/onboard/onboard-complete').then((m) => m.OnboardCompleteComponent),
+      },
+    ],
+  },
+  {
     path: 'login',
     loadComponent: () =>
       import('./features/login/login').then((m) => m.LoginComponent),
@@ -114,6 +134,26 @@ export const routes: Routes = [
           import('./features/approvals/approval-list/approval-list').then(
             (m) => m.ApprovalListComponent,
           ),
+      },
+      {
+        path: 'santei',
+        canActivate: [roleGuard('admin', 'operator')],
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/santei/santei-list/santei-list').then(
+                (m) => m.SanteiListComponent,
+              ),
+          },
+          {
+            path: ':employeeId',
+            loadComponent: () =>
+              import('./features/santei/santei-detail/santei-detail').then(
+                (m) => m.SanteiDetailComponent,
+              ),
+          },
+        ],
       },
       {
         path: 'portal',
