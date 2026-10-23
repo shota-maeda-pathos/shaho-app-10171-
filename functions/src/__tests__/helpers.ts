@@ -1,6 +1,12 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { AuthContext, Role } from '../middleware/auth';
-import { EmployeeDoc, DependentDoc } from '../types/firestore';
+import {
+  EmployeeDoc,
+  DependentDoc,
+  OfficeDoc,
+  DepartmentDoc,
+  InsuranceRateDoc,
+} from '../types/firestore';
 
 export function makeAuth(overrides: Partial<AuthContext> = {}): AuthContext {
   return {
@@ -58,6 +64,66 @@ export function makeDependentDoc(
     qualificationDate: Timestamp.fromDate(new Date('2020-04-01')),
     disqualificationDate: null,
     deletedAt: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+export function makeOfficeDoc(
+  overrides: Partial<OfficeDoc> = {},
+): OfficeDoc {
+  const now = Timestamp.now();
+  return {
+    name: '本社',
+    officeNumber: '0001',
+    prefectureCode: '13',
+    insurerId: 'kyokai',
+    address: '東京都千代田区1-1',
+    phone: '03-1234-5678',
+    closingDay: 0,
+    paymentDay: 25,
+    paymentMonth: 'current',
+    deductionMethod: 'current',
+    roundingRule: 'truncate',
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+export function makeDepartmentDoc(
+  overrides: Partial<DepartmentDoc> = {},
+): DepartmentDoc {
+  const now = Timestamp.now();
+  return {
+    name: '総務部',
+    parentId: null,
+    officeId: 'office-001',
+    sortOrder: 1,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+export function makeInsuranceRateDoc(
+  overrides: Partial<InsuranceRateDoc> = {},
+): InsuranceRateDoc {
+  const now = Timestamp.now();
+  return {
+    insuranceType: 'health',
+    insurerId: 'kyokai',
+    prefectureCode: '13',
+    appliedFrom: '2026-04',
+    appliedUntil: null,
+    totalRate: 99.8,
+    employeeRate: 49.9,
+    employerRate: 49.9,
+    gradeTable: null,
+    note: '',
     createdAt: now,
     updatedAt: now,
     ...overrides,

@@ -9,6 +9,11 @@ export { employeeDelete } from './employees/employee-delete/functions';
 export { employeeTransfer } from './employees/employee-transfer/functions';
 export { employeeResign } from './employees/employee-resign/functions';
 
+// 組織マスタAPI
+export { officeList } from './offices/office-list/functions';
+export { departmentList } from './offices/department-list/functions';
+export { insuranceRateList } from './offices/insurance-rate-list/functions';
+
 // 扶養家族API
 export { dependentCreate } from './dependents/dependent-create/functions';
 export { dependentList } from './dependents/dependent-list/functions';

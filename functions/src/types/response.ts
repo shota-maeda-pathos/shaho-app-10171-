@@ -38,6 +38,51 @@ export interface DependentResponse {
   updatedAt: string;
 }
 
+export interface OfficeResponse {
+  id: string;
+  name: string;
+  officeNumber: string;
+  prefectureCode: string;
+  insurerId: string;
+  address: string;
+  phone: string;
+  closingDay: number;
+  paymentDay: number;
+  paymentMonth: 'current' | 'next';
+  deductionMethod: 'current' | 'previous';
+  roundingRule: 'truncate' | 'round' | 'ceil';
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DepartmentResponse {
+  id: string;
+  name: string;
+  parentId: string | null;
+  officeId: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InsuranceRateResponse {
+  id: string;
+  insuranceType: 'health' | 'pension' | 'childSupport' | 'longTermCare';
+  insurerId: string;
+  prefectureCode: string;
+  appliedFrom: string;
+  appliedUntil: string | null;
+  totalRate: number;
+  employeeRate: number;
+  employerRate: number;
+  gradeTable: { gradeNumber: number; standardRemuneration: number; lowerBound: number; upperBound: number }[] | null;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;

@@ -38,6 +38,55 @@ export interface DependentDoc {
   updatedAt: Timestamp;
 }
 
+export interface OfficeDoc {
+  name: string;
+  officeNumber: string;
+  prefectureCode: string;
+  insurerId: string;
+  address: string;
+  phone: string;
+  closingDay: number;
+  paymentDay: number;
+  paymentMonth: 'current' | 'next';
+  deductionMethod: 'current' | 'previous';
+  roundingRule: 'truncate' | 'round' | 'ceil';
+  isActive: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface DepartmentDoc {
+  name: string;
+  parentId: string | null;
+  officeId: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface InsuranceRateDoc {
+  insuranceType: 'health' | 'pension' | 'childSupport' | 'longTermCare';
+  insurerId: string;
+  prefectureCode: string;
+  appliedFrom: string;
+  appliedUntil: string | null;
+  totalRate: number;
+  employeeRate: number;
+  employerRate: number;
+  gradeTable: GradeTableEntry[] | null;
+  note: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface GradeTableEntry {
+  gradeNumber: number;
+  standardRemuneration: number;
+  lowerBound: number;
+  upperBound: number;
+}
+
 export interface AuditLogDoc {
   entity: 'employee' | 'dependent';
   entityId: string;

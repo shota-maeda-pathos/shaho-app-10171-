@@ -17,6 +17,17 @@ import { MatDividerModule } from '@angular/material/divider';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 
+interface Office {
+  id: string;
+  name: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
+  officeId: string;
+}
+
 interface EmployeeForm {
   employeeNumber: string;
   lastName: string;
@@ -119,8 +130,12 @@ interface Dependent {
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
-                    <mat-label>事業所ID</mat-label>
-                    <input matInput [(ngModel)]="form.officeId" name="officeId" required>
+                    <mat-label>事業所</mat-label>
+                    <mat-select [(ngModel)]="form.officeId" name="officeId" required>
+                      @for (o of offices(); track o.id) {
+                        <mat-option [value]="o.id">{{ o.name }}</mat-option>
+                      }
+                    </mat-select>
                   </mat-form-field>
                 </div>
 
@@ -252,6 +267,8 @@ export class EmployeeDetailComponent implements OnInit {
 
   loading = signal(false);
   saving = signal(false);
+  offices = signal<Office[]>([]);
+  departments = signal<Department[]>([]);
   isNew = true;
   private employeeId = '';
   private version = 0;
@@ -278,12 +295,23 @@ export class EmployeeDetailComponent implements OnInit {
   };
 
   ngOnInit() {
+    this.loadOffices();
     const id = this.route.snapshot.paramMap.get('id');
     if (id && id !== 'new') {
       this.isNew = false;
       this.employeeId = id;
       this.loadEmployee();
       this.loadDependents();
+    }
+  }
+
+  async loadOffices() {
+    try {
+      const fn = httpsCallable<any, any>(this.functions, 'officeList');
+      const result = await fn({ companyId: this.auth.companyId });
+      this.offices.set(result.data.items);
+    } catch (e) {
+      console.error('Failed to load offices', e);
     }
   }
 
