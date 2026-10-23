@@ -37,6 +37,7 @@ export { bonusInsuranceCalculate } from './insurance/bonus-insurance-calculate/f
 export { filingCreate } from './filings/filing-create/functions';
 export { filingSubmit } from './filings/filing-submit/functions';
 export { filingList } from './filings/filing-list/functions';
+export { filingGet } from './filings/filing-get/functions';
 
 // 承認フローAPI
 export { approvalRequestCreate } from './approvals/approval-request-create/functions';

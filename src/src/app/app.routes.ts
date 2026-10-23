@@ -38,31 +38,74 @@ export const routes: Routes = [
                 (m) => m.EmployeeDetailComponent,
               ),
           },
+          {
+            path: ':id/grade',
+            loadComponent: () =>
+              import('./features/employees/grade-decide/grade-decide').then(
+                (m) => m.GradeDecideComponent,
+              ),
+          },
         ],
       },
       {
         path: 'salary',
         canActivate: [roleGuard('admin', 'operator')],
-        loadComponent: () =>
-          import('./features/salary/salary-list/salary-list').then(
-            (m) => m.SalaryListComponent,
-          ),
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/salary/salary-list/salary-list').then(
+                (m) => m.SalaryListComponent,
+              ),
+          },
+          {
+            path: ':employeeId',
+            loadComponent: () =>
+              import('./features/salary/salary-edit/salary-edit').then(
+                (m) => m.SalaryEditComponent,
+              ),
+          },
+        ],
       },
       {
-        path: 'premium/monthly',
+        path: 'premium',
         canActivate: [roleGuard('admin', 'operator')],
-        loadComponent: () =>
-          import('./features/premium/premium-monthly/premium-monthly').then(
-            (m) => m.PremiumMonthlyComponent,
-          ),
+        children: [
+          {
+            path: 'monthly',
+            loadComponent: () =>
+              import('./features/premium/premium-monthly/premium-monthly').then(
+                (m) => m.PremiumMonthlyComponent,
+              ),
+          },
+          {
+            path: 'collection',
+            loadComponent: () =>
+              import('./features/premium/premium-collection/premium-collection').then(
+                (m) => m.PremiumCollectionComponent,
+              ),
+          },
+        ],
       },
       {
         path: 'filings',
         canActivate: [roleGuard('admin', 'operator')],
-        loadComponent: () =>
-          import('./features/filings/filing-list/filing-list').then(
-            (m) => m.FilingListComponent,
-          ),
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/filings/filing-list/filing-list').then(
+                (m) => m.FilingListComponent,
+              ),
+          },
+          {
+            path: ':filingId',
+            loadComponent: () =>
+              import('./features/filings/filing-detail/filing-detail').then(
+                (m) => m.FilingDetailComponent,
+              ),
+          },
+        ],
       },
       {
         path: 'approvals',
@@ -71,6 +114,21 @@ export const routes: Routes = [
           import('./features/approvals/approval-list/approval-list').then(
             (m) => m.ApprovalListComponent,
           ),
+      },
+      {
+        path: 'portal',
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/portal/portal').then((m) => m.PortalComponent),
+          },
+          {
+            path: 'payslip/:id',
+            loadComponent: () =>
+              import('./features/portal/portal-detail').then((m) => m.PortalDetailComponent),
+          },
+        ],
       },
       {
         path: 'settings',

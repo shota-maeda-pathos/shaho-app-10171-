@@ -29,6 +29,8 @@ export class LayoutComponent {
     { icon: 'check_circle', label: '承認', route: '/approvals', roles: ['admin', 'approver', 'operator'] },
     { icon: 'payments', label: '給与', route: '/salary', roles: ['admin', 'operator'] },
     { icon: 'calculate', label: '保険料', route: '/premium/monthly', roles: ['admin', 'operator'] },
+    { icon: 'account_balance', label: '徴収', route: '/premium/collection', roles: ['admin', 'operator'] },
+    { icon: 'person', label: 'マイポータル', route: '/portal', roles: ['admin', 'approver', 'operator', 'viewer', 'employee'] },
     { icon: 'settings', label: '設定', route: '/settings', roles: ['admin'] },
   ];
 
