@@ -11,6 +11,7 @@ import {
   SalaryDoc,
   BonusDoc,
   ApprovalRequestDoc,
+  FilingDoc,
 } from '../types/firestore';
 
 export function makeAuth(overrides: Partial<AuthContext> = {}): AuthContext {
@@ -233,6 +234,27 @@ export function makeApprovalRequestDoc(
     reviewedBy: null,
     reviewedAt: null,
     comment: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+export function makeFilingDoc(
+  overrides: Partial<FilingDoc> = {},
+): FilingDoc {
+  const now = Timestamp.now();
+  return {
+    filingType: 'acquisitionNotification',
+    workflowStatus: 'draft',
+    mockStatus: 'notStarted',
+    submissionStatus: 'notSubmitted',
+    effectiveDate: '2026-10-01',
+    formData: { employeeName: '山田太郎' },
+    submittedAt: null,
+    resultReceivedAt: null,
+    resultNote: null,
+    version: 1,
     createdAt: now,
     updatedAt: now,
     ...overrides,

@@ -197,6 +197,23 @@ export interface BonusInsuranceResponse {
   updatedAt: string;
 }
 
+export interface FilingResponse {
+  id: string;
+  employeeId: string;
+  filingType: string;
+  workflowStatus: 'draft' | 'pending' | 'approved' | 'rejected';
+  mockStatus: 'notStarted' | 'processing' | 'completed' | 'failed';
+  submissionStatus: 'notSubmitted' | 'submitted' | 'accepted' | 'returned';
+  effectiveDate: string;
+  formData: Record<string, unknown>;
+  submittedAt: string | null;
+  resultReceivedAt: string | null;
+  resultNote: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ApprovalRequestResponse {
   id: string;
   employeeId: string;

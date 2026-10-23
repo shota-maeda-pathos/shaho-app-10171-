@@ -189,6 +189,21 @@ export interface BonusInsuranceDoc {
   updatedAt: Timestamp;
 }
 
+export interface FilingDoc {
+  filingType: string;
+  workflowStatus: 'draft' | 'pending' | 'approved' | 'rejected';
+  mockStatus: 'notStarted' | 'processing' | 'completed' | 'failed';
+  submissionStatus: 'notSubmitted' | 'submitted' | 'accepted' | 'returned';
+  effectiveDate: string;
+  formData: Record<string, unknown>;
+  submittedAt: Timestamp | null;
+  resultReceivedAt: Timestamp | null;
+  resultNote: string | null;
+  version: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface ApprovalRequestDoc {
   targetPath: string;
   targetVersion: number;
