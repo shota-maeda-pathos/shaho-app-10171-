@@ -24,6 +24,7 @@ export { gradeUpdate } from './grades/grade-update/functions';
 // 給与API
 export { salaryCreate } from './salaries/salary-create/functions';
 export { salaryUpdate } from './salaries/salary-update/functions';
+export { salaryList } from './salaries/salary-list/functions';
 
 // 賞与API
 export { bonusCreate } from './bonuses/bonus-create/functions';
@@ -35,15 +36,18 @@ export { bonusInsuranceCalculate } from './insurance/bonus-insurance-calculate/f
 // 届出API
 export { filingCreate } from './filings/filing-create/functions';
 export { filingSubmit } from './filings/filing-submit/functions';
+export { filingList } from './filings/filing-list/functions';
 
 // 承認フローAPI
 export { approvalRequestCreate } from './approvals/approval-request-create/functions';
 export { approvalRequestApprove } from './approvals/approval-request-approve/functions';
 export { approvalRequestReject } from './approvals/approval-request-reject/functions';
+export { approvalRequestList } from './approvals/approval-request-list/functions';
 
 // ユーザー管理API
 export { userInvite } from './users/user-invite/functions';
 export { userUpdateRole } from './users/user-update-role/functions';
+export { userList } from './users/user-list/functions';
 
 // 扶養家族API
 export { dependentCreate } from './dependents/dependent-create/functions';

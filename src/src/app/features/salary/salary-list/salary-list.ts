@@ -124,7 +124,13 @@ export class SalaryListComponent implements OnInit {
   private async loadSalaries() {
     this.loading.set(true);
     try {
-      // Placeholder — actual implementation will call Cloud Functions
+      const fn = httpsCallable<any, any>(this.functions, 'salaryList');
+      const result = await fn({
+        companyId: 'company-001',
+        yearMonth: this.selectedMonth(),
+      });
+      this.salaries.set(result.data.items ?? []);
+    } catch {
       this.salaries.set([]);
     } finally {
       this.loading.set(false);

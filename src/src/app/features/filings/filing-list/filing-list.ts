@@ -8,7 +8,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { Functions } from '@angular/fire/functions';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 
 interface FilingRow {
   id: string;
@@ -178,6 +178,10 @@ export class FilingListComponent implements OnInit {
   private async loadFilings() {
     this.loading.set(true);
     try {
+      const fn = httpsCallable<any, any>(this.functions, 'filingList');
+      const result = await fn({ companyId: 'company-001' });
+      this.filings.set(result.data.items ?? []);
+    } catch {
       this.filings.set([]);
     } finally {
       this.loading.set(false);

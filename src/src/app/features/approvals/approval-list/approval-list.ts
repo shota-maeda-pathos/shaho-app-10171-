@@ -223,6 +223,10 @@ export class ApprovalListComponent implements OnInit {
   private async loadApprovals() {
     this.loading.set(true);
     try {
+      const fn = httpsCallable<any, any>(this.functions, 'approvalRequestList');
+      const result = await fn({ companyId: this.auth.companyId });
+      this.approvals.set(result.data.items ?? []);
+    } catch {
       this.approvals.set([]);
     } finally {
       this.loading.set(false);

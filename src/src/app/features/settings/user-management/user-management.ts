@@ -233,6 +233,11 @@ export class UserManagementComponent implements OnInit {
   private async loadUsers() {
     this.loading.set(true);
     try {
+      const fn = httpsCallable<any, any>(this.functions, 'userList');
+      const result = await fn({ companyId: this.auth.companyId });
+      this.users.set(result.data.users ?? []);
+      this.invitations.set(result.data.invitations ?? []);
+    } catch {
       this.users.set([]);
       this.invitations.set([]);
     } finally {
