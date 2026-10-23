@@ -114,6 +114,42 @@ export interface GradeResponse {
   updatedAt: string;
 }
 
+export interface SalaryResponse {
+  id: string;
+  employeeId: string;
+  yearMonth: string;
+  officeId: string;
+  paymentBasisDays: number;
+  baseSalary: number;
+  fixedAllowances: Record<string, number>;
+  variableAllowances: Record<string, number>;
+  totalFixedWage: number;
+  totalVariableWage: number;
+  totalSalary: number;
+  isConfirmed: boolean;
+  confirmedAt: string | null;
+  confirmedBy: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BonusResponse {
+  id: string;
+  employeeId: string;
+  yearMonth: string;
+  officeId: string;
+  totalAmount: number;
+  standardBonusAmount: number;
+  cumulativeBonusAmount: number;
+  isConfirmed: boolean;
+  confirmedAt: string | null;
+  confirmedBy: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;

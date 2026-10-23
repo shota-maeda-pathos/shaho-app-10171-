@@ -114,6 +114,38 @@ export interface GradeDoc {
   updatedAt: Timestamp;
 }
 
+export interface SalaryDoc {
+  yearMonth: string;
+  officeId: string;
+  paymentBasisDays: number;
+  baseSalary: number;
+  fixedAllowances: Record<string, number>;
+  variableAllowances: Record<string, number>;
+  totalFixedWage: number;
+  totalVariableWage: number;
+  totalSalary: number;
+  isConfirmed: boolean;
+  confirmedAt: Timestamp | null;
+  confirmedBy: string | null;
+  version: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface BonusDoc {
+  yearMonth: string;
+  officeId: string;
+  totalAmount: number;
+  standardBonusAmount: number;
+  cumulativeBonusAmount: number;
+  isConfirmed: boolean;
+  confirmedAt: Timestamp | null;
+  confirmedBy: string | null;
+  version: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface AuditLogDoc {
   entity: 'employee' | 'dependent';
   entityId: string;

@@ -8,6 +8,8 @@ import {
   InsuranceRateDoc,
   EmploymentDoc,
   GradeDoc,
+  SalaryDoc,
+  BonusDoc,
 } from '../types/firestore';
 
 export function makeAuth(overrides: Partial<AuthContext> = {}): AuthContext {
@@ -164,6 +166,50 @@ export function makeGradeDoc(
     pensionStandardRemuneration: 300000,
     determinationType: 'regular',
     reason: '',
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+export function makeSalaryDoc(
+  overrides: Partial<SalaryDoc> = {},
+): SalaryDoc {
+  const now = Timestamp.now();
+  return {
+    yearMonth: '2026-10',
+    officeId: 'office-001',
+    paymentBasisDays: 20,
+    baseSalary: 300000,
+    fixedAllowances: { housing: 20000, commute: 15000 },
+    variableAllowances: {},
+    totalFixedWage: 335000,
+    totalVariableWage: 0,
+    totalSalary: 335000,
+    isConfirmed: false,
+    confirmedAt: null,
+    confirmedBy: null,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+export function makeBonusDoc(
+  overrides: Partial<BonusDoc> = {},
+): BonusDoc {
+  const now = Timestamp.now();
+  return {
+    yearMonth: '2026-06',
+    officeId: 'office-001',
+    totalAmount: 500000,
+    standardBonusAmount: 500000,
+    cumulativeBonusAmount: 500000,
+    isConfirmed: false,
+    confirmedAt: null,
+    confirmedBy: null,
     version: 1,
     createdAt: now,
     updatedAt: now,

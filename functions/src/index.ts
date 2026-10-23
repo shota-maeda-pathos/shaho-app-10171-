@@ -21,6 +21,13 @@ export { employmentCreate } from './employments/employment-create/functions';
 export { gradeCreate } from './grades/grade-create/functions';
 export { gradeUpdate } from './grades/grade-update/functions';
 
+// 給与API
+export { salaryCreate } from './salaries/salary-create/functions';
+export { salaryUpdate } from './salaries/salary-update/functions';
+
+// 賞与API
+export { bonusCreate } from './bonuses/bonus-create/functions';
+
 // 扶養家族API
 export { dependentCreate } from './dependents/dependent-create/functions';
 export { dependentList } from './dependents/dependent-list/functions';

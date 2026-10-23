@@ -68,6 +68,24 @@ interface Employment {
   longTermCareEnrolled: boolean;
 }
 
+interface Salary {
+  id: string;
+  yearMonth: string;
+  baseSalary: number;
+  totalFixedWage: number;
+  totalVariableWage: number;
+  totalSalary: number;
+  isConfirmed: boolean;
+}
+
+interface Bonus {
+  id: string;
+  yearMonth: string;
+  totalAmount: number;
+  standardBonusAmount: number;
+  isConfirmed: boolean;
+}
+
 interface Grade {
   id: string;
   effectiveMonth: string;
@@ -319,6 +337,76 @@ interface Grade {
               }
             </div>
           </mat-tab>
+
+          <mat-tab label="給与">
+            <div class="tab-content">
+              <div class="page-header">
+                <h2>月次給与一覧</h2>
+              </div>
+
+              @if (salaries().length > 0) {
+                <table mat-table [dataSource]="salaries()">
+                  <ng-container matColumnDef="yearMonth">
+                    <th mat-header-cell *matHeaderCellDef>年月</th>
+                    <td mat-cell *matCellDef="let s">{{ s.yearMonth }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="baseSalary">
+                    <th mat-header-cell *matHeaderCellDef>基本給</th>
+                    <td mat-cell *matCellDef="let s">{{ s.baseSalary | number }}円</td>
+                  </ng-container>
+                  <ng-container matColumnDef="totalSalary">
+                    <th mat-header-cell *matHeaderCellDef>総支給額</th>
+                    <td mat-cell *matCellDef="let s">{{ s.totalSalary | number }}円</td>
+                  </ng-container>
+                  <ng-container matColumnDef="isConfirmed">
+                    <th mat-header-cell *matHeaderCellDef>状態</th>
+                    <td mat-cell *matCellDef="let s">{{ s.isConfirmed ? '承認済' : '下書き' }}</td>
+                  </ng-container>
+                  <tr mat-header-row *matHeaderRowDef="salaryColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: salaryColumns"></tr>
+                </table>
+              } @else {
+                <div class="empty-state">
+                  <p>給与データが登録されていません</p>
+                </div>
+              }
+            </div>
+          </mat-tab>
+
+          <mat-tab label="賞与">
+            <div class="tab-content">
+              <div class="page-header">
+                <h2>賞与一覧</h2>
+              </div>
+
+              @if (bonuses().length > 0) {
+                <table mat-table [dataSource]="bonuses()">
+                  <ng-container matColumnDef="yearMonth">
+                    <th mat-header-cell *matHeaderCellDef>支給年月</th>
+                    <td mat-cell *matCellDef="let b">{{ b.yearMonth }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="totalAmount">
+                    <th mat-header-cell *matHeaderCellDef>賞与総額</th>
+                    <td mat-cell *matCellDef="let b">{{ b.totalAmount | number }}円</td>
+                  </ng-container>
+                  <ng-container matColumnDef="standardBonusAmount">
+                    <th mat-header-cell *matHeaderCellDef>標準賞与額</th>
+                    <td mat-cell *matCellDef="let b">{{ b.standardBonusAmount | number }}円</td>
+                  </ng-container>
+                  <ng-container matColumnDef="isConfirmed">
+                    <th mat-header-cell *matHeaderCellDef>状態</th>
+                    <td mat-cell *matCellDef="let b">{{ b.isConfirmed ? '承認済' : '下書き' }}</td>
+                  </ng-container>
+                  <tr mat-header-row *matHeaderRowDef="bonusColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: bonusColumns"></tr>
+                </table>
+              } @else {
+                <div class="empty-state">
+                  <p>賞与データが登録されていません</p>
+                </div>
+              }
+            </div>
+          </mat-tab>
         }
       </mat-tab-group>
     }
@@ -378,6 +466,12 @@ export class EmployeeDetailComponent implements OnInit {
   grades = signal<Grade[]>([]);
   gradeColumns = ['effectiveMonth', 'determinationType', 'healthGrade', 'pensionGrade'];
 
+  salaries = signal<Salary[]>([]);
+  salaryColumns = ['yearMonth', 'baseSalary', 'totalSalary', 'isConfirmed'];
+
+  bonuses = signal<Bonus[]>([]);
+  bonusColumns = ['yearMonth', 'totalAmount', 'standardBonusAmount', 'isConfirmed'];
+
   form: EmployeeForm = {
     employeeNumber: '',
     lastName: '',
@@ -406,6 +500,8 @@ export class EmployeeDetailComponent implements OnInit {
       this.loadDependents();
       this.loadEmployments();
       this.loadGrades();
+      this.loadSalaries();
+      this.loadBonuses();
     }
   }
 
@@ -521,6 +617,32 @@ export class EmployeeDetailComponent implements OnInit {
       this.grades.set(result.data.items ?? []);
     } catch (e) {
       console.error('Failed to load grades', e);
+    }
+  }
+
+  async loadSalaries() {
+    try {
+      const fn = httpsCallable<any, any>(this.functions, 'salaryList');
+      const result = await fn({
+        companyId: this.auth.companyId,
+        employeeId: this.employeeId,
+      });
+      this.salaries.set(result.data.items ?? []);
+    } catch (e) {
+      console.error('Failed to load salaries', e);
+    }
+  }
+
+  async loadBonuses() {
+    try {
+      const fn = httpsCallable<any, any>(this.functions, 'bonusList');
+      const result = await fn({
+        companyId: this.auth.companyId,
+        employeeId: this.employeeId,
+      });
+      this.bonuses.set(result.data.items ?? []);
+    } catch (e) {
+      console.error('Failed to load bonuses', e);
     }
   }
 
