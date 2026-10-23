@@ -1,0 +1,399 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── ヘルパー関数 ──────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData(companyId) {
+      return get(/databases/$(database)/documents/companies/$(companyId)/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(companyId, role) {
+      return role in getUserData(companyId).roles;
+    }
+
+    function isAdmin(companyId) {
+      return hasRole(companyId, 'admin');
+    }
+
+    function isLoginEnabled(companyId) {
+      return getUserData(companyId).isLoginDisabled != true;
+    }
+
+    function isNotSuspended(companyId) {
+      return getUserData(companyId).isSuspended != true;
+    }
+
+    function isActiveUser(companyId) {
+      let user = getUserData(companyId);
+      return user.isSuspended != true && user.isLoginDisabled != true;
+    }
+
+    function isAdminRole(companyId) {
+      let user = getUserData(companyId);
+      return 'admin' in user.roles
+          || 'operator' in user.roles
+          || 'approver' in user.roles
+          || 'viewer' in user.roles;
+    }
+
+    function hasWriteRole(companyId) {
+      let user = getUserData(companyId);
+      return 'admin' in user.roles || 'operator' in user.roles;
+    }
+
+    function isOfficeAllowed(companyId, officeId) {
+      let user = getUserData(companyId);
+      return 'admin' in user.roles
+          || (user.officeIds != null
+              && user.officeIds.size() > 0
+              && officeId in user.officeIds);
+    }
+
+    function getEmployeeData(companyId, employeeId) {
+      return get(/databases/$(database)/documents/companies/$(companyId)/employees/$(employeeId)).data;
+    }
+
+    function isSelf(companyId, employeeId) {
+      return getEmployeeData(companyId, employeeId).userId == request.auth.uid;
+    }
+
+    // ── companies ─────────────────────────────────────
+
+    match /companies/{companyId} {
+      allow read: if isAuthenticated() && isActiveUser(companyId);
+      allow write: if isAuthenticated() && isActiveUser(companyId)
+                   && isAdmin(companyId);
+
+      // ── マスタ系（offices / departments / insuranceRates）──
+
+      match /offices/{officeId} {
+        allow read: if isAuthenticated() && isActiveUser(companyId);
+        allow write: if isAuthenticated() && isActiveUser(companyId)
+                     && isAdmin(companyId);
+      }
+
+      match /departments/{departmentId} {
+        allow read: if isAuthenticated() && isActiveUser(companyId);
+        allow write: if isAuthenticated() && isActiveUser(companyId)
+                     && isAdmin(companyId);
+      }
+
+      match /insuranceRates/{rateId} {
+        allow read: if isAuthenticated() && isActiveUser(companyId);
+        allow write: if isAuthenticated() && isActiveUser(companyId)
+                     && isAdmin(companyId);
+      }
+
+      // ── employees ───────────────────────────────────
+
+      match /employees/{employeeId} {
+        allow read: if isAuthenticated() && isLoginEnabled(companyId)
+          && (
+            (isActiveUser(companyId) && isAdmin(companyId))
+            || (isActiveUser(companyId)
+                && isAdminRole(companyId)
+                && isOfficeAllowed(companyId, resource.data.officeId))
+            || resource.data.userId == request.auth.uid
+          );
+        allow create: if isAuthenticated() && isActiveUser(companyId)
+          && hasWriteRole(companyId);
+        allow update: if isAuthenticated() && isActiveUser(companyId)
+          && (isAdmin(companyId)
+              || (hasRole(companyId, 'operator')
+                  && isOfficeAllowed(companyId, resource.data.officeId)))
+          && !request.resource.data.diff(resource.data)
+              .affectedKeys().hasAny(['deletedAt']);
+        allow delete: if false;
+
+        // secrets: クライアントからの直接アクセスを全面禁止
+        match /secrets/{secretId} {
+          allow read, write: if false;
+        }
+
+        // ── dependents ──────────────────────────────
+
+        match /dependents/{dependentId} {
+          allow read: if isAuthenticated() && isLoginEnabled(companyId)
+            && (
+              (isActiveUser(companyId) && isAdmin(companyId))
+              || (isActiveUser(companyId)
+                  && isAdminRole(companyId)
+                  && isOfficeAllowed(companyId,
+                      getEmployeeData(companyId, employeeId).officeId))
+              || getEmployeeData(companyId, employeeId).userId == request.auth.uid
+            );
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && (isAdmin(companyId)
+                || (hasRole(companyId, 'operator')
+                    && isOfficeAllowed(companyId,
+                        getEmployeeData(companyId, employeeId).officeId)));
+          allow delete: if false;
+        }
+
+        // ── employments ─────────────────────────────
+
+        match /employments/{employmentId} {
+          allow read: if isAuthenticated() && isLoginEnabled(companyId)
+            && (
+              (isActiveUser(companyId) && isAdminRole(companyId)
+                  && isOfficeAllowed(companyId,
+                      getEmployeeData(companyId, employeeId).officeId))
+              || getEmployeeData(companyId, employeeId).userId == request.auth.uid
+            );
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && hasWriteRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow delete: if false;
+        }
+
+        // ── grades ──────────────────────────────────
+
+        match /grades/{gradeId} {
+          allow read: if isAuthenticated() && isLoginEnabled(companyId)
+            && (
+              (isActiveUser(companyId) && isAdminRole(companyId)
+                  && isOfficeAllowed(companyId,
+                      getEmployeeData(companyId, employeeId).officeId))
+              || getEmployeeData(companyId, employeeId).userId == request.auth.uid
+            );
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && hasWriteRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow delete: if false;
+        }
+
+        // ── salaries ────────────────────────────────
+
+        match /salaries/{salaryId} {
+          allow read: if isAuthenticated() && isLoginEnabled(companyId)
+            && (
+              (isActiveUser(companyId) && isAdminRole(companyId)
+                  && isOfficeAllowed(companyId,
+                      getEmployeeData(companyId, employeeId).officeId))
+              || getEmployeeData(companyId, employeeId).userId == request.auth.uid
+            );
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && hasWriteRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow delete: if false;
+
+          match /revisions/{revisionId} {
+            allow read: if isAuthenticated() && isActiveUser(companyId)
+              && (isAdmin(companyId) || hasRole(companyId, 'approver'));
+            allow write: if isAuthenticated() && isActiveUser(companyId)
+              && isAdmin(companyId);
+            allow delete: if false;
+          }
+        }
+
+        // ── bonuses ─────────────────────────────────
+
+        match /bonuses/{bonusId} {
+          allow read: if isAuthenticated() && isLoginEnabled(companyId)
+            && (
+              (isActiveUser(companyId) && isAdminRole(companyId)
+                  && isOfficeAllowed(companyId,
+                      getEmployeeData(companyId, employeeId).officeId))
+              || getEmployeeData(companyId, employeeId).userId == request.auth.uid
+            );
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && hasWriteRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow delete: if false;
+
+          match /revisions/{revisionId} {
+            allow read: if isAuthenticated() && isActiveUser(companyId)
+              && (isAdmin(companyId) || hasRole(companyId, 'approver'));
+            allow write: if isAuthenticated() && isActiveUser(companyId)
+              && isAdmin(companyId);
+            allow delete: if false;
+          }
+        }
+
+        // ── monthlyInsurance ────────────────────────
+
+        match /monthlyInsurance/{monthId} {
+          allow read: if isAuthenticated() && isLoginEnabled(companyId)
+            && (
+              (isActiveUser(companyId) && isAdminRole(companyId)
+                  && isOfficeAllowed(companyId,
+                      getEmployeeData(companyId, employeeId).officeId))
+              || getEmployeeData(companyId, employeeId).userId == request.auth.uid
+            );
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && hasWriteRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow delete: if false;
+
+          match /revisions/{revisionId} {
+            allow read: if isAuthenticated() && isActiveUser(companyId)
+              && (isAdmin(companyId) || hasRole(companyId, 'approver'));
+            allow write: if isAuthenticated() && isActiveUser(companyId)
+              && isAdmin(companyId);
+            allow delete: if false;
+          }
+        }
+
+        // ── bonusInsurance ──────────────────────────
+
+        match /bonusInsurance/{bonusInsuranceId} {
+          allow read: if isAuthenticated() && isLoginEnabled(companyId)
+            && (
+              (isActiveUser(companyId) && isAdminRole(companyId)
+                  && isOfficeAllowed(companyId,
+                      getEmployeeData(companyId, employeeId).officeId))
+              || getEmployeeData(companyId, employeeId).userId == request.auth.uid
+            );
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && hasWriteRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow delete: if false;
+        }
+
+        // ── premiumCollections ───────────────────────
+
+        match /premiumCollections/{collectionId} {
+          allow read: if isAuthenticated() && isActiveUser(companyId)
+            && isAdminRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && hasWriteRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow delete: if false;
+        }
+
+        // ── premiumExemptions ───────────────────────
+
+        match /premiumExemptions/{exemptionId} {
+          allow read: if isAuthenticated() && isActiveUser(companyId)
+            && (isAdmin(companyId)
+                || hasRole(companyId, 'approver')
+                || hasRole(companyId, 'viewer')
+                || (hasRole(companyId, 'operator')
+                    && isOfficeAllowed(companyId,
+                        getEmployeeData(companyId, employeeId).officeId)));
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && (isAdmin(companyId)
+                || (hasRole(companyId, 'operator')
+                    && isOfficeAllowed(companyId,
+                        getEmployeeData(companyId, employeeId).officeId)));
+          allow delete: if false;
+        }
+
+        // ── leaves ──────────────────────────────────
+
+        match /leaves/{leaveId} {
+          allow read: if isAuthenticated() && isLoginEnabled(companyId)
+            && (
+              (isActiveUser(companyId) && isAdminRole(companyId)
+                  && isOfficeAllowed(companyId,
+                      getEmployeeData(companyId, employeeId).officeId))
+              || getEmployeeData(companyId, employeeId).userId == request.auth.uid
+            );
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && hasWriteRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow delete: if false;
+        }
+
+        // ── filings ─────────────────────────────────
+
+        match /filings/{filingId} {
+          allow read: if isAuthenticated() && isActiveUser(companyId)
+            && isAdminRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow write: if isAuthenticated() && isActiveUser(companyId)
+            && hasWriteRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow delete: if false;
+        }
+
+        // ── approvalRequests ────────────────────────
+
+        match /approvalRequests/{requestId} {
+          allow read: if isAuthenticated() && isActiveUser(companyId)
+            && isAdminRole(companyId);
+          allow create: if isAuthenticated() && isActiveUser(companyId)
+            && (isAdmin(companyId)
+                || hasRole(companyId, 'approver')
+                || hasRole(companyId, 'operator'));
+          allow update: if isAuthenticated() && isActiveUser(companyId)
+            && (isAdmin(companyId) || hasRole(companyId, 'approver'));
+          allow delete: if false;
+        }
+
+        // ── transferHistory（異動履歴、読み取り専用）──
+
+        match /transferHistory/{historyId} {
+          allow read: if isAuthenticated() && isActiveUser(companyId)
+            && isAdminRole(companyId)
+            && isOfficeAllowed(companyId,
+                getEmployeeData(companyId, employeeId).officeId);
+          allow write: if false;
+        }
+      }
+
+      // ── auditLogs（監査ログ、クライアント書き込み禁止）──
+
+      match /auditLogs/{logId} {
+        allow read: if isAuthenticated() && isActiveUser(companyId)
+          && isAdmin(companyId);
+        allow write: if false;
+      }
+
+      // ── employeeNumbers（社員番号予約、クライアント書き込み禁止）──
+
+      match /employeeNumbers/{number} {
+        allow read: if isAuthenticated() && isActiveUser(companyId)
+          && hasWriteRole(companyId);
+        allow write: if false;
+      }
+
+      // ── employeeRequests（冪等性キー、クライアント書き込み禁止）──
+
+      match /employeeRequests/{requestId} {
+        allow read: if false;
+        allow write: if false;
+      }
+
+      // ── users ─────────────────────────────────────
+
+      match /users/{userId} {
+        allow read: if isAuthenticated() && isLoginEnabled(companyId)
+          && (isAdmin(companyId) || request.auth.uid == userId);
+        allow create: if isAuthenticated() && isActiveUser(companyId)
+          && isAdmin(companyId);
+        allow update: if isAuthenticated() && isActiveUser(companyId)
+          && isAdmin(companyId)
+          && !request.resource.data.diff(resource.data)
+              .affectedKeys().hasAny(['roles']);
+        allow delete: if false;
+      }
+
+      // ── invitations ───────────────────────────────
+
+      match /invitations/{invitationId} {
+        allow read, write: if isAuthenticated()
+          && isActiveUser(companyId)
+          && isAdmin(companyId);
+        allow delete: if false;
+      }
+    }
+  }
+}

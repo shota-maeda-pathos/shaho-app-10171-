@@ -1,0 +1,181 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "employees",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "officeId", "order": "ASCENDING" },
+        { "fieldPath": "lastNameKana", "order": "ASCENDING" },
+        { "fieldPath": "firstNameKana", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "employees",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "officeId", "order": "ASCENDING" },
+        { "fieldPath": "isActive", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "employees",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "hireDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "salaries",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "officeId", "order": "ASCENDING" },
+        { "fieldPath": "yearMonth", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "salaries",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "yearMonth", "order": "ASCENDING" },
+        { "fieldPath": "isConfirmed", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "bonuses",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "officeId", "order": "ASCENDING" },
+        { "fieldPath": "yearMonth", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "monthlyInsurance",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "officeId", "order": "ASCENDING" },
+        { "fieldPath": "yearMonth", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "monthlyInsurance",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "yearMonth", "order": "ASCENDING" },
+        { "fieldPath": "isExempted", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "premiumCollections",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "officeId", "order": "ASCENDING" },
+        { "fieldPath": "yearMonth", "order": "DESCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "bonusInsurance",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "officeId", "order": "ASCENDING" },
+        { "fieldPath": "yearMonth", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "filings",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "filingType", "order": "ASCENDING" },
+        { "fieldPath": "workflowStatus", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "filings",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "submissionStatus", "order": "ASCENDING" },
+        { "fieldPath": "filingType", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "filings",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "filingType", "order": "ASCENDING" },
+        { "fieldPath": "effectiveDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "approvalRequests",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "requestedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "approvalRequests",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "requestType", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "approvalRequests",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "reviewedBy", "order": "ASCENDING" },
+        { "fieldPath": "reviewedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "grades",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "effectiveMonth", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "employments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "effectiveDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leaves",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "leaveType", "order": "ASCENDING" },
+        { "fieldPath": "expectedStartDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "premiumExemptions",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "exemptionType", "order": "ASCENDING" },
+        { "fieldPath": "startMonth", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "insuranceRates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "insuranceType", "order": "ASCENDING" },
+        { "fieldPath": "appliedFrom", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "invitations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
