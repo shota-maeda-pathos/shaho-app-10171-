@@ -1,5 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -56,11 +57,32 @@ interface Dependent {
   disqualificationDate: string | null;
 }
 
+interface Employment {
+  id: string;
+  effectiveDate: string;
+  employmentType: string;
+  weeklyHours: number;
+  monthlyDays: number;
+  baseSalary: number;
+  socialInsuranceEnrolled: boolean;
+  longTermCareEnrolled: boolean;
+}
+
+interface Grade {
+  id: string;
+  effectiveMonth: string;
+  healthGradeNumber: number;
+  healthStandardRemuneration: number;
+  pensionGradeNumber: number;
+  pensionStandardRemuneration: number;
+  determinationType: string;
+}
+
 @Component({
   selector: 'app-employee-detail',
   standalone: true,
   imports: [
-    FormsModule, MatCardModule, MatFormFieldModule, MatInputModule,
+    DecimalPipe, FormsModule, MatCardModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatButtonModule, MatIconModule, MatDatepickerModule,
     MatNativeDateModule, MatProgressSpinnerModule, MatSnackBarModule,
     MatTabsModule, MatTableModule, MatDividerModule,
@@ -223,6 +245,80 @@ interface Dependent {
               }
             </div>
           </mat-tab>
+
+          <mat-tab label="雇用条件">
+            <div class="tab-content">
+              <div class="page-header">
+                <h2>雇用条件履歴</h2>
+              </div>
+
+              @if (employments().length > 0) {
+                <table mat-table [dataSource]="employments()">
+                  <ng-container matColumnDef="effectiveDate">
+                    <th mat-header-cell *matHeaderCellDef>適用開始日</th>
+                    <td mat-cell *matCellDef="let e">{{ e.effectiveDate }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="employmentType">
+                    <th mat-header-cell *matHeaderCellDef>雇用形態</th>
+                    <td mat-cell *matCellDef="let e">{{ employmentTypeLabel(e.employmentType) }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="baseSalary">
+                    <th mat-header-cell *matHeaderCellDef>基本給</th>
+                    <td mat-cell *matCellDef="let e">{{ e.baseSalary | number }}円</td>
+                  </ng-container>
+                  <ng-container matColumnDef="weeklyHours">
+                    <th mat-header-cell *matHeaderCellDef>週所定時間</th>
+                    <td mat-cell *matCellDef="let e">{{ e.weeklyHours }}h</td>
+                  </ng-container>
+                  <ng-container matColumnDef="socialInsurance">
+                    <th mat-header-cell *matHeaderCellDef>社保加入</th>
+                    <td mat-cell *matCellDef="let e">{{ e.socialInsuranceEnrolled ? '○' : '×' }}</td>
+                  </ng-container>
+                  <tr mat-header-row *matHeaderRowDef="employmentColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: employmentColumns"></tr>
+                </table>
+              } @else {
+                <div class="empty-state">
+                  <p>雇用条件が登録されていません</p>
+                </div>
+              }
+            </div>
+          </mat-tab>
+
+          <mat-tab label="等級・報酬">
+            <div class="tab-content">
+              <div class="page-header">
+                <h2>等級・標準報酬月額履歴</h2>
+              </div>
+
+              @if (grades().length > 0) {
+                <table mat-table [dataSource]="grades()">
+                  <ng-container matColumnDef="effectiveMonth">
+                    <th mat-header-cell *matHeaderCellDef>適用月</th>
+                    <td mat-cell *matCellDef="let g">{{ g.effectiveMonth }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="determinationType">
+                    <th mat-header-cell *matHeaderCellDef>決定種別</th>
+                    <td mat-cell *matCellDef="let g">{{ determinationTypeLabel(g.determinationType) }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="healthGrade">
+                    <th mat-header-cell *matHeaderCellDef>健保等級</th>
+                    <td mat-cell *matCellDef="let g">{{ g.healthGradeNumber }}等級 ({{ g.healthStandardRemuneration | number }}円)</td>
+                  </ng-container>
+                  <ng-container matColumnDef="pensionGrade">
+                    <th mat-header-cell *matHeaderCellDef>厚年等級</th>
+                    <td mat-cell *matCellDef="let g">{{ g.pensionGradeNumber }}等級 ({{ g.pensionStandardRemuneration | number }}円)</td>
+                  </ng-container>
+                  <tr mat-header-row *matHeaderRowDef="gradeColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: gradeColumns"></tr>
+                </table>
+              } @else {
+                <div class="empty-state">
+                  <p>等級情報が登録されていません</p>
+                </div>
+              }
+            </div>
+          </mat-tab>
         }
       </mat-tab-group>
     }
@@ -276,6 +372,12 @@ export class EmployeeDetailComponent implements OnInit {
   dependents = signal<Dependent[]>([]);
   dependentColumns = ['name', 'relationship', 'birthDate', 'qualificationDate'];
 
+  employments = signal<Employment[]>([]);
+  employmentColumns = ['effectiveDate', 'employmentType', 'baseSalary', 'weeklyHours', 'socialInsurance'];
+
+  grades = signal<Grade[]>([]);
+  gradeColumns = ['effectiveMonth', 'determinationType', 'healthGrade', 'pensionGrade'];
+
   form: EmployeeForm = {
     employeeNumber: '',
     lastName: '',
@@ -302,6 +404,8 @@ export class EmployeeDetailComponent implements OnInit {
       this.employeeId = id;
       this.loadEmployee();
       this.loadDependents();
+      this.loadEmployments();
+      this.loadGrades();
     }
   }
 
@@ -392,6 +496,51 @@ export class EmployeeDetailComponent implements OnInit {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  async loadEmployments() {
+    try {
+      const fn = httpsCallable<any, any>(this.functions, 'employmentList');
+      const result = await fn({
+        companyId: this.auth.companyId,
+        employeeId: this.employeeId,
+      });
+      this.employments.set(result.data.items ?? []);
+    } catch (e) {
+      console.error('Failed to load employments', e);
+    }
+  }
+
+  async loadGrades() {
+    try {
+      const fn = httpsCallable<any, any>(this.functions, 'gradeList');
+      const result = await fn({
+        companyId: this.auth.companyId,
+        employeeId: this.employeeId,
+      });
+      this.grades.set(result.data.items ?? []);
+    } catch (e) {
+      console.error('Failed to load grades', e);
+    }
+  }
+
+  employmentTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      regular: '正社員',
+      partTime: 'パートタイム',
+      contract: '契約社員',
+    };
+    return labels[type] ?? type;
+  }
+
+  determinationTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      regular: '定時決定',
+      occasional: '随時改定',
+      initial: '資格取得時決定',
+      specific: '特定適用',
+    };
+    return labels[type] ?? type;
   }
 
   goBack() {

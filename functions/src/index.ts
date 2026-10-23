@@ -14,6 +14,13 @@ export { officeList } from './offices/office-list/functions';
 export { departmentList } from './offices/department-list/functions';
 export { insuranceRateList } from './offices/insurance-rate-list/functions';
 
+// 雇用API
+export { employmentCreate } from './employments/employment-create/functions';
+
+// 等級API
+export { gradeCreate } from './grades/grade-create/functions';
+export { gradeUpdate } from './grades/grade-update/functions';
+
 // 扶養家族API
 export { dependentCreate } from './dependents/dependent-create/functions';
 export { dependentList } from './dependents/dependent-list/functions';

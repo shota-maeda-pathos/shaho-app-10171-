@@ -83,6 +83,37 @@ export interface InsuranceRateResponse {
   updatedAt: string;
 }
 
+export interface EmploymentResponse {
+  id: string;
+  employeeId: string;
+  effectiveDate: string;
+  employmentType: 'regular' | 'partTime' | 'contract';
+  weeklyHours: number;
+  monthlyDays: number;
+  baseSalary: number;
+  socialInsuranceEnrolled: boolean;
+  longTermCareEnrolled: boolean;
+  note: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GradeResponse {
+  id: string;
+  employeeId: string;
+  effectiveMonth: string;
+  healthGradeNumber: number;
+  healthStandardRemuneration: number;
+  pensionGradeNumber: number;
+  pensionStandardRemuneration: number;
+  determinationType: 'regular' | 'occasional' | 'initial' | 'specific';
+  reason: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;

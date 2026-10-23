@@ -6,6 +6,8 @@ import {
   OfficeDoc,
   DepartmentDoc,
   InsuranceRateDoc,
+  EmploymentDoc,
+  GradeDoc,
 } from '../types/firestore';
 
 export function makeAuth(overrides: Partial<AuthContext> = {}): AuthContext {
@@ -124,6 +126,45 @@ export function makeInsuranceRateDoc(
     employerRate: 49.9,
     gradeTable: null,
     note: '',
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+export function makeEmploymentDoc(
+  overrides: Partial<EmploymentDoc> = {},
+): EmploymentDoc {
+  const now = Timestamp.now();
+  return {
+    effectiveDate: '2020-04-01',
+    employmentType: 'regular',
+    weeklyHours: 40,
+    monthlyDays: 20,
+    baseSalary: 300000,
+    socialInsuranceEnrolled: true,
+    longTermCareEnrolled: false,
+    note: '',
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+export function makeGradeDoc(
+  overrides: Partial<GradeDoc> = {},
+): GradeDoc {
+  const now = Timestamp.now();
+  return {
+    effectiveMonth: '2026-09',
+    healthGradeNumber: 22,
+    healthStandardRemuneration: 300000,
+    pensionGradeNumber: 20,
+    pensionStandardRemuneration: 300000,
+    determinationType: 'regular',
+    reason: '',
+    version: 1,
     createdAt: now,
     updatedAt: now,
     ...overrides,

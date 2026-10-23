@@ -87,6 +87,33 @@ export interface GradeTableEntry {
   upperBound: number;
 }
 
+export interface EmploymentDoc {
+  effectiveDate: string;
+  employmentType: 'regular' | 'partTime' | 'contract';
+  weeklyHours: number;
+  monthlyDays: number;
+  baseSalary: number;
+  socialInsuranceEnrolled: boolean;
+  longTermCareEnrolled: boolean;
+  note: string;
+  version: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface GradeDoc {
+  effectiveMonth: string;
+  healthGradeNumber: number;
+  healthStandardRemuneration: number;
+  pensionGradeNumber: number;
+  pensionStandardRemuneration: number;
+  determinationType: 'regular' | 'occasional' | 'initial' | 'specific';
+  reason: string;
+  version: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface AuditLogDoc {
   entity: 'employee' | 'dependent';
   entityId: string;
