@@ -189,10 +189,25 @@ export interface BonusInsuranceDoc {
   updatedAt: Timestamp;
 }
 
+export interface ApprovalRequestDoc {
+  targetPath: string;
+  targetVersion: number;
+  snapshotData: Record<string, unknown>;
+  requestType: 'salary' | 'bonus' | 'monthlyInsurance' | 'filing' | 'employment' | 'grade';
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  requestedBy: string;
+  requestedAt: Timestamp;
+  reviewedBy: string | null;
+  reviewedAt: Timestamp | null;
+  comment: string | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface AuditLogDoc {
-  entity: 'employee' | 'dependent';
+  entity: 'employee' | 'dependent' | 'approvalRequest';
   entityId: string;
-  action: 'create' | 'update' | 'delete' | 'transfer' | 'resign';
+  action: 'create' | 'update' | 'delete' | 'transfer' | 'resign' | 'approve' | 'reject';
   changes: Record<string, { from: unknown; to: unknown }>;
   performedBy: string;
   performedAt: Timestamp;

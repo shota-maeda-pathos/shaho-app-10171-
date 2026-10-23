@@ -32,6 +32,11 @@ export { bonusCreate } from './bonuses/bonus-create/functions';
 export { monthlyInsuranceCalculate } from './insurance/monthly-insurance-calculate/functions';
 export { bonusInsuranceCalculate } from './insurance/bonus-insurance-calculate/functions';
 
+// 承認フローAPI
+export { approvalRequestCreate } from './approvals/approval-request-create/functions';
+export { approvalRequestApprove } from './approvals/approval-request-approve/functions';
+export { approvalRequestReject } from './approvals/approval-request-reject/functions';
+
 // 扶養家族API
 export { dependentCreate } from './dependents/dependent-create/functions';
 export { dependentList } from './dependents/dependent-list/functions';

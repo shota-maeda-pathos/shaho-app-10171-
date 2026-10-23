@@ -10,6 +10,7 @@ import {
   GradeDoc,
   SalaryDoc,
   BonusDoc,
+  ApprovalRequestDoc,
 } from '../types/firestore';
 
 export function makeAuth(overrides: Partial<AuthContext> = {}): AuthContext {
@@ -211,6 +212,27 @@ export function makeBonusDoc(
     confirmedAt: null,
     confirmedBy: null,
     version: 1,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+export function makeApprovalRequestDoc(
+  overrides: Partial<ApprovalRequestDoc> = {},
+): ApprovalRequestDoc {
+  const now = Timestamp.now();
+  return {
+    targetPath: 'companies/company-001/employees/emp-001/salaries/2026-10',
+    targetVersion: 1,
+    snapshotData: { totalSalary: 335000 },
+    requestType: 'salary',
+    status: 'pending',
+    requestedBy: 'user-001',
+    requestedAt: now,
+    reviewedBy: null,
+    reviewedAt: null,
+    comment: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,

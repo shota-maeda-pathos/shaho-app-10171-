@@ -197,6 +197,23 @@ export interface BonusInsuranceResponse {
   updatedAt: string;
 }
 
+export interface ApprovalRequestResponse {
+  id: string;
+  employeeId: string;
+  targetPath: string;
+  targetVersion: number;
+  snapshotData: Record<string, unknown>;
+  requestType: 'salary' | 'bonus' | 'monthlyInsurance' | 'filing' | 'employment' | 'grade';
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  requestedBy: string;
+  requestedAt: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   total: number;
