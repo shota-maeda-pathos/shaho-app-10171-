@@ -40,6 +40,46 @@ export const routes: Routes = [
           },
         ],
       },
+      {
+        path: 'salary',
+        canActivate: [roleGuard('admin', 'operator')],
+        loadComponent: () =>
+          import('./features/salary/salary-list/salary-list').then(
+            (m) => m.SalaryListComponent,
+          ),
+      },
+      {
+        path: 'premium/monthly',
+        canActivate: [roleGuard('admin', 'operator')],
+        loadComponent: () =>
+          import('./features/premium/premium-monthly/premium-monthly').then(
+            (m) => m.PremiumMonthlyComponent,
+          ),
+      },
+      {
+        path: 'filings',
+        canActivate: [roleGuard('admin', 'operator')],
+        loadComponent: () =>
+          import('./features/filings/filing-list/filing-list').then(
+            (m) => m.FilingListComponent,
+          ),
+      },
+      {
+        path: 'approvals',
+        canActivate: [roleGuard('admin', 'approver', 'operator')],
+        loadComponent: () =>
+          import('./features/approvals/approval-list/approval-list').then(
+            (m) => m.ApprovalListComponent,
+          ),
+      },
+      {
+        path: 'settings',
+        canActivate: [roleGuard('admin')],
+        loadComponent: () =>
+          import('./features/settings/user-management/user-management').then(
+            (m) => m.UserManagementComponent,
+          ),
+      },
     ],
   },
 ];
