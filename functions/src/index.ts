@@ -148,3 +148,4 @@ export { migrateInsuranceRates } from './migrations/rate-repair';
 export { onboardingStart, onboardingGet, onboardingList, onboardingPreview, onboardingUpdate, onboardInviteGet, onboardInviteSubmit } from './onboarding/functions';
 export { homeTodos } from './home/functions';
 export { resignationStart, resignationGet, resignationPreview, resignationUpdate } from './resignation/functions';
+export { dependentChangeStart, dependentChangeGet, dependentChangePreview, dependentChangeUpdate } from './dependent-change/functions';

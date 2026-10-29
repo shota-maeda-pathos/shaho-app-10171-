@@ -26,6 +26,7 @@ import { MatListModule } from '@angular/material/list';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import { OfficeContextService } from '../../../core/services/office-context.service';
+import { relationshipLabel } from '../../dependent-change/dependent-change.types';
 
 interface Office {
   id: string;
@@ -505,7 +506,7 @@ interface OnboardResult {
                   </ng-container>
                   <ng-container matColumnDef="relationship">
                     <th mat-header-cell *matHeaderCellDef>続柄</th>
-                    <td mat-cell *matCellDef="let d">{{ d.relationship }}</td>
+                    <td mat-cell *matCellDef="let d">{{ relationshipLabel(d.relationship) }}</td>
                   </ng-container>
                   <ng-container matColumnDef="birthDate">
                     <th mat-header-cell *matHeaderCellDef>生年月日</th>
@@ -803,6 +804,8 @@ export class EmployeeDetailComponent implements OnInit {
 
   dependents = signal<Dependent[]>([]);
   dependentColumns = ['name', 'relationship', 'birthDate', 'qualificationDate'];
+  /** 扶養の手続きで登録した続柄は英字の値で持つ。旧データの日本語はそのまま出す */
+  readonly relationshipLabel = relationshipLabel;
 
   employments = signal<Employment[]>([]);
   employmentColumns = ['effectiveDate', 'employmentType', 'baseSalary', 'weeklyHours', 'socialInsurance'];
@@ -856,6 +859,8 @@ export class EmployeeDetailComponent implements OnInit {
       if (action === 'loss') void this.startResignation();
       this.initialTab = action === 'dependent_change' ? 1 : action === 'leave' ? 5 : 0;
       this.loadEmployee();
+      // 最初から開いたタブは selectedTabChange が起きないので、ここで読み込む
+      if (this.initialTab === 1) this.onTabChange('扶養家族');
     }
   }
 

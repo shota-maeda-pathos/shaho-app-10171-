@@ -58,6 +58,11 @@ export interface DependentDoc {
   coResident: boolean;
   qualificationDate: Timestamp;
   disqualificationDate: Timestamp | null;
+  /** 扶養から外した理由 */
+  disqualificationReason?: string | null;
+  occupation?: string | null;
+  /** 認定状況（扶養の手続きで届け出た人） */
+  certification?: 'certified' | 'removed' | null;
   deletedAt: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -431,6 +436,42 @@ export interface ProcedureDoc {
   onboarding?: OnboardingState;
   /** 退職手続き（ウィザード）の状態。旧方式の退職手続きにはない */
   resignation?: ResignationState;
+  /** 扶養の手続き（ウィザード）の状態。旧方式の扶養異動にはない */
+  dependentChange?: DependentChangeState;
+}
+
+/** 扶養の手続きで届け出る1人分の異動 */
+export interface DependentChangeItem {
+  kind: 'add' | 'remove' | 'change';
+  /** 台帳の被扶養者。追加は完了時に作る */
+  dependentId: string | null;
+  /** 異動日（扶養に入れる日・外れる日・変わった日）YYYY-MM-DD */
+  eventDate: string;
+  lastName: string;
+  firstName: string;
+  lastNameKana: string;
+  firstNameKana: string;
+  birthDate: string;
+  gender: 'male' | 'female';
+  relationship: string;
+  /** 年間収入の見込み（円） */
+  income: number;
+  coResident: boolean;
+  occupation: string;
+  isDisabled: boolean;
+  /** 外す理由・変わった内容 */
+  reason: string;
+  /** 収入が基準以上でも扶養に入れる場合の理由 */
+  exceptionReason: string;
+}
+
+export interface DependentChangeState {
+  items: DependentChangeItem[];
+  /** 入社の手続きから引き継いだ場合の、その手続き */
+  sourceProcedureId: string | null;
+  filingId: string | null;
+  /** 台帳に反映した日時（完了時） */
+  appliedAt: Timestamp | null;
 }
 
 /** 退職手続き（ウィザード）の状態 */

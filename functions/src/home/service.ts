@@ -6,6 +6,7 @@ import { addMonths } from '../insurance/calculator';
 import { acquisitionFilingDeadline, currentWizardStep } from '../onboarding/service';
 import { monthlyOverview, runId } from '../monthly/service';
 import { currentResignationStep } from '../resignation/service';
+import { currentDependentStep } from '../dependent-change/service';
 import { mapConcurrent } from '../utils/parallel';
 import { HomeTodo, TodoTone, payDateOf, sortTodos } from './rules';
 import { monthlyProgress } from './monthly-progress';
@@ -79,37 +80,65 @@ const RESIGNATION_NEXT: Record<string, string> = {
   confirm: '完了を確認する',
 };
 
-async function resignationTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string): Promise<HomeTodo | null> {
-  const rs = p.resignation!;
-  const step = currentResignationStep(p);
-  const base: Omit<HomeTodo, 'next' | 'detail' | 'tone' | 'deadline'> = {
-    id: `procedure-${p.id}`, kind: 'resignation', title: `${p.employeeName}さんの退職`, officeName,
-    route: `/resignation/${p.id}`, queryParams: { officeId: p.officeId }, updatedAt: iso(p.updatedAt),
-  };
-  // 資格喪失届の期限（喪失日から5日）。提出が済めば関係ない
+/** 個人型のウィザード（退職・扶養）で共通の出し方。承認待ち・差し戻し・返戻を見て次にやることを出す */
+async function wizardTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, o: {
+  base: Omit<HomeTodo, 'next' | 'detail' | 'tone' | 'deadline'>; step: string; next: Record<string, string>;
+  filingName: string; detail: string | null;
+}): Promise<HomeTodo | null> {
+  // 届出の期限（提出が済めば関係ない）
   const submitted = p.steps.some(s => (s.id === 'mock_filing' || s.id === 'paper_submit') && s.status === 'completed');
   const deadline = submitted ? null : date(p.deadline);
-  const transfer = rs.settlement?.totals.transfer ?? 0;
-  const collectNote = transfer > 0 ? `別途回収 ${transfer.toLocaleString('ja-JP')}円` : null;
-  if (step === 'approval') {
+  if (o.step === 'approval') {
     const refs = p.references.filter(r => r.type === 'approval' && r.stepId === 'approval');
     const approvalId = refs.length ? refs[refs.length - 1].documentId : null;
     const approval = p.employeeId && approvalId
       ? (await db.doc(`companies/${auth.companyId}/employees/${p.employeeId}/approvalRequests/${approvalId}`).get()).data()
       : undefined;
     if (approval?.status === 'rejected') {
-      return { ...base, next: '差し戻された資格喪失届を直す', detail: approval.comment ? `理由：${approval.comment}` : null, tone: 'action', deadline };
+      return { ...o.base, next: `差し戻された${o.filingName}を直す`, detail: approval.comment ? `理由：${approval.comment}` : null, tone: 'action', deadline };
     }
     const tone = approvalTone(auth, approval?.requestedBy);
-    return { ...base, next: tone === 'yours' ? '資格喪失届を承認する' : '承認者の確認を待っています', detail: collectNote, tone, deadline };
+    return { ...o.base, next: tone === 'yours' ? `${o.filingName}を承認する` : '承認者の確認を待っています', detail: o.detail, tone, deadline };
   }
   const returned = p.steps.find(s => s.status === 'returned');
-  if (returned) return { ...base, next: '返戻された資格喪失届を直す', detail: returned.statusDetail, tone: 'action', deadline };
-  const next = RESIGNATION_NEXT[step];
-  return next ? { ...base, next, detail: step === 'entry' ? null : collectNote, tone: 'yours', deadline } : null;
+  if (returned) return { ...o.base, next: `返戻された${o.filingName}を直す`, detail: returned.statusDetail, tone: 'action', deadline };
+  const next = o.next[o.step];
+  return next ? { ...o.base, next, detail: o.detail, tone: 'yours', deadline } : null;
 }
 
-/** 入社・退職以外の手続き（段階6でウィザードに置き換える）。次のステップを出す */
+function resignationTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string) {
+  const transfer = p.resignation!.settlement?.totals.transfer ?? 0;
+  const step = currentResignationStep(p);
+  return wizardTodo(p, auth, {
+    base: {
+      id: `procedure-${p.id}`, kind: 'resignation', title: `${p.employeeName}さんの退職`, officeName,
+      route: `/resignation/${p.id}`, queryParams: { officeId: p.officeId }, updatedAt: iso(p.updatedAt),
+    },
+    step, next: RESIGNATION_NEXT, filingName: '資格喪失届',
+    detail: step !== 'entry' && transfer > 0 ? `別途回収 ${transfer.toLocaleString('ja-JP')}円` : null,
+  });
+}
+
+const DEPENDENT_NEXT: Record<string, string> = {
+  change: '変わった内容を入れる',
+  filing: '被扶養者（異動）届を作って承認を依頼する',
+  submit: '被扶養者（異動）届を提出する',
+  confirm: '完了を確認して台帳に反映する',
+};
+
+function dependentTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string) {
+  const items = p.dependentChange!.items;
+  return wizardTodo(p, auth, {
+    base: {
+      id: `procedure-${p.id}`, kind: 'dependent', title: `${p.employeeName}さんの扶養`, officeName,
+      route: `/dependents/${p.id}`, queryParams: { officeId: p.officeId }, updatedAt: iso(p.updatedAt),
+    },
+    step: currentDependentStep(p), next: DEPENDENT_NEXT, filingName: '被扶養者（異動）届',
+    detail: items.length ? items.map(i => `${i.lastName} ${i.firstName}`).join('・') : null,
+  });
+}
+
+/** 入社・退職・扶養以外の手続き（段階6でウィザードに置き換える）。次のステップを出す */
 function procedureTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string): HomeTodo | null {
   const order: ProcedureStep['status'][] = ['returned', 'in_progress', 'available'];
   const step = order.map(status => p.steps.find(s => s.status === status)).find(Boolean);
@@ -131,6 +160,7 @@ async function procedureTodos(auth: AuthContext, inScope: (officeId: string) => 
     .filter(p => inScope(p.officeId) && (!p.targetOfficeId || inScope(p.targetOfficeId)));
   const todos = await mapConcurrent(procs, 10, p => p.onboarding ? onboardingTodo(p, auth, officeName(p.officeId))
     : p.resignation ? resignationTodo(p, auth, officeName(p.officeId))
+    : p.dependentChange ? dependentTodo(p, auth, officeName(p.officeId))
     : Promise.resolve(procedureTodo(p, auth, officeName(p.officeId))));
   return todos.filter((t): t is HomeTodo => t !== null);
 }

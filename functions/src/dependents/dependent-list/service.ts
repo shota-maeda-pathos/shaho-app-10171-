@@ -14,30 +14,16 @@ export async function listDependents(
   );
   const limit = input.limit ?? 20;
 
-  let query: FirebaseFirestore.Query = collRef.orderBy('createdAt', 'asc');
-
-  if (!input.includeDeleted) {
-    query = query.where('deletedAt', '==', null);
-  }
-
-  const countSnap = await query.count().get();
-  const total = countSnap.data().count;
-
-  if (input.lastDocId) {
-    const lastDoc = await db
-      .doc(
-        `companies/${auth.companyId}/employees/${input.employeeId}/dependents/${input.lastDocId}`,
-      )
-      .get();
-    if (lastDoc.exists) {
-      query = query.startAfter(lastDoc);
-    }
-  }
-  query = query.limit(limit + 1);
-
-  const snap = await query.get();
-  const hasMore = snap.docs.length > limit;
-  const docs = hasMore ? snap.docs.slice(0, limit) : snap.docs;
+  // 複合索引（deletedAt＋createdAt）に頼らない。1人の扶養家族は少ないので、読んでから並べる
+  const all = await (input.includeDeleted ? collRef : collRef.where('deletedAt', '==', null)).get();
+  const sorted = [...all.docs].sort((a, b) =>
+    ((a.data().createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis() ?? 0) - ((b.data().createdAt as FirebaseFirestore.Timestamp | undefined)?.toMillis() ?? 0)
+    || a.id.localeCompare(b.id));
+  const total = sorted.length;
+  const start = input.lastDocId ? sorted.findIndex(d => d.id === input.lastDocId) + 1 : 0;
+  const page = sorted.slice(start, start + limit + 1);
+  const hasMore = page.length > limit;
+  const docs = hasMore ? page.slice(0, limit) : page;
 
   return {
     items: docs.map((d) =>

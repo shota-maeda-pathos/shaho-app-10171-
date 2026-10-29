@@ -187,6 +187,13 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'dependents/:id',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '扶養の手続き' },
+        loadComponent: () =>
+          import('./features/dependent-change/dependent-change-wizard').then((m) => m.DependentChangeWizardComponent),
+      },
+      {
         path: 'resignation/:id',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '退職手続き' },

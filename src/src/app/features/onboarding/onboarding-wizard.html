@@ -252,8 +252,15 @@
               </td></tr>
             }
           </table>
-          @if (v.selfInput?.dependents?.length && !isDone()) {
-            <p class="sub">扶養に入れたい家族がいます。完了したら、扶養の手続きを始めてください。</p>
+          @if (v.selfInput?.dependents?.length) {
+            @if (isDone() && v.employee) {
+              <div class="row-actions">
+                <p class="sub">扶養に入れたい家族の申し出があります（<app-term key="dependentFiling" />）。</p>
+                <button mat-flat-button type="button" (click)="startDependents()" [disabled]="busy()"><mat-icon>family_restroom</mat-icon>扶養の手続きを始める</button>
+              </div>
+            } @else {
+              <p class="sub">扶養に入れたい家族がいます。完了したら、ここから扶養の手続きを始められます。</p>
+            }
           }
         }
       }

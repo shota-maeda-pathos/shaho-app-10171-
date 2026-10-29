@@ -1,0 +1,4 @@
+.person { margin: 0 0 var(--app-space-4); padding: var(--app-space-3) var(--app-space-4); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); min-width: 0; }
+.person legend { padding: 0 var(--app-space-2); font-weight: 500; }
+.radios.inline { flex-direction: row; flex-wrap: wrap; gap: var(--app-space-3); }
+.summary thead th { width: auto; }

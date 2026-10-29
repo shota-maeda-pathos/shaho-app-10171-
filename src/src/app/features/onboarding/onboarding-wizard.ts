@@ -1,7 +1,7 @@
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -49,6 +49,7 @@ const defaultContract = (): ContractForm => ({
 })
 export class OnboardingWizardComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private functions = inject(Functions);
   private auth = inject(AuthService);
   private snackBar = inject(MatSnackBar);
@@ -394,6 +395,23 @@ export class OnboardingWizardComponent implements OnInit, OnDestroy {
       await this.load(true);
     } catch (e) {
       this.snackBar.open(errorMessage(e, '記録できませんでした'), '閉じる', { duration: 8000 });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** 本人が申し出た家族を引き継いで、扶養の手続きを始める */
+  async startDependents() {
+    const v = this.view();
+    if (!v?.employee) return;
+    this.busy.set(true);
+    try {
+      const { data } = await httpsCallable<object, { procedureId: string }>(this.functions, 'dependentChangeStart')({
+        companyId: this.auth.companyId, employeeId: v.employee.id, sourceProcedureId: this.procedureId,
+      });
+      void this.router.navigate(['/dependents', data.procedureId]);
+    } catch (e) {
+      this.snackBar.open(errorMessage(e, '扶養の手続きを始められませんでした'), '閉じる', { duration: 8000 });
     } finally {
       this.busy.set(false);
     }

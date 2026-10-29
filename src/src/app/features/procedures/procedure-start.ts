@@ -96,13 +96,18 @@ export class ProcedureStartComponent implements OnInit {
   async start() {
     if (!this.canStart()) return;
     if (this.type() === 'monthly_change') { void this.router.navigate(['/employees', this.employeeId, 'revision']); return; }
-    if (this.type() === 'loss') {
-      // 退職はウィザードで進める。同じ人の進行中の手続きがあれば、それを開く
+    // ウィザードで進める業務。同じ人の進行中の手続きがあれば、それを開く
+    const wizard: Record<string, { fn: string; route: string }> = {
+      loss: { fn: 'resignationStart', route: '/resignation' },
+      dependent_change: { fn: 'dependentChangeStart', route: '/dependents' },
+    };
+    const w = wizard[this.type()];
+    if (w) {
       this.starting.set(true); this.error.set('');
       try {
-        const {data} = await httpsCallable<object,{procedureId:string}>(this.functions,'resignationStart')({companyId:this.auth.companyId,employeeId:this.employeeId});
-        void this.router.navigate(['/resignation', data.procedureId]);
-      } catch(e:any) { this.error.set(e.message ?? '退職の手続きを始められませんでした'); } finally { this.starting.set(false); }
+        const {data} = await httpsCallable<object,{procedureId:string}>(this.functions,w.fn)({companyId:this.auth.companyId,employeeId:this.employeeId});
+        void this.router.navigate([w.route, data.procedureId]);
+      } catch(e:any) { this.error.set(e.message ?? '手続きを始められませんでした'); } finally { this.starting.set(false); }
       return;
     }
     void this.router.navigate(['/employees', this.employeeId], { queryParams: { action: this.type() } });

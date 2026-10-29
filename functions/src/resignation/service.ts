@@ -1,9 +1,8 @@
 import { Timestamp } from 'firebase-admin/firestore';
-import { HttpsError } from 'firebase-functions/v2/https';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
 import {
-  EmployeeDoc, EmploymentDoc, FilingDoc, GradeDoc, OfficeDoc, ProcedureDoc, ProcedureStep, ResignationState, UserDoc,
+  EmployeeDoc, EmploymentDoc, FilingDoc, GradeDoc, OfficeDoc, ProcedureDoc, ResignationState, UserDoc,
 } from '../types/firestore';
 import { invalidArg, notFound } from '../utils/errors';
 import { toDateString, toTimestamp } from '../utils/firestore';
@@ -14,6 +13,7 @@ import { isHealthExcluded, isLongTermCareAge, isPensionExcluded } from '../utils
 import { addDays, ageReachDate, monthOf, normalizeRoundingRule, splitPremium } from '../insurance/calculator';
 import { buildResignationSteps } from '../procedures/templates';
 import { requireProcedureAccess } from '../procedures/access';
+import { completed, isDone, latestApprovalId, requireVersion, setStep, statusReasonOf, stepOf, todayJst } from '../procedures/wizard';
 import { refreshProcedure } from '../procedures/refresh';
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
 import { confirmProcedure } from '../procedures/procedure-action/service';
@@ -24,19 +24,6 @@ import { EntryInput } from './schema';
 const FILING_STEPS = ['filing_create', 'approval', 'mock_filing', 'paper_submit'];
 
 type ResignationProcedure = ProcedureDoc & { resignation: ResignationState };
-
-function setStep(steps: ProcedureStep[], id: string, patch: Partial<ProcedureStep>) {
-  return steps.map(s => s.id === id ? { ...s, ...patch } : s);
-}
-
-function completed(by: string): Partial<ProcedureStep> {
-  return { status: 'completed', completedAt: Timestamp.now(), completedBy: by, statusDetail: null, actionLabel: null, actionRoute: null };
-}
-
-function statusReasonOf(steps: ProcedureStep[]) {
-  const next = steps.find(s => s.status === 'available' || s.status === 'in_progress' || s.status === 'returned');
-  return next ? next.label : '全ステップ完了';
-}
 
 const nameOf = (e: EmployeeDoc) => `${e.lastName} ${e.firstName}`;
 /** その日の終わり（東京）。閲覧期間の判定に使う */
@@ -95,19 +82,6 @@ async function loadProcedure(companyId: string, procedureId: string, auth: AuthC
   requireProcedureAccess(auth, proc);
   if (!proc.resignation || !proc.employeeId) throw invalidArg('この手続きは退職の画面では扱えません');
   return { ref, proc: proc as ResignationProcedure };
-}
-
-function requireVersion(proc: ProcedureDoc, expected: number) {
-  if (proc.version !== expected) throw new HttpsError('aborted', '手続きが更新されています。画面を読み込み直してください');
-  if (proc.status === 'completed' || proc.status === 'cancelled') throw invalidArg('この手続きは終了しています');
-}
-
-const stepOf = (proc: ProcedureDoc, id: string) => proc.steps.find(s => s.id === id)!;
-const isDone = (s: ProcedureStep) => s.status === 'completed' || s.status === 'skipped';
-
-function latestApprovalId(proc: ProcedureDoc): string | null {
-  const refs = proc.references.filter(r => r.type === 'approval' && r.stepId === 'approval');
-  return refs.length ? refs[refs.length - 1].documentId : null;
 }
 
 /** ウィザードで表示しているステップ */
@@ -350,7 +324,7 @@ export async function saveEntry(input: EntryInput, auth: AuthContext) {
     });
     // 喪失日（退職日の翌日）から閲覧専用、閲覧期間の翌日からログイン停止。権限は残し、再入社のときに戻せるようにする
     // 喪失日を過ぎていれば停止も記録する（予定日を見ない旧い関数でも閲覧専用になるように）
-    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+    const today = todayJst();
     if (userRef) {
       tx.update(userRef, {
         suspendFrom: facts.account.viewOnlyFrom, loginDisabledFrom: facts.account.loginStopsFrom,
