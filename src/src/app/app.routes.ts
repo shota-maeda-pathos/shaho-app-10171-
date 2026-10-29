@@ -10,23 +10,9 @@ export const routes: Routes = [
   ]},
   {
     path: 'onboard/:token',
-    children: [
-      {
-        path: '',
-        loadComponent: () =>
-          import('./features/onboard/onboard-form').then((m) => m.OnboardFormComponent),
-      },
-      {
-        path: 'confirm',
-        loadComponent: () =>
-          import('./features/onboard/onboard-confirm').then((m) => m.OnboardConfirmComponent),
-      },
-      {
-        path: 'complete',
-        loadComponent: () =>
-          import('./features/onboard/onboard-complete').then((m) => m.OnboardCompleteComponent),
-      },
-    ],
+    data: { title: '入社の手続き' },
+    loadComponent: () =>
+      import('./features/onboard/onboard-form').then((m) => m.OnboardFormComponent),
   },
   {
     path: 'login',
@@ -67,6 +53,8 @@ export const routes: Routes = [
                 (m) => m.EmployeeListComponent,
               ),
           },
+          // 入社は入社手続きのウィザードで行う（従業員詳細の新規登録は使わない）
+          { path: 'new', redirectTo: '/onboarding/new', pathMatch: 'full' },
           {
             path: ':id',
             data: { title: '従業員詳細' },
@@ -169,6 +157,30 @@ export const routes: Routes = [
               import('./features/procedures/procedure-detail').then(
                 (m) => m.ProcedureDetailComponent,
               ),
+          },
+        ],
+      },
+      {
+        path: 'onboarding',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '入社手続き' },
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/onboarding/onboarding-list').then((m) => m.OnboardingListComponent),
+          },
+          {
+            path: 'new',
+            data: { title: '人が入社する' },
+            loadComponent: () =>
+              import('./features/onboarding/onboarding-start').then((m) => m.OnboardingStartComponent),
+          },
+          {
+            path: ':id',
+            data: { title: '入社手続き' },
+            loadComponent: () =>
+              import('./features/onboarding/onboarding-wizard').then((m) => m.OnboardingWizardComponent),
           },
         ],
       },

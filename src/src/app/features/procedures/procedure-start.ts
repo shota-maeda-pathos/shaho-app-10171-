@@ -50,7 +50,7 @@ export class ProcedureStartComponent implements OnInit {
   }
   start() {
     if (!this.canStart()) return;
-    if (this.type === 'acquisition') { void this.router.navigate(['/employees/new']); return; }
+    if (this.type === 'acquisition') { void this.router.navigate(['/onboarding/new']); return; }
     if (this.type === 'annual_review') { void this.router.navigate(['/santei']); return; }
     if (this.type === 'bonus_payment') { void this.router.navigate(['/premium/bonus']); return; }
     if (this.type === 'monthly_change') { void this.router.navigate(['/employees', this.employeeId, 'revision']); return; }

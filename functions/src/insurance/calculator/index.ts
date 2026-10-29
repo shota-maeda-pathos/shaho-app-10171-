@@ -8,3 +8,4 @@ export * from './coverage';
 export * from './remuneration';
 export * from './applicability';
 export * from './dates';
+export * from './age';

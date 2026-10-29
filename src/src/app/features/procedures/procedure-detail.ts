@@ -368,6 +368,11 @@ export class ProcedureDetailComponent implements OnInit {
         companyId: this.auth.companyId,
         procedureId: this.procedureId,
       });
+      // 入社手続き（ウィザード方式）は専用の画面で進める
+      if (data.steps.some(s => s.id === 'invite')) {
+        void this.router.navigate(['/onboarding', this.procedureId], { replaceUrl: true });
+        return;
+      }
       this.procedure.set(data);
     } catch (e: any) {
       this.procedure.set(null);

@@ -67,6 +67,17 @@ export async function approveApprovalRequest(
       }
     }
 
+    // 入社手続きの資格取得届は、承認と同時に資格取得時決定の等級を確定する（等級はサーバーが申請時に計算したもの）
+    const filingGrade = reqData.requestType === 'filing' ? (reqData.metadata?.grade as Record<string, unknown> | undefined) : undefined;
+    let filingGradeRef: FirebaseFirestore.DocumentReference | null = null;
+    if (filingGrade) {
+      const path = String(filingGrade.path ?? '');
+      validateApprovalTarget(path, 'grade', auth.companyId, input.employeeId);
+      filingGradeRef = db.doc(path);
+      const existing = await tx.get(filingGradeRef);
+      if (existing.exists && existing.data()!.isConfirmed === true) throw invalidArg('この月の等級は既に確定しています');
+    }
+
     const now = Timestamp.now();
 
     tx.update(reqRef, {
@@ -105,6 +116,26 @@ export async function approveApprovalRequest(
         version: targetData.version + 1,
         updatedAt: now,
       });
+      if (filingGrade && filingGradeRef) {
+        tx.set(filingGradeRef, {
+          effectiveMonth: filingGrade.effectiveMonth,
+          determinationType: filingGrade.determinationType ?? 'initial',
+          healthGradeNumber: filingGrade.healthGradeNumber,
+          healthStandardRemuneration: filingGrade.healthStandardRemuneration,
+          pensionGradeNumber: filingGrade.pensionGradeNumber,
+          pensionStandardRemuneration: filingGrade.pensionStandardRemuneration,
+          reason: filingGrade.reason ?? '',
+          basisRemuneration: filingGrade.basisRemuneration ?? null,
+          basisMonths: null,
+          approvalRequestId: reqRef.id,
+          isConfirmed: true,
+          confirmedAt: now,
+          confirmedBy: auth.uid,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
     } else {
       tx.update(targetRef, {
         isConfirmed: true,

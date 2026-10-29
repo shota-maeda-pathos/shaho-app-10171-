@@ -109,14 +109,15 @@ const DETERMINATION_TYPES: { value: string; label: string }[] = [
           </div>
 
           <mat-form-field appearance="outline" class="full-width">
-            <mat-label>理由・メモ</mat-label>
-            <input matInput [(ngModel)]="reason">
+            <mat-label>手入力する理由（必須）</mat-label>
+            <input matInput [(ngModel)]="reason" required>
+            <mat-hint>等級は承認されると確定します。標準報酬月額は等級番号から等級表の金額になります</mat-hint>
           </mat-form-field>
 
           <div class="form-actions">
             <button mat-stroked-button (click)="goBack()">キャンセル</button>
-            <button mat-flat-button color="primary" (click)="save()" [disabled]="saving()">
-              {{ isEdit ? '等級を更新' : '等級を登録' }}
+            <button mat-flat-button color="primary" (click)="save()" [disabled]="saving() || !reason.trim()">
+              {{ isEdit ? '訂正の承認を依頼する' : '等級の承認を依頼する' }}
             </button>
           </div>
         </mat-card>
@@ -210,7 +211,7 @@ export class GradeDecideComponent implements OnInit {
           reason: this.reason,
         });
       }
-      this.snackBar.open('等級を保存しました', '閉じる', { duration: 3000 });
+      this.snackBar.open('承認を依頼しました。承認されると等級が確定します', '閉じる', { duration: 4000 });
       this.goBack();
     } catch (e: any) {
       this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });

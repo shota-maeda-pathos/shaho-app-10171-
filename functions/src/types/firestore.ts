@@ -423,6 +423,50 @@ export interface ProcedureDoc {
   updatedAt: Timestamp;
   completedAt: Timestamp | null;
   deletedAt: Timestamp | null;
+  /** 入社手続き（ウィザード）の状態。旧方式の入社手続きにはない */
+  onboarding?: OnboardingState;
+}
+
+/** 本人が招待リンクから入力した内容。台帳への登録は担当者が確かめてから行う */
+export interface OnboardSelfInput {
+  lastName: string;
+  firstName: string;
+  lastNameKana: string;
+  firstNameKana: string;
+  birthDate: string;
+  gender: 'male' | 'female';
+  postalCode: string | null;
+  prefecture: string | null;
+  city: string | null;
+  addressLine: string | null;
+  building: string | null;
+  phone: string | null;
+  email: string | null;
+  /** 扶養に入れたい家族（扶養の手続きは別に行う） */
+  dependents: { lastName: string; firstName: string; relationship: string; birthDate: string | null }[];
+}
+
+export interface OnboardingState {
+  /** 入社日（資格取得日）YYYY-MM-DD */
+  hireDate: string;
+  /** 手続きを始めたときに担当者が入れた氏名 */
+  plannedName: string;
+  email: string | null;
+  inviteToken: string | null;
+  inviteExpiresAt: Timestamp | null;
+  /** 本人に依頼せず担当者が入力する */
+  inviteSkipped: boolean;
+  selfInput: OnboardSelfInput | null;
+  selfInputAt: Timestamp | null;
+  employmentId: string | null;
+  /** 資格取得時の報酬月額に加える固定的な手当・現物給与（月額） */
+  allowances: number;
+  inKind: number;
+  filingId: string | null;
+  /** まとめて始めた入社のグループ */
+  batchId: string | null;
+  /** まとめて行う操作から外している理由（保留） */
+  hold?: { reason: string; by: string; at: Timestamp } | null;
 }
 
 export interface AuditLogDoc {

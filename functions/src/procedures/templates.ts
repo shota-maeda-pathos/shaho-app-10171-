@@ -18,6 +18,18 @@ const ACQUISITION_STEPS: StepTemplate[] = [
   { id: 'confirm', label: '完了確認', type: 'confirmation', dependsOn: ['mock_filing', 'paper_submit'], isConditional: false, condition: null },
 ];
 
+/** 入社手続き（ウィザード）。ステップ名は動詞で書く。電子申請と紙提出は画面では「提出する」1つにまとめる */
+const ONBOARDING_STEPS: StepTemplate[] = [
+  { id: 'invite', label: '本人に入力を依頼する', type: 'data_entry', dependsOn: [], isConditional: false, condition: null },
+  { id: 'register', label: '本人の入力を確かめて台帳に登録する', type: 'data_entry', dependsOn: ['invite'], isConditional: false, condition: null },
+  { id: 'contract', label: '雇用条件を入れる', type: 'data_entry', dependsOn: ['register'], isConditional: false, condition: null },
+  { id: 'filing_create', label: '等級を確かめて資格取得届を作る', type: 'document_create', dependsOn: ['contract'], isConditional: true, condition: '社会保険に加入する場合' },
+  { id: 'approval', label: '承認者が確認する', type: 'approval', dependsOn: ['filing_create'], isConditional: true, condition: '社会保険に加入する場合' },
+  { id: 'mock_filing', label: '電子申請する（模擬）', type: 'mock_filing', dependsOn: ['approval'], isConditional: true, condition: '社会保険に加入する場合' },
+  { id: 'paper_submit', label: '紙で提出して記録する', type: 'paper_submit', dependsOn: ['approval'], isConditional: true, condition: '社会保険に加入する場合' },
+  { id: 'confirm', label: '完了を確認する', type: 'confirmation', dependsOn: ['mock_filing', 'paper_submit'], isConditional: false, condition: null },
+];
+
 const LOSS_STEPS: StepTemplate[] = [
   { id: 'resign_entry', label: '退職情報入力', type: 'data_entry', dependsOn: [], isConditional: false, condition: null },
   { id: 'final_salary', label: '最終給与精算', type: 'calculation', dependsOn: [], isConditional: false, condition: null },
@@ -130,8 +142,16 @@ const PROCEDURE_TYPE_LABELS: Record<ProcedureType, string> = {
   age_event: '年齢到達手続き',
 };
 
+/** 入社手続き（ウィザード）のステップ */
+export function buildOnboardingSteps(): ProcedureStep[] {
+  return toSteps(ONBOARDING_STEPS);
+}
+
 export function buildSteps(procedureType: ProcedureType): ProcedureStep[] {
-  const templates = TEMPLATE_MAP[procedureType];
+  return toSteps(TEMPLATE_MAP[procedureType]);
+}
+
+function toSteps(templates: StepTemplate[]): ProcedureStep[] {
   return templates.map((t) => ({
     id: t.id,
     label: t.label,

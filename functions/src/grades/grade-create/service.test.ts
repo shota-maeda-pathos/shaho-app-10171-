@@ -8,6 +8,11 @@ jest.mock('../../config', () => {
   return { db: mockFirestore };
 });
 
+const mockCreateApproval = jest.fn(async () => ({ success: true, id: 'req-1' }));
+jest.mock('../../approvals/approval-request-create/service', () => ({
+  createApprovalRequest: (...args: unknown[]) => mockCreateApproval(...(args as [])),
+}));
+
 import { createGrade } from './service';
 
 describe('createGrade', () => {
@@ -20,7 +25,7 @@ describe('createGrade', () => {
     );
   });
 
-  it('等級を作成できる', async () => {
+  it('等級の手入力は承認申請になる', async () => {
     const empDoc = makeEmployeeDoc();
     mockFirestore.setDoc('companies/company-001/employees/emp-001', empDoc as any);
     mockFirestore.setDocNotExists(
@@ -38,12 +43,13 @@ describe('createGrade', () => {
         pensionGradeNumber: 20,
         pensionStandardRemuneration: 300000,
         determinationType: 'regular',
+        reason: '前の会社の資料から転記',
       },
       auth,
     );
 
-    expect(result.success).toBe(true);
-    expect(result.id).toBe('2026-09');
+    expect(result.id).toBe('req-1');
+    expect(mockCreateApproval).toHaveBeenCalledWith(expect.objectContaining({ requestType: 'grade', targetVersion: 0 }), auth);
   });
 
   it('存在しない従業員の場合はエラー', async () => {

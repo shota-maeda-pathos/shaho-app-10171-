@@ -139,3 +139,4 @@ export { procedureCancel } from './procedures/procedure-cancel/functions';
 export { seedMasterData } from './seed/seed-master/functions';
 export { seedGrades } from './seed/seed-grades/functions';
 export { migrateOfficeRoundingRule } from './migrations/rounding-rule';
+export { onboardingStart, onboardingGet, onboardingList, onboardingPreview, onboardingUpdate, onboardInviteGet, onboardInviteSubmit } from './onboarding/functions';

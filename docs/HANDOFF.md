@@ -58,6 +58,25 @@
 - 設定→事業所管理：端数処理の列（選択欄）と、「切捨て」のままの事業所への移行の案内・ボタン（まず `dryRun` で対象を表示し、確認してから実行）
 - サーバー：`officeList` が `version` を返すようにした（デプロイ済み。選択欄が使えることを画面で確認）
 
+### 段階3（入社）で作ったこと（デプロイ済み。1人分の通しを画面で確認）
+
+- サーバー `functions/src/onboarding/`：`onboardingStart`（1人・まとめて）、`onboardingGet`、`onboardingList`、`onboardingPreview`（判定と等級の試算）、`onboardingUpdate`（step＝invite／register／contract／filing／complete／hold）、本人用の `onboardInviteGet`・`onboardInviteSubmit`（ログイン不要）
+  - 手続きは `procedures`（procedureType＝acquisition）に `onboarding` フィールドを持たせ、ステップは `buildOnboardingSteps()`（invite→register→contract→filing_create→approval→mock_filing／paper_submit→confirm）
+  - 招待リンク：ランダムなトークン（14日）。`onboardInvites/{sha256}` から手続きを引く。作り直すと前のリンクは無効
+  - 雇用条件の保存で `createEmployment`（適用判定）を通す。年齢による加入の可否は `calculator/age.ts`
+  - 資格取得届はサーバーが保存済みの雇用条件から計算し直して作り、承認申請に等級（metadata.grade）を付ける。承認時に `approvalRequestApprove` が届出を承認済みにし、同時に資格取得時決定の等級を確定する。画面から metadata.grade は送れない
+  - 提出期限＝資格取得日＋5日（初日不算入）。土日祝の延長は段階7
+- 等級の手入力（`gradeCreate`・`gradeUpdate`）は承認申請に変更。標準報酬月額は等級番号から公式の等級表で決める
+- 旧 `employeeOnboard` は廃止（呼ぶと案内を返す）。`/employees/new` は `/onboarding/new` へ転送。旧 `onboard-confirm`・`onboard-complete` は削除
+- 画面：`/onboarding`（一覧・まとめて操作）、`/onboarding/new`（開始）、`/onboarding/:id`（ウィザード）、`/onboard/:token`（本人入力）。手続き詳細で入社のウィザード方式の手続きを開くとウィザードへ転送
+- 上の関数と approvalRequestApprove・approvalRequestCreate・gradeCreate・gradeUpdate・employeeOnboard はデプロイ済み
+- 画面で確認済み：テスト用の入社者「テスト 入社太郎」（本社・2026-11-01入社・社員番号 T-9001）で、招待→本人入力→台帳登録→雇用条件→届出・承認（別アカウントで承認）→模擬電子申請→完了。承認で等級（2026-11 資格取得時決定 健保22・厚年19）が作られた
+- 続けて確認済み：「テスト 一括一郎／一括二郎」（本社・2026-12-01・T-9002／T-9003）で、まとめての開始、リンクの一括コピー、保留と解除、担当者の代理入力、加入しない人（会社の特定適用事業所が未登録のため判定不能→担当者が「加入しない」と理由を残す）の完了、資格取得届の一括作成、紙の提出→受理、一括完了。等級の手入力は承認申請になり、承認後の金額は等級表どおり（入社太郎に 2027-09 の等級ができた）
+- 未確認：差し戻し後の出し直し、返戻（承認者のアカウントで差し戻しが必要）
+- 会社設定の「特定適用事業所」が未登録のため、3/4未満の人はすべて「担当者の判断が必要」になる
+- 注意：手続きの共通の更新処理（`refresh.ts`）が承認ステップの参照を届出に書き換えるため、承認申請のIDは手続きの references から引いている
+- 本番に、ユーザーが作った入社手続き「前田 翔太」（9月1日入社）が2件ある
+
 ### 本番の状態
 
 - Functions：段階1で変更した関数をデプロイ済み・稼働中。
@@ -73,7 +92,7 @@
 ## 5. 次にやるべきタスク
 
 1. **段階2の残り**：端数処理の移行の実行（設定→事業所管理の「法定のルールに移す」。本番への書き込みなのでユーザーの承認が必要）。
-2. **段階3：入社**を個人型の見本として完成させる（招待 → 本人入力 → 担当者確認 → 台帳 → 雇用条件（適用判定）→ 承認 → 資格取得時決定 → 資格取得届 → 提出。新卒一斉入社の一括開始も含める）
+2. **段階3：入社**の残りは差し戻しの確認だけ。終わったら段階4（毎月の処理）へ（招待 → 本人入力 → 担当者確認 → 台帳 → 雇用条件（適用判定）→ 承認 → 資格取得時決定 → 資格取得届 → 提出。新卒一斉入社の一括開始も含める）
    - 既知の課題：`employeeOnboard` が適用判定を通らない／`/employees/new` のルートが未定義／入社の確認画面が直接 `employeeCreate` を呼ぶ／等級の手入力（`/employees/:id/grade`）が承認を経由しない
 3. **段階4：毎月の処理**を一括型の見本にする（無給休職者の計算、徴収、大人数のバックグラウンド処理）
 4. 以降は `docs/roadmap.md` の段階5〜10。後続の課題は `docs/catalog-checklist.md` の末尾にまとめてある。

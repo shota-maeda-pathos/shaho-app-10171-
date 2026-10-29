@@ -5,7 +5,7 @@ import {
   isMonthlyPremiumExempt, isBonusPremiumExempt, exemptMonths, maternityLeavePeriod,
   coverageForMonth, lossDateFromResignation,
   acquisitionRemuneration, monthlyHoursFromWeekly, remunerationForJudgement,
-  correspondingDayNextMonth, judgeApplicability,
+  correspondingDayNextMonth, judgeApplicability, eligibilityByAge, ageReachDate,
 } from './index';
 
 describe('端数処理', () => {
@@ -246,5 +246,33 @@ describe('社会保険の適用判定', () => {
   it('非常勤役員は自動判定しない。常勤役員は通常どおり判定', () => {
     expect(judgeApplicability({ ...base, employmentType: 'executivePart' }).result).toBe('manual');
     expect(judgeApplicability({ ...base, employmentType: 'executiveFull' }).result).toBe('applicable');
+  });
+});
+
+describe('年齢による加入', () => {
+  it('年齢の到達日は誕生日の前日', () => {
+    expect(ageReachDate('1986-04-01', 40)).toBe('2026-03-31');
+    // 2/29生まれは平年の2/28に到達する
+    expect(ageReachDate('1988-02-29', 40)).toBe('2028-02-28');
+    expect(ageReachDate('1984-02-29', 41)).toBe('2025-02-28');
+  });
+
+  it('介護保険は40歳到達日から65歳到達日の前日まで', () => {
+    expect(eligibilityByAge('1986-04-02', '2026-03-31').longTermCare).toBe(false);
+    expect(eligibilityByAge('1986-04-02', '2026-04-01').longTermCare).toBe(true);
+    expect(eligibilityByAge('1961-11-02', '2026-10-31').longTermCare).toBe(true);
+    expect(eligibilityByAge('1961-11-02', '2026-11-01').longTermCare).toBe(false);
+  });
+
+  it('厚生年金は70歳到達日から、健康保険は75歳の誕生日から加入しない', () => {
+    const at70 = eligibilityByAge('1956-11-02', '2026-11-01');
+    expect(at70.pension).toBe(false);
+    expect(at70.health).toBe(true);
+    expect(eligibilityByAge('1956-11-02', '2026-10-31').pension).toBe(true);
+    expect(eligibilityByAge('1951-11-02', '2026-11-01').health).toBe(true);
+    const at75 = eligibilityByAge('1951-11-02', '2026-11-02');
+    expect(at75.health).toBe(false);
+    expect(at75.longTermCare).toBe(false);
+    expect(at75.notes).toHaveLength(2);
   });
 });
