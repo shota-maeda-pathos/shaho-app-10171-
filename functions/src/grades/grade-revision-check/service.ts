@@ -1,37 +1,21 @@
 import { db } from '../../config';
 import { AuthContext, requireOffice } from '../../middleware/auth';
-import { EmployeeDoc, SalaryDoc, GradeDoc, EmploymentDoc, GradeTableEntry } from '../../types/firestore';
+import { EmployeeDoc, SalaryDoc, GradeDoc, EmploymentDoc } from '../../types/firestore';
 import { notFound } from '../../utils/errors';
 import { findApplicableRate } from '../../utils/insurance-rate';
+import { normalizeEmployment } from '../../utils/employment';
+import {
+  addMonths, ChangeDirection, judgeGradeChange, occasionalRevisionAverage, occasionalRevisionMinDays,
+  remunerationForJudgement, resolveGradeTable, RevisionJudgement,
+} from '../../insurance/calculator';
 import { GradeRevisionCheckInput } from './schema';
-
-function addMonths(ym: string, n: number): string {
-  const [y, m] = ym.split('-').map(Number);
-  const total = y * 12 + (m - 1) + n;
-  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
-}
-
-function lookupGrade(table: GradeTableEntry[], amount: number): GradeTableEntry | null {
-  for (const entry of table) {
-    if (amount >= entry.lowerBound && amount <= entry.upperBound) {
-      return entry;
-    }
-  }
-  if (table.length > 0 && amount > table[table.length - 1].upperBound) {
-    return table[table.length - 1];
-  }
-  if (table.length > 0 && amount < table[0].lowerBound) {
-    return table[0];
-  }
-  return null;
-}
 
 export interface RevisionCheckResult {
   eligible: boolean;
   employeeId: string;
   employeeName: string;
   changeMonth: string;
-  months: { yearMonth: string; totalSalary: number; paymentBasisDays: number }[];
+  months: { yearMonth: string; totalSalary: number; paymentBasisDays: number; remuneration: number }[];
   averageSalary: number | null;
   currentHealthGrade: number | null;
   currentPensionGrade: number | null;
@@ -46,8 +30,34 @@ export interface RevisionCheckResult {
   effectiveMonth: string | null;
   reasons: string[];
   failReasons: string[];
+  /** 健保・厚年それぞれの判定（保険ごとに別々に判定する） */
+  healthEligible: boolean;
+  pensionEligible: boolean;
+  /** 自動では決められず、担当者の確認が必要 */
+  needsReview: boolean;
+  insuredCategory: string;
 }
 
+function emptyResult(base: Pick<RevisionCheckResult, 'employeeId' | 'employeeName' | 'changeMonth' | 'months' | 'averageSalary' | 'failReasons' | 'insuredCategory'>): RevisionCheckResult {
+  return {
+    ...base,
+    eligible: false,
+    currentHealthGrade: null, currentPensionGrade: null,
+    currentHealthStandardRemuneration: null, currentPensionStandardRemuneration: null,
+    newHealthGrade: null, newPensionGrade: null,
+    newHealthStandardRemuneration: null, newPensionStandardRemuneration: null,
+    healthGradeDiff: null, pensionGradeDiff: null,
+    effectiveMonth: null, reasons: [],
+    healthEligible: false, pensionEligible: false, needsReview: false,
+  };
+}
+
+/**
+ * 随時改定（産休・育休終了時改定を含む）の判定。
+ * ① 固定的賃金の変動 ② 変動月から3か月の報酬 ③ 3か月とも支払基礎日数が基準以上
+ * ④ 等級差（随時改定は2等級、終了時改定は1等級。上限・下限の特例あり） ⑤ 変動方向の一致
+ * ④⑤は健保・厚年で別々に判定する。
+ */
 export async function checkGradeRevision(
   input: GradeRevisionCheckInput,
   auth: AuthContext,
@@ -66,6 +76,7 @@ export async function checkGradeRevision(
 
   const employeeName = `${emp.lastName} ${emp.firstName}`;
   const failReasons: string[] = [];
+  const isLeaveEnd = input.revisionType === 'leaveEnd';
 
   const month1 = input.changeMonth;
   const month2 = addMonths(month1, 1);
@@ -78,7 +89,8 @@ export async function checkGradeRevision(
     )
   );
 
-  const months: { yearMonth: string; totalSalary: number; paymentBasisDays: number }[] = [];
+  // ② 3か月分の承認済み給与
+  const months: RevisionCheckResult['months'] = [];
   let allConfirmed = true;
   for (let i = 0; i < 3; i++) {
     if (!salarySnaps[i].exists) {
@@ -95,141 +107,112 @@ export async function checkGradeRevision(
       yearMonth: targetMonths[i],
       totalSalary: sal.totalSalary,
       paymentBasisDays: sal.paymentBasisDays,
+      // 判定用：現物給与を含め、遡及差額を除く
+      remuneration: remunerationForJudgement({ totalSalary: sal.totalSalary, inKind: sal.inKindAmount, retroactiveAmount: sal.retroactivePay?.amount }),
     });
   }
 
-  if (months.length < 3) {
-    return {
-      eligible: false, employeeId: input.employeeId, employeeName,
-      changeMonth: input.changeMonth, months, averageSalary: null,
-      currentHealthGrade: null, currentPensionGrade: null,
-      currentHealthStandardRemuneration: null, currentPensionStandardRemuneration: null,
-      newHealthGrade: null, newPensionGrade: null,
-      newHealthStandardRemuneration: null, newPensionStandardRemuneration: null,
-      healthGradeDiff: null, pensionGradeDiff: null,
-      effectiveMonth: null, reasons: [], failReasons,
-    };
-  }
-
-  // ③ 支払基礎日数チェック
+  // ③ 支払基礎日数：被保険者の区分で基準が変わる（一般・パート17日、短時間労働者11日）
   const empSnaps = await db.collection(`companies/${companyId}/employees/${input.employeeId}/employments`)
     .orderBy('effectiveDate', 'desc').limit(1).get();
-  const isPartTime = empSnaps.docs.length > 0 && (empSnaps.docs[0].data() as EmploymentDoc).employmentType === 'partTime';
-  const minDays = isPartTime ? 11 : 17;
+  const insuredCategory = empSnaps.empty ? 'general' : normalizeEmployment(empSnaps.docs[0].data() as EmploymentDoc).insuredCategory;
 
-  for (const m of months) {
-    if (m.paymentBasisDays < minDays) {
-      failReasons.push(`${m.yearMonth}の支払基礎日数（${m.paymentBasisDays}日）が基準（${minDays}日）未満です`);
-    }
+  if (months.length < 3) {
+    return emptyResult({ employeeId: input.employeeId, employeeName, changeMonth: input.changeMonth, months, averageSalary: null, failReasons, insuredCategory });
   }
-  const allDaysOk = months.every(m => m.paymentBasisDays >= minDays);
 
-  // 3か月平均
-  const averageSalary = Math.round(months.reduce((s, m) => s + m.totalSalary, 0) / 3);
+  const minDays = occasionalRevisionMinDays(insuredCategory);
+  const average = occasionalRevisionAverage(months, insuredCategory);
+  for (const ym of average.shortMonths) {
+    const m = months.find(x => x.yearMonth === ym)!;
+    failReasons.push(`${ym}の支払基礎日数（${m.paymentBasisDays}日）が基準（${minDays}日）未満です`);
+  }
+  // 3か月平均（円未満切捨て）。日数が足りない場合も参考として表示する
+  const averageSalary = average.average ?? Math.floor(months.reduce((sum, m) => sum + m.remuneration, 0) / 3);
 
-  // 現在の等級を取得
+  // 変動月の時点で適用されている等級
   const gradeSnaps = await db.collection(`companies/${companyId}/employees/${input.employeeId}/grades`)
+    .where('effectiveMonth', '<=', month1)
     .orderBy('effectiveMonth', 'desc').limit(1).get();
   if (gradeSnaps.empty) {
     failReasons.push('現在の等級データがありません');
-    return {
-      eligible: false, employeeId: input.employeeId, employeeName,
-      changeMonth: input.changeMonth, months, averageSalary,
-      currentHealthGrade: null, currentPensionGrade: null,
-      currentHealthStandardRemuneration: null, currentPensionStandardRemuneration: null,
-      newHealthGrade: null, newPensionGrade: null,
-      newHealthStandardRemuneration: null, newPensionStandardRemuneration: null,
-      healthGradeDiff: null, pensionGradeDiff: null,
-      effectiveMonth: null, reasons: [], failReasons,
-    };
+    return emptyResult({ employeeId: input.employeeId, employeeName, changeMonth: input.changeMonth, months, averageSalary, failReasons, insuredCategory });
   }
   const currentGrade = gradeSnaps.docs[0].data() as GradeDoc;
 
-  // 新等級を算出 — 等級表を使って平均報酬から等級を逆引き
-  const officeSnap = await db.doc(`companies/${companyId}/offices/${emp.officeId}`).get();
-  const office = officeSnap.data()!;
-  const prefectureCode = office.prefectureCode;
-
-  const healthRate = await findApplicableRate({
-    companyId, insuranceType: 'health', yearMonth: month3, prefectureCode,
-  });
-  const pensionRate = await findApplicableRate({
-    companyId, insuranceType: 'pension', yearMonth: month3,
-  });
-
-  let newHealthGrade: number | null = null;
-  let newHealthSR: number | null = null;
-  let newPensionGrade: number | null = null;
-  let newPensionSR: number | null = null;
-
-  if (healthRate?.gradeTable) {
-    const entry = lookupGrade(healthRate.gradeTable, averageSalary);
-    if (entry) {
-      newHealthGrade = entry.gradeNumber;
-      newHealthSR = entry.standardRemuneration;
-    }
-  }
-  if (pensionRate?.gradeTable) {
-    const entry = lookupGrade(pensionRate.gradeTable, averageSalary);
-    if (entry) {
-      newPensionGrade = entry.gradeNumber;
-      newPensionSR = entry.standardRemuneration;
-    }
-  }
-
-  // ④ 2等級以上の差
-  const healthDiff = newHealthGrade != null ? newHealthGrade - currentGrade.healthGradeNumber : null;
-  const pensionDiff = newPensionGrade != null ? newPensionGrade - currentGrade.pensionGradeNumber : null;
-
-  const healthGradeDiffAbs = healthDiff != null ? Math.abs(healthDiff) : 0;
-  const pensionGradeDiffAbs = pensionDiff != null ? Math.abs(pensionDiff) : 0;
-  const hasGradeDiff = healthGradeDiffAbs >= 2 || pensionGradeDiffAbs >= 2;
-
-  if (!hasGradeDiff) {
-    failReasons.push(`等級差が2等級未満です（健保: ${healthDiff ?? '?'}, 厚年: ${pensionDiff ?? '?'}）`);
-  }
-
-  // ① 固定的賃金の変動チェック — 変動月の前月と比較
-  const prevMonth = addMonths(month1, -1);
-  const prevSalSnap = await db.doc(`companies/${companyId}/employees/${input.employeeId}/salaries/${prevMonth}`).get();
+  // ① 固定的賃金の変動と方向：変動月と前月の固定的賃金を比べる（終了時改定は変動を要件としない）
   let fixedWageChanged = true;
-  let fixedWageDirection: 'up' | 'down' | 'none' = 'none';
-  if (prevSalSnap.exists) {
-    const prevSal = prevSalSnap.data()! as SalaryDoc;
+  let direction: ChangeDirection | null = null;
+  let needsReview = false;
+  if (!isLeaveEnd) {
+    const prevMonth = addMonths(month1, -1);
+    const prevSalSnap = await db.doc(`companies/${companyId}/employees/${input.employeeId}/salaries/${prevMonth}`).get();
     const curSal = salarySnaps[0].data()! as SalaryDoc;
-    const prevFixed = prevSal.totalFixedWage;
-    const curFixed = curSal.totalFixedWage;
-    if (prevFixed === curFixed) {
+    const prevFixed = prevSalSnap.exists ? (prevSalSnap.data() as SalaryDoc).totalFixedWage : curSal.previousTotalFixedWage ?? null;
+    if (prevFixed === null || prevFixed === undefined) {
+      needsReview = true;
+      failReasons.push(`${prevMonth}の給与がないため固定的賃金の変動を確認できません。変動の有無と方向を確認してください`);
+    } else if (prevFixed === curSal.totalFixedWage) {
       fixedWageChanged = false;
       failReasons.push('固定的賃金に変動がありません');
     } else {
-      fixedWageDirection = curFixed > prevFixed ? 'up' : 'down';
+      direction = curSal.totalFixedWage > prevFixed ? 'up' : 'down';
     }
   }
 
-  // ⑤ 変動方向の一致
-  const gradeDirection = (healthDiff ?? 0) > 0 || (pensionDiff ?? 0) > 0 ? 'up'
-    : (healthDiff ?? 0) < 0 || (pensionDiff ?? 0) < 0 ? 'down' : 'none';
+  // ④⑤ 健保・厚年で別々に判定する
+  const officeSnap = await db.doc(`companies/${companyId}/offices/${emp.officeId}`).get();
+  const office = officeSnap.data() ?? {};
+  const healthRate = await findApplicableRate({
+    companyId, insuranceType: 'health', yearMonth: month3, prefectureCode: office.prefectureCode, insurerId: office.insurerId,
+  });
+  const pensionRate = await findApplicableRate({ companyId, insuranceType: 'pension', yearMonth: month3 });
 
-  let directionMatch = true;
-  if (fixedWageDirection !== 'none' && gradeDirection !== 'none' && fixedWageDirection !== gradeDirection) {
-    directionMatch = false;
-    failReasons.push(`固定的賃金の変動方向（${fixedWageDirection === 'up' ? '昇給' : '減給'}）と等級の変動方向（${gradeDirection === 'up' ? '上昇' : '低下'}）が一致しません`);
+  const judge = (kind: 'health' | 'pension'): RevisionJudgement => {
+    const currentStandard = kind === 'health' ? currentGrade.healthStandardRemuneration : currentGrade.pensionStandardRemuneration;
+    return judgeGradeChange({
+      kind,
+      table: resolveGradeTable(kind, (kind === 'health' ? healthRate : pensionRate)?.gradeTable),
+      currentStandard,
+      averageRemuneration: averageSalary,
+      // 終了時改定・方向不明の場合は、等級の動きの向きで等級差だけを判定する
+      direction: direction ?? (averageSalary >= currentStandard ? 'up' : 'down'),
+      minDiff: isLeaveEnd ? 1 : 2,
+      previousRemuneration: null,
+    });
+  };
+  const health = judge('health');
+  const pension = judge('pension');
+  if (health.needsReview || pension.needsReview) needsReview = true;
+
+  const prerequisites = allConfirmed && average.allMonthsQualified && fixedWageChanged && (isLeaveEnd || direction !== null);
+  const healthEligible = prerequisites && health.eligible;
+  const pensionEligible = prerequisites && pension.eligible;
+  const eligible = healthEligible || pensionEligible;
+  // どちらかの保険で改定対象なら、もう一方の「等級差不足」は失敗理由に含めない
+  for (const j of [health, pension]) {
+    if (!j.eligible && !(eligible && j.reason.includes('等級差'))) failReasons.push(j.reason);
   }
 
-  const eligible = allConfirmed && allDaysOk && hasGradeDiff && fixedWageChanged && directionMatch;
+  const healthDiff = health.newGrade.gradeNumber - currentGrade.healthGradeNumber;
+  const pensionDiff = pension.newGrade.gradeNumber - currentGrade.pensionGradeNumber;
 
+  // 変動月から4か月目に新等級を適用する
   const effectiveMonth = addMonths(month1, 3);
 
   const reasons: string[] = [];
   if (eligible) {
     reasons.push(`変動月${month1}から3か月の平均報酬: ${averageSalary.toLocaleString()}円`);
-    if (healthDiff != null) reasons.push(`健保等級: ${currentGrade.healthGradeNumber} → ${newHealthGrade} (${healthDiff > 0 ? '+' : ''}${healthDiff})`);
-    if (pensionDiff != null) reasons.push(`厚年等級: ${currentGrade.pensionGradeNumber} → ${newPensionGrade} (${pensionDiff > 0 ? '+' : ''}${pensionDiff})`);
+    reasons.push(healthEligible
+      ? `健保等級: ${currentGrade.healthGradeNumber} → ${health.newGrade.gradeNumber} (${healthDiff > 0 ? '+' : ''}${healthDiff})`
+      : `健保等級: ${currentGrade.healthGradeNumber}（改定なし）`);
+    reasons.push(pensionEligible
+      ? `厚年等級: ${currentGrade.pensionGradeNumber} → ${pension.newGrade.gradeNumber} (${pensionDiff > 0 ? '+' : ''}${pensionDiff})`
+      : `厚年等級: ${currentGrade.pensionGradeNumber}（改定なし）`);
     reasons.push(`新等級適用月: ${effectiveMonth}`);
   }
 
-  if (eligible) {
+  if (eligible && !isLeaveEnd) {
     const { createSimpleProcedure } = await import('../../procedures/hooks');
     const existingProcs = await db
       .collection(`companies/${companyId}/procedures`)
@@ -264,14 +247,19 @@ export async function checkGradeRevision(
     currentPensionGrade: currentGrade.pensionGradeNumber,
     currentHealthStandardRemuneration: currentGrade.healthStandardRemuneration,
     currentPensionStandardRemuneration: currentGrade.pensionStandardRemuneration,
-    newHealthGrade,
-    newPensionGrade,
-    newHealthStandardRemuneration: newHealthSR,
-    newPensionStandardRemuneration: newPensionSR,
+    // 改定対象でない保険は現在の等級のまま
+    newHealthGrade: healthEligible ? health.newGrade.gradeNumber : currentGrade.healthGradeNumber,
+    newPensionGrade: pensionEligible ? pension.newGrade.gradeNumber : currentGrade.pensionGradeNumber,
+    newHealthStandardRemuneration: healthEligible ? health.newGrade.standardRemuneration : currentGrade.healthStandardRemuneration,
+    newPensionStandardRemuneration: pensionEligible ? pension.newGrade.standardRemuneration : currentGrade.pensionStandardRemuneration,
     healthGradeDiff: healthDiff,
     pensionGradeDiff: pensionDiff,
     effectiveMonth: eligible ? effectiveMonth : null,
     reasons,
     failReasons,
+    healthEligible,
+    pensionEligible,
+    needsReview,
+    insuredCategory,
   };
 }

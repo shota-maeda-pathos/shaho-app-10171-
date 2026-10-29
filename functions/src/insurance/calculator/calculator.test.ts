@@ -5,7 +5,7 @@ import {
   isMonthlyPremiumExempt, isBonusPremiumExempt, exemptMonths, maternityLeavePeriod,
   coverageForMonth, lossDateFromResignation,
   acquisitionRemuneration, monthlyHoursFromWeekly, remunerationForJudgement,
-  correspondingDayNextMonth,
+  correspondingDayNextMonth, judgeApplicability,
 } from './index';
 
 describe('端数処理', () => {
@@ -210,5 +210,41 @@ describe('報酬月額', () => {
 
   it('判定用の報酬月額は現物を含み遡及差額を除く', () => {
     expect(remunerationForJudgement({ totalSalary: 320_000, inKind: 20_000, retroactiveAmount: 30_000 })).toBe(310_000);
+  });
+});
+
+describe('社会保険の適用判定', () => {
+  const base = {
+    employmentType: 'regular' as const, weeklyHours: 40, monthlyDays: 21, fullTimeWeeklyHours: 40, fullTimeMonthlyDays: 21,
+    isSpecificApplicableOffice: true, contractType: 'indefinite' as const, renewalExpected: false, isStudent: false,
+  };
+
+  it('3/4基準：時間と日数がともに3/4以上なら適用（ちょうど3/4を含む）', () => {
+    expect(judgeApplicability({ ...base, employmentType: 'partTime', weeklyHours: 30, monthlyDays: 15 })).toMatchObject({ result: 'applicable', applicabilityReason: 'specificShortTime' });
+    expect(judgeApplicability({ ...base, employmentType: 'partTime', weeklyHours: 30, monthlyDays: 15.75 })).toMatchObject({ result: 'applicable', applicabilityReason: 'standard', insuredCategory: 'partTimer' });
+    expect(judgeApplicability(base)).toMatchObject({ result: 'applicable', insuredCategory: 'general' });
+  });
+
+  it('特定適用事業所の短時間労働者：週20時間以上・学生でない', () => {
+    expect(judgeApplicability({ ...base, employmentType: 'partTime', weeklyHours: 20, monthlyDays: 12 })).toMatchObject({ result: 'applicable', insuredCategory: 'shortTime' });
+    expect(judgeApplicability({ ...base, employmentType: 'partTime', weeklyHours: 19.5, monthlyDays: 12 }).result).toBe('notApplicable');
+    expect(judgeApplicability({ ...base, employmentType: 'arbeit', weeklyHours: 20, monthlyDays: 12, isStudent: true }).result).toBe('notApplicable');
+  });
+
+  it('特定適用事業所でなければ3/4未満は適用外。未登録なら担当者判断', () => {
+    expect(judgeApplicability({ ...base, employmentType: 'partTime', weeklyHours: 20, monthlyDays: 12, isSpecificApplicableOffice: false }).result).toBe('notApplicable');
+    expect(judgeApplicability({ ...base, employmentType: 'partTime', weeklyHours: 20, monthlyDays: 12, isSpecificApplicableOffice: null }).result).toBe('manual');
+  });
+
+  it('2か月以内の有期契約で更新見込みがなければ適用外', () => {
+    const fixed = { ...base, contractType: 'fixed' as const, contractStartDate: '2026-10-01' };
+    expect(judgeApplicability({ ...fixed, contractEndDate: '2026-11-30' }).result).toBe('notApplicable');
+    expect(judgeApplicability({ ...fixed, contractEndDate: '2026-12-01' }).result).toBe('applicable');
+    expect(judgeApplicability({ ...fixed, contractEndDate: '2026-11-30', renewalExpected: true }).result).toBe('applicable');
+  });
+
+  it('非常勤役員は自動判定しない。常勤役員は通常どおり判定', () => {
+    expect(judgeApplicability({ ...base, employmentType: 'executivePart' }).result).toBe('manual');
+    expect(judgeApplicability({ ...base, employmentType: 'executiveFull' }).result).toBe('applicable');
   });
 });
