@@ -90,6 +90,8 @@ export async function updateSalary(
       updatedAt: now,
       version: current.version + 1,
     };
+    if (input.inKindAmount !== undefined) updateData.inKindAmount = input.inKindAmount;
+    if (input.retroactivePay !== undefined) updateData.retroactivePay = input.retroactivePay;
     if (revisionFlag) {
       updateData.revisionFlag = true;
       updateData.revisionDetectedAt = now;

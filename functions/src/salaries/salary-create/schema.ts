@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SalaryExtraFields } from '../../types/catalog-schemas';
 
 export const SalaryCreateSchema = z.object({
   companyId: z.string(),
@@ -8,6 +9,7 @@ export const SalaryCreateSchema = z.object({
   baseSalary: z.number().int().min(0),
   fixedAllowances: z.record(z.string(), z.number().int().min(0)).optional(),
   variableAllowances: z.record(z.string(), z.number().int().min(0)).optional(),
+  ...SalaryExtraFields,
 });
 
 export type SalaryCreateInput = z.infer<typeof SalaryCreateSchema>;

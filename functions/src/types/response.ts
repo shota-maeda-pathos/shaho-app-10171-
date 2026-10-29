@@ -50,7 +50,7 @@ export interface OfficeResponse {
   paymentDay: number;
   paymentMonth: 'current' | 'next';
   deductionMethod: 'current' | 'previous';
-  roundingRule: 'truncate' | 'round' | 'ceil';
+  roundingRule: 'statutory' | 'truncate' | 'round' | 'ceil';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -87,7 +87,7 @@ export interface EmploymentResponse {
   id: string;
   employeeId: string;
   effectiveDate: string;
-  employmentType: 'regular' | 'partTime' | 'contract';
+  employmentType: import('./firestore').EmploymentType;
   weeklyHours: number;
   monthlyDays: number;
   baseSalary: number;

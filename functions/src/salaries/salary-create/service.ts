@@ -56,6 +56,8 @@ export async function createSalary(
       totalFixedWage,
       totalVariableWage,
       totalSalary,
+      inKindAmount: input.inKindAmount ?? 0,
+      retroactivePay: input.retroactivePay ?? null,
       isConfirmed: false,
       confirmedAt: null,
       confirmedBy: null,

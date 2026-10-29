@@ -1,3 +1,4 @@
+import { OFFICE_EXTRA_KEYS } from '../../types/catalog-schemas';
 import { Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { db } from '../../config';
@@ -34,6 +35,7 @@ export async function updateOffice(
       'name', 'officeNumber', 'prefectureCode', 'insurerId',
       'address', 'phone', 'closingDay', 'paymentDay',
       'paymentMonth', 'deductionMethod', 'roundingRule',
+      ...OFFICE_EXTRA_KEYS,
     ] as const;
 
     for (const f of fields) {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { OfficeExtraFields, RoundingRuleSchema } from '../../types/catalog-schemas';
 
 export const OfficeCreateSchema = z.object({
   companyId: z.string().min(1),
@@ -12,7 +13,8 @@ export const OfficeCreateSchema = z.object({
   paymentDay: z.number().int().min(1).max(31).optional(),
   paymentMonth: z.enum(['current', 'next']).optional(),
   deductionMethod: z.enum(['current', 'previous']).optional(),
-  roundingRule: z.enum(['truncate', 'round', 'ceil']).optional(),
+  roundingRule: RoundingRuleSchema.optional(),
+  ...OfficeExtraFields,
 });
 
 export type OfficeCreateInput = z.infer<typeof OfficeCreateSchema>;

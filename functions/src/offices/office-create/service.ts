@@ -1,3 +1,4 @@
+import { OFFICE_EXTRA_KEYS, pickDefined } from '../../types/catalog-schemas';
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '../../config';
 import { AuthContext } from '../../middleware/auth';
@@ -20,8 +21,10 @@ export async function createOffice(
     closingDay: input.closingDay ?? 25,
     paymentDay: input.paymentDay ?? 25,
     paymentMonth: input.paymentMonth ?? 'next',
-    deductionMethod: input.deductionMethod ?? 'current',
-    roundingRule: input.roundingRule ?? 'truncate',
+    // カタログの既定：翌月控除・50銭ルール
+    deductionMethod: input.deductionMethod ?? 'previous',
+    roundingRule: input.roundingRule ?? 'statutory',
+    ...pickDefined(input, OFFICE_EXTRA_KEYS),
     isActive: true,
     version: 1,
     createdAt: Timestamp.now(),

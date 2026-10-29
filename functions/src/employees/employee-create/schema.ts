@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { EmployeeProfileFields } from '../../types/catalog-schemas';
 
 export const EmployeeCreateSchema = z.object({
   companyId: z.string(),
@@ -13,6 +14,7 @@ export const EmployeeCreateSchema = z.object({
   departmentId: z.string().nullable().optional(),
   hireDate: z.string().min(1),
   requestId: z.string().uuid().optional(),
+  ...EmployeeProfileFields,
 });
 
 export type EmployeeCreateInput = z.output<typeof EmployeeCreateSchema>;

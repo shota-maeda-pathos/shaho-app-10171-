@@ -11,29 +11,12 @@ import { notFound, invalidArg } from '../../utils/errors';
 import { isLongTermCareAge, isPensionExcluded, isHealthExcluded } from '../../utils/age';
 import { findAllRates } from '../../utils/insurance-rate';
 import { calculateChildSupportPayment } from '../../utils/child-support-payment';
+import { decideExemption } from '../../utils/exemption-period';
+import { employerOnlyPremium, normalizeRoundingRule, splitPremium } from '../calculator';
 import { BonusInsuranceCalculateInput } from './schema';
 
 const HEALTH_BONUS_CAP = 5_730_000;
 const PENSION_BONUS_CAP = 1_500_000;
-
-function calcPremium(
-  cappedAmount: number,
-  employeeRate: number,
-  employerRate: number,
-  roundingRule: 'truncate' | 'round' | 'ceil',
-): InsurancePremiumBreakdown {
-  const roundFn =
-    roundingRule === 'truncate'
-      ? Math.floor
-      : roundingRule === 'ceil'
-        ? Math.ceil
-        : Math.round;
-
-  return {
-    employeeAmount: roundFn((cappedAmount * employeeRate) / 1000),
-    employerAmount: roundFn((cappedAmount * employerRate) / 1000),
-  };
-}
 
 function capToThousand(amount: number, cap: number): number {
   const capped = Math.min(amount, cap);
@@ -78,7 +61,7 @@ export async function calculateBonusInsurance(
     );
     if (!officeSnap.exists) throw notFound('事業所');
     const office = officeSnap.data()! as OfficeDoc;
-    const roundingRule = office.roundingRule ?? 'truncate';
+    const roundingRule = normalizeRoundingRule(office.roundingRule);
 
     // 年齢判定
     const healthExcl = isHealthExcluded(employee.birthDate, input.yearMonth);
@@ -96,17 +79,9 @@ export async function calculateBonusInsurance(
     if (!healthExcl && !rates.health) throw invalidArg('健康保険料率が設定されていません');
     if (!pensionExcl && !rates.pension) throw invalidArg('厚生年金保険料率が設定されていません');
 
-    // 免除判定
-    const exemptionsSnap = await tx.get(db
-      .collection(`companies/${auth.companyId}/employees/${input.employeeId}/premiumExemptions`)
-      .where('startMonth', '<=', input.yearMonth));
-    const applicableExemptions = exemptionsSnap.docs.filter(doc => {
-      const d = doc.data();
-      return d.status === 'active' && d.deletedAt == null && d.approvedAt != null
-        && d.isBonusExempted === true && ['maternity', 'childcare'].includes(d.exemptionType)
-        && (!d.endMonth || input.yearMonth <= d.endMonth);
-    });
-    const isExempted = applicableExemptions.length > 0;
+    // 免除判定（産休：支給月の末日が休業中。育休：さらに休業期間が1か月超）
+    const exemption = await decideExemption(tx, auth.companyId, input.employeeId, input.yearMonth, 'bonus');
+    const isExempted = exemption.exempt;
     if (input.isExempted !== undefined && input.isExempted !== isExempted) {
       throw invalidArg('賞与免除の指定が承認済みの免除期間と一致しません。免除登録を確認してください');
     }
@@ -117,20 +92,20 @@ export async function calculateBonusInsurance(
     // 健康保険
     const healthInsurance = (healthExcl || isExempted || !rates.health)
       ? ZERO
-      : calcPremium(healthCappedAmount, rates.health.employeeRate, rates.health.employerRate, roundingRule);
+      : splitPremium(healthCappedAmount, rates.health.employeeRate, rates.health.employerRate, roundingRule, rates.health.totalRate);
 
     // 介護保険: 年齢自動判定
     let longTermCareInsurance: InsurancePremiumBreakdown | null = null;
     if (ltcAge && !healthExcl && rates.longTermCare) {
       longTermCareInsurance = isExempted
         ? ZERO
-        : calcPremium(healthCappedAmount, rates.longTermCare.employeeRate, rates.longTermCare.employerRate, roundingRule);
+        : splitPremium(healthCappedAmount, rates.longTermCare.employeeRate, rates.longTermCare.employerRate, roundingRule, rates.longTermCare.totalRate);
     }
 
     // 厚生年金
     const pensionInsurance = (pensionExcl || isExempted || !rates.pension)
       ? ZERO
-      : calcPremium(pensionCappedAmount, rates.pension.employeeRate, rates.pension.employerRate, roundingRule);
+      : splitPremium(pensionCappedAmount, rates.pension.employeeRate, rates.pension.employerRate, roundingRule, rates.pension.totalRate);
 
     const childSupportPayment = calculateChildSupportPayment(
       healthCappedAmount, input.yearMonth, healthExcl || isExempted,
@@ -142,12 +117,7 @@ export async function calculateBonusInsurance(
     if (!rates.childSupport || isExempted || pensionExcl) {
       childSupportContribution = ZERO;
     } else {
-      childSupportContribution = calcPremium(
-        pensionCappedAmount,
-        0,
-        rates.childSupport.employerRate,
-        roundingRule,
-      );
+      childSupportContribution = employerOnlyPremium(pensionCappedAmount, rates.childSupport.employerRate);
     }
 
     const totalEmployeeAmount =
@@ -193,7 +163,7 @@ export async function calculateBonusInsurance(
       isHealthExcluded: healthExcl,
       isPensionExcluded: pensionExcl,
       isLongTermCareApplicable: ltcAge,
-      exemptionIds: applicableExemptions.map(doc => doc.id),
+      exemptionIds: exemption.exemptionIds,
       isConfirmed: false,
       approvalPending: false,
       version,

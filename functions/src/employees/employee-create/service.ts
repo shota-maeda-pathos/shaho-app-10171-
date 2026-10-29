@@ -5,6 +5,7 @@ import { alreadyExists, invalidArg } from '../../utils/errors';
 import { toTimestamp } from '../../utils/firestore';
 import { MutationResponse } from '../../types/response';
 import { EmployeeCreateInput } from './schema';
+import { pickProfile } from '../../types/catalog-schemas';
 
 export async function createEmployee(
   input: EmployeeCreateInput,
@@ -63,6 +64,7 @@ export async function createEmployee(
       resignationDate: null,
       userId: null,
       isActive: true,
+      ...pickProfile(input),
       version: 1,
       deletedAt: null,
       createdAt: now,

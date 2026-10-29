@@ -7,6 +7,7 @@ import { MutationResponse } from '../../types/response';
 import { notFound } from '../../utils/errors';
 import { toTimestamp } from '../../utils/firestore';
 import { EmployeeUpdateInput } from './schema';
+import { EMPLOYEE_PROFILE_KEYS } from '../../types/catalog-schemas';
 
 const MUTABLE_FIELDS = [
   'lastName',
@@ -15,6 +16,7 @@ const MUTABLE_FIELDS = [
   'firstNameKana',
   'gender',
   'departmentId',
+  ...EMPLOYEE_PROFILE_KEYS,
 ] as const;
 
 const DATE_FIELDS = ['birthDate', 'hireDate'] as const;

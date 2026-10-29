@@ -6,4 +6,5 @@ export * from './payment-basis';
 export * from './exemption';
 export * from './coverage';
 export * from './remuneration';
+export * from './applicability';
 export * from './dates';

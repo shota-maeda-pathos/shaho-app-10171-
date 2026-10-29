@@ -1,6 +1,9 @@
 import { db } from '../../config';
 import { AuthContext } from '../../middleware/auth';
-import { InsuranceRateDoc, GradeTableEntry, OfficeDoc } from '../../types/firestore';
+import { OfficeDoc } from '../../types/firestore';
+import { findAllRates } from '../../utils/insurance-rate';
+import { calculateChildSupportPayment } from '../../utils/child-support-payment';
+import { employerOnlyPremium, lookupGrade, normalizeRoundingRule, resolveGradeTable, splitPremium } from '../../insurance/calculator';
 import { notFound } from '../../utils/errors';
 import { PremiumSimulateInput } from './schema';
 
@@ -20,22 +23,11 @@ export interface PremiumSimulateResponse {
   longTermCare: SimulationBreakdown | null;
   pension: SimulationBreakdown | null;
   childSupport: { rate: number; employerAmount: number };
+  /** 子ども・子育て支援金（2026年4月分から） */
+  childSupportPayment: { employeeAmount: number; employerAmount: number };
   totalEmployee: number;
   totalEmployer: number;
   totalCompany: number;
-}
-
-function findGrade(table: GradeTableEntry[], remuneration: number): GradeTableEntry {
-  for (const entry of table) {
-    if (remuneration >= entry.lowerBound && remuneration < entry.upperBound) return entry;
-  }
-  return table[table.length - 1];
-}
-
-function roundPremium(amount: number, rule: string): number {
-  if (rule === 'truncate') return Math.floor(amount);
-  if (rule === 'ceil') return Math.ceil(amount);
-  return Math.round(amount);
 }
 
 export async function simulatePremium(
@@ -50,63 +42,50 @@ export async function simulatePremium(
   if (!officeSnap.exists) throw notFound('事業所');
   const office = officeSnap.data()! as OfficeDoc;
 
-  const ratesSnap = await db
-    .collection(`${base}/insuranceRates`)
-    .where('insurerId', '==', office.insurerId)
-    .where('appliedFrom', '<=', ym)
-    .get();
+  // 本処理と同じ料率検索・等級表・端数処理を使う
+  const rates = await findAllRates(auth.companyId, ym, office.prefectureCode, office.insurerId);
+  const healthRate = rates.health;
+  const pensionRate = rates.pension;
+  const longTermCareRate = rates.longTermCare;
+  const childSupportRate = rates.childSupport;
+  const rule = normalizeRoundingRule(office.roundingRule);
 
-  const activeRates = ratesSnap.docs
-    .map((d) => d.data() as InsuranceRateDoc)
-    .filter((r) => !r.appliedUntil || r.appliedUntil >= ym);
+  if (!healthRate) throw notFound('健康保険料率');
 
-  const findRate = (type: string) => activeRates.find((r) => r.insuranceType === type);
-
-  const healthRate = findRate('health');
-  const pensionRate = findRate('pension');
-  const longTermCareRate = findRate('longTermCare');
-  const childSupportRate = findRate('childSupport');
-  const rule = office.roundingRule;
-
-  if (!healthRate?.gradeTable) throw notFound('健康保険料率');
-
-  const healthGrade = findGrade(healthRate.gradeTable, input.monthlyRemuneration);
-  const healthEmployee = roundPremium(healthGrade.standardRemuneration * healthRate.employeeRate / 1000, rule);
-  const healthEmployer = roundPremium(healthGrade.standardRemuneration * healthRate.employerRate / 1000, rule);
+  const healthGrade = lookupGrade(resolveGradeTable('health', healthRate.gradeTable), input.monthlyRemuneration);
+  const health = splitPremium(healthGrade.standardRemuneration, healthRate.employeeRate, healthRate.employerRate, rule, healthRate.totalRate);
+  const healthEmployee = health.employeeAmount;
+  const healthEmployer = health.employerAmount;
 
   let longTermCare: SimulationBreakdown | null = null;
   if (input.age >= 40 && input.age < 65 && longTermCareRate) {
-    const ltcEmployee = roundPremium(healthGrade.standardRemuneration * longTermCareRate.employeeRate / 1000, rule);
-    const ltcEmployer = roundPremium(healthGrade.standardRemuneration * longTermCareRate.employerRate / 1000, rule);
+    const ltc = splitPremium(healthGrade.standardRemuneration, longTermCareRate.employeeRate, longTermCareRate.employerRate, rule, longTermCareRate.totalRate);
     longTermCare = {
       gradeNumber: healthGrade.gradeNumber,
       standardRemuneration: healthGrade.standardRemuneration,
       rate: longTermCareRate.totalRate,
-      employeeAmount: ltcEmployee,
-      employerAmount: ltcEmployer,
+      ...ltc,
     };
   }
 
   let pension: SimulationBreakdown | null = null;
-  if (input.age < 70 && pensionRate?.gradeTable) {
-    const pensionGrade = findGrade(pensionRate.gradeTable, input.monthlyRemuneration);
-    const penEmployee = roundPremium(pensionGrade.standardRemuneration * pensionRate.employeeRate / 1000, rule);
-    const penEmployer = roundPremium(pensionGrade.standardRemuneration * pensionRate.employerRate / 1000, rule);
+  if (input.age < 70 && pensionRate) {
+    const pensionGrade = lookupGrade(resolveGradeTable('pension', pensionRate.gradeTable), input.monthlyRemuneration);
     pension = {
       gradeNumber: pensionGrade.gradeNumber,
       standardRemuneration: pensionGrade.standardRemuneration,
       rate: pensionRate.totalRate,
-      employeeAmount: penEmployee,
-      employerAmount: penEmployer,
+      ...splitPremium(pensionGrade.standardRemuneration, pensionRate.employeeRate, pensionRate.employerRate, rule, pensionRate.totalRate),
     };
   }
 
-  const childEmployer = childSupportRate
-    ? roundPremium((pension?.standardRemuneration ?? 0) * childSupportRate.employerRate / 1000, rule)
+  const support = calculateChildSupportPayment(healthGrade.standardRemuneration, ym, input.age >= 75, rule, rates.childSupportPayment);
+  const childEmployer = childSupportRate && pension
+    ? employerOnlyPremium(pension.standardRemuneration, childSupportRate.employerRate).employerAmount
     : 0;
 
-  const totalEmployee = healthEmployee + (longTermCare?.employeeAmount ?? 0) + (pension?.employeeAmount ?? 0);
-  const totalEmployer = healthEmployer + (longTermCare?.employerAmount ?? 0) + (pension?.employerAmount ?? 0) + childEmployer;
+  const totalEmployee = healthEmployee + (longTermCare?.employeeAmount ?? 0) + (pension?.employeeAmount ?? 0) + support.employeeAmount;
+  const totalEmployer = healthEmployer + (longTermCare?.employerAmount ?? 0) + (pension?.employerAmount ?? 0) + childEmployer + support.employerAmount;
 
   return {
     yearMonth: ym,
@@ -122,6 +101,7 @@ export async function simulatePremium(
     longTermCare,
     pension,
     childSupport: { rate: childSupportRate?.totalRate ?? 0, employerAmount: childEmployer },
+    childSupportPayment: support,
     totalEmployee,
     totalEmployer,
     totalCompany: totalEmployee + totalEmployer,

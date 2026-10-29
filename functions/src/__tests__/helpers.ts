@@ -91,7 +91,7 @@ export function makeOfficeDoc(
     paymentDay: 25,
     paymentMonth: 'current',
     deductionMethod: 'current',
-    roundingRule: 'truncate',
+    roundingRule: 'statutory',
     isActive: true,
     version: 1,
     createdAt: now,
@@ -263,18 +263,86 @@ export function makeFilingDoc(
 }
 
 type TxOp = { type: 'set' | 'update'; ref: string; data: Record<string, unknown> };
+type DocEntry = { exists: boolean; data: Record<string, unknown> | undefined };
+type Filter = { field: string; op: string; value: unknown };
+
+function compare(a: unknown, b: unknown): number {
+  if (a === b) return 0;
+  if (a === null || a === undefined) return -1;
+  if (b === null || b === undefined) return 1;
+  return (a as number | string) < (b as number | string) ? -1 : 1;
+}
+
+function matches(data: Record<string, unknown>, f: Filter): boolean {
+  const v = data[f.field] ?? null;
+  switch (f.op) {
+    case '==': return v === f.value;
+    case '!=': return v !== f.value;
+    case '<': return v !== null && compare(v, f.value) < 0;
+    case '<=': return v !== null && compare(v, f.value) <= 0;
+    case '>': return v !== null && compare(v, f.value) > 0;
+    case '>=': return v !== null && compare(v, f.value) >= 0;
+    case 'in': return (f.value as unknown[]).includes(v);
+    case 'array-contains': return Array.isArray(v) && v.includes(f.value);
+    default: throw new Error(`MockFirestore: unsupported operator ${f.op}`);
+  }
+}
+
+/** コレクション直下の文書に対するクエリ（where / orderBy / limit）の簡易実装 */
+export class MockQuery {
+  constructor(
+    readonly path: string,
+    private store: Map<string, DocEntry>,
+    private filters: Filter[] = [],
+    private orders: { field: string; dir: 'asc' | 'desc' }[] = [],
+    private max: number | null = null,
+  ) {}
+
+  where(field: string, op: string, value: unknown) {
+    return new MockQuery(this.path, this.store, [...this.filters, { field, op, value }], this.orders, this.max);
+  }
+
+  orderBy(field: string, dir: 'asc' | 'desc' = 'asc') {
+    return new MockQuery(this.path, this.store, this.filters, [...this.orders, { field, dir }], this.max);
+  }
+
+  limit(n: number) {
+    return new MockQuery(this.path, this.store, this.filters, this.orders, n);
+  }
+
+  async get() {
+    const prefix = `${this.path}/`;
+    let rows = [...this.store.entries()]
+      .filter(([p, e]) => e.exists && p.startsWith(prefix) && !p.slice(prefix.length).includes('/'))
+      .map(([p, e]) => ({ path: p, data: e.data ?? {} }))
+      .filter(r => this.filters.every(f => matches(r.data, f)));
+    for (const o of [...this.orders].reverse()) {
+      rows = [...rows].sort((a, b) => compare(a.data[o.field], b.data[o.field]) * (o.dir === 'desc' ? -1 : 1));
+    }
+    if (this.max !== null) rows = rows.slice(0, this.max);
+    const docs = rows.map(r => ({ id: r.path.split('/').pop()!, ref: { path: r.path }, exists: true, data: () => r.data }));
+    return { empty: docs.length === 0, size: docs.length, docs };
+  }
+
+  count() {
+    return { get: async () => { const snap = await this.get(); return { data: () => ({ count: snap.size }) }; } };
+  }
+}
 
 export class MockTransaction {
   ops: TxOp[] = [];
-  private docs: Map<string, { exists: boolean; data: Record<string, unknown> | undefined }>;
+  private docs: Map<string, DocEntry>;
 
-  constructor(
-    docs: Map<string, { exists: boolean; data: Record<string, unknown> | undefined }>,
-  ) {
+  constructor(docs: Map<string, DocEntry>) {
     this.docs = docs;
   }
 
-  async get(ref: { path: string }) {
+  async get(ref: { path: string } | MockQuery) {
+    // Firestore のトランザクションは、書き込みの後に読み取ると失敗する
+    if (this.ops.length > 0) {
+      throw new Error('Firestore transactions require all reads to be executed before all writes.');
+    }
+    if (ref instanceof MockQuery) return ref.get();
     const entry = this.docs.get(ref.path);
     return {
       exists: entry?.exists ?? false,
@@ -290,12 +358,21 @@ export class MockTransaction {
   update(ref: { path: string }, data: Record<string, unknown>) {
     this.ops.push({ type: 'update', ref: ref.path, data });
   }
+
+  create(ref: { path: string }, data: Record<string, unknown>) {
+    this.ops.push({ type: 'set', ref: ref.path, data });
+  }
+
+  delete(ref: { path: string }) {
+    this.ops.push({ type: 'update', ref: ref.path, data: { __deleted: true } });
+  }
 }
 
 export class MockFirestore {
-  private docs: Map<string, { exists: boolean; data: Record<string, unknown> | undefined }> =
-    new Map();
+  private docs: Map<string, DocEntry> = new Map();
   private autoIdCounter = 0;
+  /** 最後に実行したトランザクション（書き込み内容の検証用） */
+  lastTransaction: MockTransaction | null = null;
 
   setDoc(path: string, data: Record<string, unknown>) {
     this.docs.set(path, { exists: true, data });
@@ -317,22 +394,28 @@ export class MockFirestore {
           id: path.split('/').pop()!,
         };
       },
+      set: async (data: Record<string, unknown>) => { this.docs.set(path, { exists: true, data }); },
+      update: async (data: Record<string, unknown>) => {
+        const entry = this.docs.get(path);
+        this.docs.set(path, { exists: true, data: { ...(entry?.data ?? {}), ...data } });
+      },
     };
   }
 
   collection(path: string) {
-    return {
-      path,
+    const query = new MockQuery(path, this.docs);
+    return Object.assign(query, {
       doc: (id?: string) => {
         const docId = id ?? `auto-${++this.autoIdCounter}`;
         const fullPath = `${path}/${docId}`;
         return this.doc(fullPath);
       },
-    };
+    });
   }
 
   async runTransaction<T>(fn: (tx: MockTransaction) => Promise<T>): Promise<T> {
     const tx = new MockTransaction(this.docs);
+    this.lastTransaction = tx;
     const result = await fn(tx);
     return result;
   }

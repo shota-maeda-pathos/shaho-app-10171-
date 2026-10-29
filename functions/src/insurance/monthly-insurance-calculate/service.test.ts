@@ -6,6 +6,9 @@ const mockTxUpdate = jest.fn();
 let exemptions: any[] = [];
 let confirmed = false;
 let pending = false;
+let employments: any[] = [];
+let leaves: Record<string, any> = {};
+let employee: any = null;
 
 const mockQueryGet = jest.fn();
 const buildQuery = (path = ""): any => {
@@ -85,6 +88,9 @@ describe('calculateMonthlyInsurance', () => {
     exemptions = [];
     confirmed = false;
     pending = false;
+    employments = [];
+    leaves = {};
+    employee = empDoc;
 
     mockFindAllRates.mockResolvedValue({
       health: healthRate,
@@ -95,11 +101,18 @@ describe('calculateMonthlyInsurance', () => {
 
     mockTxGet.mockImplementation(async (ref: any) => {
       if (ref.path.includes('/salaries/')) return { exists: true, data: () => ({ isConfirmed: true }) };
+      if (ref.path.endsWith('/employments')) {
+        return { empty: employments.length === 0, docs: employments.map((d, i) => ({ id: `employment-${i}`, data: () => d })) };
+      }
+      if (ref.path.includes('/leaves/')) {
+        const leave = leaves[ref.path.split('/').pop()];
+        return { exists: !!leave, data: () => leave };
+      }
       if (ref.path.endsWith('/premiumExemptions')) {
         return { docs: exemptions.map((d, i) => ({ id: `exemption-${i}`, data: () => d })) };
       }
       if (ref.path.includes('/employees/') && !ref.path.includes('/monthlyInsurance/')) {
-        return { exists: true, data: () => empDoc, id: 'emp-001' };
+        return { exists: true, data: () => employee, id: 'emp-001' };
       }
       if (ref.path.includes('/offices/')) {
         return { exists: true, data: () => officeDoc, id: 'office-001' };
@@ -235,6 +248,73 @@ describe('calculateMonthlyInsurance', () => {
     await expect(calculate()).rejects.toThrow('承認申請中');
     expect(mockTxSet).not.toHaveBeenCalled();
     expect(mockTxUpdate).not.toHaveBeenCalled();
+  });
+
+  describe('カタログの法定ルール', () => {
+    it('本人負担は50銭ルール、会社負担は全額−本人負担', async () => {
+      mockFindAllRates.mockResolvedValue({
+        health: makeInsuranceRateDoc({ insuranceType: 'health', employeeRate: 49.55, employerRate: 49.55, totalRate: 99.1 }),
+        pension: pensionRate, childSupport: null, longTermCare: null,
+      });
+      mockQueryGet.mockResolvedValue({ empty: false, docs: [{ id: '2026-09', data: () => ({ ...gradeDoc, healthStandardRemuneration: 98000 }) }] });
+      await calculate();
+      // 98,000 × 4.955% = 4,855.9 → 本人 4,856、全額 9,711.8 → 9,711 − 4,856 = 4,855
+      expect(storedData().healthInsurance).toEqual({ employeeAmount: 4856, employerAmount: 4855 });
+      expect(storedData().roundingRule).toBe('statutory');
+    });
+
+    it('月の途中で退職した月（資格喪失月）は保険料が発生しない', async () => {
+      employee = { ...empDoc, resignationDate: { toDate: () => new Date('2026-10-20T00:00:00Z') } };
+      await expect(calculate()).rejects.toThrow('資格喪失月');
+      expect(mockTxSet).not.toHaveBeenCalled();
+    });
+
+    it('月末退職は退職月も発生する', async () => {
+      employee = { ...empDoc, resignationDate: { toDate: () => new Date('2026-10-31T00:00:00Z') } };
+      await calculate();
+      expect(storedData().totalEmployeeAmount).toBeGreaterThan(0);
+    });
+
+    it('同月得喪は1か月分が発生し、記録を残す', async () => {
+      employee = { ...empDoc, qualificationAcquiredDate: '2026-10-05', qualificationLostDate: '2026-10-21' };
+      await calculate();
+      expect(storedData().sameMonthAcquisitionAndLoss).toBe(true);
+    });
+
+    it('資格取得前の月は計算しない', async () => {
+      employee = { ...empDoc, qualificationAcquiredDate: '2026-11-01' };
+      await expect(calculate()).rejects.toThrow('資格取得前');
+    });
+
+    it('社会保険の適用外の従業員は計算しない', async () => {
+      employments = [{ effectiveDate: '2026-04-01', employmentType: 'partTime', socialInsuranceEnrolled: false }];
+      await expect(calculate()).rejects.toThrow('適用外');
+    });
+
+    it('厚生年金だけ適用外なら健保だけ計算する', async () => {
+      employments = [{ effectiveDate: '2026-04-01', employmentType: 'regular', healthInsuranceEnrolled: true, pensionEnrolled: false }];
+      await calculate();
+      expect(storedData().pensionInsurance).toEqual({ employeeAmount: 0, employerAmount: 0 });
+      expect(storedData().healthInsurance.employeeAmount).toBeGreaterThan(0);
+    });
+
+    it('育休が同じ月の中で14日以上なら免除、13日なら免除しない', async () => {
+      exemptions = [{ ...exemption, leaveId: 'leave-1' }];
+      leaves = { 'leave-1': { leaveType: 'childcare', expectedStartDate: '2026-10-05', expectedEndDate: '2026-10-18' } };
+      await calculate();
+      expect(storedData().isExempted).toBe(true);
+      jest.clearAllMocks();
+      leaves = { 'leave-1': { leaveType: 'childcare', expectedStartDate: '2026-10-05', expectedEndDate: '2026-10-17' } };
+      await calculate();
+      expect(storedData().isExempted).toBe(false);
+    });
+
+    it('休業の終了日の翌日が属する月は免除しない（実績の終了日を優先）', async () => {
+      exemptions = [{ ...exemption, startMonth: '2026-08', endMonth: null, leaveId: 'leave-1' }];
+      leaves = { 'leave-1': { leaveType: 'childcare', expectedStartDate: '2026-08-01', expectedEndDate: '2027-03-31', actualEndDate: '2026-10-15' } };
+      await calculate();
+      expect(storedData().isExempted).toBe(false);
+    });
   });
 
 });

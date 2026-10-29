@@ -247,7 +247,8 @@ describe('calculateBonusInsurance', () => {
     });
     await calculateBonusInsurance(input, makeAuth());
     expect(saved().childSupportContribution).toEqual({ employeeAmount: 0, employerAmount: 1800 });
-    expect(saved().childSupportPayment).toEqual({ employeeAmount: 264, employerAmount: 264 });
+    // 支援金 264.5円：本人は50銭以下切捨てで264円、会社は全額529円−本人264円＝265円
+    expect(saved().childSupportPayment).toEqual({ employeeAmount: 264, employerAmount: 265 });
   });
   it.each([{ cumulativeBonusAmount: 499000 }, { standardBonusAmount: 1 }, { cumulativeBonusAmount: 500001 }])('refuses inconsistent saved amounts %j', async override => {
     Object.assign(sourceBonus, override);

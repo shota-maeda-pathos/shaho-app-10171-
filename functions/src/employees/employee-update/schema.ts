@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { EmployeeProfileFields } from '../../types/catalog-schemas';
 
 export const EmployeeUpdateSchema = z.object({
   companyId: z.string(),
@@ -12,6 +13,7 @@ export const EmployeeUpdateSchema = z.object({
   gender: z.enum(['male', 'female']).optional(),
   departmentId: z.string().nullable().optional(),
   hireDate: z.string().datetime().optional(),
+  ...EmployeeProfileFields,
 });
 
 export type EmployeeUpdateInput = z.infer<typeof EmployeeUpdateSchema>;

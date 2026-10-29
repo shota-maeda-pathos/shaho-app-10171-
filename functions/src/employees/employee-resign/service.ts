@@ -5,7 +5,40 @@ import { AuthContext, requireOffice } from '../../middleware/auth';
 import { EmployeeDoc, OfficeDoc, EmploymentDoc, GradeDoc, UserDoc } from '../../types/firestore';
 import { notFound } from '../../utils/errors';
 import { toTimestamp, toDateString } from '../../utils/firestore';
+import { normalizeEmployment, NormalizedEmployment, qualificationDates } from '../../utils/employment';
+import { findAllRates } from '../../utils/insurance-rate';
+import { isHealthExcluded, isLongTermCareAge, isPensionExcluded } from '../../utils/age';
+import { addMonths, lossDateFromResignation, monthOf, normalizeRoundingRule, splitPremium } from '../../insurance/calculator';
 import { EmployeeResignInput } from './schema';
+
+/** 最終月の保険料の見込み額（本人負担・会社負担）。料率は事業所の都道府県・保険者のものを使う */
+async function estimateLastMonthPremium(
+  companyId: string,
+  employee: EmployeeDoc,
+  office: OfficeDoc,
+  grade: GradeDoc,
+  yearMonth: string,
+  employment: NormalizedEmployment | null,
+) {
+  const rule = normalizeRoundingRule(office.roundingRule);
+  const rates = await findAllRates(companyId, yearMonth, office.prefectureCode, office.insurerId);
+  const healthOn = (employment?.healthInsuranceEnrolled ?? true) && !isHealthExcluded(employee.birthDate, yearMonth) && rates.health;
+  const pensionOn = (employment?.pensionEnrolled ?? true) && !isPensionExcluded(employee.birthDate, yearMonth) && rates.pension;
+  const zero = { employeeAmount: 0, employerAmount: 0 };
+  const health = healthOn ? splitPremium(grade.healthStandardRemuneration, rates.health!.employeeRate, rates.health!.employerRate, rule, rates.health!.totalRate) : zero;
+  const care = healthOn && rates.longTermCare && isLongTermCareAge(employee.birthDate, yearMonth)
+    ? splitPremium(grade.healthStandardRemuneration, rates.longTermCare.employeeRate, rates.longTermCare.employerRate, rule, rates.longTermCare.totalRate) : zero;
+  const pension = pensionOn ? splitPremium(grade.pensionStandardRemuneration, rates.pension!.employeeRate, rates.pension!.employerRate, rule, rates.pension!.totalRate) : zero;
+  return {
+    healthEmployee: health.employeeAmount + care.employeeAmount,
+    healthEmployer: health.employerAmount + care.employerAmount,
+    pensionEmployee: pension.employeeAmount,
+    pensionEmployer: pension.employerAmount,
+    totalEmployee: health.employeeAmount + care.employeeAmount + pension.employeeAmount,
+    totalEmployer: health.employerAmount + care.employerAmount + pension.employerAmount,
+    isEstimate: true,
+  };
+}
 
 export interface ResignResult {
   success: boolean;
@@ -57,25 +90,15 @@ export async function resignEmployee(
     const resignDateTs = toTimestamp(resignationDate);
 
     // 資格喪失日 = 退職日の翌日
-    const lossDateObj = new Date(resignationDate);
-    lossDateObj.setDate(lossDateObj.getDate() + 1);
-    const lossDate = lossDateObj.toISOString().slice(0, 10);
+    const lossDate = lossDateFromResignation(resignationDate);
 
-    tx.update(docRef, {
-      resignationDate: resignDateTs,
-      isActive: false,
-      updatedAt: now,
-      version: current.version + 1,
-    });
-
-    // 資格喪失届を自動生成
-    let filingId: string | null = null;
+    // --- 読み取り（トランザクションでは書き込みより前にすべて読む） ---
     const empSnap = await tx.get(
       db.collection(`${base}/employees/${input.employeeId}/employments`)
         .orderBy('effectiveDate', 'desc').limit(1),
     );
-    const employment = empSnap.empty ? null : empSnap.docs[0].data() as EmploymentDoc;
-    const isSocialInsured = employment?.socialInsuranceEnrolled !== false;
+    const employment = empSnap.empty ? null : normalizeEmployment(empSnap.docs[0].data() as EmploymentDoc);
+    const isSocialInsured = employment === null || employment.healthInsuranceEnrolled || employment.pensionEnrolled;
 
     const officeSnap = isSocialInsured ? await tx.get(db.doc(`${base}/offices/${current.officeId}`)) : null;
     const office = officeSnap?.exists ? officeSnap.data()! as OfficeDoc : null;
@@ -85,6 +108,31 @@ export async function resignEmployee(
       : null;
     const grade = gradeSnap && !gradeSnap.empty ? gradeSnap.docs[0].data() as GradeDoc : null;
 
+    // 最終月：保険料が発生する最後の月（月末退職は退職月、月の途中の退職は前月、同月得喪は取得月）
+    const acquisitionDate = qualificationDates(current).acquisitionDate ?? resignationDate;
+    const isSameMonthEntry = monthOf(acquisitionDate) === monthOf(lossDate);
+    const lastChargedMonth = isSameMonthEntry ? monthOf(acquisitionDate) : addMonths(monthOf(lossDate), -1);
+    const lastInsuranceSnap = isSocialInsured && grade && lastChargedMonth >= monthOf(acquisitionDate)
+      ? await tx.get(db.doc(`${base}/employees/${input.employeeId}/monthlyInsurance/${lastChargedMonth}`))
+      : null;
+    const settlement = lastInsuranceSnap && (!lastInsuranceSnap.exists || isSameMonthEntry) && grade && office
+      ? await estimateLastMonthPremium(auth.companyId, current, office, grade, lastChargedMonth, employment)
+      : null;
+
+    const userRef = current.userId ? db.doc(`${base}/users/${current.userId}`) : null;
+    const userSnap = userRef ? await tx.get(userRef) : null;
+
+    // --- 書き込み ---
+    tx.update(docRef, {
+      resignationDate: resignDateTs,
+      qualificationLostDate: isSocialInsured ? lossDate : null,
+      isActive: false,
+      updatedAt: now,
+      version: current.version + 1,
+    });
+
+    // 資格喪失届を自動生成
+    let filingId: string | null = null;
     if (isSocialInsured) {
       const filingRef = db.collection(`${base}/employees/${input.employeeId}/filings`).doc();
       filingId = filingRef.id;
@@ -97,7 +145,7 @@ export async function resignEmployee(
         formData: {
           '事業所整理記号': office?.officeNumber ?? '',
           '事業所名称': office?.name ?? '',
-          '被保険者整理番号': current.employeeNumber,
+          '被保険者整理番号': current.insuredPersonNumber ?? current.employeeNumber,
           '被保険者氏名': `${current.lastName} ${current.firstName}`,
           '被保険者氏名フリガナ': `${current.lastNameKana} ${current.firstNameKana}`,
           '生年月日': current.birthDate ? toDateString(current.birthDate) : '',
@@ -121,60 +169,37 @@ export async function resignEmployee(
       });
     }
 
-    // 最終月保険料精算
-    if (isSocialInsured && grade) {
-      const resignMonth = resignationDate.slice(0, 7);
-      const hireMonth = current.hireDate ? toDateString(current.hireDate).slice(0, 7) : null;
-      const isSameMonthEntry = hireMonth === resignMonth;
-
-      const lastInsuranceSnap = await tx.get(
-        db.doc(`${base}/employees/${input.employeeId}/monthlyInsurance/${resignMonth}`),
-      );
-
-      if (!lastInsuranceSnap.exists || isSameMonthEntry) {
-        const officeData = office ?? { roundingRule: 'truncate' as const };
-        const roundingRule = (officeData as any).roundingRule ?? 'truncate';
-        const roundFn = roundingRule === 'truncate' ? Math.floor : roundingRule === 'ceil' ? Math.ceil : Math.round;
-
-        const healthEmployee = roundFn((grade.healthStandardRemuneration * 50) / 1000);
-        const pensionEmployee = roundFn((grade.pensionStandardRemuneration * 91.5) / 1000);
-        const totalEmployee = healthEmployee + pensionEmployee;
-        const healthEmployer = roundFn((grade.healthStandardRemuneration * 50) / 1000);
-        const pensionEmployer = roundFn((grade.pensionStandardRemuneration * 91.5) / 1000);
-        const totalEmployer = healthEmployer + pensionEmployer;
-
-        const collRef = db.collection(`${base}/premiumCollections`).doc();
-        tx.set(collRef, {
-          employeeId: input.employeeId,
-          yearMonth: resignMonth,
-          type: 'resignation_settlement',
-          healthEmployee, pensionEmployee, totalEmployee,
-          healthEmployer, pensionEmployer, totalEmployer,
-          status: 'uncollected',
-          isSameMonthEntry,
-          createdAt: now,
-          updatedAt: now,
-          version: 1,
-        });
-      }
+    // 最終月保険料の精算（未計算の月、または同月得喪の場合に見込み額を登録する）
+    if (settlement) {
+      const collRef = db.collection(`${base}/premiumCollections`).doc();
+      tx.set(collRef, {
+        employeeId: input.employeeId,
+        yearMonth: lastChargedMonth,
+        type: 'resignation_settlement',
+        ...settlement,
+        status: 'uncollected',
+        isSameMonthEntry,
+        note: isSameMonthEntry
+          ? '同月得喪のため1か月分が発生します。同じ月に別の厚生年金・国民年金の資格を取得した場合、厚生年金保険料は後日還付されます'
+          : '最終月の保険料が未計算のため見込み額を登録しました。月次計算の確定後に差額を確認してください',
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+      });
     }
 
     // ユーザーアカウントの自動停止・権限縮小
     let userSuspended = false;
-    if (current.userId) {
-      const userRef = db.doc(`${base}/users/${current.userId}`);
-      const userSnap = await tx.get(userRef);
-      if (userSnap.exists) {
-        const userData = userSnap.data()! as UserDoc;
-        const strippedRoles = userData.roles.filter(r => r === 'employee' || r === 'viewer');
-        const newRoles = strippedRoles.length > 0 ? strippedRoles : ['employee' as const];
-        tx.update(userRef, {
-          isSuspended: true,
-          roles: newRoles,
-          updatedAt: now,
-        });
-        userSuspended = true;
-      }
+    if (userRef && userSnap?.exists) {
+      const userData = userSnap.data()! as UserDoc;
+      const strippedRoles = userData.roles.filter(r => r === 'employee' || r === 'viewer');
+      const newRoles = strippedRoles.length > 0 ? strippedRoles : ['employee' as const];
+      tx.update(userRef, {
+        isSuspended: true,
+        roles: newRoles,
+        updatedAt: now,
+      });
+      userSuspended = true;
     }
 
     const auditRef = db.collection(`${base}/auditLogs`).doc();
@@ -203,9 +228,7 @@ export async function resignEmployee(
     ? input.resignationDate.slice(0, 10)
     : input.resignationDate;
 
-  const lossDateObj = new Date(resignationDate);
-  lossDateObj.setDate(lossDateObj.getDate() + 1);
-  const lossDate = lossDateObj.toISOString().slice(0, 10);
+  const lossDate = lossDateFromResignation(resignationDate);
 
   const { createLossProcedure } = await import('../../procedures/hooks');
   await createLossProcedure({

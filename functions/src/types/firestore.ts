@@ -18,6 +18,31 @@ export interface EmployeeDoc {
   deletedAt: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  // 以下はカタログ2章の台帳項目。旧データには存在しないため任意
+  formerLastName?: string | null;
+  postalCode?: string | null;
+  prefecture?: string | null;
+  city?: string | null;
+  addressLine?: string | null;
+  building?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  /** 被保険者整理番号 */
+  insuredPersonNumber?: string | null;
+  /** 資格取得年月日（YYYY-MM-DD）。未設定なら入社日 */
+  qualificationAcquiredDate?: string | null;
+  /** 資格喪失年月日（YYYY-MM-DD）。未設定なら退職日の翌日 */
+  qualificationLostDate?: string | null;
+  foreignInfo?: ForeignWorkerInfo | null;
+}
+
+export interface ForeignWorkerInfo {
+  romanName: string;
+  nationality: string;
+  residenceStatus: string;
+  residencePeriodEnd: string | null;
+  residenceCardNumber: string | null;
+  workPermission: boolean;
 }
 
 export interface DependentDoc {
@@ -49,11 +74,26 @@ export interface OfficeDoc {
   paymentDay: number;
   paymentMonth: 'current' | 'next';
   deductionMethod: 'current' | 'previous';
-  roundingRule: 'truncate' | 'round' | 'ceil';
+  roundingRule: 'statutory' | 'truncate' | 'round' | 'ceil';
   isActive: boolean;
   version: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  // 以下はカタログ1章の事業所項目。旧データには存在しないため任意
+  postalCode?: string | null;
+  /** 事業所番号（5桁） */
+  officeCode?: string | null;
+  /** 管轄年金事務所 */
+  pensionOfficeName?: string | null;
+  /** 適用年月日（YYYY-MM-DD） */
+  appliedDate?: string | null;
+  /** 賞与の支給予定月（1〜12） */
+  bonusMonths?: number[];
+  insuredNumberMode?: 'auto' | 'manual';
+  /** 通常の労働者の週所定労働時間（適用判定の3/4基準）。未設定は40時間 */
+  fullTimeWeeklyHours?: number | null;
+  /** 通常の労働者の月所定労働日数（適用判定の3/4基準）。未設定は21日 */
+  fullTimeMonthlyDays?: number | null;
 }
 
 export interface DepartmentDoc {
@@ -88,18 +128,42 @@ export interface GradeTableEntry {
   upperBound: number;
 }
 
+export type EmploymentType = 'regular' | 'contract' | 'partTime' | 'arbeit' | 'executiveFull' | 'executivePart';
+
 export interface EmploymentDoc {
   effectiveDate: string;
-  employmentType: 'regular' | 'partTime' | 'contract';
+  employmentType: EmploymentType;
   weeklyHours: number;
   monthlyDays: number;
   baseSalary: number;
+  /** 旧項目。新しいデータでは healthInsuranceEnrolled / pensionEnrolled を使う */
   socialInsuranceEnrolled: boolean;
   longTermCareEnrolled: boolean;
   note: string;
   version: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  // 以下はカタログ3章の項目。旧データには存在しないため任意（utils/employment.ts で既定値を補う）
+  contractType?: 'indefinite' | 'fixed';
+  contractStartDate?: string | null;
+  contractEndDate?: string | null;
+  renewalExpected?: boolean;
+  weeklyDays?: number | null;
+  workStyle?: 'fullTime' | 'partTime' | 'shortTime';
+  probationStartDate?: string | null;
+  probationEndDate?: string | null;
+  wageType?: 'monthly' | 'daily' | 'hourly';
+  /** 日給・時給の単価（月給は baseSalary） */
+  wageAmount?: number | null;
+  monthlyHours?: number | null;
+  healthInsuranceEnrolled?: boolean;
+  pensionEnrolled?: boolean;
+  applicabilityReason?: 'standard' | 'specificShortTime' | 'excluded';
+  insuredCategory?: 'general' | 'partTimer' | 'shortTime';
+  isStudent?: boolean;
+  /** システムの適用判定。担当者が異なる判断をした場合は override に理由を残す */
+  applicabilityJudgement?: { result: 'applicable' | 'notApplicable' | 'manual'; reason: string } | null;
+  applicabilityOverride?: { reason: string; by: string } | null;
 }
 
 export interface GradeDoc {
@@ -132,6 +196,10 @@ export interface SalaryDoc {
   revisionFlag?: boolean;
   revisionDetectedAt?: Timestamp | null;
   previousTotalFixedWage?: number | null;
+  /** 現物給与（社宅・食事など。担当者が金額を入力） */
+  inKindAmount?: number;
+  /** 遡及昇給の差額。実際の支給額には含まれ、等級の判定からは除く */
+  retroactivePay?: { amount: number; fromMonth: string; toMonth: string } | null;
   version: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;

@@ -3,6 +3,7 @@ import { db } from '../../config';
 import { AuthContext, requireOffice } from '../../middleware/auth';
 import {
   EmployeeDoc,
+  EmploymentDoc,
   GradeDoc,
   OfficeDoc,
   InsurancePremiumBreakdown,
@@ -12,26 +13,10 @@ import { notFound, invalidArg } from '../../utils/errors';
 import { isLongTermCareAge, isPensionExcluded, isHealthExcluded } from '../../utils/age';
 import { findAllRates } from '../../utils/insurance-rate';
 import { calculateChildSupportPayment } from '../../utils/child-support-payment';
+import { normalizeEmployment, qualificationDates } from '../../utils/employment';
+import { decideExemption } from '../../utils/exemption-period';
+import { coverageForMonth, employerOnlyPremium, lastDayOfMonth, normalizeRoundingRule, splitPremium } from '../calculator';
 import { MonthlyInsuranceCalculateInput } from './schema';
-
-function calcPremium(
-  standardRemuneration: number,
-  employeeRate: number,
-  employerRate: number,
-  roundingRule: 'truncate' | 'round' | 'ceil',
-): InsurancePremiumBreakdown {
-  const roundFn =
-    roundingRule === 'truncate'
-      ? Math.floor
-      : roundingRule === 'ceil'
-        ? Math.ceil
-        : Math.round;
-
-  return {
-    employeeAmount: roundFn((standardRemuneration * employeeRate) / 1000),
-    employerAmount: roundFn((standardRemuneration * employerRate) / 1000),
-  };
-}
 
 const ZERO: InsurancePremiumBreakdown = { employeeAmount: 0, employerAmount: 0 };
 
@@ -54,6 +39,23 @@ export async function calculateMonthlyInsurance(
 
     if (!auth.roles.includes('admin')) {
       requireOffice(auth, employee.officeId);
+    }
+
+    // 資格取得月・喪失月の判定（喪失月は発生しない。月末退職・同月得喪は発生する）
+    const { acquisitionDate, lossDate } = qualificationDates(employee);
+    if (!acquisitionDate) throw invalidArg('資格取得日（入社日）が登録されていません');
+    const coverage = coverageForMonth(acquisitionDate, lossDate, input.yearMonth);
+    if (!coverage.charged) throw invalidArg(`${input.yearMonth}は保険料が発生しません（${coverage.reason}）`);
+
+    // 対象月末時点の雇用条件で適用・適用外を判定
+    const employmentSnap = await tx.get(db
+      .collection(`companies/${auth.companyId}/employees/${input.employeeId}/employments`)
+      .where('effectiveDate', '<=', lastDayOfMonth(input.yearMonth))
+      .orderBy('effectiveDate', 'desc')
+      .limit(1));
+    const employment = employmentSnap.empty ? null : normalizeEmployment(employmentSnap.docs[0].data() as EmploymentDoc);
+    if (employment && !employment.healthInsuranceEnrolled && !employment.pensionEnrolled) {
+      throw invalidArg('社会保険の適用外のため保険料は計算しません');
     }
 
     // 対象月の給与が承認済みか確認
@@ -87,11 +89,13 @@ export async function calculateMonthlyInsurance(
     );
     if (!officeSnap.exists) throw notFound('事業所');
     const office = officeSnap.data()! as OfficeDoc;
-    const roundingRule = office.roundingRule ?? 'truncate';
+    const roundingRule = normalizeRoundingRule(office.roundingRule);
 
-    // 年齢判定
-    const healthExcluded = isHealthExcluded(employee.birthDate, input.yearMonth);
-    const pensionExcluded = isPensionExcluded(employee.birthDate, input.yearMonth);
+    // 年齢判定と、健保・厚年それぞれの適用区分
+    const healthExcluded = isHealthExcluded(employee.birthDate, input.yearMonth)
+      || (employment !== null && !employment.healthInsuranceEnrolled);
+    const pensionExcluded = isPensionExcluded(employee.birthDate, input.yearMonth)
+      || (employment !== null && !employment.pensionEnrolled);
     const ltcAge = isLongTermCareAge(employee.birthDate, input.yearMonth);
 
     // 料率検索（年月・都道府県・保険者IDで適用料率を特定）
@@ -109,18 +113,9 @@ export async function calculateMonthlyInsurance(
       throw invalidArg('厚生年金保険料率が設定されていません');
     }
 
-    // 免除判定
-    const exemptionsSnap = await tx.get(db
-      .collection(`companies/${auth.companyId}/employees/${input.employeeId}/premiumExemptions`)
-      .where('startMonth', '<=', input.yearMonth));
-    const applicableExemptions = exemptionsSnap.docs.filter((doc) => {
-      const d = doc.data();
-      return d.status === 'active' && d.deletedAt == null && d.approvedAt != null
-        && d.isMonthlyExempted === true
-        && ['maternity', 'childcare'].includes(d.exemptionType)
-        && (!d.endMonth || input.yearMonth <= d.endMonth);
-    });
-    const isExempted = applicableExemptions.length > 0;
+    // 免除判定（届出承認済みの産休・育休。月末・育休14日の基準）
+    const exemption = await decideExemption(tx, auth.companyId, input.employeeId, input.yearMonth, 'monthly');
+    const isExempted = exemption.exempt;
     if (input.isExempted !== undefined && input.isExempted !== isExempted) {
       throw invalidArg('免除指定が承認済みの免除期間と一致しません。免除登録を確認してください');
     }
@@ -128,7 +123,7 @@ export async function calculateMonthlyInsurance(
     // 健康保険
     const healthInsurance = (healthExcluded || isExempted || !rates.health)
       ? ZERO
-      : calcPremium(grade.healthStandardRemuneration, rates.health.employeeRate, rates.health.employerRate, roundingRule);
+      : splitPremium(grade.healthStandardRemuneration, rates.health.employeeRate, rates.health.employerRate, roundingRule, rates.health.totalRate);
 
     // 介護保険: 年齢自動判定（40歳以上65歳未満）
     let longTermCareInsurance: InsurancePremiumBreakdown | null = null;
@@ -136,14 +131,14 @@ export async function calculateMonthlyInsurance(
       if (rates.longTermCare) {
         longTermCareInsurance = isExempted
           ? ZERO
-          : calcPremium(grade.healthStandardRemuneration, rates.longTermCare.employeeRate, rates.longTermCare.employerRate, roundingRule);
+          : splitPremium(grade.healthStandardRemuneration, rates.longTermCare.employeeRate, rates.longTermCare.employerRate, roundingRule, rates.longTermCare.totalRate);
       }
     }
 
     // 厚生年金
     const pensionInsurance = (pensionExcluded || isExempted || !rates.pension)
       ? ZERO
-      : calcPremium(grade.pensionStandardRemuneration, rates.pension.employeeRate, rates.pension.employerRate, roundingRule);
+      : splitPremium(grade.pensionStandardRemuneration, rates.pension.employeeRate, rates.pension.employerRate, roundingRule, rates.pension.totalRate);
 
     const childSupportPayment = calculateChildSupportPayment(
       grade.healthStandardRemuneration, input.yearMonth, healthExcluded || isExempted,
@@ -151,17 +146,9 @@ export async function calculateMonthlyInsurance(
     );
 
     // 子ども・子育て拠出金（事業主のみ、厚生年金の標準報酬月額が基礎）
-    let childSupportContribution: InsurancePremiumBreakdown;
-    if (!rates.childSupport || isExempted || pensionExcluded) {
-      childSupportContribution = ZERO;
-    } else {
-      childSupportContribution = calcPremium(
-        grade.pensionStandardRemuneration,
-        0,
-        rates.childSupport.employerRate,
-        roundingRule,
-      );
-    }
+    const childSupportContribution = (!rates.childSupport || isExempted || pensionExcluded)
+      ? ZERO
+      : employerOnlyPremium(grade.pensionStandardRemuneration, rates.childSupport.employerRate);
 
     const totalEmployeeAmount =
       healthInsurance.employeeAmount +
@@ -207,7 +194,9 @@ export async function calculateMonthlyInsurance(
       isHealthExcluded: healthExcluded,
       isPensionExcluded: pensionExcluded,
       isLongTermCareApplicable: ltcAge,
-      exemptionIds: applicableExemptions.map((doc) => doc.id),
+      exemptionIds: exemption.exemptionIds,
+      sameMonthAcquisitionAndLoss: coverage.sameMonthAcquisitionAndLoss,
+      roundingRule,
       isConfirmed: false,
       approvalPending: false,
       version,

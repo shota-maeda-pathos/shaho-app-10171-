@@ -44,8 +44,13 @@ export function daysInclusive(start: string, end: string): number {
  * 例：1/10 → 2/10、1/31 → 3/1
  */
 export function correspondingDayNextMonth(start: string): string {
+  return correspondingDayAfterMonths(start, 1);
+}
+
+/** start から n か月後の応当日（応当日がない月はその翌月の初日） */
+export function correspondingDayAfterMonths(start: string, n: number): string {
   const [y, m, d] = start.split('-').map(Number);
-  const candidate = new Date(Date.UTC(y, m, d));
-  if (candidate.getUTCMonth() === m % 12) return formatDate(candidate);
-  return formatDate(new Date(Date.UTC(y, m + 1, 1)));
+  const candidate = new Date(Date.UTC(y, m - 1 + n, d));
+  if (candidate.getUTCMonth() === (((m - 1 + n) % 12) + 12) % 12) return formatDate(candidate);
+  return formatDate(new Date(Date.UTC(y, m + n, 1)));
 }
