@@ -6,6 +6,7 @@ import { findApplicableRate } from '../utils/insurance-rate';
 import { normalizeEmployment, qualificationDates } from '../utils/employment';
 import { resolveGradeTable } from '../insurance/calculator';
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
+import { mapConcurrent } from '../utils/parallel';
 import { computeSanteiRow, SanteiEmployeeData, SanteiRow, santeiCurrentGradeMonth, santeiEffectiveMonth } from './santei-calc';
 import { SanteiPreviewInput, SanteiSubmitInput } from './schema';
 
@@ -100,19 +101,18 @@ export async function previewSantei(input: SanteiPreviewInput, auth: AuthContext
     docs = hasMore ? snap.docs.slice(0, input.limit) : snap.docs;
   }
 
-  const offices = new Map<string, OfficeDoc | undefined>();
+  // 事業所ごとの等級表を先に読み、従業員ごとの読み取りは並行して行う（1人ずつ順に読むと大人数で遅くなる）
   const tablesByOffice = new Map<string, Awaited<ReturnType<typeof gradeTables>>>();
-  const items: SanteiRow[] = [];
-  for (const doc of docs) {
+  const officeIdsInPage = [...new Set(docs.map(d => (d.data() as EmployeeDoc).officeId))];
+  await mapConcurrent(officeIdsInPage, 5, async (officeId) => {
+    const officeSnap = await db.doc(`${base(auth.companyId)}/offices/${officeId}`).get();
+    tablesByOffice.set(officeId, await gradeTables(auth.companyId, officeSnap.exists ? officeSnap.data() as OfficeDoc : undefined, input.year));
+  });
+  const items = await mapConcurrent(docs, 10, async (doc) => {
     const employee = doc.data() as EmployeeDoc;
-    if (!offices.has(employee.officeId)) {
-      const officeSnap = await db.doc(`${base(auth.companyId)}/offices/${employee.officeId}`).get();
-      offices.set(employee.officeId, officeSnap.exists ? officeSnap.data() as OfficeDoc : undefined);
-      tablesByOffice.set(employee.officeId, await gradeTables(auth.companyId, offices.get(employee.officeId), input.year));
-    }
     const data = await loadEmployeeData(auth.companyId, doc.id, employee, input.year);
-    items.push(computeSanteiRow(input.year, data, tablesByOffice.get(employee.officeId)!));
-  }
+    return computeSanteiRow(input.year, data, tablesByOffice.get(employee.officeId)!);
+  });
   return { ...empty, items, hasMore, lastDocId: docs.length ? docs[docs.length - 1].id : undefined };
 }
 
