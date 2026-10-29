@@ -20,6 +20,7 @@ function toOfficeResponse(id: string, data: OfficeDoc): OfficeResponse {
     deductionMethod: data.deductionMethod,
     roundingRule: data.roundingRule,
     isActive: data.isActive,
+    version: data.version ?? 1,
     createdAt: toISOString(data.createdAt),
     updatedAt: toISOString(data.updatedAt),
   };

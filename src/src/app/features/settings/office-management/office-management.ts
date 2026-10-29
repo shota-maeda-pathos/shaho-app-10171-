@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, computed, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatTableModule } from '@angular/material/table';
@@ -12,7 +12,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
+import { MatDialog } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
+import { ConfirmDialogComponent } from '../../../shared/confirm-dialog/confirm-dialog';
+import { TermComponent } from '../../../shared/ui';
 
 interface OfficeRow {
   id: string;
@@ -23,6 +27,23 @@ interface OfficeRow {
   closingDay: number;
   paymentDay: number;
   isActive: boolean;
+  roundingRule?: RoundingRule;
+  /** 古いサーバーは返さない */
+  version?: number;
+}
+
+type RoundingRule = 'statutory' | 'truncate' | 'round' | 'ceil';
+
+const ROUNDING_LABELS: Record<RoundingRule, string> = {
+  statutory: '法定（50銭以下切捨て・50銭超切上げ）',
+  truncate: '切捨て（労使の取り決めがある場合）',
+  round: '四捨五入（労使の取り決めがある場合）',
+  ceil: '切上げ（労使の取り決めがある場合）',
+};
+
+interface MigrationResult {
+  dryRun: boolean;
+  offices: { id: string; name: string; from: string | null }[];
 }
 
 const PREFECTURES: Record<string, string> = {
@@ -39,7 +60,7 @@ const PREFECTURES: Record<string, string> = {
     CommonModule, FormsModule,
     MatTableModule, MatCardModule, MatIconModule,
     MatButtonModule, MatChipsModule, MatProgressSpinnerModule,
-    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule,
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatSnackBarModule, TermComponent,
   ],
   template: `
     <div class="section">
@@ -100,6 +121,19 @@ const PREFECTURES: Record<string, string> = {
         </mat-card>
       }
 
+      @if (needsMigration().length > 0) {
+        <div class="migration" role="status">
+          <mat-icon aria-hidden="true">info</mat-icon>
+          <div>
+            <strong>{{ needsMigration().length }}件の事業所の<app-term key="rounding" />が「切捨て」のままです。</strong>
+            以前の画面では選べず、自動で「切捨て」になっていました。労使の取り決めがなければ、法定のルールに移してください。
+          </div>
+          <button mat-stroked-button (click)="migrate()" [disabled]="migrating()">
+            {{ migrating() ? '確認中…' : '法定のルールに移す' }}
+          </button>
+        </div>
+      }
+
       @if (loading()) {
         <div class="loading"><mat-spinner diameter="40"></mat-spinner></div>
       } @else {
@@ -125,6 +159,16 @@ const PREFECTURES: Record<string, string> = {
               <th mat-header-cell *matHeaderCellDef>締日/支払日</th>
               <td mat-cell *matCellDef="let row">
                 {{ row.closingDay === 0 ? '末日' : row.closingDay + '日' }}締 / {{ row.paymentDay }}日払
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="rounding">
+              <th mat-header-cell *matHeaderCellDef>端数処理 <app-term key="rounding" [showLabel]="false" /></th>
+              <td mat-cell *matCellDef="let row">
+                <select class="rounding-select" [ngModel]="row.roundingRule ?? 'truncate'" (ngModelChange)="changeRounding(row, $event)"
+                        [disabled]="savingId() === row.id || row.version === undefined" [attr.aria-label]="row.name + 'の端数処理'">
+                  @for (r of roundingOptions; track r.value) { <option [value]="r.value">{{ r.label }}</option> }
+                </select>
+                @if (row.version === undefined) { <div class="hint">サーバーの更新後に変更できます</div> }
               </td>
             </ng-container>
             <ng-container matColumnDef="status">
@@ -161,19 +205,32 @@ const PREFECTURES: Record<string, string> = {
     .empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; color: #ccc; }
     .status-chip { padding: 4px 12px; border-radius: 16px; font-size: 12px; background: #e8f5e9; color: #2e7d32; }
     .status-chip.inactive { background: #f5f5f5; color: #999; }
+    .rounding-select { padding: 6px 8px; max-width: 260px; font: inherit; }
+    .hint { font-size: var(--app-font-xs); color: var(--app-color-text-sub); margin-top: 2px; }
+    .migration { display: flex; align-items: center; gap: var(--app-space-3); flex-wrap: wrap; margin-bottom: var(--app-space-4);
+      padding: var(--app-space-3) var(--app-space-4); border-radius: var(--app-radius); background: var(--app-status-yours-bg); line-height: 1.7; }
+    .migration > div { flex: 1; min-width: 280px; }
+    .migration mat-icon { color: var(--app-status-yours-fg); }
   `],
 })
 export class OfficeManagementComponent implements OnInit {
   private functions = inject(Functions);
   private auth = inject(AuthService);
   private snackBar = inject(MatSnackBar);
+  private dialog = inject(MatDialog);
 
   offices = signal<OfficeRow[]>([]);
   loading = signal(false);
   saving = signal(false);
   showForm = signal(false);
+  savingId = signal('');
+  migrating = signal(false);
 
-  columns = ['officeNumber', 'name', 'address', 'phone', 'paymentInfo', 'status'];
+  readonly roundingOptions = (Object.keys(ROUNDING_LABELS) as RoundingRule[]).map(value => ({ value, label: ROUNDING_LABELS[value] }));
+  /** 移行の対象（サーバーの migrateOfficeRoundingRule と同じ条件：切捨てか未設定） */
+  needsMigration = computed(() => this.offices().filter(o => !o.roundingRule || o.roundingRule === 'truncate'));
+
+  columns = ['officeNumber', 'name', 'address', 'phone', 'paymentInfo', 'rounding', 'status'];
 
   prefectureList = Object.entries(PREFECTURES).map(([code, name]) => ({ code, name }));
 
@@ -222,5 +279,58 @@ export class OfficeManagementComponent implements OnInit {
     } finally {
       this.saving.set(false);
     }
+  }
+
+  async changeRounding(row: OfficeRow, rule: RoundingRule) {
+    if (rule === row.roundingRule || row.version === undefined) return;
+    const ok = await this.confirm(`${row.name}の端数処理を変更しますか`,
+      `「${ROUNDING_LABELS[rule]}」に変更します。変更後に計算する保険料から使います（計算済みの保険料は変わりません）。`, '変更する');
+    if (!ok) {
+      // 選択を元に戻す（行を作り直さないと select の表示が戻らない）
+      await this.loadOffices();
+      return;
+    }
+    this.savingId.set(row.id);
+    try {
+      await httpsCallable(this.functions, 'officeUpdate')({
+        companyId: this.auth.companyId, officeId: row.id, roundingRule: rule, expectedVersion: row.version,
+      });
+      this.snackBar.open('端数処理を変更しました', '閉じる', { duration: 3000 });
+    } catch (e: unknown) {
+      this.snackBar.open(`変更できませんでした：${e instanceof Error ? e.message : ''}`, '閉じる', { duration: 6000 });
+    } finally {
+      this.savingId.set('');
+      await this.loadOffices();
+    }
+  }
+
+  /** まず変更せずに対象を確かめ、確認を取ってから移行する */
+  async migrate() {
+    this.migrating.set(true);
+    try {
+      const fn = httpsCallable<object, MigrationResult>(this.functions, 'migrateOfficeRoundingRule');
+      const { data: preview } = await fn({ companyId: this.auth.companyId, dryRun: true });
+      if (preview.offices.length === 0) {
+        this.snackBar.open('移す対象の事業所はありません', '閉じる', { duration: 3000 });
+        return;
+      }
+      const names = preview.offices.map(o => o.name).join('、');
+      const ok = await this.confirm('端数処理を法定のルールに移しますか',
+        `${names}（${preview.offices.length}件）を「${ROUNDING_LABELS.statutory}」に変更します。労使の取り決めで切捨てにしている事業所は、移した後に個別に設定し直してください。`,
+        '移す');
+      if (!ok) return;
+      const { data } = await fn({ companyId: this.auth.companyId, dryRun: false });
+      this.snackBar.open(`${data.offices.length}件の事業所を法定のルールに移しました`, '閉じる', { duration: 4000 });
+      await this.loadOffices();
+    } catch (e: unknown) {
+      this.snackBar.open(`移せませんでした：${e instanceof Error ? e.message : ''}`, '閉じる', { duration: 6000 });
+    } finally {
+      this.migrating.set(false);
+    }
+  }
+
+  private async confirm(title: string, message: string, confirmLabel: string) {
+    const ref = this.dialog.open(ConfirmDialogComponent, { data: { title, message, confirmLabel }, width: '480px' });
+    return (await firstValueFrom(ref.afterClosed())) === true;
   }
 }

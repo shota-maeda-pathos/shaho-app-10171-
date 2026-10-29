@@ -30,6 +30,7 @@ export const routes: Routes = [
   },
   {
     path: 'login',
+    data: { title: 'ログイン' },
     loadComponent: () =>
       import('./features/login/login').then((m) => m.LoginComponent),
   },
@@ -239,6 +240,19 @@ export const routes: Routes = [
           import('./features/settings/settings').then(
             (m) => m.SettingsComponent,
           ),
+      },
+      {
+        path: 'glossary',
+        data: { title: '用語集' },
+        loadComponent: () =>
+          import('./features/glossary/glossary').then((m) => m.GlossaryComponent),
+      },
+      {
+        path: 'ui-samples',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '画面部品の見本' },
+        loadComponent: () =>
+          import('./features/ui-samples/ui-samples').then((m) => m.UiSamplesComponent),
       },
     ],
   },

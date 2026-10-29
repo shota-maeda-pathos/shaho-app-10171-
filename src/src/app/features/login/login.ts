@@ -60,17 +60,25 @@ import { AuthService } from '../../core/services/auth.service';
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      background: #f5f5f5;
+      min-height: 100vh;
+      padding: var(--app-space-4);
+      box-sizing: border-box;
+      background: var(--app-color-surface-sub);
     }
     .login-card {
-      width: 400px;
-      padding: 24px;
+      width: 100%;
+      max-width: 400px;
+      padding: var(--app-space-5);
+      box-sizing: border-box;
     }
+    mat-card-header { padding: 0; }
+    mat-card-subtitle { margin-top: var(--app-space-1); }
+    /* 浮き上がったラベルが見出しと重ならないよう、フォームとの間を空ける */
+    mat-card-content { padding: var(--app-space-5) 0 0; }
     .full-width { width: 100%; }
-    .login-btn { height: 48px; margin-top: 8px; }
-    .error { color: #d32f2f; font-size: 14px; margin: 8px 0; }
-    .timeout-msg { color: #f57c00; font-size: 14px; margin: 0 0 16px; padding: 8px 12px; background: #fff3e0; border-radius: 4px; }
+    .login-btn { height: 48px; margin-top: var(--app-space-2); }
+    .error { color: var(--app-status-action-fg); font-size: var(--app-font-md); margin: var(--app-space-2) 0; }
+    .timeout-msg { color: var(--app-color-text); font-size: var(--app-font-md); margin: 0 0 var(--app-space-4); padding: var(--app-space-2) var(--app-space-3); background: var(--app-status-action-bg); border-radius: var(--app-radius); }
   `],
 })
 export class LoginComponent implements OnInit {

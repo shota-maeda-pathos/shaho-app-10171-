@@ -46,6 +46,7 @@ export class LayoutComponent {
     { icon: 'check_circle', label: '承認', route: '/approvals', roles: ['admin', 'approver', 'operator'] },
     { icon: 'description', label: '届出・帳票', route: '/filings', roles: ['admin', 'operator'] },
     { icon: 'trending_up', label: '集計・試算', route: '/analytics', roles: ['admin', 'operator', 'viewer'] },
+    { icon: 'menu_book', label: '用語集', route: '/glossary', roles: ['admin', 'approver', 'operator', 'viewer'] },
     { icon: 'settings', label: '設定', route: '/settings', roles: ['admin'] },
   ];
 

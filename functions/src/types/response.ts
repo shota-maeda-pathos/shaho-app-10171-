@@ -52,6 +52,8 @@ export interface OfficeResponse {
   deductionMethod: 'current' | 'previous';
   roundingRule: 'statutory' | 'truncate' | 'round' | 'ceil';
   isActive: boolean;
+  /** 更新時の expectedVersion に使う */
+  version: number;
   createdAt: string;
   updatedAt: string;
 }

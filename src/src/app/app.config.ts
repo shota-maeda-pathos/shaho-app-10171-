@@ -1,5 +1,5 @@
 import { ApplicationConfig, ErrorHandler, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideRouter, RouteReuseStrategy } from '@angular/router';
+import { provideRouter, RouteReuseStrategy, TitleStrategy } from '@angular/router';
 import { OfficeRouteReuseStrategy } from './core/services/office-route-reuse';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
@@ -9,6 +9,7 @@ import { provideFunctions, getFunctions, connectFunctionsEmulator } from '@angul
 import { environment } from '../environments/environment';
 import { routes } from './app.routes';
 import { GlobalErrorHandler } from './core/services/error-handler.service';
+import { PageTitleStrategy } from './core/services/page-title.strategy';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -16,6 +17,7 @@ export const appConfig: ApplicationConfig = {
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
     provideRouter(routes),
     {provide:RouteReuseStrategy,useClass:OfficeRouteReuseStrategy},
+    { provide: TitleStrategy, useClass: PageTitleStrategy },
     provideAnimationsAsync(),
     provideFirebaseApp(() => initializeApp(environment.firebase)),
     provideAuth(() => {

@@ -1,0 +1,14 @@
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--app-space-2);
+  padding: var(--app-space-6) var(--app-space-4);
+  color: var(--app-color-text-sub);
+  text-align: center;
+}
+.state p { margin: 0; }
+.state-icon { font-size: 40px; width: 40px; height: 40px; color: var(--app-color-border); }
+.state-title { font-size: var(--app-font-lg); color: var(--app-color-text); }
+.state-hint { font-size: var(--app-font-md); line-height: 1.6; max-width: 560px; }
+.state.error .state-icon { color: var(--app-status-action-fg); }
