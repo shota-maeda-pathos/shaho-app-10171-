@@ -8,3 +8,8 @@ work/jest-cache/
 work/*-deploy/
 work/official-pdf-check/
 work/pdf-python-deps/
+
+# 作業用ファイルと各自のエディター・ツールの設定（リポジトリには載せない）
+work/
+.claude/
+/.vscode/
