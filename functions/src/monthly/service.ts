@@ -27,7 +27,7 @@ const CHUNK_SIZE = 25;
 /** 処理が止まったとみなす時間 */
 const STALE_MS = 10 * 60_000;
 
-function runId(officeId: string, payMonth: string) { return `${officeId}_${payMonth}`; }
+export function runId(officeId: string, payMonth: string) { return `${officeId}_${payMonth}`; }
 
 /** 給与項目マスタ（会社ごと）。未登録なら既定の2項目 */
 async function salaryItemsOf(companyId: string): Promise<{ items: SalaryItem[]; version: number }> {

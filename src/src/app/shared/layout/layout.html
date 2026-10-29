@@ -3,16 +3,34 @@
     <div class="sidebar-header">
       <span class="logo">社保管理</span>
     </div>
-    <mat-nav-list>
-      @for (item of visibleNavItems; track item.route) {
+    <mat-nav-list aria-label="メインメニュー">
+      @for (item of visibleNavItems(); track item.route) {
         <a mat-list-item
            [routerLink]="item.route"
-           [queryParams]="office.queryParams()" [class.active]="active(item.route)"
-           routerLinkActive="active"
-           [routerLinkActiveOptions]="{ exact: false }">
+           [queryParams]="office.queryParams()"
+           [class.active]="activeRoute() === item.route"
+           [attr.aria-current]="activeRoute() === item.route ? 'page' : null">
           <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
           <span matListItemTitle>{{ item.label }}</span>
         </a>
+      }
+      @if (visibleMoreItems().length) {
+        <button type="button" class="more-toggle" (click)="moreOpen.set(!moreShown())" [attr.aria-expanded]="moreShown()">
+          <mat-icon aria-hidden="true">{{ moreShown() ? 'expand_less' : 'expand_more' }}</mat-icon>
+          <span>その他</span>
+        </button>
+        @if (moreShown()) {
+          @for (item of visibleMoreItems(); track item.route) {
+            <a mat-list-item class="more-item"
+               [routerLink]="item.route"
+               [queryParams]="office.queryParams()"
+               [class.active]="activeRoute() === item.route"
+               [attr.aria-current]="activeRoute() === item.route ? 'page' : null">
+              <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+              <span matListItemTitle>{{ item.label }}</span>
+            </a>
+          }
+        }
       }
     </mat-nav-list>
     <div class="sidebar-footer">

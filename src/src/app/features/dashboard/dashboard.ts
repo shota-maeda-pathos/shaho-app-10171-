@@ -1,474 +1,209 @@
-import { Component, inject, signal, effect, untracked } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
+import { Component, inject, signal, computed, effect, untracked } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDividerModule } from '@angular/material/divider';
+import { MatIconModule } from '@angular/material/icon';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
+import { StatusBadgeComponent, StatusTone, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent } from '../../shared/ui';
+import { LifeEventCardsComponent } from '../procedures/life-events';
 
-interface FilingAlert {
-  employeeId: string;
-  employeeName: string;
-  filingType: string;
-  filingId: string;
-  createdAt: string;
-  daysElapsed: number;
-}
-
-interface UncollectedAlert {
-  yearMonth: string;
-  employeeId: string;
-  employeeName: string;
-  totalAmount: number;
-}
-
-interface DashboardAlerts {
-  filingDeadlines: FilingAlert[];
-  uncollectedPremiums: UncollectedAlert[];
-  revisionCandidates: number;
-}
-
-interface DashboardStats {
-  employeeCount: number;
-  pendingApprovals: number;
-  pendingFilings: number;
-  activeLeaves: number;
-  activeExemptions: number;
-  alerts: DashboardAlerts;
-}
-
-interface TaskItem {
-  icon: string;
-  label: string;
+/** サーバーの homeTodos が返す1件 */
+interface HomeTodo {
+  id: string;
+  kind: 'onboarding' | 'procedure' | 'monthly';
+  title: string;
+  next: string;
+  detail: string | null;
+  officeName: string;
+  deadline: string | null;
+  tone: Exclude<StatusTone, 'done'>;
   route: string;
-  count: number;
-  color: string;
+  queryParams: Record<string, string>;
+  updatedAt: string | null;
 }
 
-interface MonthlyTrend {
-  yearMonth: string;
-  totalEmployee: number;
-  totalEmployer: number;
-  healthTotal: number;
-  pensionTotal: number;
-  employeeCount: number;
-}
-
-interface FilingStats {
-  total: number;
-  draft: number;
-  pending: number;
-  approved: number;
-  submitted: number;
-  accepted: number;
-}
-
-interface AnalyticsData {
-  insuranceTrends: MonthlyTrend[];
-  filingStats: FilingStats;
-  recentFilings: { id: string; employeeId: string; employeeName: string; filingType: string; status: string; effectiveDate: string }[];
-  monthOverMonth: { currentMonth: string; previousMonth: string; currentTotal: number; previousTotal: number; changePercent: number | null } | null;
-  forecast: { nextMonth: string; estimatedTotal: number; estimatedEmployee: number; estimatedEmployer: number; basis: string } | null;
-}
-
+/**
+ * ホーム。やることリスト（期限の近い順・「続きから」）と、新しく始める業務のカード。
+ * 統計は集計・試算の画面で見る
+ */
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule, MatIconModule, MatListModule,
-    MatButtonModule, MatProgressSpinnerModule, MatDividerModule,
-  ],
+  imports: [NgTemplateOutlet, RouterLink, MatButtonModule, MatIconModule, StatusBadgeComponent, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent, LifeEventCardsComponent],
   template: `
-    <div class="dashboard-container">
-      <div class="welcome-section">
+    <div class="home">
+      <header class="welcome">
         <h1>ホーム</h1>
         <p class="subtitle">{{ greeting() }}、{{ auth.profile()?.displayName ?? 'ユーザー' }}さん</p>
-      </div>
+      </header>
 
-      @if (auth.hasAnyRole('admin','operator','approver')) {
-        <section class="procedure-home">
-          <h2>進行中の手続き</h2>
-          @if (auth.hasAnyRole('admin','operator')) { <button mat-flat-button (click)="navigate('/procedures/new')">手続きを始める</button> }
-          <button mat-stroked-button (click)="navigate('/procedures')">手続き一覧</button>
-          @if (procedureLoading()) { <p>手続きを読み込んでいます…</p> }
-          @if (procedureError()) { <p role="alert">{{procedureError()}}</p><button mat-stroked-button (click)="loadProcedures()">再読み込み</button> }
-          @for (procedure of procedures(); track procedure.id) {
-            <button class="procedure-home-row" (click)="navigate('/procedures/' + procedure.id)"><strong>{{procedure.title}}</strong><span>{{procedure.statusReason}}</span><span>{{procedure.deadline ? '期限：' + procedure.deadline : ''}}</span></button>
+      @if (!auth.loading() && !auth.profile()) {
+        <p role="alert">ユーザー情報を取得できません。会社への登録とアクセス権を管理者に確認してください。</p>
+      }
+
+      @if (canSeeTodos()) {
+        <section class="todos" aria-labelledby="todo-heading">
+          <div class="section-head">
+            <h2 id="todo-heading">やること</h2>
+            @if (todos(); as items) {
+              <span class="counts">
+                @if (count('action')) { <app-status-badge tone="action" [label]="'要対応 ' + count('action') + '件'" /> }
+                @if (count('yours')) { <app-status-badge tone="yours" [label]="'あなたの番 ' + count('yours') + '件'" /> }
+                @if (count('waiting')) { <app-status-badge tone="waiting" [label]="'他の人の待ち ' + count('waiting') + '件'" /> }
+              </span>
+            }
+            <button mat-button type="button" class="refresh" (click)="load()" [disabled]="loading()"><mat-icon>refresh</mat-icon>最新にする</button>
+          </div>
+          <p class="caption">期限の近い順です。{{ office.label() }}の分を表示しています。</p>
+
+          @if (loading() && !todos()) { <app-loading-state message="やることを集めています…" /> }
+          @if (error()) { <app-error-state heading="やることを読み込めませんでした" [message]="error()" (retry)="load()" /> }
+
+          @if (todos(); as items) {
+            @if (mine().length === 0 && waiting().length === 0) {
+              <app-empty-state icon="task_alt" message="いまやることはありません" [hint]="isOperator() ? '新しい業務は下のカードから始められます。' : '承認を頼まれると、ここに表示されます。'" />
+            }
+            @if (mine().length) {
+              <ul class="todo-list" aria-label="あなたがやること">
+                @for (todo of mine(); track todo.id) { <ng-container *ngTemplateOutlet="row; context: { $implicit: todo }" /> }
+              </ul>
+            }
+            @if (waiting().length) {
+              <h3 class="sub-heading">ほかの人を待っているもの</h3>
+              <ul class="todo-list" aria-label="ほかの人を待っているもの">
+                @for (todo of waiting(); track todo.id) { <ng-container *ngTemplateOutlet="row; context: { $implicit: todo }" /> }
+              </ul>
+            }
           }
-          @if (!procedureLoading() && !procedureError() && procedures().length === 0) { <p>進行中の手続きはありません。</p> }
+          <p class="links">
+            <a routerLink="/procedures" [queryParams]="office.queryParams()">進行中の手続きをすべて見る</a>
+            <a routerLink="/approvals" [queryParams]="office.queryParams()">承認の一覧を見る</a>
+          </p>
         </section>
       }
 
-      @if (auth.loading()) {
-        <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
-      } @else if (!auth.profile()) {
-        <p role="alert">ユーザー情報を取得できません。会社への登録とアクセス権を管理者に確認してください。</p>
-      }
-      @if (auth.hasAnyRole('admin', 'operator')) {
-      @if (error()) {
-        <p role="alert">{{ error() }}</p>
-        <button mat-stroked-button (click)="loadStats()">再読み込み</button>
-      }
-      @if (loading()) {
-        <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
-      }
-      @if (stats(); as data) {
-      <div class="stats-row">
-        <mat-card class="stat-card" (click)="navigate('/employees')">
-          <mat-icon class="stat-icon" style="color: #1976d2">people</mat-icon>
-          <div class="stat-value">{{ data.employeeCount }}</div>
-          <div class="stat-label">従業員数</div>
-        </mat-card>
-        <mat-card class="stat-card" (click)="navigate('/approvals')"
-          [class.alert]="data.pendingApprovals > 0">
-          <mat-icon class="stat-icon" style="color: #e65100">pending_actions</mat-icon>
-          <div class="stat-value">{{ data.pendingApprovals }}</div>
-          <div class="stat-label">承認待ち</div>
-        </mat-card>
-        <mat-card class="stat-card" (click)="navigate('/filings')"
-          [class.alert]="data.pendingFilings > 0">
-          <mat-icon class="stat-icon" style="color: #2e7d32">description</mat-icon>
-          <div class="stat-value">{{ data.pendingFilings }}</div>
-          <div class="stat-label">未提出届出</div>
-        </mat-card>
-        <mat-card class="stat-card">
-          <mat-icon class="stat-icon" style="color: #7b1fa2">baby_changing_station</mat-icon>
-          <div class="stat-value">{{ data.activeLeaves }}</div>
-          <div class="stat-label">休業中</div>
-        </mat-card>
-      </div>
-
-      <p>免除登録：{{ data.activeExemptions }}件</p>
-
-      @if (data.alerts; as alerts) {
-        @if (alerts.filingDeadlines.length > 0 || alerts.uncollectedPremiums.length > 0 || alerts.revisionCandidates > 0) {
-        <div class="alerts-section">
-          <h2><mat-icon>warning</mat-icon> 業務アラート</h2>
-          <div class="alert-cards">
-            @if (alerts.filingDeadlines.length > 0) {
-              <mat-card class="alert-card filing-alert">
-                <div class="alert-header">
-                  <mat-icon>schedule</mat-icon>
-                  <span>届出期限超過 ({{ alerts.filingDeadlines.length }}件)</span>
-                </div>
-                <div class="alert-body">
-                  @for (f of alerts.filingDeadlines; track f.filingId) {
-                    <div class="alert-row" (click)="openFiling(f.employeeId, f.filingId)">
-                      <span class="alert-name">{{ f.employeeName }}</span>
-                      <span class="alert-type">{{ filingTypeLabel(f.filingType) }}</span>
-                      <span class="alert-days">{{ f.daysElapsed }}日経過</span>
-                    </div>
-                  }
-                </div>
-              </mat-card>
-            }
-            @if (alerts.uncollectedPremiums.length > 0) {
-              <mat-card class="alert-card premium-alert">
-                <div class="alert-header">
-                  <mat-icon>account_balance_wallet</mat-icon>
-                  <span>未徴収保険料 ({{ alerts.uncollectedPremiums.length }}件)</span>
-                </div>
-                <div class="alert-body">
-                  @for (p of alerts.uncollectedPremiums; track p.employeeId + p.yearMonth) {
-                    <div class="alert-row" (click)="navigate('/premium/collection')">
-                      <span class="alert-name">{{ p.employeeName }}</span>
-                      <span class="alert-type">{{ p.yearMonth }}</span>
-                      <span class="alert-amount">{{ p.totalAmount | number }}円</span>
-                    </div>
-                  }
-                </div>
-              </mat-card>
-            }
-            @if (alerts.revisionCandidates > 0) {
-              <mat-card class="alert-card revision-alert" (click)="navigate('/santei')">
-                <div class="alert-header">
-                  <mat-icon>swap_vert</mat-icon>
-                  <span>随時改定候補者</span>
-                </div>
-                <div class="alert-body">
-                  <p class="revision-count">{{ alerts.revisionCandidates }}名の従業員に固定的賃金の変動があります</p>
-                </div>
-              </mat-card>
-            }
-          </div>
-        </div>
-        }
-      }
-      }
-        <div class="content-grid">
-          <mat-card class="task-card">
-            <h2>
-              <mat-icon>assignment</mat-icon>
-              今月のタスク
-            </h2>
-            @if (loading()) {
-              <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
-            } @else {
-              <div class="task-list">
-                @for (task of tasks(); track task.label) {
-                  <button mat-button class="task-item" (click)="navigate(task.route)">
-                    <mat-icon [style.color]="task.color">{{ task.icon }}</mat-icon>
-                    <span class="task-label">{{ task.label }}</span>
-                    @if (task.count > 0) {
-                      <span class="task-badge" [style.background]="task.color">{{ task.count }}</span>
-                    }
-                  </button>
-                }
-              </div>
-            }
-          </mat-card>
-
-          @if(auth.hasAnyRole('admin','operator')) {
-          <mat-card class="shortcut-card">
-            <h2>
-              <mat-icon>bolt</mat-icon>
-              クイック操作
-            </h2>
-            <div class="shortcut-grid">
-              <button mat-stroked-button (click)="navigate('/procedures/new')">
-                <mat-icon>person_add</mat-icon>
-                手続きを始める
-              </button>
-              <button mat-stroked-button (click)="navigate('/monthly')">
-                <mat-icon>event_repeat</mat-icon>
-                毎月の処理を進める
-              </button>
-              <button mat-stroked-button (click)="navigate('/analytics')">
-                <mat-icon>trending_up</mat-icon>
-                集計・試算を確認
-              </button>
-              <button mat-stroked-button (click)="navigate('/premium/bonus')">
-                <mat-icon>card_giftcard</mat-icon>
-                賞与保険料
-              </button>
-              <button mat-stroked-button (click)="navigate('/filings')">
-                <mat-icon>description</mat-icon>
-                届出管理
-              </button>
-              <button mat-stroked-button (click)="navigate('/santei')">
-                <mat-icon>assessment</mat-icon>
-                算定基礎届
-              </button>
-              @if (auth.hasRole('admin')) {
-              <button mat-stroked-button (click)="navigate('/settings')">
-                <mat-icon>manage_accounts</mat-icon>
-                ユーザー管理
-              </button>
-              }
-            </div>
-          </mat-card>
-          }
-        </div>
-
-        @if (analytics(); as a) {
-          <div class="analytics-section">
-            @if (a.monthOverMonth; as mom) {
-              <div class="mom-row">
-                <mat-card class="mom-card">
-                  <div class="mom-label">前月比 ({{ mom.previousMonth }} → {{ mom.currentMonth }})</div>
-                  <div class="mom-value" [class.up]="(mom.changePercent ?? 0) > 0" [class.down]="(mom.changePercent ?? 0) < 0">
-                    {{ mom.changePercent !== null ? ((mom.changePercent > 0 ? '+' : '') + mom.changePercent + '%') : '—' }}
-                  </div>
-                  <div class="mom-detail">{{ mom.previousTotal | number }}円 → {{ mom.currentTotal | number }}円</div>
-                </mat-card>
-                <mat-card class="filing-stats-card">
-                  <h3>届出ステータス</h3>
-                  <div class="filing-stat-grid">
-                    <div class="fs-item"><span class="fs-num">{{ a.filingStats.draft }}</span><span class="fs-label">下書き</span></div>
-                    <div class="fs-item"><span class="fs-num">{{ a.filingStats.pending }}</span><span class="fs-label">承認待ち</span></div>
-                    <div class="fs-item"><span class="fs-num">{{ a.filingStats.approved }}</span><span class="fs-label">承認済み</span></div>
-                    <div class="fs-item"><span class="fs-num">{{ a.filingStats.submitted }}</span><span class="fs-label">提出済み</span></div>
-                    <div class="fs-item"><span class="fs-num">{{ a.filingStats.accepted }}</span><span class="fs-label">受理</span></div>
-                  </div>
-                </mat-card>
-              </div>
-            }
-
-            @if (a.forecast; as fc) {
-              <mat-card class="forecast-card">
-                <h3><mat-icon>auto_graph</mat-icon> 来月の予測（{{ fc.nextMonth }}）</h3>
-                <div class="forecast-body">
-                  <div class="fc-item"><span class="fc-label">合計（推定）</span><span class="fc-value">{{ fc.estimatedTotal | number }}円</span></div>
-                  <div class="fc-item"><span class="fc-label">被保険者</span><span class="fc-value">{{ fc.estimatedEmployee | number }}円</span></div>
-                  <div class="fc-item"><span class="fc-label">事業主</span><span class="fc-value">{{ fc.estimatedEmployer | number }}円</span></div>
-                </div>
-                <div class="fc-note">※ {{ fc.basis === 'trend' ? '直近2か月の推移に基づく概算' : '直近月のデータに基づく概算' }}です</div>
-              </mat-card>
-            }
-
-            <mat-card class="trends-card">
-              <h2><mat-icon>trending_up</mat-icon> 保険料推移（月別）</h2>
-              <div class="trends-table-wrap">
-                <table class="trends-table">
-                  <thead>
-                    <tr><th>年月</th><th>被保険者負担</th><th>事業主負担</th><th>健保計</th><th>厚年計</th><th>対象人数</th></tr>
-                  </thead>
-                  <tbody>
-                    @for (t of a.insuranceTrends; track t.yearMonth) {
-                      <tr>
-                        <td>{{ t.yearMonth }}</td>
-                        <td class="num">{{ t.totalEmployee | number }}</td>
-                        <td class="num">{{ t.totalEmployer | number }}</td>
-                        <td class="num">{{ t.healthTotal | number }}</td>
-                        <td class="num">{{ t.pensionTotal | number }}</td>
-                        <td class="num">{{ t.employeeCount }}</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </mat-card>
-
-            @if (a.recentFilings.length > 0) {
-              <mat-card class="recent-filings-card">
-                <h2><mat-icon>history</mat-icon> 最近の届出</h2>
-                <mat-list>
-                  @for (f of a.recentFilings; track f.id) {
-                    <mat-list-item (click)="openFiling(f.employeeId, f.id)">
-                      <mat-icon matListItemIcon>description</mat-icon>
-                      <div matListItemTitle>{{ f.employeeName }} — {{ f.filingType }}</div>
-                      <div matListItemLine>{{ f.effectiveDate }} ／ {{ f.status }}</div>
-                    </mat-list-item>
-                  }
-                </mat-list>
-              </mat-card>
-            }
-          </div>
-        }
+      @if (isOperator()) {
+        <section class="start" aria-labelledby="start-heading">
+          <h2 id="start-heading">新しく始める</h2>
+          <p class="caption">何が起きたかを選んでください。</p>
+          <app-life-event-cards />
+        </section>
       }
 
-      @if(auth.hasRole('employee')&&!auth.profile()?.employeeId) {<p role="alert">従業員情報とアカウントが紐付いていません。管理者に確認してください。</p>}
-      @if (auth.hasRole('employee')&&auth.profile()?.employeeId) {
-        <mat-card class="portal-banner" (click)="navigate('/portal')">
-          <mat-icon>account_circle</mat-icon>
-          <div>
-            <h3>マイポータル</h3>
-            <p>給与明細や保険情報を確認できます</p>
-          </div>
-          <mat-icon class="chevron">chevron_right</mat-icon>
-        </mat-card>
+      @if (auth.hasRole('viewer') && !canSeeTodos()) {
+        <section class="viewer">
+          <p>集計・試算の画面で、保険料の推移や内訳を確認できます。</p>
+          <a mat-stroked-button routerLink="/analytics" [queryParams]="office.queryParams()">集計・試算を開く</a>
+        </section>
+      }
+
+      @if (auth.hasRole('employee') && !auth.profile()?.employeeId) { <p role="alert">従業員情報とアカウントが紐付いていません。管理者に確認してください。</p> }
+      @if (auth.hasRole('employee') && auth.profile()?.employeeId) {
+        <a class="portal-banner" routerLink="/portal">
+          <mat-icon aria-hidden="true">account_circle</mat-icon>
+          <span><strong>マイポータル</strong><br>給与明細や保険情報を確認できます</span>
+          <mat-icon aria-hidden="true" class="chevron">chevron_right</mat-icon>
+        </a>
       }
     </div>
+
+    <ng-template #row let-todo>
+      <li class="todo" [attr.data-tone]="todo.tone">
+        <div class="todo-main">
+          <div class="todo-title">
+            <app-status-badge [tone]="todo.tone" />
+            <strong>{{ todo.title }}</strong>
+            @if (todo.officeName && showOffice()) { <span class="office">{{ todo.officeName }}</span> }
+          </div>
+          <p class="next">{{ todo.next }}</p>
+          @if (todo.detail) { <p class="detail">{{ todo.detail }}</p> }
+        </div>
+        <div class="todo-deadline" [class.overdue]="overdue(todo)" [class.soon]="soon(todo)">
+          @if (todo.deadline) {
+            <span class="deadline-label">{{ overdue(todo) ? '期限切れ' : '期限' }}</span>
+            <span>{{ dateLabel(todo.deadline) }}</span>
+            <span class="days">{{ daysLabel(todo.deadline) }}</span>
+          } @else { <span class="deadline-label">期限なし</span> }
+        </div>
+        <button mat-flat-button type="button" class="continue" [class.secondary]="todo.tone === 'waiting'" (click)="open(todo)">{{ todo.tone === 'waiting' ? '状況を見る' : '続きから' }}</button>
+      </li>
+    </ng-template>
   `,
   styles: [`
-    .procedure-home{padding:20px 0;margin-bottom:24px;border-bottom:1px solid #ddd}.procedure-home button{margin-right:12px}.procedure-home-row{display:flex;width:100%;gap:16px;align-items:center;flex-wrap:wrap;text-align:left;padding:16px;margin:12px 0;border:1px solid #ddd;border-radius:8px;background:transparent;cursor:pointer;font:inherit}.procedure-home-row:hover{background:#f0f5fa}.procedure-home-row span{font-size:14px}
-    .dashboard-container { padding: 24px; }
-    .welcome-section { margin-bottom: 24px; }
-    .welcome-section h1 { margin: 0; font-size: 28px; font-weight: 500; }
-    .subtitle { margin: 4px 0 0; color: #666; font-size: 14px; }
-    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-    .stat-card { padding: 20px; text-align: center; cursor: pointer; transition: box-shadow 0.2s, transform 0.2s; }
-    .stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); transform: translateY(-2px); }
-    .stat-card.alert { border-left: 4px solid #e65100; }
-    .stat-icon { font-size: 32px; width: 32px; height: 32px; }
-    .stat-value { font-size: 32px; font-weight: 700; margin: 8px 0 4px; }
-    .stat-label { font-size: 12px; color: #666; }
-    .content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-    .task-card, .shortcut-card { padding: 24px; }
-    h2 { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; margin: 0 0 16px; }
-    h2 mat-icon { color: #1976d2; font-size: 20px; width: 20px; height: 20px; }
-    .loading { display: flex; justify-content: center; padding: 24px; }
-    .task-list { display: flex; flex-direction: column; gap: 4px; }
-    .task-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
-    .task-item:hover { background: #f5f5f5; }
-    .task-label { flex: 1; font-size: 14px; }
-    .task-badge { color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
-    .task-done { color: #4caf50; font-size: 20px; width: 20px; height: 20px; }
-    .shortcut-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .shortcut-grid button { justify-content: flex-start; gap: 8px; padding: 12px 16px; }
-    .portal-banner { display: flex; align-items: center; gap: 16px; padding: 24px; cursor: pointer; transition: box-shadow 0.2s; }
-    .portal-banner:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    .portal-banner mat-icon:first-child { font-size: 48px; width: 48px; height: 48px; color: #1976d2; }
-    .portal-banner h3 { margin: 0; font-size: 18px; }
-    .portal-banner p { margin: 4px 0 0; color: #666; font-size: 14px; }
-    .portal-banner .chevron { color: #999; margin-left: auto; }
-    @media (max-width: 960px) {
-      .stats-row { grid-template-columns: repeat(2, 1fr); }
-      .content-grid { grid-template-columns: 1fr; }
+    .home { max-width: 1080px; margin: 0 auto; padding: var(--app-space-5); }
+    .welcome { margin-bottom: var(--app-space-5); }
+    .welcome h1 { margin: 0; font-size: 28px; font-weight: 500; }
+    .subtitle { margin: var(--app-space-1) 0 0; color: var(--app-color-text-sub); font-size: var(--app-font-md); }
+    section { margin-bottom: var(--app-space-6); }
+    h2 { margin: 0; font-size: var(--app-font-xl); font-weight: 600; }
+    .section-head { display: flex; align-items: center; gap: var(--app-space-3); flex-wrap: wrap; }
+    .counts { display: flex; gap: var(--app-space-2); flex-wrap: wrap; }
+    .refresh { margin-left: auto; }
+    .caption { margin: var(--app-space-2) 0 var(--app-space-4); color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
+    .sub-heading { margin: var(--app-space-5) 0 var(--app-space-3); font-size: var(--app-font-md); font-weight: 600; color: var(--app-color-text-sub); }
+    .todo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--app-space-2); }
+    .todo {
+      display: grid; grid-template-columns: 1fr 150px auto; gap: var(--app-space-4); align-items: center;
+      padding: var(--app-space-4); background: var(--app-color-surface); border: 1px solid var(--app-color-border);
+      border-left: 4px solid var(--app-status-yours-fg); border-radius: var(--app-radius);
     }
-    .alerts-section { margin-bottom: 24px; }
-    .alerts-section h2 mat-icon { color: #e65100; }
-    .alert-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-    .alert-card { padding: 16px; border-left: 4px solid #e65100; }
-    .alert-card.premium-alert { border-left-color: #d32f2f; }
-    .alert-card.revision-alert { border-left-color: #f57c00; cursor: pointer; }
-    .alert-card.revision-alert:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    .alert-header { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 14px; margin-bottom: 12px; }
-    .alert-header mat-icon { font-size: 20px; width: 20px; height: 20px; color: #e65100; }
-    .premium-alert .alert-header mat-icon { color: #d32f2f; }
-    .revision-alert .alert-header mat-icon { color: #f57c00; }
-    .alert-body { display: flex; flex-direction: column; gap: 4px; }
-    .alert-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; }
-    .alert-row:hover { background: #f5f5f5; }
-    .alert-name { flex: 1; font-weight: 500; }
-    .alert-type { color: #666; font-size: 12px; }
-    .alert-days { color: #e65100; font-weight: 600; font-size: 12px; white-space: nowrap; }
-    .alert-amount { color: #d32f2f; font-weight: 600; font-size: 12px; white-space: nowrap; }
-    .revision-count { margin: 0; font-size: 13px; color: #666; }
-    .analytics-section { margin-bottom: 24px; display: flex; flex-direction: column; gap: 16px; }
-    .mom-row { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
-    .mom-card { padding: 24px; text-align: center; }
-    .mom-label { font-size: 13px; color: #666; }
-    .mom-value { font-size: 36px; font-weight: 700; margin: 8px 0; }
-    .mom-value.up { color: #d32f2f; }
-    .mom-value.down { color: #2e7d32; }
-    .mom-detail { font-size: 13px; color: #888; }
-    .filing-stats-card { padding: 24px; }
-    .filing-stats-card h3 { margin: 0 0 16px; font-size: 15px; font-weight: 500; }
-    .filing-stat-grid { display: flex; gap: 16px; flex-wrap: wrap; }
-    .fs-item { text-align: center; flex: 1; min-width: 60px; }
-    .fs-num { display: block; font-size: 24px; font-weight: 600; }
-    .fs-label { font-size: 12px; color: #666; }
-    .forecast-card { padding: 24px; }
-    .forecast-card h3 { margin: 0 0 16px; font-size: 15px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
-    .forecast-body { display: flex; gap: 24px; flex-wrap: wrap; }
-    .fc-item { text-align: center; flex: 1; min-width: 120px; }
-    .fc-label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
-    .fc-value { display: block; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
-    .fc-note { margin-top: 12px; font-size: 12px; color: #999; }
-    .trends-card { padding: 24px; }
-    .trends-table-wrap { overflow-x: auto; }
-    .trends-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .trends-table th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #e0e0e0; font-weight: 500; color: #666; font-size: 12px; }
-    .trends-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
-    .trends-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-    .recent-filings-card { padding: 24px; }
-    .recent-filings-card mat-list-item { cursor: pointer; }
-    @media (max-width: 960px) { .mom-row { grid-template-columns: 1fr; } }
-    @media (max-width: 600px) {
-      .stats-row { grid-template-columns: 1fr; }
+    .todo[data-tone="action"] { border-left-color: var(--app-status-action-fg); }
+    .todo[data-tone="waiting"] { border-left-color: var(--app-color-border); background: var(--app-color-surface-sub); }
+    .todo-title { display: flex; align-items: center; gap: var(--app-space-2); flex-wrap: wrap; }
+    .todo-title strong { font-size: var(--app-font-lg); }
+    .office { font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
+    .next { margin: var(--app-space-2) 0 0; font-size: var(--app-font-md); }
+    .detail { margin: var(--app-space-1) 0 0; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
+    .todo-deadline { display: flex; flex-direction: column; font-size: var(--app-font-md); font-variant-numeric: tabular-nums; }
+    .deadline-label { font-size: var(--app-font-xs); color: var(--app-color-text-sub); }
+    .days { font-size: var(--app-font-xs); color: var(--app-color-text-sub); }
+    .todo-deadline.soon, .todo-deadline.soon .days { color: var(--app-status-yours-fg); font-weight: 600; }
+    .todo-deadline.overdue, .todo-deadline.overdue .days, .todo-deadline.overdue .deadline-label { color: var(--app-status-action-fg); font-weight: 600; }
+    .continue { min-width: 112px; }
+    .continue.secondary { background: transparent; color: var(--app-color-link); border: 1px solid var(--app-color-border); }
+    .links { display: flex; gap: var(--app-space-5); flex-wrap: wrap; margin-top: var(--app-space-4); font-size: var(--app-font-md); }
+    .links a { color: var(--app-color-link); }
+    .portal-banner { display: flex; align-items: center; gap: var(--app-space-4); padding: var(--app-space-5); background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); color: inherit; text-decoration: none; }
+    .portal-banner mat-icon:first-child { font-size: 40px; width: 40px; height: 40px; color: var(--app-color-link); }
+    .portal-banner .chevron { margin-left: auto; color: var(--app-color-text-sub); }
+    @media (max-width: 720px) {
+      .todo { grid-template-columns: 1fr; }
+      .todo-deadline { flex-direction: row; gap: var(--app-space-2); align-items: baseline; }
     }
   `],
 })
-export class DashboardComponent  {
+export class DashboardComponent {
   office = inject(OfficeContextService);
   auth = inject(AuthService);
   private router = inject(Router);
   private functions = inject(Functions);
 
-  stats = signal<DashboardStats | null>(null);
-  tasks = signal<TaskItem[]>([]);
+  todos = signal<HomeTodo[] | null>(null);
+  /** サーバーの今日（東京）。期限の残り日数に使う */
+  today = signal(new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }));
   loading = signal(false);
   error = signal('');
-  analytics = signal<AnalyticsData | null>(null);
-  procedures = signal<{id:string;title:string;statusReason:string;deadline:string|null}[]>([]);
-  procedureLoading = signal(false); procedureError = signal('');
+  private sequence = 0;
+
+  mine = computed(() => (this.todos() ?? []).filter(t => t.tone !== 'waiting'));
+  waiting = computed(() => (this.todos() ?? []).filter(t => t.tone === 'waiting'));
+  /** 事業所を1つに絞っていなければ、各行に事業所名を出す */
+  showOffice = computed(() => !this.office.selected() && this.office.offices().length > 1);
 
   constructor() {
+    // ログインした・事業所を切り替えたら読み込み直す
     effect(() => {
       const profile = this.auth.profile();
-      if (!this.auth.loading() && profile && this.auth.hasAnyRole('admin','operator','approver')) untracked(() => void this.loadProcedures());
-      if (!this.auth.loading() && profile && this.auth.hasAnyRole('admin', 'operator')) {
-        void this.loadStats();
-      }
+      this.office.selected();
+      if (!this.auth.loading() && profile && this.canSeeTodos()) untracked(() => void this.load());
     });
   }
+
+  canSeeTodos() { return this.auth.hasAnyRole('admin', 'operator', 'approver'); }
+  isOperator() { return this.auth.hasAnyRole('admin', 'operator'); }
+  count(tone: HomeTodo['tone']) { return (this.todos() ?? []).filter(t => t.tone === tone).length; }
 
   greeting(): string {
     const h = new Date().getHours();
@@ -477,63 +212,35 @@ export class DashboardComponent  {
     return 'お疲れさまです';
   }
 
-  navigate(route: string) {
-    this.router.navigateByUrl(route);
-  }
-
-  openFiling(employeeId:string, filingId:string) { this.router.navigate(['/filings',filingId],{queryParams:{employeeId}}); }
-  async loadProcedures() {
-    if (this.procedureLoading()) return;
-    this.procedureLoading.set(true); this.procedureError.set('');
-    try {
-      const {data} = await httpsCallable<object,{items:{id:string;title:string;statusReason:string;deadline:string|null}[]}>(this.functions,'procedureList')({companyId:this.auth.companyId,...this.office.params(),status:'in_progress',limit:6});
-      this.procedures.set(data.items);
-    } catch(e:any) { this.procedureError.set(e.message==='INTERNAL'?'手続きを取得できませんでした。少し待って再読み込みしてください。':e.message ?? '手続きを取得できませんでした'); }
-    finally { this.procedureLoading.set(false); }
-  }
-
-  async loadStats() {
+  async load() {
+    const sequence = ++this.sequence;
     this.loading.set(true);
     this.error.set('');
-    this.stats.set(null);
-    this.tasks.set([]);
     try {
-      const fn = httpsCallable<{ companyId: string }, DashboardStats>(this.functions, 'dashboardStats');
-      const { data } = await fn({ companyId: this.auth.companyId, ...this.office.params() });
-      this.stats.set(data);
-      this.tasks.set([
-        ...(this.auth.hasAnyRole('admin','operator')?[{ icon: 'event_repeat', label: '毎月の処理（給与・保険料・徴収）', route: '/monthly', count: 0, color: '#1976d2' }]:[]),
-        { icon: 'pending_actions', label: '承認処理', route: '/approvals', count: data.pendingApprovals, color: '#e65100' },
-        ...(this.auth.hasAnyRole('admin','operator')?[{ icon: 'description', label: '届出提出', route: '/filings', count: data.pendingFilings, color: '#7b1fa2' }]:[]),
-      ].filter(task=>task.route!=='/approvals'||this.auth.hasAnyRole('admin','operator','approver')));
-    } catch {
-      this.error.set('統計情報を取得できませんでした。接続状況・権限・APIの公開状況を確認してください。');
+      const { data } = await httpsCallable<object, { today: string; items: HomeTodo[] }>(this.functions, 'homeTodos', { timeout: 60_000 })({
+        companyId: this.auth.companyId, ...this.office.params(),
+      });
+      if (sequence !== this.sequence) return;
+      this.today.set(data.today);
+      this.todos.set(data.items);
+    } catch (e: any) {
+      if (sequence === this.sequence) this.error.set(e.message === 'INTERNAL' || !e.message ? '少し待ってから、もう一度試してください。' : e.message);
     } finally {
-      this.loading.set(false);
+      if (sequence === this.sequence) this.loading.set(false);
     }
   }
 
-  private readonly FILING_TYPE_LABELS: Record<string, string> = {
-    acquisitionNotification: '資格取得届',
-    lossNotification: '資格喪失届',
-    remunerationMonthlyChange: '月額変更届',
-    remunerationMonthlyAlgorithm: '算定基礎届',
-    bonusPayment: '賞与支払届',
-    dependentChange: '扶養異動届',
-    maternityLeaveStart: '産前産後休業取得者申出書',
-    childcareLeaveStart: '育児休業等取得者申出書',
-    childcareLeaveEnd: '育児休業等取得者終了届',
-  };
+  open(todo: HomeTodo) { void this.router.navigate([todo.route], { queryParams: todo.queryParams }); }
 
-  filingTypeLabel(type: string): string {
-    return this.FILING_TYPE_LABELS[type] ?? type;
+  private days(deadline: string) {
+    return Math.round((Date.parse(deadline) - Date.parse(this.today())) / 86_400_000);
   }
-
-  async loadAnalytics() {
-    try {
-      const fn = httpsCallable<{ companyId: string; months?: number }, AnalyticsData>(this.functions, 'dashboardAnalytics');
-      const { data } = await fn({ companyId: this.auth.companyId, months: 6 });
-      this.analytics.set(data);
-    } catch { /* analytics is non-critical */ }
+  overdue(todo: HomeTodo) { return !!todo.deadline && this.days(todo.deadline) < 0; }
+  /** 期限まで7日以内 */
+  soon(todo: HomeTodo) { return !!todo.deadline && this.days(todo.deadline) >= 0 && this.days(todo.deadline) <= 7; }
+  dateLabel(d: string) { const [y, m, day] = d.split('-'); return `${y}年${Number(m)}月${Number(day)}日`; }
+  daysLabel(d: string) {
+    const n = this.days(d);
+    return n < 0 ? `${-n}日過ぎています` : n === 0 ? '今日まで' : `あと${n}日`;
   }
 }

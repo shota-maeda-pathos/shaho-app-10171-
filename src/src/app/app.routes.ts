@@ -40,8 +40,8 @@ export const routes: Routes = [
           import('./features/dashboard/dashboard').then((m) => m.DashboardComponent),
       },
       {path:'monthly',canActivate:[roleGuard('admin','operator','approver')],data:{title:'毎月の処理'},loadComponent:()=>import('./features/monthly/monthly').then(m=>m.MonthlyComponent)},
-      // 旧「定例業務」は毎月の処理に置き換えた。賞与・算定などの年次業務への入口は段階5でホームに移す
-      {path:'operations',canActivate:[roleGuard('admin','operator')],data:{title:'定例業務'},loadComponent:()=>import('./features/operations/operations').then(m=>m.OperationsComponent)},
+      // 旧「定例業務」は毎月の処理に置き換え、賞与・算定への入口は「手続きを始める」に移した
+      { path: 'operations', redirectTo: 'procedures/new', pathMatch: 'full' },
       {path:'analytics',canActivate:[roleGuard('admin','operator','viewer')],data:{title:'集計・試算'},loadComponent:()=>import('./features/analytics/analytics').then(m=>m.AnalyticsComponent)},
       {
         path: 'employees',

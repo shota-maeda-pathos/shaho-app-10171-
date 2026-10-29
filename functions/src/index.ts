@@ -146,3 +146,4 @@ export { seedGrades } from './seed/seed-grades/functions';
 export { migrateOfficeRoundingRule } from './migrations/rounding-rule';
 export { migrateInsuranceRates } from './migrations/rate-repair';
 export { onboardingStart, onboardingGet, onboardingList, onboardingPreview, onboardingUpdate, onboardInviteGet, onboardInviteSubmit } from './onboarding/functions';
+export { homeTodos } from './home/functions';
