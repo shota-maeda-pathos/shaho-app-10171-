@@ -235,9 +235,9 @@ interface AnalyticsData {
                 <mat-icon>person_add</mat-icon>
                 手続きを始める
               </button>
-              <button mat-stroked-button (click)="navigate('/operations')">
+              <button mat-stroked-button (click)="navigate('/monthly')">
                 <mat-icon>event_repeat</mat-icon>
-                今月の定例業務を進める
+                毎月の処理を進める
               </button>
               <button mat-stroked-button (click)="navigate('/analytics')">
                 <mat-icon>trending_up</mat-icon>
@@ -502,7 +502,7 @@ export class DashboardComponent  {
       const { data } = await fn({ companyId: this.auth.companyId, ...this.office.params() });
       this.stats.set(data);
       this.tasks.set([
-        ...(this.auth.hasAnyRole('admin','operator')?[{ icon: 'event_repeat', label: '定例業務（給与・保険料・公開）', route: '/operations', count: 0, color: '#1976d2' }]:[]),
+        ...(this.auth.hasAnyRole('admin','operator')?[{ icon: 'event_repeat', label: '毎月の処理（給与・保険料・徴収）', route: '/monthly', count: 0, color: '#1976d2' }]:[]),
         { icon: 'pending_actions', label: '承認処理', route: '/approvals', count: data.pendingApprovals, color: '#e65100' },
         ...(this.auth.hasAnyRole('admin','operator')?[{ icon: 'description', label: '届出提出', route: '/filings', count: data.pendingFilings, color: '#7b1fa2' }]:[]),
       ].filter(task=>task.route!=='/approvals'||this.auth.hasAnyRole('admin','operator','approver')));

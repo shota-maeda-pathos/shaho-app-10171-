@@ -41,7 +41,8 @@ export class LayoutComponent {
   navItems = [
     { icon: 'dashboard', label: 'ホーム', route: '/home', roles: ['admin', 'approver', 'operator', 'viewer'] },
     { icon: 'assignment', label: '手続き', route: '/procedures', roles: ['admin', 'operator', 'approver'] },
-    { icon: 'event_repeat', label: '定例業務', route: '/operations', roles: ['admin', 'operator'] },
+    { icon: 'event_repeat', label: '毎月の処理', route: '/monthly', roles: ['admin', 'operator', 'approver'] },
+    { icon: 'event_note', label: '定例業務', route: '/operations', roles: ['admin', 'operator'] },
     { icon: 'people', label: '従業員台帳', route: '/employees', roles: ['admin', 'operator'] },
     { icon: 'check_circle', label: '承認', route: '/approvals', roles: ['admin', 'approver', 'operator'] },
     { icon: 'description', label: '届出・帳票', route: '/filings', roles: ['admin', 'operator'] },

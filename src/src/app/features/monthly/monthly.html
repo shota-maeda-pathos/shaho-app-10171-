@@ -1,0 +1,189 @@
+<div class="app-page">
+  <h1 class="app-page-title">毎月の処理</h1>
+
+  @if (!office.selected()) {
+    <p class="app-page-guide">毎月の処理を進める事業所を選んでください。</p>
+    <div class="offices">
+      @for (item of office.offices(); track item.id) {
+        <button mat-stroked-button type="button" (click)="chooseOffice(item.id)">{{ item.name }}</button>
+      }
+    </div>
+  } @else {
+    <div class="period">
+      <label>給与の支給月
+        <input type="month" [ngModel]="payMonth" (ngModelChange)="changeMonth($event)" [disabled]="busy()">
+      </label>
+      @if (data(); as d) {
+        <div class="period-note">
+          {{ d.office.name }}・{{ monthLabel(d.payMonth) }}に支給する給与から、<strong>{{ monthLabel(d.premiumMonth) }}分</strong>の保険料を控除します
+          （{{ d.deductionMethod === 'previous' ? '翌月控除' : '当月控除' }}<app-term key="deduction" [showLabel]="false" />）
+        </div>
+      }
+      <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || busy()"><mat-icon>refresh</mat-icon>読み込み直す</button>
+    </div>
+
+    @if (job(); as j) {
+      @if (j.status === 'running') {
+        <div class="job" role="status">
+          <div><strong>{{ j.label || '処理' }}を実行しています</strong>（{{ j.processed }} / {{ j.total }}名）。画面を閉じても処理は続きます。</div>
+          <mat-progress-bar mode="determinate" [value]="j.total ? j.processed / j.total * 100 : 0" aria-label="処理の進み具合"></mat-progress-bar>
+        </div>
+      } @else if (j.status === 'stalled') {
+        <div class="job job-stalled" role="alert">前回の「{{ j.label }}」が途中で止まりました（{{ j.processed }} / {{ j.total }}名）。残った人に、もう一度実行してください。</div>
+      }
+    }
+
+    @if (error()) {
+      <app-error-state [message]="error()" (retry)="load()" />
+    } @else if (!data() && loading()) {
+      <app-loading-state message="対象者の状況を読み込んでいます…" />
+    } @else if (data(); as d) {
+      <nav class="steps" aria-label="毎月の処理のステップ">
+        <ol>
+          @for (s of steps; track s.key; let i = $index) {
+            @let sum = summaries()[i];
+            <li [attr.data-view]="stepView(s.key)" [class.current]="current() === s.key">
+              <button type="button" (click)="selectStep(s.key)" [attr.aria-current]="current() === s.key ? 'step' : null">
+                <span class="mark" aria-hidden="true">
+                  @switch (stepView(s.key)) {
+                    @case ('done') { <mat-icon>check</mat-icon> }
+                    @case ('waiting') { <mat-icon>hourglass_empty</mat-icon> }
+                    @default { {{ i + 1 }} }
+                  }
+                </span>
+                <span class="step-text">
+                  <span class="step-label">{{ s.label }}</span>
+                  <span class="step-count">
+                    @if (sum.empty) { 対象なし }
+                    @else if (sum.done) { 完了 }
+                    @else if (sum.todo) { 残り{{ sum.todo }}名 }
+                    @else { {{ sum.waiting }}名 承認待ち }
+                  </span>
+                </span>
+              </button>
+            </li>
+          }
+        </ol>
+      </nav>
+
+      <section class="panel" aria-labelledby="step-title">
+        <h2 id="step-title">{{ currentDef().label }}</h2>
+        <dl class="guide">
+          <div><dt>やること</dt><dd>{{ currentDef().what }}</dd></div>
+          <div><dt>なぜ必要か</dt><dd>{{ currentDef().why }}</dd></div>
+          <div><dt>次に起きること</dt><dd>{{ currentDef().next }}</dd></div>
+        </dl>
+
+        @if (reviewNote(); as note) {
+          <div class="note" [attr.data-mine]="note.mine" role="status"><mat-icon aria-hidden="true">{{ note.mine ? 'hourglass_empty' : 'fact_check' }}</mat-icon>{{ note.text }}</div>
+        }
+
+        @switch (current()) {
+          @case ('salary') {
+            <div class="import">
+              <div class="import-actions">
+                <button mat-stroked-button type="button" (click)="downloadTemplate()"><mat-icon>download</mat-icon>取込用のCSVをダウンロード</button>
+                <label class="file" [class.disabled]="busy()">
+                  <mat-icon>upload_file</mat-icon>CSVを選んで確認する
+                  <input type="file" accept=".csv,text/csv" (change)="pickCsv($event)" [disabled]="busy()">
+                </label>
+              </div>
+              <p class="hint">
+                ダウンロードしたCSVに金額を入れて取り込みます。手当は「固定:住宅手当」「非固定:残業手当」のように列を足せます。
+                給与がない月の人は「無給」の列に 1 を入れるか、一覧で「無給として記録」を押します。<app-term key="paymentBasisDays" />
+              </p>
+              @if (importResult(); as res) {
+                <div class="import-result">
+                  <h3>{{ res.dryRun ? '取込前の確認' : '取込の結果' }}{{ csvName() ? '：' + csvName() : '' }}</h3>
+                  <p>
+                    {{ res.dryRun ? '取り込める人' : '取り込んだ人' }}：<strong>{{ res.dryRun ? res.rows.length : res.imported }}名</strong>
+                    @if (res.errors.length) { ／ 誤りのある行：<strong class="bad">{{ res.errors.length }}行</strong>（取り込みません） }
+                  </p>
+                  @if (res.errors.length) {
+                    <div class="table-wrap">
+                      <table class="errors">
+                        <thead><tr><th>行</th><th>社員番号</th><th>誤りの内容</th></tr></thead>
+                        <tbody>
+                          @for (e of res.errors; track e.line + e.message) {
+                            <tr><td>{{ e.line }}</td><td>{{ e.employeeNumber || '—' }}</td><td>{{ e.message }}</td></tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                  @if (res.dryRun) {
+                    @if (res.rows.length) {
+                      <details>
+                        <summary>取り込む内容を見る（上書き {{ res.rows.filter(r => r.overwrite).length }}名）</summary>
+                        <div class="table-wrap">
+                          <table>
+                            <thead><tr><th>行</th><th>社員番号</th><th>氏名</th><th class="num">支給額</th><th>備考</th></tr></thead>
+                            <tbody>
+                              @for (r of res.rows; track r.line) {
+                                <tr><td>{{ r.line }}</td><td>{{ r.employeeNumber }}</td><td>{{ r.name }}</td><td class="num">{{ r.total | number }}円</td>
+                                  <td>{{ r.noPay ? '無給' : '' }}{{ r.overwrite ? '登録済みの給与を上書き' : '' }}</td></tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                      </details>
+                    }
+                    <div class="import-actions">
+                      <button mat-flat-button type="button" (click)="importCsv(false)" [disabled]="busy() || !res.rows.length">
+                        {{ res.rows.length }}名を取り込む{{ res.errors.length ? '（誤りの行は除く）' : '' }}
+                      </button>
+                      <button mat-button type="button" (click)="cancelImport()" [disabled]="busy()">やめる</button>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+          @case ('premiumReview') {
+            <div class="totals" aria-label="事業所の合計">
+              <div><span>本人負担の合計</span><strong>{{ d.totals.employee | number }}円</strong>
+                <small>前月比 {{ d.totals.employee - d.totals.previousEmployee >= 0 ? '+' : '' }}{{ d.totals.employee - d.totals.previousEmployee | number }}円</small></div>
+              <div><span>会社負担の合計</span><strong>{{ d.totals.employer | number }}円</strong>
+                <small>前月比 {{ d.totals.employer - d.totals.previousEmployer >= 0 ? '+' : '' }}{{ d.totals.employer - d.totals.previousEmployer | number }}円</small></div>
+              <div><span>納付する額（合計）</span><strong>{{ d.totals.employee + d.totals.employer | number }}円</strong>
+                <small>{{ monthLabel(d.premiumMonth) }}分</small></div>
+            </div>
+          }
+          @case ('collection') {
+            <div class="totals" aria-label="徴収の合計">
+              <div><span>集める本人負担</span><strong>{{ d.totals.due | number }}円</strong></div>
+              <div><span>徴収済み</span><strong>{{ d.totals.collected | number }}円</strong></div>
+              <div><span>未徴収</span><strong [class.bad]="d.totals.due - d.totals.collected > 0">{{ d.totals.due - d.totals.collected | number }}円</strong>
+                <small>別途入金<app-term key="separateCollection" [showLabel]="false" />の人は、名前を押して入金を記録します</small></div>
+            </div>
+          }
+        }
+
+        <app-target-list [rows]="targetRows()" [actions]="actions()" [busy]="busy() || loading()" [loading]="loading()" [cellHeader]="cellHeader()" [includeYours]="true"
+                         (run)="run($event)" (retryFailed)="retry($event)" (hold)="hold($event.id, $event.reason)"
+                         (release)="hold($event, null)" (open)="open($event.id)">
+          <ng-template appTargetCell let-t>
+            @if (row(t.id); as r) {
+              @switch (current()) {
+                @case ('salary') { @if (r.salary) { {{ r.salary.noPay ? '無給' : (r.salary.total | number) + '円' }} } @else { — } }
+                @case ('salaryReview') { {{ r.salary?.noPay ? '無給' : (r.salary?.total | number) + '円' }} }
+                @case ('calculate') { @if (r.premium) { {{ r.premium.employee | number }}円 } @else { {{ r.premiumNote || '—' }} } }
+                @case ('premiumReview') {
+                  <div class="num">{{ r.premium?.employee | number }}円 / {{ r.premium?.employer | number }}円</div>
+                  @if (r.diff !== null && r.diff !== 0) { <div class="diff">前月比 {{ r.diff > 0 ? '+' : '' }}{{ r.diff | number }}円</div> }
+                  @if (r.diffReasons.length) { <div class="diff">{{ r.diffReasons.join('／') }}</div> }
+                }
+                @case ('publish') { 給与 {{ r.salary?.noPay ? '無給' : (r.salary?.total | number) + '円' }} }
+                @case ('collection') { {{ r.collection.collected ?? 0 | number }} / {{ r.collection.due | number }}円 }
+              }
+            }
+          </ng-template>
+        </app-target-list>
+
+        <p class="links">
+          給与を1人ずつ直すときは名前を押してください。承認の差し戻しは <a routerLink="/approvals">承認の画面</a> から行えます。
+        </p>
+      </section>
+    }
+  }
+</div>

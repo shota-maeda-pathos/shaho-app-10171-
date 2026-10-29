@@ -194,6 +194,8 @@ export class TargetListComponent {
   hasMore = input(false);
   /** 独自の列の見出し */
   cellHeader = input('');
+  /** 「あなたの番」の人も要対応に数える（毎月の処理のように、全員にまとめて操作する手続き） */
+  includeYours = input(false);
 
   run = output<BulkRun>();
   hold = output<{ id: string; reason: string }>();
@@ -206,9 +208,9 @@ export class TargetListComponent {
   filter = signal<Filter>('attention');
   selected = signal<ReadonlySet<string>>(new Set());
 
-  attention = computed(() => this.rows().filter(r => !r.held && (r.tone === 'action' || r.error)));
+  attention = computed(() => this.rows().filter(r => !r.held && (this.needsAction(r) || r.error)));
   held = computed(() => this.rows().filter(r => r.held));
-  ok = computed(() => this.rows().filter(r => !r.held && r.tone !== 'action' && !r.error));
+  ok = computed(() => this.rows().filter(r => !r.held && !this.needsAction(r) && !r.error));
   failed = computed(() => this.rows().filter(r => r.error));
   failedIds = computed(() => this.failed().map(r => r.id));
   visible = computed(() => {
@@ -230,6 +232,10 @@ export class TargetListComponent {
     ok: '問題のない人はまだいません',
     all: '対象の人はいません',
   })[this.filter()]);
+
+  private needsAction(r: TargetRow) {
+    return r.tone === 'action' || (this.includeYours() && r.tone === 'yours');
+  }
 
   /** 操作の対象：選んだ人がいれば選んだ人、いなければ全員。どちらも保留中と対象外の人は除く */
   targetsOf(action: BulkAction) {

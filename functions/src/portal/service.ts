@@ -35,11 +35,13 @@ function insuranceResult(data: FirebaseFirestore.DocumentData | undefined) {
   };
 }
 async function payslip(path: string, yearMonth: string, salary: FirebaseFirestore.DocumentData) {
-  const insurance = await db.doc(`${path}/monthlyInsurance/${yearMonth}`).get();
+  // 毎月の処理で公開した明細は、控除した保険料の月（翌月控除なら前月分）を持つ。null は控除なし
+  const premiumMonth = salary.deductedPremiumMonth === undefined ? yearMonth : salary.deductedPremiumMonth;
+  const insurance = premiumMonth ? await db.doc(`${path}/monthlyInsurance/${premiumMonth}`).get() : null;
   return {
     yearMonth, baseSalary: amount(salary.baseSalary), totalSalary: amount(salary.totalSalary),
     fixedAllowances: allowances(salary.fixedAllowances), variableAllowances: allowances(salary.variableAllowances),
-    insurance: insuranceResult(insurance.data()),
+    insurance: insuranceResult(insurance?.data()),
   };
 }
 export async function getPortalOverview(input: PortalOverviewInput, auth: AuthContext) {

@@ -10,6 +10,7 @@ import { validateApprovalTarget } from '../target';
 export async function createApprovalRequest(
   input: ApprovalRequestCreateInput,
   auth: AuthContext,
+  options: { notify?: boolean } = {},
 ): Promise<MutationResponse> {
   const empRef = db.doc(
     `companies/${auth.companyId}/employees/${input.employeeId}`,
@@ -106,6 +107,8 @@ export async function createApprovalRequest(
     }
   }
 
+  // 毎月の処理など大人数をまとめて申請するときは、1人ずつの通知を出さない
+  if (options.notify === false) return { success: true, id: result };
   const { notify } = await import('../../utils/notify');
   await notify({
     companyId: auth.companyId,

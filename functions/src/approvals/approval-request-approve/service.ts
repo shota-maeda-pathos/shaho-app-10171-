@@ -10,6 +10,7 @@ import { validateApprovalTarget } from '../target';
 export async function approveApprovalRequest(
   input: ApprovalRequestApproveInput,
   auth: AuthContext,
+  options: { notify?: boolean } = {},
 ): Promise<MutationResponse> {
   const empRef = db.doc(
     `companies/${auth.companyId}/employees/${input.employeeId}`,
@@ -163,6 +164,8 @@ export async function approveApprovalRequest(
     return input.requestId;
   });
 
+  // 毎月の処理でまとめて承認するときは、1人ずつの手続きの更新と通知を出さない（給与・保険料は手続きに関わらない）
+  if (options.notify === false) return { success: true, id: result };
   const { refreshEmployeeProcedures } = await import('../../procedures/hooks');
   await refreshEmployeeProcedures(auth.companyId, input.employeeId);
 

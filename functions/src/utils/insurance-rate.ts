@@ -1,5 +1,6 @@
 import { db } from '../config';
 import { InsuranceRateDoc } from '../types/firestore';
+import { invalidArg } from './errors';
 
 export interface RateQuery {
   companyId: string;
@@ -58,8 +59,24 @@ export async function findApplicableRate(
     // 適用開始月の新しい順に並んでいるので、同じ優先度なら先に見つかったもの（最新）を使う
     if (!best || score > best.score) best = { rate, score };
   }
+  if (best) assertRateUnit(best.rate);
   return best?.rate ?? null;
 }
+
+/**
+ * 料率は ‰（1000分の1。例：健康保険 99.1）で登録する。0より大きく1未満の値は、小数（0.0991）や％の誤りとみなして計算を止める。
+ * 単位を誤った料率で計算すると、保険料がほぼ0円になっても気づけないため。
+ */
+export function assertRateUnit(rate: Pick<InsuranceRateDoc, 'insuranceType' | 'appliedFrom' | 'employeeRate' | 'employerRate' | 'totalRate'>): void {
+  const values = [rate.employeeRate, rate.employerRate, rate.totalRate].filter((v): v is number => typeof v === 'number');
+  if (values.some(v => v > 0 && v < 1)) {
+    throw invalidArg(`料率の単位が正しくありません（${RATE_LABELS[rate.insuranceType] ?? rate.insuranceType}・${rate.appliedFrom}から：${values.join('／')}）。料率マスタは‰（例：健康保険 99.1）で登録してください`);
+  }
+}
+
+const RATE_LABELS: Record<string, string> = {
+  health: '健康保険', pension: '厚生年金', longTermCare: '介護保険', childSupport: '子ども・子育て拠出金', childSupportPayment: '子ども・子育て支援金',
+};
 
 export interface AllRates {
   health: InsuranceRateDoc | null;

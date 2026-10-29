@@ -1,6 +1,9 @@
 import './config';
 export { collectionRecord } from './collections/collection-record/functions';
 export { operationsMonthlyStatus, operationsMonthlyHold, operationsMonthlyAction } from './operations/functions';
+export {
+  monthlyRunOverview, monthlyRunHold, monthlySalaryImport, monthlySalaryNoPay, monthlyCollectionEntry, monthlyJobStart, monthlyJobGet, monthlyJobChunk,
+} from './monthly/functions';
 export { procedureAction } from './procedures/procedure-action/functions';
 
 // 会社API
@@ -139,4 +142,5 @@ export { procedureCancel } from './procedures/procedure-cancel/functions';
 export { seedMasterData } from './seed/seed-master/functions';
 export { seedGrades } from './seed/seed-grades/functions';
 export { migrateOfficeRoundingRule } from './migrations/rounding-rule';
+export { migrateInsuranceRates } from './migrations/rate-repair';
 export { onboardingStart, onboardingGet, onboardingList, onboardingPreview, onboardingUpdate, onboardInviteGet, onboardInviteSubmit } from './onboarding/functions';

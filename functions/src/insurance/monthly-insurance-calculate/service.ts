@@ -58,17 +58,7 @@ export async function calculateMonthlyInsurance(
       throw invalidArg('社会保険の適用外のため保険料は計算しません');
     }
 
-    // 対象月の給与が承認済みか確認
-    const salaryRef = db.doc(
-      `companies/${auth.companyId}/employees/${input.employeeId}/salaries/${input.yearMonth}`,
-    );
-    const salaryDoc = await tx.get(salaryRef);
-    if (!salaryDoc.exists) {
-      throw invalidArg(`${input.yearMonth}の給与データが登録されていません。先に給与を入力してください`);
-    }
-    if (!salaryDoc.data()!.isConfirmed) {
-      throw invalidArg(`${input.yearMonth}の給与が未承認です。先に給与の承認を完了してください`);
-    }
+    // 保険料は等級から決まるため、給与の登録・承認は求めない（無給の休職者も計算する。徴収は別途入金で扱う）
 
     const gradesSnap = await db
       .collection(
