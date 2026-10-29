@@ -77,7 +77,7 @@ type Filter = 'all' | 'attention' | 'ok' | 'excluded';
             <th mat-header-cell *matHeaderCellDef>4〜6月（報酬・支払基礎日数）</th>
             <td mat-cell *matCellDef="let row">
               @for (m of row.months; track m.yearMonth) {
-                <div class="month" [class.unused]="!m.used">
+                <div class="month" [class.unused]="isCalculated(row) && !m.used">
                   {{ +m.yearMonth.slice(5) }}月：
                   @if (m.remuneration !== null) { {{ m.remuneration | number }}円・{{ m.paymentBasisDays }}日 } @else { 未登録 }
                 </div>
@@ -208,6 +208,11 @@ export class SanteiListComponent implements OnInit {
 
   ngOnInit() {
     void this.reload();
+  }
+
+  /** 平均を計算した行か（保留・除外の行は月の使用・不使用を表示しない） */
+  isCalculated(row: SanteiRow) {
+    return row.status === 'ok' || row.status === 'needsAction';
   }
 
   statusLabel(status: SanteiStatus) {

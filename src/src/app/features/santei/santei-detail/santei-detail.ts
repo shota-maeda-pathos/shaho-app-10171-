@@ -40,11 +40,11 @@ import {
 
         <div class="month-cards">
           @for (m of r.months; track m.yearMonth) {
-            <mat-card [class.excluded]="!m.used">
+            <mat-card [class.excluded]="calculated(r) && !m.used">
               <h2>{{ +m.yearMonth.slice(5) }}月</h2>
               <div class="detail-row"><span class="label">支払基礎日数</span><span>{{ m.paymentBasisDays === null ? '—' : m.paymentBasisDays + ' 日' }}</span></div>
               <div class="detail-row total"><span class="label">報酬月額</span><span>{{ m.remuneration === null ? '未登録' : (m.remuneration | number) + ' 円' }}</span></div>
-              @if (!m.used && m.remuneration !== null) {
+              @if (calculated(r) && !m.used && m.remuneration !== null) {
                 <div class="excluded-badge"><mat-icon>info</mat-icon>日数が基準に満たないため平均に含めません</div>
               }
             </mat-card>
@@ -60,11 +60,11 @@ import {
           <div class="result-grid">
             <div class="result-item"><label>平均（円未満切捨て）</label><span class="large">{{ r.average === null ? '—' : (r.average | number) + ' 円' }}</span></div>
             <div class="result-item"><label>健康保険</label>
-              <span>{{ r.current?.healthGradeNumber ?? '—' }}等級 → <strong [class.changed]="r.changed">{{ r.proposed?.healthGradeNumber ?? '—' }}等級</strong></span>
+              <span>{{ r.current?.healthGradeNumber ?? '—' }}等級 @if (r.proposed) { → <strong [class.changed]="r.changed">{{ r.proposed.healthGradeNumber }}等級</strong> } @else { （未計算） }</span>
               <span class="sub">{{ (r.proposed?.healthStandardRemuneration ?? null) === null ? '' : (r.proposed!.healthStandardRemuneration | number) + ' 円' }}</span>
             </div>
             <div class="result-item"><label>厚生年金</label>
-              <span>{{ r.current?.pensionGradeNumber ?? '—' }}等級 → <strong [class.changed]="r.changed">{{ r.proposed?.pensionGradeNumber ?? '—' }}等級</strong></span>
+              <span>{{ r.current?.pensionGradeNumber ?? '—' }}等級 @if (r.proposed) { → <strong [class.changed]="r.changed">{{ r.proposed.pensionGradeNumber }}等級</strong> } @else { （未計算） }</span>
               <span class="sub">{{ (r.proposed?.pensionStandardRemuneration ?? null) === null ? '' : (r.proposed!.pensionStandardRemuneration | number) + ' 円' }}</span>
             </div>
           </div>
@@ -144,6 +144,11 @@ export class SanteiDetailComponent implements OnInit {
     const year = Number(this.route.snapshot.queryParamMap.get('year'));
     if (Number.isInteger(year) && year > 2000) this.year = year;
     void this.load();
+  }
+
+  /** 平均を計算した行か（保留・除外の行は月の使用・不使用を表示しない） */
+  calculated(row: SanteiRow) {
+    return row.status === 'ok' || row.status === 'needsAction';
   }
 
   statusLabel(status: SanteiRow['status']) {

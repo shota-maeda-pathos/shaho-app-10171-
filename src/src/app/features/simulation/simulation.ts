@@ -20,6 +20,7 @@ interface SimResult {
   longTermCare: { gradeNumber: number; standardRemuneration: number; rate: number; employeeAmount: number; employerAmount: number } | null;
   pension: { gradeNumber: number; standardRemuneration: number; rate: number; employeeAmount: number; employerAmount: number } | null;
   childSupport: { rate: number; employerAmount: number };
+  childSupportPayment?: { employeeAmount: number; employerAmount: number };
   totalEmployee: number;
   totalEmployer: number;
   totalCompany: number;
@@ -153,6 +154,9 @@ export class SimulationComponent implements OnInit {
     }
     if (r.pension) {
       rows.push({ item: '厚生年金', grade: r.pension.gradeNumber + '等級', standard: fmt(r.pension.standardRemuneration), rate: r.pension.rate, employee: fmt(r.pension.employeeAmount), employer: fmt(r.pension.employerAmount) });
+    }
+    if (r.childSupportPayment && (r.childSupportPayment.employeeAmount || r.childSupportPayment.employerAmount)) {
+      rows.push({ item: '子ども・子育て支援金', grade: '', standard: '', rate: '', employee: fmt(r.childSupportPayment.employeeAmount), employer: fmt(r.childSupportPayment.employerAmount) });
     }
     rows.push({ item: '子ども・子育て拠出金', grade: '', standard: '', rate: r.childSupport.rate, employee: '-', employer: fmt(r.childSupport.employerAmount) });
     rows.push({ item: '合計', grade: '', standard: '', rate: '', employee: fmt(r.totalEmployee), employer: fmt(r.totalEmployer), isTotal: true });

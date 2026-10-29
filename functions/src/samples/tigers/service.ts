@@ -18,7 +18,7 @@ export async function seedTigersSamples(auth: AuthContext) {
     const entries: { path: string; data: Record<string, unknown> }[] = [];
     const add = (path: string, data: Record<string, unknown>) => entries.push({ path: `${base}/${path}`, data: { ...shared, ...data } });
     const officeId = 'sample-tigers-office';
-    add(`offices/${officeId}`, { name: 'サンプル甲子園事業所', officeNumber: 'TEST-001', prefectureCode: '28', insurerId: 'sample-insurer', address: 'テスト用住所', phone: '000-0000-0000', closingDay: 0, paymentDay: 25, paymentMonth: 'current', deductionMethod: 'current', roundingRule: 'truncate', isActive: true });
+    add(`offices/${officeId}`, { name: 'サンプル甲子園事業所', officeNumber: 'TEST-001', prefectureCode: '28', insurerId: 'sample-insurer', address: 'テスト用住所', phone: '000-0000-0000', closingDay: 0, paymentDay: 25, paymentMonth: 'current', deductionMethod: 'current', roundingRule: 'statutory', isActive: true });
     add('departments/sample-tigers-team', { name: 'サンプル営業部', officeId, parentId: null, sortOrder: 1, isActive: true });
     for (const player of samplePlayers) {
       const id = `sample-tigers-${String(player.n).padStart(2, '0')}`;
