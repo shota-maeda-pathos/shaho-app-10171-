@@ -31,7 +31,7 @@ describe('resignEmployee', () => {
     const result = await resignEmployee(baseInput, auth);
 
     expect(result.success).toBe(true);
-    expect(result.id).toBe('emp-001');
+    expect(result.employeeId).toBe('emp-001');
   });
 
   it('既に退職済みの場合エラーになる', async () => {

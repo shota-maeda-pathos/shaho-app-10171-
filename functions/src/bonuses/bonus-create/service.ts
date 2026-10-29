@@ -43,6 +43,7 @@ export async function createBonus(
       standardBonusAmount: input.standardBonusAmount,
       cumulativeBonusAmount: input.cumulativeBonusAmount,
       isConfirmed: false,
+      approvalPending: false,
       confirmedAt: null,
       confirmedBy: null,
       version: 1,

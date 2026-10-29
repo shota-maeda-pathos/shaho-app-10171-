@@ -77,6 +77,39 @@ describe('approveApprovalRequest', () => {
     ).rejects.toThrow('処理済み');
   });
 
+  it('自分が作成した承認リクエストは承認できない', async () => {
+    const empDoc = makeEmployeeDoc();
+    mockDb.setDoc('companies/company-001/employees/emp-001', empDoc as any);
+    mockDb.setDoc(
+      'companies/company-001/employees/emp-001/approvalRequests/req-001',
+      {
+        targetPath: 'companies/company-001/employees/emp-001/salaries/2026-10',
+        targetVersion: 1,
+        snapshotData: { totalSalary: 335000 },
+        requestType: 'salary',
+        status: 'pending',
+        requestedBy: 'user-001',
+        comment: null,
+      },
+    );
+    mockDb.setDoc(
+      'companies/company-001/employees/emp-001/salaries/2026-10',
+      { totalSalary: 335000, version: 1, isConfirmed: false },
+    );
+
+    const auth = makeAuth();
+    await expect(
+      approveApprovalRequest(
+        {
+          companyId: 'company-001',
+          employeeId: 'emp-001',
+          requestId: 'req-001',
+        },
+        auth,
+      ),
+    ).rejects.toThrow('自分が作成した承認リクエストを自分で承認することはできません');
+  });
+
   it('対象の版が変更されている場合はエラー', async () => {
     const empDoc = makeEmployeeDoc();
     mockDb.setDoc('companies/company-001/employees/emp-001', empDoc as any);

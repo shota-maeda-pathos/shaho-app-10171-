@@ -3,13 +3,17 @@ import { makeAuth, makeEmployeeDoc, makeOfficeDoc, makeInsuranceRateDoc } from '
 const mockTxGet = jest.fn();
 const mockTxSet = jest.fn();
 const mockTxUpdate = jest.fn();
+let exemptions: any[] = [];
+let confirmed = false;
+let pending = false;
 
 const mockQueryGet = jest.fn();
-const buildQuery = (): any => {
+const buildQuery = (path = ""): any => {
   const q: any = {
-    where: jest.fn(() => buildQuery()),
-    orderBy: jest.fn(() => buildQuery()),
-    limit: jest.fn(() => buildQuery()),
+    path,
+    where: jest.fn(() => buildQuery(path)),
+    orderBy: jest.fn(() => buildQuery(path)),
+    limit: jest.fn(() => buildQuery(path)),
     get: mockQueryGet,
   };
   return q;
@@ -21,8 +25,8 @@ jest.mock('../../config', () => ({
       path,
       id: path.split('/').pop(),
     })),
-    collection: jest.fn(() => ({
-      ...buildQuery(),
+    collection: jest.fn((path: string) => ({
+      ...buildQuery(path),
       doc: jest.fn((id?: string) => ({
         path: `auto/${id ?? 'auto-1'}`,
         id: id ?? 'auto-1',
@@ -37,6 +41,17 @@ jest.mock('../../config', () => ({
       return fn(tx);
     }),
   },
+}));
+
+const mockFindAllRates = jest.fn();
+jest.mock('../../utils/insurance-rate', () => ({
+  findAllRates: (...args: any[]) => mockFindAllRates(...args),
+}));
+
+jest.mock('../../utils/age', () => ({
+  isLongTermCareAge: jest.fn(() => false),
+  isPensionExcluded: jest.fn(() => false),
+  isHealthExcluded: jest.fn(() => false),
 }));
 
 import { calculateMonthlyInsurance } from './service';
@@ -67,8 +82,21 @@ describe('calculateMonthlyInsurance', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    exemptions = [];
+    confirmed = false;
+    pending = false;
+
+    mockFindAllRates.mockResolvedValue({
+      health: healthRate,
+      pension: pensionRate,
+      childSupport: null,
+      longTermCare: null,
+    });
 
     mockTxGet.mockImplementation(async (ref: any) => {
+      if (ref.path.endsWith('/premiumExemptions')) {
+        return { docs: exemptions.map((d, i) => ({ id: `exemption-${i}`, data: () => d })) };
+      }
       if (ref.path.includes('/employees/') && !ref.path.includes('/monthlyInsurance/')) {
         return { exists: true, data: () => empDoc, id: 'emp-001' };
       }
@@ -76,28 +104,12 @@ describe('calculateMonthlyInsurance', () => {
         return { exists: true, data: () => officeDoc, id: 'office-001' };
       }
       if (ref.path.includes('/monthlyInsurance/')) {
-        return { exists: false, data: () => undefined, id: '2026-10' };
+        return { exists: confirmed || pending, data: () => ({ isConfirmed: confirmed, approvalPending: pending, version: 2 }), id: '2026-10' };
       }
       return { exists: false, data: () => undefined };
     });
 
-    let queryCallCount = 0;
-    mockQueryGet.mockImplementation(async () => {
-      queryCallCount++;
-      if (queryCallCount === 1) {
-        return { empty: false, docs: [{ id: '2026-09', data: () => gradeDoc }] };
-      }
-      if (queryCallCount === 2) {
-        return { empty: true, docs: [] };
-      }
-      if (queryCallCount === 3) {
-        return { empty: false, docs: [{ id: 'rate-health', data: () => healthRate }] };
-      }
-      if (queryCallCount === 4) {
-        return { empty: false, docs: [{ id: 'rate-pension', data: () => pensionRate }] };
-      }
-      return { empty: true, docs: [] };
-    });
+    mockQueryGet.mockResolvedValue({ empty: false, docs: [{ id: '2026-09', data: () => gradeDoc }] });
   });
 
   it('月次保険料を計算できる', async () => {
@@ -117,6 +129,7 @@ describe('calculateMonthlyInsurance', () => {
   });
 
   it('免除の場合は保険料が0', async () => {
+    exemptions = [{ exemptionType: 'maternity', status: 'active', approvedAt: 'approved', isMonthlyExempted: true }];
     const auth = makeAuth();
     const result = await calculateMonthlyInsurance(
       {
@@ -133,6 +146,7 @@ describe('calculateMonthlyInsurance', () => {
     const setCall = mockTxSet.mock.calls.find((c: any) =>
       c[0].path.includes('monthlyInsurance'),
     );
+    expect(setCall).toBeDefined();
     if (setCall) {
       const data = setCall[1];
       expect(data.totalEmployeeAmount).toBe(0);
@@ -156,4 +170,44 @@ describe('calculateMonthlyInsurance', () => {
       ),
     ).rejects.toThrow('等級');
   });
+  const calculate = () => calculateMonthlyInsurance({ companyId: 'company-001', employeeId: 'emp-001', yearMonth: '2026-10' }, makeAuth());
+  const exemption = { exemptionType: 'childcare', startMonth: '2026-10', endMonth: '2026-10', status: 'active', approvedAt: 'approved', isMonthlyExempted: true };
+  const storedData = () => mockTxSet.mock.calls.find((c: any) => c[0].path.includes('/monthlyInsurance/'))?.[1];
+  it('開始月と終了月を含む免除を自動反映し根拠IDを保存する', async () => {
+    exemptions = [exemption];
+    await calculate();
+    expect(storedData()).toMatchObject({ isExempted: true, totalEmployeeAmount: 0, totalEmployerAmount: 0, exemptionIds: ['exemption-0'] });
+  });
+  it.each([
+    { approvedAt: null }, { isMonthlyExempted: false }, { isMonthlyExempted: undefined },
+    { status: 'ended' }, { endMonth: '2026-09' }, { deletedAt: 'deleted' }, { exemptionType: 'childcare_reduced' },
+  ])('対象外の免除は適用しない: %j', async (override) => {
+    exemptions = [{ ...exemption, ...override }];
+    await calculate();
+    expect(storedData().isExempted).toBe(false);
+    expect(storedData().totalEmployeeAmount).toBeGreaterThan(0);
+  });
+  it('終了月未定の承認済み免除を反映する', async () => {
+    exemptions = [{ ...exemption, endMonth: null }];
+    await calculate();
+    expect(storedData().isExempted).toBe(true);
+  });
+  it('免除登録なしで手動免除を強制できない', async () => {
+    await expect(calculateMonthlyInsurance({ companyId: 'company-001', employeeId: 'emp-001', yearMonth: '2026-10', isExempted: true }, makeAuth())).rejects.toThrow('一致しません');
+    expect(mockTxSet).not.toHaveBeenCalled();
+  });
+  it('承認済みの保険料計算を上書きしない', async () => {
+    confirmed = true;
+    await expect(calculate()).rejects.toThrow('承認済み');
+    expect(mockTxSet).not.toHaveBeenCalled();
+    expect(mockTxUpdate).not.toHaveBeenCalled();
+  });
+
+  it('承認待ちの月次計算は上書きしない', async () => {
+    pending = true;
+    await expect(calculate()).rejects.toThrow('承認申請中');
+    expect(mockTxSet).not.toHaveBeenCalled();
+    expect(mockTxUpdate).not.toHaveBeenCalled();
+  });
+
 });

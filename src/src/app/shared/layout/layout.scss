@@ -1,3 +1,5 @@
+@use '@angular/material' as mat;
+
 .app-layout {
   display: flex;
   height: 100vh;
@@ -7,6 +9,13 @@
 .sidebar {
   width: 240px;
   min-width: 240px;
+  @include mat.list-overrides((
+    list-item-label-text-color: #e4edf7,
+    list-item-hover-label-text-color: #ffffff,
+    list-item-focus-label-text-color: #ffffff,
+    list-item-leading-icon-color: #b8cbe0,
+    active-indicator-color: #2c3e55,
+  ));
   background: #1a2332;
   color: #c8d6e5;
   display: flex;
@@ -34,11 +43,12 @@
     border-radius: 0;
 
     mat-icon {
-      color: #8899aa;
+      color: #b8cbe0;
     }
 
     &.active {
       background: rgba(255, 255, 255, 0.08);
+      --mat-list-list-item-label-text-color: #ffffff;
       color: #ffffff;
       border-left: 3px solid #4fc3f7;
 
@@ -57,10 +67,10 @@
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 
   a {
-    color: #8899aa;
+    color: #b8cbe0;
 
     mat-icon {
-      color: #8899aa;
+      color: #b8cbe0;
     }
 
     &:hover {

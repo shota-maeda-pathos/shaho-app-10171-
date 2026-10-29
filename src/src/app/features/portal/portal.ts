@@ -1,3 +1,4 @@
+import { PortalProfile, PortalPayslip, PortalOverview } from './portal.types';
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -10,13 +11,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 
-interface PayslipSummary {
-  yearMonth: string;
-  totalSalary: number;
-  totalPremium: number;
-  netAmount: number;
-}
-
 @Component({
   selector: 'app-portal',
   standalone: true,
@@ -27,79 +21,67 @@ interface PayslipSummary {
   ],
   template: `
     <div class="page-container">
-      <div class="page-header">
-        <h1>マイポータル</h1>
-      </div>
-
-      <div class="portal-grid">
-        <mat-card class="profile-card">
-          <div class="profile-header">
-            <mat-icon class="profile-icon">account_circle</mat-icon>
-            <div>
-              <h2>{{ employeeName() }}</h2>
-              <p class="subtitle">{{ departmentName() }}</p>
+      <div class="page-header"><h1>マイポータル</h1></div>
+      @if (error()) {
+        <p role="alert">{{ error() }}</p>
+        <button mat-stroked-button (click)="load()" [disabled]="loading()">再読み込み</button>
+      }
+      @if (loading() && !profile()) {
+        <div class="loading-container"><mat-spinner diameter="32" /></div>
+      } @else if (linked() === false) {
+        <mat-card class="profile-card"><p>従業員との紐付けがありません。管理者に確認してください。</p></mat-card>
+      } @else if (profile(); as employee) {
+        @if (notifications().length > 0) {
+          <mat-card class="notifications-card">
+            <div class="section-header">
+              <h2><mat-icon>notifications</mat-icon> お知らせ</h2>
+              @if (unreadCount() > 0) {
+                <span class="unread-badge">{{ unreadCount() }}件未読</span>
+              }
             </div>
-          </div>
-          <mat-divider></mat-divider>
-          <div class="profile-details">
-            <div class="detail-row">
-              <span class="detail-label">社員番号</span>
-              <span>{{ employeeNumber() }}</span>
+            @for (n of notifications(); track n.id) {
+              <div class="notification-item" [class.unread]="!n.isRead" (click)="markRead(n)">
+                <mat-icon class="notif-icon" [class]="'cat-' + n.category">
+                  {{ n.category === 'warning' ? 'warning' : n.category === 'action' ? 'assignment' : 'info' }}
+                </mat-icon>
+                <div class="notif-content">
+                  <div class="notif-title">{{ n.title }}</div>
+                  <div class="notif-body">{{ n.body }}</div>
+                  <div class="notif-date">{{ n.createdAt | date:'yyyy/MM/dd HH:mm' }}</div>
+                </div>
+              </div>
+            }
+          </mat-card>
+        }
+        <div class="portal-grid">
+          <mat-card class="profile-card">
+            <div class="profile-header"><mat-icon class="profile-icon">account_circle</mat-icon>
+              <div><h2>{{ employee.employeeName }}</h2><p>{{ employee.departmentName ?? '—' }}</p></div>
             </div>
-            <div class="detail-row">
-              <span class="detail-label">入社日</span>
-              <span>{{ hireDate() }}</span>
+            <div class="profile-details">
+              <div class="detail-row"><span>社員番号</span><span>{{ employee.employeeNumber }}</span></div>
+              <div class="detail-row"><span>入社日</span><span>{{ employee.hireDate ?? '—' }}</span></div>
+              <div class="detail-row"><span>事業所</span><span>{{ employee.officeName ?? '—' }}</span></div>
+              @if (!employee.isActive) { <p>退職後の閲覧用画面です。</p> }
             </div>
-            <div class="detail-row">
-              <span class="detail-label">事業所</span>
-              <span>{{ officeName() }}</span>
-            </div>
-          </div>
-        </mat-card>
-
-        <mat-card class="payslip-card">
-          <h2>給与明細</h2>
-          @if (loading()) {
-            <div class="loading-container"><mat-spinner diameter="32"></mat-spinner></div>
-          } @else if (payslips().length === 0) {
-            <div class="empty-state">
-              <mat-icon>receipt_long</mat-icon>
-              <p>明細がありません</p>
-            </div>
-          } @else {
+          </mat-card>
+          <mat-card class="payslip-card">
+            <h2>給与・社会保険料</h2>
+            <p>承認済みの給与を表示します。社会保険料は同じ発生月の承認済み計算額で、給与からの実際の控除額とは異なる場合があります。</p>
+            @if (payslips().length === 0 && !loading()) { <p>表示できる承認済み給与はありません。</p> }
             <mat-list>
               @for (slip of payslips(); track slip.yearMonth) {
                 <mat-list-item class="payslip-item" (click)="viewPayslip(slip.yearMonth)">
                   <mat-icon matListItemIcon>description</mat-icon>
                   <div matListItemTitle>{{ slip.yearMonth }}</div>
-                  <div matListItemLine>
-                    支給: {{ slip.totalSalary | number }}円 / 控除: {{ slip.totalPremium | number }}円 / 手取: {{ slip.netAmount | number }}円
-                  </div>
-                  <mat-icon matListItemMeta>chevron_right</mat-icon>
+                  <div matListItemLine>支給：{{ slip.totalSalary === null ? '未登録' : (slip.totalSalary | number) + ' 円' }} ／ 同月分社会保険料：{{ slip.insurance?.totalEmployee == null ? '未確定' : (slip.insurance!.totalEmployee | number) + ' 円' }}</div>
                 </mat-list-item>
               }
             </mat-list>
-          }
-        </mat-card>
-      </div>
-
-      <div class="info-cards">
-        <mat-card class="info-card" (click)="viewSection('dependents')">
-          <mat-icon>family_restroom</mat-icon>
-          <span>扶養家族</span>
-          <mat-icon class="chevron">chevron_right</mat-icon>
-        </mat-card>
-        <mat-card class="info-card" (click)="viewSection('insurance')">
-          <mat-icon>security</mat-icon>
-          <span>保険情報</span>
-          <mat-icon class="chevron">chevron_right</mat-icon>
-        </mat-card>
-        <mat-card class="info-card" (click)="viewSection('filings')">
-          <mat-icon>description</mat-icon>
-          <span>届出履歴</span>
-          <mat-icon class="chevron">chevron_right</mat-icon>
-        </mat-card>
-      </div>
+            @if (hasMore()) { <button mat-stroked-button (click)="load(true)" [disabled]="loading()">{{ loading() ? '読み込み中...' : '過去の月を読み込む' }}</button> }
+          </mat-card>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -128,6 +110,22 @@ interface PayslipSummary {
     .info-card span { flex: 1; font-size: 14px; font-weight: 500; }
     .chevron { color: #999; }
     mat-divider { margin: 0 -24px; }
+    .notifications-card { padding: 24px; margin-bottom: 16px; }
+    .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .section-header h2 { margin: 0; font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+    .unread-badge { background: #d32f2f; color: #fff; border-radius: 12px; padding: 2px 10px; font-size: 12px; font-weight: 500; }
+    .notification-item { display: flex; gap: 12px; padding: 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+    .notification-item:hover { background: rgba(0,0,0,0.04); }
+    .notification-item.unread { background: rgba(25,118,210,0.06); }
+    .notif-icon { margin-top: 2px; }
+    .notif-icon.cat-warning { color: #ed6c02; }
+    .notif-icon.cat-action { color: #1976d2; }
+    .notif-icon.cat-info { color: #2e7d32; }
+    .notif-icon.cat-system { color: #666; }
+    .notif-content { flex: 1; min-width: 0; }
+    .notif-title { font-weight: 500; font-size: 14px; }
+    .notif-body { color: #666; font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .notif-date { color: #999; font-size: 12px; margin-top: 4px; }
     @media (max-width: 768px) {
       .portal-grid { grid-template-columns: 1fr; }
       .info-cards { flex-direction: column; }
@@ -139,101 +137,48 @@ export class PortalComponent implements OnInit {
   private functions = inject(Functions);
   private auth = inject(AuthService);
 
-  employeeName = signal('');
-  employeeNumber = signal('');
-  departmentName = signal('');
-  officeName = signal('');
-  hireDate = signal('');
-  payslips = signal<PayslipSummary[]>([]);
+  profile = signal<PortalProfile | null>(null);
+  payslips = signal<PortalPayslip[]>([]);
+  linked = signal<boolean | null>(null);
   loading = signal(false);
+  error = signal('');
+  hasMore = signal(false);
+  notifications = signal<{ id: string; title: string; body: string; category: string; createdAt: string; isRead: boolean }[]>([]);
+  unreadCount = signal(0);
+  private lastDocId: string | null = null;
+  ngOnInit() { void this.load(); void this.loadNotifications(); }
+  viewPayslip(yearMonth: string) { this.router.navigate(['/portal/payslip', yearMonth]); }
 
-  ngOnInit() {
-    this.loadProfile();
-    this.loadPayslips();
-  }
-
-  viewPayslip(yearMonth: string) {
-    this.router.navigate(['/portal/payslip', yearMonth]);
-  }
-
-  viewSection(section: string) {
-    const profile = this.auth.profile();
-    if (!profile?.employeeId) return;
-    if (section === 'dependents') {
-      this.router.navigate(['/employees', profile.employeeId]);
-    } else if (section === 'filings') {
-      this.router.navigate(['/filings']);
-    } else if (section === 'insurance') {
-      this.router.navigate(['/premium/monthly']);
-    }
-  }
-
-  private async loadProfile() {
-    const profile = this.auth.profile();
-    if (!profile?.employeeId) {
-      this.employeeName.set(profile?.displayName ?? '');
-      return;
-    }
+  async loadNotifications() {
     try {
-      const fn = httpsCallable<any, any>(this.functions, 'employeeGet');
-      const result = await fn({
-        companyId: this.auth.companyId,
-        employeeId: profile.employeeId,
-      });
-      const emp = result.data;
-      this.employeeName.set(`${emp.lastName} ${emp.firstName}`);
-      this.employeeNumber.set(emp.employeeNumber);
-      this.hireDate.set(emp.hireDate ?? '');
-      this.officeName.set(emp.officeName ?? emp.officeId ?? '');
-      this.departmentName.set(emp.departmentName ?? '');
-    } catch {
-      this.employeeName.set(profile?.displayName ?? '');
-    }
+      const fn = httpsCallable<object, any>(this.functions, 'notificationList');
+      const { data } = await fn({ companyId: this.auth.companyId, limit: 10 });
+      this.notifications.set(data.notifications ?? []);
+      this.unreadCount.set(data.unreadCount ?? 0);
+    } catch { /* silent */ }
   }
 
-  private async loadPayslips() {
-    this.loading.set(true);
-    const profile = this.auth.profile();
-    if (!profile?.employeeId) {
-      this.loading.set(false);
-      return;
-    }
+  async markRead(n: { id: string; isRead: boolean }) {
+    if (n.isRead) return;
     try {
-      const months = this.getRecentMonths(6);
-      const slips: PayslipSummary[] = [];
-      for (const ym of months) {
-        const fn = httpsCallable<any, any>(this.functions, 'salaryList');
-        const result = await fn({
-          companyId: this.auth.companyId,
-          yearMonth: ym,
-        });
-        const items: any[] = result.data.items ?? [];
-        const match = items.find((i: any) => i.employeeId === profile.employeeId);
-        if (match && match.isConfirmed) {
-          const premium = Math.round(match.totalSalary * 0.15);
-          slips.push({
-            yearMonth: ym,
-            totalSalary: match.totalSalary,
-            totalPremium: premium,
-            netAmount: match.totalSalary - premium,
-          });
-        }
-      }
-      this.payslips.set(slips);
-    } catch {
-      this.payslips.set([]);
-    } finally {
-      this.loading.set(false);
-    }
+      const fn = httpsCallable(this.functions, 'notificationMarkRead');
+      await fn({ companyId: this.auth.companyId, notificationIds: [n.id] });
+      this.notifications.update(list => list.map(x => x.id === n.id ? { ...x, isRead: true } : x));
+      this.unreadCount.update(c => Math.max(0, c - 1));
+    } catch { /* silent */ }
   }
 
-  private getRecentMonths(count: number): string[] {
-    const months: string[] = [];
-    const now = new Date();
-    for (let i = 0; i < count; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-    }
-    return months;
+  async load(append = false) {
+    if (this.loading()) return;
+    this.loading.set(true); this.error.set('');
+    try {
+      const fn = httpsCallable<object, PortalOverview>(this.functions, 'portalOverview');
+      const { data } = await fn({ companyId: this.auth.companyId, limit: 12, ...(append && this.lastDocId ? { lastDocId: this.lastDocId } : {}) });
+      this.linked.set(data.linked); this.profile.set(data.profile);
+      this.payslips.set(append ? [...this.payslips(), ...data.payslips] : data.payslips);
+      this.hasMore.set(data.hasMore); this.lastDocId = data.lastDocId;
+    } catch (e: any) {
+      this.error.set(`本人情報を取得できませんでした：${e.message ?? '再読み込みしてください'}`);
+    } finally { this.loading.set(false); }
   }
 }

@@ -6,6 +6,14 @@ export function toISOString(ts: Timestamp): string {
   return ts.toDate().toISOString();
 }
 
+export function toDateString(ts: Timestamp): string {
+  return ts.toDate().toISOString().slice(0, 10);
+}
+
+export function toNullableDateString(ts: Timestamp | null): string | null {
+  return ts ? toDateString(ts) : null;
+}
+
 export function toTimestamp(iso: string): Timestamp {
   return Timestamp.fromDate(new Date(iso));
 }
@@ -16,7 +24,7 @@ export function toNullableISO(ts: Timestamp | null): string | null {
 
 export function toEmployeeResponse(
   id: string,
-  data: EmployeeDoc,
+  data: Omit<EmployeeDoc, 'birthDate'> & { birthDate: Timestamp | null },
 ): EmployeeResponse {
   return {
     id,
@@ -25,12 +33,13 @@ export function toEmployeeResponse(
     firstName: data.firstName,
     lastNameKana: data.lastNameKana,
     firstNameKana: data.firstNameKana,
-    birthDate: toISOString(data.birthDate),
+    // Create/onboard allow an unknown birthday; keep the API's date-string contract.
+    birthDate: data.birthDate ? toDateString(data.birthDate) : '',
     gender: data.gender,
     officeId: data.officeId,
     departmentId: data.departmentId,
-    hireDate: toISOString(data.hireDate),
-    resignationDate: toNullableISO(data.resignationDate),
+    hireDate: toDateString(data.hireDate),
+    resignationDate: toNullableDateString(data.resignationDate),
     isActive: data.isActive,
     version: data.version,
     createdAt: toISOString(data.createdAt),
@@ -50,14 +59,14 @@ export function toDependentResponse(
     firstName: data.firstName,
     lastNameKana: data.lastNameKana,
     firstNameKana: data.firstNameKana,
-    birthDate: toISOString(data.birthDate),
+    birthDate: toDateString(data.birthDate),
     gender: data.gender,
     relationship: data.relationship,
     isDisabled: data.isDisabled,
     income: data.income,
     coResident: data.coResident,
-    qualificationDate: toISOString(data.qualificationDate),
-    disqualificationDate: toNullableISO(data.disqualificationDate),
+    qualificationDate: toDateString(data.qualificationDate),
+    disqualificationDate: toNullableDateString(data.disqualificationDate),
     createdAt: toISOString(data.createdAt),
     updatedAt: toISOString(data.updatedAt),
   };

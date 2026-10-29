@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/guards/auth.guard';
-import { roleGuard } from './core/guards/auth.guard';
+import { authGuard, roleGuard, portalGuard } from './core/guards/auth.guard';
 import { LayoutComponent } from './shared/layout/layout';
 
 export const routes: Routes = [
@@ -28,6 +27,11 @@ export const routes: Routes = [
     path: 'login',
     loadComponent: () =>
       import('./features/login/login').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'suspended',
+    loadComponent: () =>
+      import('./features/suspended/suspended').then((m) => m.SuspendedComponent),
   },
   {
     path: '',
@@ -63,6 +67,13 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/employees/grade-decide/grade-decide').then(
                 (m) => m.GradeDecideComponent,
+              ),
+          },
+          {
+            path: ':id/revision',
+            loadComponent: () =>
+              import('./features/employees/grade-revision/grade-revision').then(
+                (m) => m.GradeRevisionComponent,
               ),
           },
         ],
@@ -103,6 +114,13 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/premium/premium-collection/premium-collection').then(
                 (m) => m.PremiumCollectionComponent,
+              ),
+          },
+          {
+            path: 'bonus',
+            loadComponent: () =>
+              import('./features/premium/premium-bonus/premium-bonus').then(
+                (m) => m.PremiumBonusComponent,
               ),
           },
         ],
@@ -157,6 +175,7 @@ export const routes: Routes = [
       },
       {
         path: 'portal',
+        canActivate: [portalGuard],
         children: [
           {
             path: '',
@@ -174,8 +193,8 @@ export const routes: Routes = [
         path: 'settings',
         canActivate: [roleGuard('admin')],
         loadComponent: () =>
-          import('./features/settings/user-management/user-management').then(
-            (m) => m.UserManagementComponent,
+          import('./features/settings/settings').then(
+            (m) => m.SettingsComponent,
           ),
       },
     ],

@@ -1,0 +1,47 @@
+import { Component } from '@angular/core';
+import { MatTabsModule } from '@angular/material/tabs';
+import { UserManagementComponent } from './user-management/user-management';
+import { CompanySettingsComponent } from './company-settings/company-settings';
+import { OfficeManagementComponent } from './office-management/office-management';
+import { AuditLogComponent } from './audit-log/audit-log';
+import { NotificationManagementComponent } from './notification-management/notification-management';
+
+@Component({
+  selector: 'app-settings',
+  standalone: true,
+  imports: [
+    MatTabsModule,
+    UserManagementComponent,
+    CompanySettingsComponent,
+    OfficeManagementComponent,
+    AuditLogComponent,
+    NotificationManagementComponent,
+  ],
+  template: `
+    <div class="settings-container">
+      <h1>設定</h1>
+      <mat-tab-group>
+        <mat-tab label="会社情報">
+          <ng-template matTabContent><app-company-settings /></ng-template>
+        </mat-tab>
+        <mat-tab label="事業所管理">
+          <ng-template matTabContent><app-office-management /></ng-template>
+        </mat-tab>
+        <mat-tab label="ユーザー管理">
+          <ng-template matTabContent><app-user-management /></ng-template>
+        </mat-tab>
+        <mat-tab label="お知らせ管理">
+          <ng-template matTabContent><app-notification-management /></ng-template>
+        </mat-tab>
+        <mat-tab label="監査ログ">
+          <ng-template matTabContent><app-audit-log /></ng-template>
+        </mat-tab>
+      </mat-tab-group>
+    </div>
+  `,
+  styles: [`
+    .settings-container { padding: 24px; }
+    h1 { margin: 0 0 24px; font-size: 24px; font-weight: 500; }
+  `],
+})
+export class SettingsComponent {}

@@ -200,21 +200,19 @@ export class PremiumCollectionComponent implements OnInit {
   private async loadData() {
     this.loading.set(true);
     try {
-      const fn = httpsCallable<any, any>(this.functions, 'salaryList');
-      const result = await fn({
+      const fn = httpsCallable<any, any>(this.functions, 'collectionSummary');
+      const { data } = await fn({
         companyId: this.auth.companyId,
         yearMonth: this.selectedMonth(),
-        limit: 100,
       });
-      const salaryItems: any[] = result.data.items ?? [];
 
-      const all: CollectionRow[] = salaryItems.map((s: any) => {
-        const premium = Math.round(s.totalSalary * 0.15);
-        const deducted = s.isConfirmed ? premium : 0;
+      const all: CollectionRow[] = (data.rows ?? []).map((r: any) => {
+        const premium = r.totalEmployee;
+        const deducted = r.isConfirmed ? premium : 0;
         const balance = premium - deducted;
         return {
-          employeeId: s.employeeId,
-          employeeName: s.employeeName,
+          employeeId: r.employeeId,
+          employeeName: r.employeeName,
           totalPremium: premium,
           deducted,
           balance,
@@ -227,7 +225,7 @@ export class PremiumCollectionComponent implements OnInit {
       this.rows.set(all);
       this.uncollectedRows.set(all.filter((r) => r.status !== 'collected'));
       this.uncollectedCount.set(this.uncollectedRows().length);
-      this.totalPremium.set(all.reduce((s, r) => s + r.totalPremium, 0));
+      this.totalPremium.set(data.totals?.totalEmployee ?? 0);
       this.totalDeducted.set(all.reduce((s, r) => s + r.deducted, 0));
       this.totalBalance.set(all.reduce((s, r) => s + r.balance, 0));
     } catch {

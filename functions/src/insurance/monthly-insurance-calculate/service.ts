@@ -4,12 +4,13 @@ import { AuthContext, requireOffice } from '../../middleware/auth';
 import {
   EmployeeDoc,
   GradeDoc,
-  EmploymentDoc,
-  InsuranceRateDoc,
+  OfficeDoc,
   InsurancePremiumBreakdown,
 } from '../../types/firestore';
 import { MutationResponse } from '../../types/response';
 import { notFound, invalidArg } from '../../utils/errors';
+import { isLongTermCareAge, isPensionExcluded, isHealthExcluded } from '../../utils/age';
+import { findAllRates } from '../../utils/insurance-rate';
 import { MonthlyInsuranceCalculateInput } from './schema';
 
 function calcPremium(
@@ -18,9 +19,6 @@ function calcPremium(
   employerRate: number,
   roundingRule: 'truncate' | 'round' | 'ceil',
 ): InsurancePremiumBreakdown {
-  const rawEmployee = (standardRemuneration * employeeRate) / 1000;
-  const rawEmployer = (standardRemuneration * employerRate) / 1000;
-
   const roundFn =
     roundingRule === 'truncate'
       ? Math.floor
@@ -29,10 +27,12 @@ function calcPremium(
         : Math.round;
 
   return {
-    employeeAmount: roundFn(rawEmployee),
-    employerAmount: roundFn(rawEmployer),
+    employeeAmount: roundFn((standardRemuneration * employeeRate) / 1000),
+    employerAmount: roundFn((standardRemuneration * employerRate) / 1000),
   };
 }
+
+const ZERO: InsurancePremiumBreakdown = { employeeAmount: 0, employerAmount: 0 };
 
 export async function calculateMonthlyInsurance(
   input: MonthlyInsuranceCalculateInput,
@@ -55,6 +55,18 @@ export async function calculateMonthlyInsurance(
       requireOffice(auth, employee.officeId);
     }
 
+    // 対象月の給与が承認済みか確認
+    const salaryRef = db.doc(
+      `companies/${auth.companyId}/employees/${input.employeeId}/salaries/${input.yearMonth}`,
+    );
+    const salaryDoc = await tx.get(salaryRef);
+    if (!salaryDoc.exists) {
+      throw invalidArg(`${input.yearMonth}の給与データが登録されていません。先に給与を入力してください`);
+    }
+    if (!salaryDoc.data()!.isConfirmed) {
+      throw invalidArg(`${input.yearMonth}の給与が未承認です。先に給与の承認を完了してください`);
+    }
+
     const gradesSnap = await db
       .collection(
         `companies/${auth.companyId}/employees/${input.employeeId}/grades`,
@@ -69,107 +81,78 @@ export async function calculateMonthlyInsurance(
     }
     const grade = gradesSnap.docs[0].data() as GradeDoc;
 
-    const employmentsSnap = await db
-      .collection(
-        `companies/${auth.companyId}/employees/${input.employeeId}/employments`,
-      )
-      .where('effectiveDate', '<=', input.yearMonth + '-31')
-      .orderBy('effectiveDate', 'desc')
-      .limit(1)
-      .get();
-
-    const employment = employmentsSnap.empty
-      ? null
-      : (employmentsSnap.docs[0].data() as EmploymentDoc);
-
     const officeSnap = await tx.get(
       db.doc(`companies/${auth.companyId}/offices/${employee.officeId}`),
     );
-    const officeData = officeSnap.data()!;
-    const roundingRule = (officeData.roundingRule ?? 'truncate') as
-      | 'truncate'
-      | 'round'
-      | 'ceil';
+    if (!officeSnap.exists) throw notFound('事業所');
+    const office = officeSnap.data()! as OfficeDoc;
+    const roundingRule = office.roundingRule ?? 'truncate';
 
-    const healthRateSnap = await db
-      .collection(`companies/${auth.companyId}/insuranceRates`)
-      .where('insuranceType', '==', 'health')
-      .where('appliedUntil', '==', null)
-      .limit(1)
-      .get();
+    // 年齢判定
+    const healthExcluded = isHealthExcluded(employee.birthDate, input.yearMonth);
+    const pensionExcluded = isPensionExcluded(employee.birthDate, input.yearMonth);
+    const ltcAge = isLongTermCareAge(employee.birthDate, input.yearMonth);
 
-    const pensionRateSnap = await db
-      .collection(`companies/${auth.companyId}/insuranceRates`)
-      .where('insuranceType', '==', 'pension')
-      .where('appliedUntil', '==', null)
-      .limit(1)
-      .get();
+    // 料率検索（年月・都道府県・保険者IDで適用料率を特定）
+    const rates = await findAllRates(
+      auth.companyId,
+      input.yearMonth,
+      office.prefectureCode,
+      office.insurerId,
+    );
 
-    const childSupportRateSnap = await db
-      .collection(`companies/${auth.companyId}/insuranceRates`)
-      .where('insuranceType', '==', 'childSupport')
-      .where('appliedUntil', '==', null)
-      .limit(1)
-      .get();
-
-    if (healthRateSnap.empty || pensionRateSnap.empty) {
-      throw invalidArg('保険料率が設定されていません');
+    if (!healthExcluded && !rates.health) {
+      throw invalidArg('健康保険料率が設定されていません');
+    }
+    if (!pensionExcluded && !rates.pension) {
+      throw invalidArg('厚生年金保険料率が設定されていません');
     }
 
-    const healthRate = healthRateSnap.docs[0].data() as InsuranceRateDoc;
-    const pensionRate = pensionRateSnap.docs[0].data() as InsuranceRateDoc;
+    // 免除判定
+    const exemptionsSnap = await tx.get(db
+      .collection(`companies/${auth.companyId}/employees/${input.employeeId}/premiumExemptions`)
+      .where('startMonth', '<=', input.yearMonth));
+    const applicableExemptions = exemptionsSnap.docs.filter((doc) => {
+      const d = doc.data();
+      return d.status === 'active' && d.deletedAt == null && d.approvedAt != null
+        && d.isMonthlyExempted === true
+        && ['maternity', 'childcare'].includes(d.exemptionType)
+        && (!d.endMonth || input.yearMonth <= d.endMonth);
+    });
+    const isExempted = applicableExemptions.length > 0;
+    if (input.isExempted !== undefined && input.isExempted !== isExempted) {
+      throw invalidArg('免除指定が承認済みの免除期間と一致しません。免除登録を確認してください');
+    }
 
-    const isExempted = input.isExempted ?? false;
+    // 健康保険
+    const healthInsurance = (healthExcluded || isExempted || !rates.health)
+      ? ZERO
+      : calcPremium(grade.healthStandardRemuneration, rates.health.employeeRate, rates.health.employerRate, roundingRule);
 
-    const healthInsurance = isExempted
-      ? { employeeAmount: 0, employerAmount: 0 }
-      : calcPremium(
-          grade.healthStandardRemuneration,
-          healthRate.employeeRate,
-          healthRate.employerRate,
-          roundingRule,
-        );
-
+    // 介護保険: 年齢自動判定（40歳以上65歳未満）
     let longTermCareInsurance: InsurancePremiumBreakdown | null = null;
-    if (employment?.longTermCareEnrolled) {
-      const ltcRateSnap = await db
-        .collection(`companies/${auth.companyId}/insuranceRates`)
-        .where('insuranceType', '==', 'longTermCare')
-        .where('appliedUntil', '==', null)
-        .limit(1)
-        .get();
-
-      if (!ltcRateSnap.empty) {
-        const ltcRate = ltcRateSnap.docs[0].data() as InsuranceRateDoc;
+    if (ltcAge && !healthExcluded) {
+      if (rates.longTermCare) {
         longTermCareInsurance = isExempted
-          ? { employeeAmount: 0, employerAmount: 0 }
-          : calcPremium(
-              grade.healthStandardRemuneration,
-              ltcRate.employeeRate,
-              ltcRate.employerRate,
-              roundingRule,
-            );
+          ? ZERO
+          : calcPremium(grade.healthStandardRemuneration, rates.longTermCare.employeeRate, rates.longTermCare.employerRate, roundingRule);
       }
     }
 
-    const pensionInsurance = isExempted
-      ? { employeeAmount: 0, employerAmount: 0 }
-      : calcPremium(
-          grade.pensionStandardRemuneration,
-          pensionRate.employeeRate,
-          pensionRate.employerRate,
-          roundingRule,
-        );
+    // 厚生年金
+    const pensionInsurance = (pensionExcluded || isExempted || !rates.pension)
+      ? ZERO
+      : calcPremium(grade.pensionStandardRemuneration, rates.pension.employeeRate, rates.pension.employerRate, roundingRule);
 
+    // 子ども・子育て拠出金（事業主のみ）
     let childSupportContribution: InsurancePremiumBreakdown;
-    if (childSupportRateSnap.empty || isExempted) {
-      childSupportContribution = { employeeAmount: 0, employerAmount: 0 };
+    if (!rates.childSupport || isExempted || pensionExcluded) {
+      childSupportContribution = ZERO;
     } else {
-      const csRate = childSupportRateSnap.docs[0].data() as InsuranceRateDoc;
       childSupportContribution = calcPremium(
         grade.healthStandardRemuneration,
-        csRate.employeeRate,
-        csRate.employerRate,
+        rates.childSupport.employeeRate,
+        rates.childSupport.employerRate,
         roundingRule,
       );
     }
@@ -192,6 +175,10 @@ export async function calculateMonthlyInsurance(
     );
 
     const existingDoc = await tx.get(insuranceRef);
+    if (existingDoc.exists && existingDoc.data()!.approvalPending) throw invalidArg('承認申請中の月次保険料は再計算できません');
+    if (existingDoc.exists && existingDoc.data()!.isConfirmed) {
+      throw invalidArg('承認済みの月次保険料は再計算できません');
+    }
     const version = existingDoc.exists
       ? (existingDoc.data()!.version as number) + 1
       : 1;
@@ -210,7 +197,12 @@ export async function calculateMonthlyInsurance(
       totalEmployeeAmount,
       totalEmployerAmount,
       isExempted,
+      isHealthExcluded: healthExcluded,
+      isPensionExcluded: pensionExcluded,
+      isLongTermCareApplicable: ltcAge,
+      exemptionIds: applicableExemptions.map((doc) => doc.id),
       isConfirmed: false,
+      approvalPending: false,
       version,
       updatedAt: now,
     };

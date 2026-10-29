@@ -14,6 +14,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { AccessOffice, UserAccessDialogComponent, UserAccessResult } from './user-access-dialog';
 
 interface UserRow {
   id: string;
@@ -86,6 +87,16 @@ const ROLE_LABELS: Record<string, string> = {
       }
 
       <h2>ユーザー一覧</h2>
+      <p>ロールは操作できる内容、担当事業所はアクセスできる範囲を表します。管理者は全事業所を管理できます。</p>
+      <p>自分自身の権限は変更できません。変更が必要な場合は、別の管理者に依頼してください。</p>
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+        <button mat-stroked-button (click)="loadUsers()" [disabled]="loading()">再読み込み</button>
+      }
+      @if (officeError()) {
+        <p class="error" role="alert">{{ officeError() }}</p>
+        <button mat-stroked-button (click)="loadOffices()" [disabled]="loadingOffices()">事業所を再読み込み</button>
+      }
       @if (loading()) {
         <div class="loading-container"><mat-spinner diameter="40"></mat-spinner></div>
       } @else {
@@ -119,11 +130,38 @@ const ROLE_LABELS: Record<string, string> = {
               </td>
             </ng-container>
 
+            <ng-container matColumnDef="offices">
+              <th mat-header-cell *matHeaderCellDef>担当事業所</th>
+              <td mat-cell *matCellDef="let row">
+                @if (row.roles.includes('admin')) {
+                  <span>全事業所</span>
+                } @else if (row.officeIds.length > 0) {
+                  @for (id of row.officeIds; track id) { <div>{{ officeName(id) }}</div> }
+                } @else {
+                  <span>{{ row.roles.some(isOfficeRole) ? '未設定' : '担当設定なし（本人向け）' }}</span>
+                }
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef>操作</th>
+              <td mat-cell *matCellDef="let row">
+                @if (isSelf(row)) {
+                  <span>自分（変更不可）</span>
+                } @else {
+                  <button mat-stroked-button (click)="editAccess(row)"
+                    [disabled]="!canEdit()" [attr.aria-label]="row.displayName + 'の権限を変更'">
+                    権限を変更
+                  </button>
+                }
+              </td>
+            </ng-container>
+
             <tr mat-header-row *matHeaderRowDef="userColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: userColumns"></tr>
           </table>
 
-          @if (users().length === 0) {
+          @if (users().length === 0 && !error()) {
             <div class="empty-state">
               <mat-icon>people</mat-icon>
               <p>ユーザーがいません</p>
@@ -184,30 +222,77 @@ const ROLE_LABELS: Record<string, string> = {
     .role-chip { padding: 2px 8px; border-radius: 12px; font-size: 11px; background: #e3f2fd; color: #1565c0; margin-right: 4px; }
     .status-chip { padding: 4px 12px; border-radius: 16px; font-size: 12px; background: #e8f5e9; color: #2e7d32; }
     .status-chip.suspended { background: #ffebee; color: #c62828; }
+    .error { color: #b3261e; }
+    mat-card { overflow-x: auto; }
+    td.mat-mdc-cell, th.mat-mdc-header-cell { padding: 12px; }
   `],
 })
 export class UserManagementComponent implements OnInit {
   private functions = inject(Functions);
   private snackBar = inject(MatSnackBar);
   private auth = inject(AuthService);
+  private dialog = inject(MatDialog);
 
   users = signal<UserRow[]>([]);
   invitations = signal<InvitationRow[]>([]);
   loading = signal(false);
   showInviteForm = signal(false);
   inviting = signal(false);
+  offices = signal<AccessOffice[]>([]);
+  loadingOffices = signal(false);
+  officesLoaded = signal(false);
+  error = signal('');
+  officeError = signal('');
 
   inviteEmail = '';
   inviteRoles: string[] = [];
 
-  userColumns = ['displayName', 'email', 'roles', 'status'];
+  userColumns = ['displayName', 'email', 'roles', 'offices', 'status', 'actions'];
   invitationColumns = ['email', 'roles', 'status', 'expiresAt'];
 
   ngOnInit() {
     this.loadUsers();
+    this.loadOffices();
   }
 
   roleLabel(role: string): string { return ROLE_LABELS[role] ?? role; }
+  isOfficeRole = (role: string) => ['operator', 'approver', 'viewer'].includes(role);
+
+  officeName(id: string): string {
+    return this.offices().find(office => office.id === id)?.name
+      ?? (this.loadingOffices() ? '事業所を読込中…' : `名称未取得（${id}）`);
+  }
+
+  isSelf(user: UserRow) { return user.id === this.auth.profile()?.uid; }
+  canEdit() { return this.auth.hasRole('admin') && this.officesLoaded() && !this.loadingOffices(); }
+
+  editAccess(user: UserRow) {
+    if (!this.canEdit() || this.isSelf(user)) return;
+    this.dialog.open<UserAccessDialogComponent, { user: UserRow; offices: AccessOffice[] }, UserAccessResult>(UserAccessDialogComponent, {
+      width: '600px', maxWidth: '95vw', data: { user, offices: this.offices() },
+    }).afterClosed().subscribe(result => {
+      if (!result) return;
+      this.users.update(users => users.map(row => row.id === user.id ? { ...row, ...result } : row));
+      this.snackBar.open(`${user.displayName}さんのロール・担当事業所を保存しました`, '閉じる', { duration: 5000 });
+    });
+  }
+
+  async loadOffices() {
+    if (this.loadingOffices()) return;
+    this.loadingOffices.set(true);
+    this.officesLoaded.set(false);
+    this.officeError.set('');
+    try {
+      const fn = httpsCallable<{ companyId: string; includeInactive: boolean }, { items: AccessOffice[] }>(this.functions, 'officeList');
+      const { data } = await fn({ companyId: this.auth.companyId, includeInactive: true });
+      this.offices.set(data.items);
+      this.officesLoaded.set(true);
+    } catch {
+      this.officeError.set('担当事業所を取得できませんでした。権限の変更は事業所の再読み込み後に行えます。');
+    } finally {
+      this.loadingOffices.set(false);
+    }
+  }
 
   async sendInvite() {
     this.inviting.set(true);
@@ -230,16 +315,17 @@ export class UserManagementComponent implements OnInit {
     }
   }
 
-  private async loadUsers() {
+  async loadUsers() {
+    if (this.loading()) return;
     this.loading.set(true);
+    this.error.set('');
     try {
-      const fn = httpsCallable<any, any>(this.functions, 'userList');
+      const fn = httpsCallable<{ companyId: string }, { users: UserRow[]; invitations: InvitationRow[] }>(this.functions, 'userList');
       const result = await fn({ companyId: this.auth.companyId });
       this.users.set(result.data.users ?? []);
       this.invitations.set(result.data.invitations ?? []);
     } catch {
-      this.users.set([]);
-      this.invitations.set([]);
+      this.error.set('ユーザー一覧を取得できませんでした。管理者権限と接続状況を確認して、再読み込みしてください。');
     } finally {
       this.loading.set(false);
     }

@@ -21,10 +21,11 @@ interface ApprovalRow {
   requestedBy: string;
   requestedAt: string;
   targetVersion: number;
+  summary?: { yearMonth: string | null; totalAmount: number | null; cumulativeBonusAmount: number | null; totalEmployee: number | null; totalEmployer: number | null } | null;
 }
 
 const REQUEST_TYPE_LABELS: Record<string, string> = {
-  salary: '給与', bonus: '賞与', monthlyInsurance: '月次保険料',
+  salary: '給与', bonus: '賞与', monthlyInsurance: '月次保険料', bonusInsurance: '賞与保険料',
   filing: '届出', employment: '雇用条件', grade: '等級',
 };
 
@@ -44,6 +45,10 @@ const STATUS_LABELS: Record<string, string> = {
   template: `
     <div class="page-container">
       <h1>承認管理</h1>
+      @if (error()) {
+        <p role="alert">{{ error() }}</p>
+        <button mat-stroked-button (click)="loadApprovals()" [disabled]="loading()">再読み込み</button>
+      }
 
       <mat-tab-group (selectedIndexChange)="onTabChange($event)">
         <mat-tab label="承認待ち ({{ pendingCount() }})">
@@ -60,7 +65,13 @@ const STATUS_LABELS: Record<string, string> = {
 
                   <ng-container matColumnDef="employeeName">
                     <th mat-header-cell *matHeaderCellDef>対象従業員</th>
-                    <td mat-cell *matCellDef="let row">{{ row.employeeName }}</td>
+                    <td mat-cell *matCellDef="let row">{{ row.employeeName }}
+                      @if (row.summary; as summary) {
+                        <div>{{ summary.yearMonth }} ／ 賞与額：{{ summary.totalAmount | number }} 円</div>
+                        @if (row.requestType === 'bonus') { <div>年度標準賞与累計：{{ summary.cumulativeBonusAmount | number }} 円</div> }
+                        @if (row.requestType === 'bonusInsurance') { <div>本人負担：{{ summary.totalEmployee | number }} 円 ／ 会社負担：{{ summary.totalEmployer | number }} 円</div> }
+                      }
+                    </td>
                   </ng-container>
 
                   <ng-container matColumnDef="requestedAt">
@@ -71,12 +82,16 @@ const STATUS_LABELS: Record<string, string> = {
                   <ng-container matColumnDef="actions">
                     <th mat-header-cell *matHeaderCellDef>操作</th>
                     <td mat-cell *matCellDef="let row">
-                      <button mat-flat-button color="primary" (click)="approve(row)" class="action-btn">
-                        <mat-icon>check</mat-icon>承認
-                      </button>
-                      <button mat-stroked-button color="warn" (click)="reject(row)" class="action-btn">
-                        <mat-icon>close</mat-icon>却下
-                      </button>
+                      @if (isOwnRequest(row)) {
+                        <span class="own-request-label">自分の申請</span>
+                      } @else {
+                        <button mat-flat-button color="primary" (click)="approve(row)" class="action-btn">
+                          <mat-icon>check</mat-icon>承認
+                        </button>
+                        <button mat-stroked-button color="warn" (click)="reject(row)" class="action-btn">
+                          <mat-icon>close</mat-icon>却下
+                        </button>
+                      }
                     </td>
                   </ng-container>
 
@@ -84,7 +99,7 @@ const STATUS_LABELS: Record<string, string> = {
                   <tr mat-row *matRowDef="let row; columns: pendingColumns"></tr>
                 </table>
 
-                @if (pendingRequests().length === 0) {
+                @if (pendingRequests().length === 0 && !error()) {
                   <div class="empty-state">
                     <mat-icon>check_circle</mat-icon>
                     <p>承認待ちの申請はありません</p>
@@ -127,7 +142,7 @@ const STATUS_LABELS: Record<string, string> = {
                 <tr mat-row *matRowDef="let row; columns: processedColumns"></tr>
               </table>
 
-              @if (processedRequests().length === 0) {
+              @if (processedRequests().length === 0 && !error()) {
                 <div class="empty-state">
                   <mat-icon>history</mat-icon>
                   <p>処理済みの申請はありません</p>
@@ -152,6 +167,7 @@ const STATUS_LABELS: Record<string, string> = {
     .status-chip[data-status="rejected"] { background: #ffebee; color: #c62828; }
     .status-chip[data-status="cancelled"] { background: #f5f5f5; color: #757575; }
     mat-card { margin-top: 16px; }
+    .own-request-label { font-size: 12px; color: #888; font-style: italic; }
   `],
 })
 export class ApprovalListComponent implements OnInit {
@@ -185,6 +201,10 @@ export class ApprovalListComponent implements OnInit {
 
   requestTypeLabel(type: string): string { return REQUEST_TYPE_LABELS[type] ?? type; }
   statusLabel(status: string): string { return STATUS_LABELS[status] ?? status; }
+
+  isOwnRequest(row: ApprovalRow): boolean {
+    return row.requestedBy === this.auth.profile()?.uid;
+  }
 
   async approve(row: ApprovalRow) {
     try {
@@ -220,14 +240,16 @@ export class ApprovalListComponent implements OnInit {
     }
   }
 
-  private async loadApprovals() {
+  error = signal('');
+  async loadApprovals() {
     this.loading.set(true);
+    this.error.set('');
     try {
       const fn = httpsCallable<any, any>(this.functions, 'approvalRequestList');
       const result = await fn({ companyId: this.auth.companyId });
       this.approvals.set(result.data.items ?? []);
     } catch {
-      this.approvals.set([]);
+      this.error.set('承認情報を取得できませんでした。再読み込みしてください。');
     } finally {
       this.loading.set(false);
     }

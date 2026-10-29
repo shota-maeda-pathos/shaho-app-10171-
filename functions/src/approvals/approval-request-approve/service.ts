@@ -38,17 +38,36 @@ export async function approveApprovalRequest(
       throw invalidArg(`この承認リクエストは既に処理済みです（状態: ${reqData.status}）`);
     }
 
-    const targetRef = db.doc(reqData.targetPath);
-    const targetSnap = await tx.get(targetRef);
-    if (!targetSnap.exists) {
-      throw notFound('承認対象ドキュメント');
+    if (reqData.requestedBy === auth.uid) {
+      throw invalidArg('自分が作成した承認リクエストを自分で承認することはできません');
     }
 
-    const targetData = targetSnap.data()!;
-    if (targetData.version !== reqData.targetVersion) {
-      throw invalidArg(
-        `承認対象が変更されています（承認リクエスト時: v${reqData.targetVersion}, 現行: v${targetData.version}）`,
-      );
+    if (['bonus', 'bonusInsurance'].includes(reqData.requestType)) {
+      const collection = reqData.requestType === 'bonus' ? 'bonuses' : 'bonusInsurance';
+      const prefix = `companies/${auth.companyId}/employees/${input.employeeId}/${collection}/`;
+      if (!reqData.targetPath.startsWith(prefix) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(reqData.targetPath.slice(prefix.length))) throw invalidArg('承認対象パスが不正です');
+    }
+    const targetRef = db.doc(reqData.targetPath);
+    const isDeferred = reqData.requestType === 'grade' && reqData.targetVersion === 0;
+    let targetData: FirebaseFirestore.DocumentData = {};
+
+    if (!isDeferred) {
+      const targetSnap = await tx.get(targetRef);
+      if (!targetSnap.exists) {
+        throw notFound('承認対象ドキュメント');
+      }
+      targetData = targetSnap.data()!;
+    }
+    if (!isDeferred) {
+      if (reqData.requestType === 'bonusInsurance') {
+          const source = await tx.get(db.doc(`companies/${auth.companyId}/employees/${input.employeeId}/bonuses/${targetRef.id}`));
+          if (!source.exists || source.data()!.isConfirmed !== true || source.data()!.version !== targetData.bonusVersion) throw invalidArg('承認済み賞与が変更されています。再計算してください');
+      }
+      if (targetData.version !== reqData.targetVersion) {
+        throw invalidArg(
+          `承認対象が変更されています（承認リクエスト時: v${reqData.targetVersion}, 現行: v${targetData.version}）`,
+        );
+      }
     }
 
     const now = Timestamp.now();
@@ -61,7 +80,27 @@ export async function approveApprovalRequest(
       updatedAt: now,
     });
 
-    if (reqData.requestType === 'filing') {
+    if (reqData.requestType === 'grade' && reqData.metadata) {
+      const meta = reqData.metadata as Record<string, unknown>;
+      const gradeRef = db.collection(
+        `companies/${auth.companyId}/employees/${input.employeeId}/grades`,
+      ).doc();
+      tx.set(gradeRef, {
+        effectiveMonth: meta.effectiveMonth,
+        determinationType: meta.determinationType ?? 'regular',
+        healthGradeNumber: meta.healthGradeNumber,
+        healthStandardRemuneration: meta.healthStandardRemuneration,
+        pensionGradeNumber: meta.pensionGradeNumber,
+        pensionStandardRemuneration: meta.pensionStandardRemuneration,
+        reason: meta.reason ?? '',
+        isConfirmed: true,
+        confirmedAt: now,
+        confirmedBy: auth.uid,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else if (reqData.requestType === 'filing') {
       tx.update(targetRef, {
         workflowStatus: 'approved',
         version: targetData.version + 1,
@@ -70,6 +109,7 @@ export async function approveApprovalRequest(
     } else {
       tx.update(targetRef, {
         isConfirmed: true,
+        ...(['monthlyInsurance', 'bonus', 'bonusInsurance'].includes(reqData.requestType) ? { approvalPending: false } : {}),
         confirmedAt: now,
         confirmedBy: auth.uid,
         version: targetData.version + 1,

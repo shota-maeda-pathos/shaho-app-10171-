@@ -7,11 +7,11 @@ export const EmployeeCreateSchema = z.object({
   firstName: z.string().min(1),
   lastNameKana: z.string().min(1),
   firstNameKana: z.string().min(1),
-  birthDate: z.string().datetime(),
+  birthDate: z.string().min(1).optional().default(''),
   gender: z.enum(['male', 'female']),
   officeId: z.string(),
   departmentId: z.string().nullable().optional(),
-  hireDate: z.string().datetime(),
+  hireDate: z.string().min(1),
   requestId: z.string().uuid().optional(),
 });
 

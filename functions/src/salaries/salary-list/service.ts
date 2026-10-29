@@ -1,3 +1,4 @@
+import { mapConcurrent } from '../../utils/parallel';
 import { db } from '../../config';
 import { AuthContext } from '../../middleware/auth';
 import { SalaryListInput } from './schema';
@@ -9,6 +10,7 @@ interface SalaryListItem {
   baseSalary: number;
   totalSalary: number;
   isConfirmed: boolean;
+  version: number;
 }
 
 export interface SalaryListResponse {
@@ -21,6 +23,7 @@ export async function listSalaries(
   input: SalaryListInput,
   auth: AuthContext,
 ): Promise<SalaryListResponse> {
+  if (!auth.roles.includes('admin') && auth.officeIds.length === 0) return { items: [], hasMore: false };
   let empQuery: FirebaseFirestore.Query = db
     .collection(`companies/${auth.companyId}/employees`)
     .where('deletedAt', '==', null)
@@ -50,24 +53,23 @@ export async function listSalaries(
   const hasMore = empSnap.docs.length > effectiveLimit;
   const empDocs = hasMore ? empSnap.docs.slice(0, effectiveLimit) : empSnap.docs;
 
-  const items: SalaryListItem[] = [];
-
-  for (const empDoc of empDocs) {
+  const items = await mapConcurrent(empDocs, 8, async (empDoc): Promise<SalaryListItem> => {
     const empData = empDoc.data();
     const salaryRef = db.doc(
       `companies/${auth.companyId}/employees/${empDoc.id}/salaries/${input.yearMonth}`,
     );
     const salarySnap = await salaryRef.get();
 
-    items.push({
+    return {
       employeeId: empDoc.id,
       employeeName: `${empData.lastName} ${empData.firstName}`,
       yearMonth: input.yearMonth,
       baseSalary: salarySnap.exists ? salarySnap.data()!.baseSalary : 0,
       totalSalary: salarySnap.exists ? salarySnap.data()!.totalSalary : 0,
       isConfirmed: salarySnap.exists ? salarySnap.data()!.isConfirmed : false,
-    });
-  }
+      version: salarySnap.exists ? salarySnap.data()!.version : 0,
+    };
+  });
 
   return {
     items,

@@ -25,30 +25,49 @@ export async function createApprovalRequest(
       requireOffice(auth, employee.officeId);
     }
 
+    const locked = ['monthlyInsurance', 'bonus', 'bonusInsurance'].includes(input.requestType);
+    const collection = input.requestType === 'bonus' ? 'bonuses' : input.requestType;
+    const prefix = `companies/${auth.companyId}/employees/${input.employeeId}/${collection}/`;
+    if (locked && (!input.targetPath.startsWith(prefix) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(input.targetPath.slice(prefix.length)))) {
+      throw invalidArg('承認対象パスが不正です');
+    }
     const targetRef = db.doc(input.targetPath);
-    const targetSnap = await tx.get(targetRef);
-    if (!targetSnap.exists) {
-      throw notFound('承認対象ドキュメント');
+    const isDeferred = input.requestType === 'grade' && input.targetVersion === 0;
+    let targetData: FirebaseFirestore.DocumentData | null = null;
+
+    if (!isDeferred) {
+      const targetSnap = await tx.get(targetRef);
+      if (!targetSnap.exists) {
+        throw notFound('承認対象ドキュメント');
+      }
+      targetData = targetSnap.data()!;
+      if (input.requestType === 'bonusInsurance') {
+        const source = await tx.get(db.doc(`companies/${auth.companyId}/employees/${input.employeeId}/bonuses/${targetRef.id}`));
+        if (!source.exists || source.data()!.isConfirmed !== true || source.data()!.version !== targetData.bonusVersion) throw invalidArg('承認済み賞与の内容を確認して再計算してください');
+      }
+      if (targetData.version !== input.targetVersion) {
+        throw invalidArg(
+          `承認対象の版番号が一致しません（現行: ${targetData.version}, 指定: ${input.targetVersion}）`,
+        );
+      }
     }
 
-    const targetData = targetSnap.data()!;
-    if (targetData.version !== input.targetVersion) {
-      throw invalidArg(
-        `承認対象の版番号が一致しません（現行: ${targetData.version}, 指定: ${input.targetVersion}）`,
-      );
+    const requests = db.collection(`companies/${auth.companyId}/employees/${input.employeeId}/approvalRequests`);
+    const reqRef = locked ? requests.doc(`${input.requestType}-${targetRef.id}-v${input.targetVersion}`) : requests.doc();
+    if (locked && targetData) {
+      if (targetData.isConfirmed) throw invalidArg('承認済みの対象です');
+      const previous = await tx.get(reqRef);
+      if (previous.exists && previous.data()!.status === 'pending') return reqRef.id;
+      if (targetData.approvalPending) throw invalidArg('既に承認申請中です');
+      if (previous.exists) throw invalidArg('再計算してから再申請してください');
     }
-
     const now = Timestamp.now();
-    const reqRef = db
-      .collection(
-        `companies/${auth.companyId}/employees/${input.employeeId}/approvalRequests`,
-      )
-      .doc();
+    if (locked) tx.update(targetRef, { approvalPending: true, updatedAt: now });
 
     tx.set(reqRef, {
       targetPath: input.targetPath,
       targetVersion: input.targetVersion,
-      snapshotData: targetData,
+      snapshotData: targetData ?? {},
       requestType: input.requestType,
       status: 'pending',
       requestedBy: auth.uid,
@@ -56,6 +75,7 @@ export async function createApprovalRequest(
       reviewedBy: null,
       reviewedAt: null,
       comment: input.comment ?? null,
+      metadata: input.metadata ?? null,
       createdAt: now,
       updatedAt: now,
     });

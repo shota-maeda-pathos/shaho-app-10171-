@@ -1,0 +1,47 @@
+{
+  "acquisition": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/hihokensha/20140718.files/0000002415.pdf",
+    "checkedOn": "2026-10-28",
+    "sha256": "07ca65ddff861611dc27d0800f68e5983228e0941e7ac6b675ca5a1afc9502ac"
+  },
+  "loss": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/hihokensha/20140722.files/0000020841WmioE6Jhw7.pdf",
+    "checkedOn": "2026-10-28",
+    "sha256": "004ad7fa30b53a24a5bf3ff52b8a26ffcc53584ebd7dfd1fa19f287f90aeeb4d"
+  },
+  "santei": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/hoshu/20141225.files/225.pdf",
+    "checkedOn": "2026-10-28",
+    "sha256": "82874d6d1ddcb48caf94964f616fef33ad0ec5a19cd1d50627597f3911ee80bd"
+  },
+  "change": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/hoshu/20141224.files/0000024464KdVsRuUUKk.pdf",
+    "checkedOn": "2026-10-28",
+    "sha256": "610461c8d24b0d19e22b7d115caee5f44b562c323bf1e9596471e3a83f164c7f"
+  },
+  "bonus": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/shoyo/20140821.files/0000018634IO4fCzsBO1.pdf",
+    "checkedOn": "2026-10-28",
+    "sha256": "24902c8aedbe6837eb6c7ca53ad44fcd3624a96f0fba14259ac4d6b3a0e81921"
+  },
+  "dependent": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/hihokensha/20141224.files/01.pdf",
+    "checkedOn": "2026-10-28",
+    "sha256": "93da8bc4656ee44ad778d06cbc2aa3584e364101f762bbea2654cc30d79bdfe7"
+  },
+  "maternity": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/menjo/20140326-01.files/0000018131zo7isNeqBi.pdf",
+    "checkedOn": "2026-10-28",
+    "sha256": "77eced44d60eb34b0a27a6db6d6c4060f7b132b2959444352e42dd157e906648"
+  },
+  "childcare": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/menjo/20140403-01.files/A.pdf",
+    "checkedOn": "2026-10-28",
+    "sha256": "8e30d157b2fdfacd00623950637a44201d4af3109e8c630adb839170d65def1f"
+  },
+  "childcare-end": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/menjo/20140403-02.files/A.pdf",
+    "checkedOn": "2026-10-28",
+    "sha256": "8e30d157b2fdfacd00623950637a44201d4af3109e8c630adb839170d65def1f"
+  }
+}

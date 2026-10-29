@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatListModule } from '@angular/material/list';
@@ -20,6 +20,7 @@ import { AuthService } from '../../core/services/auth.service';
   styleUrl: './layout.scss',
 })
 export class LayoutComponent {
+  private router = inject(Router);
   auth = inject(AuthService);
 
   navItems = [
@@ -29,6 +30,7 @@ export class LayoutComponent {
     { icon: 'check_circle', label: '承認', route: '/approvals', roles: ['admin', 'approver', 'operator'] },
     { icon: 'payments', label: '給与', route: '/salary', roles: ['admin', 'operator'] },
     { icon: 'calculate', label: '保険料', route: '/premium/monthly', roles: ['admin', 'operator'] },
+    { icon: 'card_giftcard', label: '賞与保険料', route: '/premium/bonus', roles: ['admin', 'operator'] },
     { icon: 'account_balance', label: '徴収', route: '/premium/collection', roles: ['admin', 'operator'] },
     { icon: 'assessment', label: '算定', route: '/santei', roles: ['admin', 'operator'] },
     { icon: 'person', label: 'マイポータル', route: '/portal', roles: ['admin', 'approver', 'operator', 'viewer', 'employee'] },
@@ -43,5 +45,6 @@ export class LayoutComponent {
 
   async logout() {
     await this.auth.logout();
+    await this.router.navigate(['/login']);
   }
 }

@@ -173,25 +173,31 @@ export class SanteiListComponent implements OnInit {
 
   async submitAll() {
     this.submitting.set(true);
+    let sent = 0;
     try {
       const changed = this.rows().filter((r) => r.gradeChanged);
       for (const row of changed) {
-        const fn = httpsCallable(this.functions, 'gradeCreate');
-        await fn({
+        await httpsCallable(this.functions, 'approvalRequestCreate')({
           companyId: this.auth.companyId,
           employeeId: row.employeeId,
-          effectiveMonth: `${this.targetYear()}-09`,
-          determinationType: 'regular',
-          healthGradeNumber: row.proposedGrade,
-          healthStandardRemuneration: row.average,
-          pensionGradeNumber: row.proposedGrade,
-          pensionStandardRemuneration: row.average,
-          reason: '算定基礎届による定時決定',
+          targetPath: `companies/${this.auth.companyId}/employees/${row.employeeId}/grades/santei-${this.targetYear()}`,
+          targetVersion: 0,
+          requestType: 'grade',
+          metadata: {
+            effectiveMonth: `${this.targetYear()}-09`,
+            determinationType: 'regular',
+            healthGradeNumber: row.proposedGrade,
+            healthStandardRemuneration: row.average,
+            pensionGradeNumber: row.proposedGrade,
+            pensionStandardRemuneration: row.average,
+            reason: '算定基礎届による定時決定',
+          },
         });
+        sent++;
       }
-      this.snackBar.open(`${changed.length}件の等級を登録しました`, '閉じる', { duration: 3000 });
+      this.snackBar.open(`${sent}件の承認申請を送信しました`, '閉じる', { duration: 3000 });
     } catch (e: any) {
-      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
+      this.snackBar.open(`エラー: ${e.message}（${sent}件送信済み）`, '閉じる', { duration: 5000 });
     } finally {
       this.submitting.set(false);
     }

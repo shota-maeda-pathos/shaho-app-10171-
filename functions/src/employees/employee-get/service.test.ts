@@ -15,6 +15,15 @@ beforeEach(() => {
 });
 
 describe('getEmployee', () => {
+  it('生年月日が未入力でも詳細を取得できる', async () => {
+    mockDb.setDoc('companies/company-001/employees/emp-001', { ...makeEmployeeDoc(), birthDate: null });
+
+    const result = await getEmployee('company-001', 'emp-001', makeAuth({ roles: ['admin'] }));
+
+    expect(result.id).toBe('emp-001');
+    expect(result.birthDate).toBe('');
+  });
+
   it('admin は従業員詳細を取得できる', async () => {
     const auth = makeAuth({ roles: ['admin'] });
     mockDb.setDoc('companies/company-001/employees/emp-001', {

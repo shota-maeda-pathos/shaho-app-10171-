@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { HttpsError } from 'firebase-functions/v2/https';
 
-export function validate<T>(schema: z.ZodSchema<T>, data: unknown): T {
+export function validate<T extends z.ZodTypeAny>(schema: T, data: unknown): z.output<T> {
   const result = schema.safeParse(data);
   if (!result.success) {
     const message = result.error.issues

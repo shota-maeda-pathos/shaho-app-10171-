@@ -131,20 +131,6 @@
       ]
     },
     {
-      "collectionGroup": "grades",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "effectiveMonth", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "employments",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "effectiveDate", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "leaves",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
@@ -174,6 +160,58 @@
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "expiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "employees",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deletedAt", "order": "ASCENDING" },
+        { "fieldPath": "employeeNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "employees",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deletedAt", "order": "ASCENDING" },
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "employeeNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "employees",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deletedAt", "order": "ASCENDING" },
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "officeId", "order": "ASCENDING" },
+        { "fieldPath": "employeeNumber", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "filings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "workflowStatus", "order": "ASCENDING" },
+        { "fieldPath": "submissionStatus", "order": "ASCENDING" },
+        { "fieldPath": "filingType", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "action", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "actorUid", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
       ]
     }
   ],

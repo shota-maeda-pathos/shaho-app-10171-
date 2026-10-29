@@ -11,6 +11,7 @@ interface ApprovalRequestListItem {
   requestedBy: string;
   requestedAt: string;
   targetVersion: number;
+  summary: { yearMonth: string | null; totalAmount: number | null; cumulativeBonusAmount: number | null; totalEmployee: number | null; totalEmployer: number | null } | null;
 }
 
 export interface ApprovalRequestListResponse {
@@ -26,7 +27,6 @@ export async function listApprovalRequests(
   const empSnap = await db
     .collection(`companies/${auth.companyId}/employees`)
     .where('deletedAt', '==', null)
-    .orderBy('employeeNumber', 'asc')
     .get();
 
   const items: ApprovalRequestListItem[] = [];
@@ -62,6 +62,13 @@ export async function listApprovalRequests(
         requestedBy: data.requestedBy,
         requestedAt: data.requestedAt?.toDate?.()?.toISOString?.() ?? '',
         targetVersion: data.targetVersion,
+        summary: ['bonus', 'bonusInsurance'].includes(data.requestType) ? {
+          yearMonth: data.snapshotData?.yearMonth ?? null,
+          totalAmount: data.snapshotData?.totalAmount ?? data.snapshotData?.totalBonusAmount ?? null,
+          cumulativeBonusAmount: data.snapshotData?.cumulativeBonusAmount ?? null,
+          totalEmployee: data.snapshotData?.totalEmployeeAmount ?? null,
+          totalEmployer: data.snapshotData?.totalEmployerAmount ?? null,
+        } : null,
       });
     }
 

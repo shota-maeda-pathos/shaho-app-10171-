@@ -39,7 +39,7 @@ export async function updateSalary(
     }
     const current = salaryDoc.data()! as SalaryDoc;
 
-    if (current.isConfirmed) {
+    if (current.isConfirmed && input.isConfirmed === undefined) {
       throw invalidArg('承認済みの給与データは直接編集できません');
     }
 
@@ -73,7 +73,7 @@ export async function updateSalary(
       changes.variableAllowances = { from: current.variableAllowances, to: input.variableAllowances };
     }
 
-    tx.update(salaryRef, {
+    const updateData: Record<string, unknown> = {
       paymentBasisDays: input.paymentBasisDays ?? current.paymentBasisDays,
       baseSalary,
       fixedAllowances: fixed,
@@ -83,7 +83,13 @@ export async function updateSalary(
       totalSalary,
       updatedAt: now,
       version: current.version + 1,
-    });
+    };
+    if (input.isConfirmed !== undefined) {
+      updateData.isConfirmed = input.isConfirmed;
+      updateData.confirmedAt = input.isConfirmed ? now : null;
+      updateData.confirmedBy = input.isConfirmed ? auth.uid : null;
+    }
+    tx.update(salaryRef, updateData);
 
     if (Object.keys(changes).length > 0) {
       const auditRef = db

@@ -55,7 +55,7 @@ export async function createEmployee(
       firstName: input.firstName,
       lastNameKana: input.lastNameKana,
       firstNameKana: input.firstNameKana,
-      birthDate: toTimestamp(input.birthDate),
+      birthDate: input.birthDate ? toTimestamp(input.birthDate) : null,
       gender: input.gender,
       officeId: input.officeId,
       departmentId: input.departmentId ?? null,

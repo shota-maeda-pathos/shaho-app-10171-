@@ -8,6 +8,7 @@ export interface AuthContext {
   companyId: string;
   roles: Role[];
   officeIds: string[];
+  employeeId?: string | null;
   isSuspended: boolean;
   isLoginDisabled: boolean;
 }
@@ -32,6 +33,7 @@ export async function getAuthContext(
     companyId,
     roles: data.roles ?? [],
     officeIds: data.officeIds ?? [],
+    employeeId: typeof data.employeeId === 'string' ? data.employeeId : null,
     isSuspended: data.isSuspended ?? false,
     isLoginDisabled: data.isLoginDisabled ?? false,
   };

@@ -34,13 +34,16 @@ export class AuthService {
 
   constructor() {
     onAuthStateChanged(this.auth, async (user) => {
+      this._loading.set(true);
+      this._profile.set(null);
       this._user.set(user);
-      if (user) {
-        await this.loadProfile(user.uid);
-      } else {
-        this._profile.set(null);
+      try {
+        if (user) await this.loadProfile(user.uid);
+      } catch (error) {
+        console.error('ユーザー情報の取得に失敗しました', error);
+      } finally {
+        this._loading.set(false);
       }
-      this._loading.set(false);
     });
   }
 
@@ -53,7 +56,7 @@ export class AuthService {
         uid,
         email: data['email'],
         displayName: data['displayName'],
-        roles: data['roles'],
+        roles: Array.isArray(data['roles']) ? data['roles'] : [],
         officeIds: data['officeIds'] ?? [],
         employeeId: data['employeeId'] ?? null,
         isSuspended: data['isSuspended'] ?? false,

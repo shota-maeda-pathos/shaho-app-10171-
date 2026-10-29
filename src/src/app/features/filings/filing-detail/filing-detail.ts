@@ -9,19 +9,21 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatStepperModule } from '@angular/material/stepper';
+import { MatDialog } from '@angular/material/dialog';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import type { FilingPrintMeta } from '../templates/official-filing-pdf';
 
 const FILING_TYPE_LABELS: Record<string, string> = {
-  acquisitionHealth: '健保 資格取得届',
-  acquisitionPension: '厚年 資格取得届',
-  lossHealth: '健保 資格喪失届',
-  lossPension: '厚年 資格喪失届',
-  monthlySantei: '算定基礎届',
-  monthlyChange: '月額変更届',
-  bonusReport: '賞与支払届',
-  dependentAdd: '被扶養者（異動）届',
-  dependentRemove: '被扶養者 削除届',
+  acquisitionNotification: '被保険者資格取得届',
+  lossNotification: '被保険者資格喪失届',
+  remunerationMonthlyChange: '報酬月額変更届',
+  remunerationMonthlyAlgorithm: '報酬月額算定基礎届',
+  dependentChange: '被扶養者（異動）届',
+  bonusPayment: '賞与支払届',
+  maternityLeaveStart: '産前産後休業取得者申出書',
+  childcareLeaveStart: '育児休業等取得者申出書',
+  childcareLeaveEnd: '育児休業等取得者終了届',
 };
 
 const WORKFLOW_STATUS_LABELS: Record<string, string> = {
@@ -116,6 +118,11 @@ const SUBMISSION_STATUS_LABELS: Record<string, string> = {
                 <mat-icon>send</mat-icon> 承認申請
               </button>
             }
+            @if (filing()!.workflowStatus === 'approved' && filing()!.mockStatus === 'notStarted') {
+              <button mat-flat-button color="accent" (click)="mockSubmit()" [disabled]="processing()">
+                <mat-icon>science</mat-icon> 模擬申請
+              </button>
+            }
             @if (filing()!.workflowStatus === 'approved' && filing()!.submissionStatus === 'notSubmitted') {
               <button mat-flat-button color="primary" (click)="submitFiling()" [disabled]="processing()">
                 <mat-icon>upload_file</mat-icon> 提出記録
@@ -129,18 +136,34 @@ const SUBMISSION_STATUS_LABELS: Record<string, string> = {
                 <mat-icon>reply</mat-icon> 返戻記録
               </button>
             }
+            <button mat-stroked-button (click)="printPdf()" [disabled]="processing()">
+              <mat-icon>picture_as_pdf</mat-icon> {{ processing() ? '処理中…' : '公式PDFを確認・保存' }}
+            </button>
           </div>
         </mat-card>
+
+        @if (filing()!.mockStatus === 'failed' && filing()!.mockValidationErrors?.length) {
+          <mat-card class="error-card">
+            <h2>模擬申請エラー</h2>
+            <ul class="error-list">
+              @for (err of filing()!.mockValidationErrors; track err) {
+                <li>{{ err }}</li>
+              }
+            </ul>
+          </mat-card>
+        }
 
         @if (filing()!.formData && objectKeys(filing()!.formData).length > 0) {
           <mat-card class="data-card">
             <h2>届出データ</h2>
             <div class="data-grid">
               @for (key of objectKeys(filing()!.formData); track key) {
-                <div class="data-item">
-                  <label>{{ key }}</label>
-                  <span>{{ filing()!.formData[key] }}</span>
-                </div>
+                @if (!isArrayValue(filing()!.formData[key])) {
+                  <div class="data-item">
+                    <label>{{ key }}</label>
+                    <span>{{ formatValue(filing()!.formData[key]) }}</span>
+                  </div>
+                }
               }
             </div>
           </mat-card>
@@ -192,6 +215,9 @@ const SUBMISSION_STATUS_LABELS: Record<string, string> = {
     .data-item label { font-size: 12px; color: #666; }
     .data-item span { font-size: 14px; }
     .result-card p { margin: 0; }
+    .error-card { border-left: 4px solid #f44336; }
+    .error-list { margin: 0; padding-left: 20px; color: #c62828; }
+    .error-list li { margin-bottom: 4px; }
   `],
 })
 export class FilingDetailComponent implements OnInit {
@@ -200,6 +226,7 @@ export class FilingDetailComponent implements OnInit {
   private functions = inject(Functions);
   private snackBar = inject(MatSnackBar);
   private auth = inject(AuthService);
+  private dialog = inject(MatDialog);
 
   filing = signal<any>(null);
   loading = signal(false);
@@ -209,6 +236,16 @@ export class FilingDetailComponent implements OnInit {
   private filingId = '';
 
   objectKeys = Object.keys;
+
+  formatValue(v: unknown): string {
+    if (v == null) return '—';
+    if (typeof v === 'number') return v.toLocaleString('ja-JP');
+    return String(v);
+  }
+
+  isArrayValue(v: unknown): boolean {
+    return Array.isArray(v);
+  }
 
   ngOnInit() {
     this.filingId = this.route.snapshot.paramMap.get('filingId') ?? '';
@@ -228,7 +265,7 @@ export class FilingDetailComponent implements OnInit {
       await fn({
         companyId: this.auth.companyId,
         employeeId: this.employeeId,
-        targetPath: `filings/${this.filingId}`,
+        targetPath: `companies/${this.auth.companyId}/employees/${this.employeeId}/filings/${this.filingId}`,
         targetVersion: this.filing()?.version ?? 1,
         requestType: 'filing',
         comment: '',
@@ -254,6 +291,78 @@ export class FilingDetailComponent implements OnInit {
       });
       this.snackBar.open('提出を記録しました', '閉じる', { duration: 3000 });
       this.loadFiling();
+    } catch (e: any) {
+      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  async mockSubmit() {
+    this.processing.set(true);
+    try {
+      const fn = httpsCallable<any, any>(this.functions, 'filingMockSubmit');
+      const result = await fn({
+        companyId: this.auth.companyId,
+        employeeId: this.employeeId,
+        filingId: this.filingId,
+        expectedVersion: this.filing()?.version ?? 1,
+      });
+      const status = result.data.mockStatus;
+      if (status === 'completed') {
+        this.snackBar.open('模擬申請が完了しました', '閉じる', { duration: 3000 });
+      } else {
+        this.snackBar.open('模擬申請でエラーが検出されました', '閉じる', { duration: 5000 });
+      }
+      this.loadFiling();
+    } catch (e: any) {
+      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  async printPdf() {
+    if (this.processing()) return;
+    this.processing.set(true);
+    try {
+      const fn = httpsCallable<any, any>(this.functions, 'filingPdfData');
+      const result = await fn({
+        companyId: this.auth.companyId,
+        employeeId: this.employeeId,
+        filingId: this.filingId,
+      });
+      const d = result.data;
+      const [companyResult, employeeResult] = await Promise.all([
+        httpsCallable<{ companyId: string }, { representativeName: string }>(this.functions, 'companyGet')({ companyId: this.auth.companyId }),
+        httpsCallable<{ companyId: string; employeeId: string }, { officeId: string }>(this.functions, 'employeeGet')({ companyId: this.auth.companyId, employeeId: this.employeeId }),
+      ]);
+      const { data: officeData } = await httpsCallable<object, { items: { id: string; name: string; officeNumber: string; address: string; phone: string }[] }>(this.functions, 'officeList')({ companyId: this.auth.companyId, includeInactive: true });
+      const office = officeData.items.find(item => item.id === employeeResult.data.officeId);
+      if (!office) throw new Error('届出の事業所情報を取得できませんでした。');
+      const meta: FilingPrintMeta = {
+        companyName: d.companyName,
+        officeName: office.name,
+        officeNumber: office.officeNumber,
+        officeAddress: office.address,
+        officePhone: office.phone,
+        representativeName: companyResult.data.representativeName,
+        effectiveDate: d.effectiveDate,
+        employeeNumber: d.employeeNumber,
+      };
+      const [{ createOfficialFilingPdf, OFFICIAL_FORMS }, { OfficialPdfPreviewComponent }] = await Promise.all([
+        import('../templates/official-filing-pdf'), import('../templates/official-pdf-preview'),
+      ]);
+      const output = await createOfficialFilingPdf(d.filingType, d.formData ?? {}, meta);
+      const form = OFFICIAL_FORMS[d.filingType];
+      this.dialog.open(OfficialPdfPreviewComponent, {
+        width: '1100px', height: '94vh', maxWidth: '96vw',
+        data: { ...output, title: form.title,
+          filename: `${form.title}_${this.filingId.replace(/[^a-zA-Z0-9_-]/g, '')}.pdf`,
+          sourceUrl: `https://www.nenkin.go.jp/shinsei/kounen/tekiyo/${form.source}`,
+          originalUrl: `/filing-forms/${form.file}.pdf`,
+        },
+      });
     } catch (e: any) {
       this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
     } finally {

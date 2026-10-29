@@ -38,6 +38,17 @@ export async function rejectApprovalRequest(
       throw invalidArg(`この承認リクエストは既に処理済みです（状態: ${reqData.status}）`);
     }
 
+    if (['monthlyInsurance', 'bonus', 'bonusInsurance'].includes(reqData.requestType)) {
+      if (reqData.requestType !== 'monthlyInsurance') {
+        const collection = reqData.requestType === 'bonus' ? 'bonuses' : 'bonusInsurance';
+        const prefix = `companies/${auth.companyId}/employees/${input.employeeId}/${collection}/`;
+        if (!reqData.targetPath.startsWith(prefix) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(reqData.targetPath.slice(prefix.length))) throw invalidArg('承認対象パスが不正です');
+      }
+      const targetRef = db.doc(reqData.targetPath);
+      const target = await tx.get(targetRef);
+      if (!target.exists || target.data()!.version !== reqData.targetVersion) throw invalidArg('承認対象が変更されています');
+      tx.update(targetRef, { approvalPending: false, version: target.data()!.version + 1, updatedAt: Timestamp.now() });
+    }
     if (reqData.requestType === 'filing') {
       const targetRef = db.doc(reqData.targetPath);
       const targetSnap = await tx.get(targetRef);

@@ -51,6 +51,7 @@ export interface OfficeDoc {
   deductionMethod: 'current' | 'previous';
   roundingRule: 'truncate' | 'round' | 'ceil';
   isActive: boolean;
+  version: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -208,13 +209,15 @@ export interface ApprovalRequestDoc {
   targetPath: string;
   targetVersion: number;
   snapshotData: Record<string, unknown>;
-  requestType: 'salary' | 'bonus' | 'monthlyInsurance' | 'filing' | 'employment' | 'grade';
+  requestType: 'salary' | 'bonus' | 'monthlyInsurance' | 'bonusInsurance' | 'filing' | 'employment' | 'grade';
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   requestedBy: string;
   requestedAt: Timestamp;
   reviewedBy: string | null;
   reviewedAt: Timestamp | null;
   comment: string | null;
+  isDeferred?: boolean;
+  metadata?: Record<string, unknown>;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

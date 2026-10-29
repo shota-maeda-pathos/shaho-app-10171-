@@ -9,7 +9,12 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatInputModule } from '@angular/material/input';
+import { FormsModule } from '@angular/forms';
 import { Functions, httpsCallable } from '@angular/fire/functions';
+import { AuthService } from '../../../core/services/auth.service';
 
 interface FilingRow {
   id: string;
@@ -20,6 +25,13 @@ interface FilingRow {
   mockStatus: string;
   submissionStatus: string;
   effectiveDate: string;
+}
+
+interface EmployeeListItem {
+  id: string;
+  lastName: string;
+  firstName: string;
+  employeeNumber: string;
 }
 
 const FILING_TYPE_LABELS: Record<string, string> = {
@@ -46,15 +58,67 @@ const SUBMISSION_LABELS: Record<string, string> = {
   selector: 'app-filing-list',
   standalone: true,
   imports: [
-    CommonModule,
+    CommonModule, FormsModule,
     MatTableModule, MatButtonModule, MatIconModule, MatCardModule,
     MatChipsModule, MatFormFieldModule, MatSelectModule, MatProgressSpinnerModule,
+    MatDialogModule, MatSnackBarModule, MatInputModule,
   ],
   template: `
     <div class="page-container">
       <div class="page-header">
         <h1>届出管理</h1>
+        <button mat-flat-button color="primary" (click)="openAutoGenerate()">
+          <mat-icon>auto_fix_high</mat-icon> 自動生成
+        </button>
       </div>
+
+      @if (showAutoGen()) {
+        <mat-card class="auto-gen-card">
+          <h2>届出自動生成</h2>
+          <div class="auto-gen-form">
+            <mat-form-field appearance="outline">
+              <mat-label>届出種別</mat-label>
+              <mat-select [(ngModel)]="autoGenType">
+                <mat-option value="acquisitionNotification">資格取得届</mat-option>
+                <mat-option value="lossNotification">資格喪失届</mat-option>
+                <mat-option value="remunerationMonthlyChange">月額変更届</mat-option>
+                <mat-option value="remunerationMonthlyAlgorithm">算定基礎届</mat-option>
+                <mat-option value="dependentChange">被扶養者異動届</mat-option>
+                <mat-option value="bonusPayment">賞与支払届</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>対象従業員</mat-label>
+              <mat-select [(ngModel)]="autoGenEmployeeId" [disabled]="employeesLoading() || generating()">
+                @for (emp of employees(); track emp.id) {
+                  <mat-option [value]="emp.id">{{ emp.number }} - {{ emp.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            @if (employeesLoading()) {
+              <p role="status">従業員を読み込み中...</p>
+            } @else if (employeesError()) {
+              <div role="alert">
+                <p>{{ employeesError() }}</p>
+                <button mat-stroked-button (click)="loadEmployees()">従業員を再読み込み</button>
+              </div>
+            } @else if (employees().length === 0) {
+              <p>選択できる従業員がいません。</p>
+            }
+            <mat-form-field appearance="outline">
+              <mat-label>届出日</mat-label>
+              <input matInput [(ngModel)]="autoGenDate" placeholder="2026-10-27">
+            </mat-form-field>
+            <div class="auto-gen-actions">
+              <button mat-flat-button color="primary" (click)="executeAutoGenerate()" [disabled]="generating() || employeesLoading() || !autoGenEmployeeId || !autoGenDate">
+                @if (generating()) { <mat-spinner diameter="20"></mat-spinner> }
+                生成
+              </button>
+              <button mat-stroked-button (click)="showAutoGen.set(false)">キャンセル</button>
+            </div>
+          </div>
+        </mat-card>
+      }
 
       <div class="filters">
         <mat-form-field appearance="outline">
@@ -152,21 +216,54 @@ const SUBMISSION_LABELS: Record<string, string> = {
     .status-chip[data-status="rejected"], .status-chip[data-status="returned"] { background: #ffebee; color: #c62828; }
     .link { color: #1976d2; cursor: pointer; text-decoration: none; }
     .link:hover { text-decoration: underline; }
+    .auto-gen-card { padding: 24px; margin-bottom: 16px; }
+    .auto-gen-form { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+    .auto-gen-form mat-form-field { min-width: 200px; }
+    .auto-gen-actions { display: flex; gap: 8px; align-items: center; padding-top: 8px; }
   `],
 })
 export class FilingListComponent implements OnInit {
   private functions = inject(Functions);
   private router = inject(Router);
+  private snackBar = inject(MatSnackBar);
+  private auth = inject(AuthService);
 
   filings = signal<FilingRow[]>([]);
   loading = signal(false);
   workflowFilter = signal('all');
   submissionFilter = signal('all');
+  showAutoGen = signal(false);
+  generating = signal(false);
+  employees = signal<{ id: string; name: string; number: string }[]>([]);
+  employeesLoading = signal(false);
+  employeesError = signal('');
+
+  autoGenType = 'acquisitionNotification';
+  autoGenEmployeeId = '';
+  autoGenDate = new Date().toISOString().slice(0, 10);
 
   displayedColumns = ['filingType', 'employeeName', 'effectiveDate', 'workflowStatus', 'submissionStatus'];
 
   ngOnInit() {
     this.loadFilings();
+    this.loadEmployees();
+  }
+
+  async loadEmployees() {
+    if (this.employeesLoading()) return;
+    this.employeesLoading.set(true);
+    this.employeesError.set('');
+    try {
+      const fn = httpsCallable<object, { items: EmployeeListItem[] }>(this.functions, 'employeeList');
+      const { data } = await fn({ companyId: this.auth.companyId, limit: 100 });
+      this.employees.set((data.items ?? []).map(e => ({
+        id: e.id, name: `${e.lastName} ${e.firstName}`, number: e.employeeNumber || '-',
+      })));
+    } catch {
+      this.employeesError.set('従業員を取得できませんでした。再読み込みしてください。');
+    } finally {
+      this.employeesLoading.set(false);
+    }
   }
 
   filteredFilings() {
@@ -185,11 +282,40 @@ export class FilingListComponent implements OnInit {
   workflowLabel(status: string): string { return WORKFLOW_LABELS[status] ?? status; }
   submissionLabel(status: string): string { return SUBMISSION_LABELS[status] ?? status; }
 
+  openAutoGenerate() {
+    this.showAutoGen.set(true);
+  }
+
+  async executeAutoGenerate() {
+    if (!this.autoGenEmployeeId || !this.autoGenDate) {
+      this.snackBar.open('対象従業員と届出日を選択してください', '閉じる', { duration: 3000 });
+      return;
+    }
+    this.generating.set(true);
+    try {
+      const fn = httpsCallable<any, any>(this.functions, 'filingAutoGenerate');
+      const result = await fn({
+        companyId: this.auth.companyId,
+        employeeId: this.autoGenEmployeeId,
+        filingType: this.autoGenType,
+        effectiveDate: this.autoGenDate,
+      });
+      this.snackBar.open('届出を自動生成しました', '閉じる', { duration: 3000 });
+      this.showAutoGen.set(false);
+      this.loadFilings();
+      this.router.navigate(['/filings', result.data.id], { queryParams: { employeeId: this.autoGenEmployeeId } });
+    } catch (e: any) {
+      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
+    } finally {
+      this.generating.set(false);
+    }
+  }
+
   private async loadFilings() {
     this.loading.set(true);
     try {
       const fn = httpsCallable<any, any>(this.functions, 'filingList');
-      const result = await fn({ companyId: 'company-001' });
+      const result = await fn({ companyId: this.auth.companyId });
       this.filings.set(result.data.items ?? []);
     } catch {
       this.filings.set([]);

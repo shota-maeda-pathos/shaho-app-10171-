@@ -93,6 +93,7 @@ export function makeOfficeDoc(
     deductionMethod: 'current',
     roundingRule: 'truncate',
     isActive: true,
+    version: 1,
     createdAt: now,
     updatedAt: now,
     ...overrides,

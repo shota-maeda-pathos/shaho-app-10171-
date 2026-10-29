@@ -31,7 +31,7 @@ export async function listOffices(
 ): Promise<{ items: OfficeResponse[] }> {
   const collRef = db.collection(`companies/${auth.companyId}/offices`);
 
-  let query: FirebaseFirestore.Query = collRef.orderBy('name', 'asc');
+  let query: FirebaseFirestore.Query = collRef;
 
   if (!(input.includeInactive ?? false)) {
     query = query.where('isActive', '==', true);
@@ -46,9 +46,9 @@ export async function listOffices(
   }
 
   const snap = await query.get();
-  const items = snap.docs.map((d) =>
-    toOfficeResponse(d.id, d.data() as OfficeDoc),
-  );
+  const items = snap.docs
+    .map((d) => toOfficeResponse(d.id, d.data() as OfficeDoc))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 
   return { items };
 }

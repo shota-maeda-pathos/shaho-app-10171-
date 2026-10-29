@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -10,11 +10,35 @@ import { MatDividerModule } from '@angular/material/divider';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 
+interface FilingAlert {
+  employeeId: string;
+  employeeName: string;
+  filingType: string;
+  filingId: string;
+  createdAt: string;
+  daysElapsed: number;
+}
+
+interface UncollectedAlert {
+  yearMonth: string;
+  employeeId: string;
+  employeeName: string;
+  totalAmount: number;
+}
+
+interface DashboardAlerts {
+  filingDeadlines: FilingAlert[];
+  uncollectedPremiums: UncollectedAlert[];
+  revisionCandidates: number;
+}
+
 interface DashboardStats {
   employeeCount: number;
   pendingApprovals: number;
   pendingFilings: number;
-  uncollectedPremium: number;
+  activeLeaves: number;
+  activeExemptions: number;
+  alerts: DashboardAlerts;
 }
 
 interface TaskItem {
@@ -23,6 +47,31 @@ interface TaskItem {
   route: string;
   count: number;
   color: string;
+}
+
+interface MonthlyTrend {
+  yearMonth: string;
+  totalEmployee: number;
+  totalEmployer: number;
+  healthTotal: number;
+  pensionTotal: number;
+  employeeCount: number;
+}
+
+interface FilingStats {
+  total: number;
+  draft: number;
+  pending: number;
+  approved: number;
+  submitted: number;
+  accepted: number;
+}
+
+interface AnalyticsData {
+  insuranceTrends: MonthlyTrend[];
+  filingStats: FilingStats;
+  recentFilings: { id: string; employeeId: string; employeeName: string; filingType: string; status: string; effectiveDate: string }[];
+  monthOverMonth: { currentMonth: string; previousMonth: string; currentTotal: number; previousTotal: number; changePercent: number | null } | null;
 }
 
 @Component({
@@ -40,32 +89,102 @@ interface TaskItem {
         <p class="subtitle">{{ greeting() }}、{{ auth.profile()?.displayName ?? 'ユーザー' }}さん</p>
       </div>
 
+      @if (auth.loading()) {
+        <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
+      } @else if (!auth.profile()) {
+        <p role="alert">ユーザー情報を取得できません。会社への登録とアクセス権を管理者に確認してください。</p>
+      }
+      @if (auth.hasAnyRole('admin', 'operator')) {
+      @if (error()) {
+        <p role="alert">{{ error() }}</p>
+        <button mat-stroked-button (click)="loadStats()">再読み込み</button>
+      }
+      @if (loading()) {
+        <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
+      }
+      @if (stats(); as data) {
       <div class="stats-row">
         <mat-card class="stat-card" (click)="navigate('/employees')">
           <mat-icon class="stat-icon" style="color: #1976d2">people</mat-icon>
-          <div class="stat-value">{{ stats().employeeCount }}</div>
+          <div class="stat-value">{{ data.employeeCount }}</div>
           <div class="stat-label">従業員数</div>
         </mat-card>
         <mat-card class="stat-card" (click)="navigate('/approvals')"
-          [class.alert]="stats().pendingApprovals > 0">
+          [class.alert]="data.pendingApprovals > 0">
           <mat-icon class="stat-icon" style="color: #e65100">pending_actions</mat-icon>
-          <div class="stat-value">{{ stats().pendingApprovals }}</div>
+          <div class="stat-value">{{ data.pendingApprovals }}</div>
           <div class="stat-label">承認待ち</div>
         </mat-card>
         <mat-card class="stat-card" (click)="navigate('/filings')"
-          [class.alert]="stats().pendingFilings > 0">
+          [class.alert]="data.pendingFilings > 0">
           <mat-icon class="stat-icon" style="color: #2e7d32">description</mat-icon>
-          <div class="stat-value">{{ stats().pendingFilings }}</div>
+          <div class="stat-value">{{ data.pendingFilings }}</div>
           <div class="stat-label">未提出届出</div>
         </mat-card>
-        <mat-card class="stat-card" (click)="navigate('/premium/collection')">
-          <mat-icon class="stat-icon" style="color: #7b1fa2">account_balance</mat-icon>
-          <div class="stat-value">{{ stats().uncollectedPremium | number }}</div>
-          <div class="stat-label">未徴収額（円）</div>
+        <mat-card class="stat-card">
+          <mat-icon class="stat-icon" style="color: #7b1fa2">baby_changing_station</mat-icon>
+          <div class="stat-value">{{ data.activeLeaves }}</div>
+          <div class="stat-label">休業中</div>
         </mat-card>
       </div>
 
-      @if (auth.hasAnyRole('admin', 'operator')) {
+      <p>免除登録：{{ data.activeExemptions }}件</p>
+
+      @if (data.alerts; as alerts) {
+        @if (alerts.filingDeadlines.length > 0 || alerts.uncollectedPremiums.length > 0 || alerts.revisionCandidates > 0) {
+        <div class="alerts-section">
+          <h2><mat-icon>warning</mat-icon> 業務アラート</h2>
+          <div class="alert-cards">
+            @if (alerts.filingDeadlines.length > 0) {
+              <mat-card class="alert-card filing-alert">
+                <div class="alert-header">
+                  <mat-icon>schedule</mat-icon>
+                  <span>届出期限超過 ({{ alerts.filingDeadlines.length }}件)</span>
+                </div>
+                <div class="alert-body">
+                  @for (f of alerts.filingDeadlines; track f.filingId) {
+                    <div class="alert-row" (click)="navigate('/employees/' + f.employeeId + '/filings/' + f.filingId)">
+                      <span class="alert-name">{{ f.employeeName }}</span>
+                      <span class="alert-type">{{ filingTypeLabel(f.filingType) }}</span>
+                      <span class="alert-days">{{ f.daysElapsed }}日経過</span>
+                    </div>
+                  }
+                </div>
+              </mat-card>
+            }
+            @if (alerts.uncollectedPremiums.length > 0) {
+              <mat-card class="alert-card premium-alert">
+                <div class="alert-header">
+                  <mat-icon>account_balance_wallet</mat-icon>
+                  <span>未徴収保険料 ({{ alerts.uncollectedPremiums.length }}件)</span>
+                </div>
+                <div class="alert-body">
+                  @for (p of alerts.uncollectedPremiums; track p.employeeId + p.yearMonth) {
+                    <div class="alert-row" (click)="navigate('/premium/collection')">
+                      <span class="alert-name">{{ p.employeeName }}</span>
+                      <span class="alert-type">{{ p.yearMonth }}</span>
+                      <span class="alert-amount">{{ p.totalAmount | number }}円</span>
+                    </div>
+                  }
+                </div>
+              </mat-card>
+            }
+            @if (alerts.revisionCandidates > 0) {
+              <mat-card class="alert-card revision-alert" (click)="navigate('/santei')">
+                <div class="alert-header">
+                  <mat-icon>swap_vert</mat-icon>
+                  <span>随時改定候補者</span>
+                </div>
+                <div class="alert-body">
+                  <p class="revision-count">{{ alerts.revisionCandidates }}名の従業員に固定的賃金の変動があります</p>
+                </div>
+              </mat-card>
+            }
+          </div>
+        </div>
+        }
+      }
+      }
         <div class="content-grid">
           <mat-card class="task-card">
             <h2>
@@ -82,8 +201,6 @@ interface TaskItem {
                     <span class="task-label">{{ task.label }}</span>
                     @if (task.count > 0) {
                       <span class="task-badge" [style.background]="task.color">{{ task.count }}</span>
-                    } @else {
-                      <mat-icon class="task-done">check_circle</mat-icon>
                     }
                   </div>
                 }
@@ -109,6 +226,10 @@ interface TaskItem {
                 <mat-icon>calculate</mat-icon>
                 保険料計算
               </button>
+              <button mat-stroked-button (click)="navigate('/premium/bonus')">
+                <mat-icon>card_giftcard</mat-icon>
+                賞与保険料
+              </button>
               <button mat-stroked-button (click)="navigate('/filings')">
                 <mat-icon>description</mat-icon>
                 届出管理
@@ -117,13 +238,79 @@ interface TaskItem {
                 <mat-icon>assessment</mat-icon>
                 算定基礎届
               </button>
+              @if (auth.hasRole('admin')) {
               <button mat-stroked-button (click)="navigate('/settings')">
                 <mat-icon>manage_accounts</mat-icon>
                 ユーザー管理
               </button>
+              }
             </div>
           </mat-card>
         </div>
+
+        @if (analytics(); as a) {
+          <div class="analytics-section">
+            @if (a.monthOverMonth; as mom) {
+              <div class="mom-row">
+                <mat-card class="mom-card">
+                  <div class="mom-label">前月比 ({{ mom.previousMonth }} → {{ mom.currentMonth }})</div>
+                  <div class="mom-value" [class.up]="(mom.changePercent ?? 0) > 0" [class.down]="(mom.changePercent ?? 0) < 0">
+                    {{ mom.changePercent !== null ? ((mom.changePercent > 0 ? '+' : '') + mom.changePercent + '%') : '—' }}
+                  </div>
+                  <div class="mom-detail">{{ mom.previousTotal | number }}円 → {{ mom.currentTotal | number }}円</div>
+                </mat-card>
+                <mat-card class="filing-stats-card">
+                  <h3>届出ステータス</h3>
+                  <div class="filing-stat-grid">
+                    <div class="fs-item"><span class="fs-num">{{ a.filingStats.draft }}</span><span class="fs-label">下書き</span></div>
+                    <div class="fs-item"><span class="fs-num">{{ a.filingStats.pending }}</span><span class="fs-label">承認待ち</span></div>
+                    <div class="fs-item"><span class="fs-num">{{ a.filingStats.approved }}</span><span class="fs-label">承認済み</span></div>
+                    <div class="fs-item"><span class="fs-num">{{ a.filingStats.submitted }}</span><span class="fs-label">提出済み</span></div>
+                    <div class="fs-item"><span class="fs-num">{{ a.filingStats.accepted }}</span><span class="fs-label">受理</span></div>
+                  </div>
+                </mat-card>
+              </div>
+            }
+
+            <mat-card class="trends-card">
+              <h2><mat-icon>trending_up</mat-icon> 保険料推移（月別）</h2>
+              <div class="trends-table-wrap">
+                <table class="trends-table">
+                  <thead>
+                    <tr><th>年月</th><th>被保険者負担</th><th>事業主負担</th><th>健保計</th><th>厚年計</th><th>対象人数</th></tr>
+                  </thead>
+                  <tbody>
+                    @for (t of a.insuranceTrends; track t.yearMonth) {
+                      <tr>
+                        <td>{{ t.yearMonth }}</td>
+                        <td class="num">{{ t.totalEmployee | number }}</td>
+                        <td class="num">{{ t.totalEmployer | number }}</td>
+                        <td class="num">{{ t.healthTotal | number }}</td>
+                        <td class="num">{{ t.pensionTotal | number }}</td>
+                        <td class="num">{{ t.employeeCount }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </mat-card>
+
+            @if (a.recentFilings.length > 0) {
+              <mat-card class="recent-filings-card">
+                <h2><mat-icon>history</mat-icon> 最近の届出</h2>
+                <mat-list>
+                  @for (f of a.recentFilings; track f.id) {
+                    <mat-list-item (click)="navigate('/employees/' + f.employeeId + '/filings/' + f.id)">
+                      <mat-icon matListItemIcon>description</mat-icon>
+                      <div matListItemTitle>{{ f.employeeName }} — {{ f.filingType }}</div>
+                      <div matListItemLine>{{ f.effectiveDate }} ／ {{ f.status }}</div>
+                    </mat-list-item>
+                  }
+                </mat-list>
+              </mat-card>
+            }
+          </div>
+        }
       }
 
       @if (auth.hasRole('employee')) {
@@ -173,22 +360,72 @@ interface TaskItem {
       .stats-row { grid-template-columns: repeat(2, 1fr); }
       .content-grid { grid-template-columns: 1fr; }
     }
+    .alerts-section { margin-bottom: 24px; }
+    .alerts-section h2 mat-icon { color: #e65100; }
+    .alert-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .alert-card { padding: 16px; border-left: 4px solid #e65100; }
+    .alert-card.premium-alert { border-left-color: #d32f2f; }
+    .alert-card.revision-alert { border-left-color: #f57c00; cursor: pointer; }
+    .alert-card.revision-alert:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .alert-header { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 14px; margin-bottom: 12px; }
+    .alert-header mat-icon { font-size: 20px; width: 20px; height: 20px; color: #e65100; }
+    .premium-alert .alert-header mat-icon { color: #d32f2f; }
+    .revision-alert .alert-header mat-icon { color: #f57c00; }
+    .alert-body { display: flex; flex-direction: column; gap: 4px; }
+    .alert-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+    .alert-row:hover { background: #f5f5f5; }
+    .alert-name { flex: 1; font-weight: 500; }
+    .alert-type { color: #666; font-size: 12px; }
+    .alert-days { color: #e65100; font-weight: 600; font-size: 12px; white-space: nowrap; }
+    .alert-amount { color: #d32f2f; font-weight: 600; font-size: 12px; white-space: nowrap; }
+    .revision-count { margin: 0; font-size: 13px; color: #666; }
+    .analytics-section { margin-bottom: 24px; display: flex; flex-direction: column; gap: 16px; }
+    .mom-row { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
+    .mom-card { padding: 24px; text-align: center; }
+    .mom-label { font-size: 13px; color: #666; }
+    .mom-value { font-size: 36px; font-weight: 700; margin: 8px 0; }
+    .mom-value.up { color: #d32f2f; }
+    .mom-value.down { color: #2e7d32; }
+    .mom-detail { font-size: 13px; color: #888; }
+    .filing-stats-card { padding: 24px; }
+    .filing-stats-card h3 { margin: 0 0 16px; font-size: 15px; font-weight: 500; }
+    .filing-stat-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+    .fs-item { text-align: center; flex: 1; min-width: 60px; }
+    .fs-num { display: block; font-size: 24px; font-weight: 600; }
+    .fs-label { font-size: 12px; color: #666; }
+    .trends-card { padding: 24px; }
+    .trends-table-wrap { overflow-x: auto; }
+    .trends-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .trends-table th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #e0e0e0; font-weight: 500; color: #666; font-size: 12px; }
+    .trends-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+    .trends-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .recent-filings-card { padding: 24px; }
+    .recent-filings-card mat-list-item { cursor: pointer; }
+    @media (max-width: 960px) { .mom-row { grid-template-columns: 1fr; } }
     @media (max-width: 600px) {
       .stats-row { grid-template-columns: 1fr; }
     }
   `],
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent  {
   auth = inject(AuthService);
   private router = inject(Router);
   private functions = inject(Functions);
 
-  stats = signal<DashboardStats>({ employeeCount: 0, pendingApprovals: 0, pendingFilings: 0, uncollectedPremium: 0 });
+  stats = signal<DashboardStats | null>(null);
   tasks = signal<TaskItem[]>([]);
   loading = signal(false);
+  error = signal('');
+  analytics = signal<AnalyticsData | null>(null);
 
-  ngOnInit() {
-    this.loadStats();
+  constructor() {
+    effect(() => {
+      const profile = this.auth.profile();
+      if (!this.auth.loading() && profile && this.auth.hasAnyRole('admin', 'operator')) {
+        void this.loadStats();
+        void this.loadAnalytics();
+      }
+    });
   }
 
   greeting(): string {
@@ -202,51 +439,49 @@ export class DashboardComponent implements OnInit {
     this.router.navigate([route]);
   }
 
-  private async loadStats() {
+  async loadStats() {
     this.loading.set(true);
-    const companyId = this.auth.companyId;
-    const currentMonth = this.getCurrentMonth();
-
+    this.error.set('');
+    this.stats.set(null);
+    this.tasks.set([]);
     try {
-      const [empResult, approvalResult, filingResult, salaryResult] = await Promise.all([
-        httpsCallable<any, any>(this.functions, 'employeeList')({ companyId, limit: 1 }).catch(() => ({ data: { total: 0 } })),
-        httpsCallable<any, any>(this.functions, 'approvalRequestList')({ companyId, status: 'pending' }).catch(() => ({ data: { items: [] } })),
-        httpsCallable<any, any>(this.functions, 'filingList')({ companyId, submissionStatus: 'notSubmitted' }).catch(() => ({ data: { items: [] } })),
-        httpsCallable<any, any>(this.functions, 'salaryList')({ companyId, yearMonth: currentMonth, limit: 200 }).catch(() => ({ data: { items: [] } })),
-      ]);
-
-      const employees = empResult.data.total ?? empResult.data.items?.length ?? 0;
-      const pendingApprovals = approvalResult.data.items?.length ?? 0;
-      const pendingFilings = filingResult.data.items?.length ?? 0;
-
-      const salaryItems: any[] = salaryResult.data.items ?? [];
-      const uncollected = salaryItems
-        .filter((s: any) => !s.isConfirmed)
-        .reduce((sum: number, s: any) => sum + Math.round(s.totalSalary * 0.15), 0);
-
-      this.stats.set({
-        employeeCount: employees,
-        pendingApprovals,
-        pendingFilings,
-        uncollectedPremium: uncollected,
-      });
-
+      const fn = httpsCallable<{ companyId: string }, DashboardStats>(this.functions, 'dashboardStats');
+      const { data } = await fn({ companyId: this.auth.companyId });
+      this.stats.set(data);
       this.tasks.set([
-        { icon: 'payments', label: '給与入力', route: '/salary', count: salaryItems.filter((s: any) => !s.isConfirmed).length, color: '#1976d2' },
+        { icon: 'payments', label: '給与入力', route: '/salary', count: 0, color: '#1976d2' },
         { icon: 'calculate', label: '保険料計算', route: '/premium/monthly', count: 0, color: '#2e7d32' },
-        { icon: 'pending_actions', label: '承認処理', route: '/approvals', count: pendingApprovals, color: '#e65100' },
-        { icon: 'description', label: '届出提出', route: '/filings', count: pendingFilings, color: '#7b1fa2' },
-        { icon: 'account_balance', label: '徴収確認', route: '/premium/collection', count: uncollected > 0 ? 1 : 0, color: '#c62828' },
+        { icon: 'pending_actions', label: '承認処理', route: '/approvals', count: data.pendingApprovals, color: '#e65100' },
+        { icon: 'description', label: '届出提出', route: '/filings', count: data.pendingFilings, color: '#7b1fa2' },
       ]);
     } catch {
-      this.tasks.set([]);
+      this.error.set('統計情報を取得できませんでした。接続状況・権限・APIの公開状況を確認してください。');
     } finally {
       this.loading.set(false);
     }
   }
 
-  private getCurrentMonth(): string {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  private readonly FILING_TYPE_LABELS: Record<string, string> = {
+    acquisitionNotification: '資格取得届',
+    lossNotification: '資格喪失届',
+    remunerationMonthlyChange: '月額変更届',
+    remunerationMonthlyAlgorithm: '算定基礎届',
+    bonusPayment: '賞与支払届',
+    dependentChange: '扶養異動届',
+    maternityLeaveStart: '産前産後休業取得者申出書',
+    childcareLeaveStart: '育児休業等取得者申出書',
+    childcareLeaveEnd: '育児休業等取得者終了届',
+  };
+
+  filingTypeLabel(type: string): string {
+    return this.FILING_TYPE_LABELS[type] ?? type;
+  }
+
+  async loadAnalytics() {
+    try {
+      const fn = httpsCallable<{ companyId: string; months?: number }, AnalyticsData>(this.functions, 'dashboardAnalytics');
+      const { data } = await fn({ companyId: this.auth.companyId, months: 6 });
+      this.analytics.set(data);
+    } catch { /* analytics is non-critical */ }
   }
 }

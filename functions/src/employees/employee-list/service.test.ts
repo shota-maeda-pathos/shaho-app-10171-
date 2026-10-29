@@ -53,6 +53,21 @@ beforeEach(() => {
 });
 
 describe('listEmployees', () => {
+  it('生年月日が未入力の従業員がいても一覧全体を取得できる', async () => {
+    mockQueryDocs.mockResolvedValue({
+      docs: [
+        { id: 'emp-1', data: () => emp1 },
+        { id: 'emp-2', data: () => ({ ...makeEmployeeDoc(), birthDate: null }) },
+      ],
+    });
+
+    const result = await listEmployees({ companyId: 'company-001' }, makeAuth({ roles: ['admin'] }));
+
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0].birthDate).toBe('1990-01-15');
+    expect(result.items[1].birthDate).toBe('');
+  });
+
   it('admin は全事業所の従業員を取得できる', async () => {
     const auth = makeAuth({ roles: ['admin'] });
     const result = await listEmployees(

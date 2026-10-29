@@ -1,3 +1,4 @@
+import { PortalPayslip } from './portal.types';
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -19,82 +20,35 @@ import { AuthService } from '../../core/services/auth.service';
   ],
   template: `
     <div class="page-container">
-      <div class="page-header">
-        <button mat-icon-button (click)="goBack()"><mat-icon>arrow_back</mat-icon></button>
-        <h1>給与明細 — {{ yearMonth() }}</h1>
-      </div>
-
+      <div class="page-header"><button mat-icon-button (click)="goBack()"><mat-icon>arrow_back</mat-icon></button><h1>給与・社会保険料 — {{ yearMonth() }}</h1></div>
       @if (loading()) {
-        <div class="loading-container"><mat-spinner diameter="40"></mat-spinner></div>
-      } @else if (salary()) {
+        <div class="loading-container"><mat-spinner diameter="40" /></div>
+      } @else if (error()) {
+        <p role="alert">{{ error() }}</p><button mat-stroked-button (click)="loadPayslip()">再読み込み</button>
+      } @else if (payslip(); as slip) {
         <mat-card class="payslip-card">
-          <div class="payslip-header">
-            <h2>{{ salary()!.employeeName }}</h2>
-            <span class="period">{{ yearMonth() }}</span>
-          </div>
-
-          <mat-divider></mat-divider>
-
-          <div class="section">
-            <h3>支給</h3>
-            <div class="line-item">
-              <span>基本給</span>
-              <span class="amount">{{ salary()!.baseSalary | number }} 円</span>
-            </div>
-            @if (salary()!.fixedAllowances) {
-              @for (key of objectKeys(salary()!.fixedAllowances); track key) {
-                <div class="line-item">
-                  <span>{{ key }}</span>
-                  <span class="amount">{{ salary()!.fixedAllowances[key] | number }} 円</span>
-                </div>
-              }
+          <h2>{{ slip.employeeName }}</h2>
+          <div class="section"><h3>承認済み給与</h3>
+            <div class="line-item"><span>基本給</span><span>{{ slip.baseSalary === null ? '未登録' : (slip.baseSalary | number) + ' 円' }}</span></div>
+            @for (key of objectKeys(slip.fixedAllowances); track key) {
+              <div class="line-item"><span>{{ key }}</span><span>{{ slip.fixedAllowances[key] | number }} 円</span></div>
             }
-            @if (salary()!.variableAllowances) {
-              @for (key of objectKeys(salary()!.variableAllowances); track key) {
-                <div class="line-item">
-                  <span>{{ key }}</span>
-                  <span class="amount">{{ salary()!.variableAllowances[key] | number }} 円</span>
-                </div>
-              }
+            @for (key of objectKeys(slip.variableAllowances); track key) {
+              <div class="line-item"><span>{{ key }}</span><span>{{ slip.variableAllowances[key] | number }} 円</span></div>
             }
-            <div class="line-item total">
-              <span>支給合計</span>
-              <span class="amount">{{ salary()!.totalSalary | number }} 円</span>
-            </div>
+            <div class="line-item total"><span>支給合計</span><span>{{ slip.totalSalary === null ? '未登録' : (slip.totalSalary | number) + ' 円' }}</span></div>
           </div>
-
-          <mat-divider></mat-divider>
-
-          <div class="section">
-            <h3>控除</h3>
-            <div class="line-item">
-              <span>健康保険料</span>
-              <span class="amount">{{ healthPremium() | number }} 円</span>
-            </div>
-            <div class="line-item">
-              <span>厚生年金保険料</span>
-              <span class="amount">{{ pensionPremium() | number }} 円</span>
-            </div>
-            <div class="line-item total">
-              <span>控除合計</span>
-              <span class="amount">{{ totalDeduction() | number }} 円</span>
-            </div>
-          </div>
-
-          <mat-divider></mat-divider>
-
-          <div class="section net">
-            <div class="line-item grand-total">
-              <span>差引支給額</span>
-              <span class="amount">{{ netAmount() | number }} 円</span>
-            </div>
-          </div>
-        </mat-card>
-      } @else {
-        <mat-card class="empty-card">
-          <div class="empty-state">
-            <mat-icon>receipt_long</mat-icon>
-            <p>明細が見つかりません</p>
+          <mat-divider />
+          <div class="section"><h3>同月分の社会保険料（本人負担・承認済み計算額）</h3>
+            @if (slip.insurance; as premium) {
+              <div class="line-item"><span>健康保険料</span><span>{{ premium.health === null ? '未登録' : (premium.health | number) + ' 円' }}</span></div>
+              <div class="line-item"><span>厚生年金保険料</span><span>{{ premium.pension === null ? '未登録' : (premium.pension | number) + ' 円' }}</span></div>
+              <div class="line-item"><span>介護保険料</span><span>{{ premium.longTermCare === null ? '未登録' : (premium.longTermCare | number) + ' 円' }}</span></div>
+              <div class="line-item"><span>子ども・子育て関連拠出</span><span>{{ premium.childSupport === null ? '未登録' : (premium.childSupport | number) + ' 円' }}</span></div>
+              <div class="line-item total"><span>本人負担合計</span><span>{{ premium.totalEmployee === null ? '未登録' : (premium.totalEmployee | number) + ' 円' }}</span></div>
+              @if (premium.isExempted) { <p>この発生月には免除が適用されています。</p> }
+            } @else { <p>同月分の社会保険料は未計算または未承認です。</p> }
+            <p>表示額は保険料の発生月の計算結果です。給与からの実際の控除額・差引支給額を示すものではありません。</p>
           </div>
         </mat-card>
       }
@@ -129,53 +83,23 @@ export class PortalDetailComponent implements OnInit {
   private auth = inject(AuthService);
 
   yearMonth = signal('');
-  salary = signal<any>(null);
+  payslip = signal<PortalPayslip | null>(null);
   loading = signal(false);
-
-  healthPremium = signal(0);
-  pensionPremium = signal(0);
-  totalDeduction = signal(0);
-  netAmount = signal(0);
-
+  error = signal('');
   objectKeys = Object.keys;
-
   ngOnInit() {
     this.yearMonth.set(this.route.snapshot.paramMap.get('id') ?? '');
-    this.loadPayslip();
+    void this.loadPayslip();
   }
-
-  goBack() {
-    this.router.navigate(['/portal']);
-  }
-
-  private async loadPayslip() {
-    this.loading.set(true);
-    const profile = this.auth.profile();
-    if (!profile?.employeeId) {
-      this.loading.set(false);
-      return;
-    }
+  goBack() { this.router.navigate(['/portal']); }
+  async loadPayslip() {
+    if (this.loading()) return;
+    this.loading.set(true); this.error.set(''); this.payslip.set(null);
     try {
-      const fn = httpsCallable<any, any>(this.functions, 'salaryList');
-      const result = await fn({
-        companyId: this.auth.companyId,
-        yearMonth: this.yearMonth(),
-      });
-      const items: any[] = result.data.items ?? [];
-      const match = items.find((i: any) => i.employeeId === profile.employeeId);
-      if (match) {
-        this.salary.set(match);
-        const health = Math.round(match.totalSalary * 0.05);
-        const pension = Math.round(match.totalSalary * 0.09);
-        this.healthPremium.set(health);
-        this.pensionPremium.set(pension);
-        this.totalDeduction.set(health + pension);
-        this.netAmount.set(match.totalSalary - health - pension);
-      }
-    } catch {
-      this.salary.set(null);
-    } finally {
-      this.loading.set(false);
-    }
+      const fn = httpsCallable<object, PortalPayslip>(this.functions, 'portalPayslipGet');
+      const { data } = await fn({ companyId: this.auth.companyId, yearMonth: this.yearMonth() });
+      this.payslip.set(data);
+    } catch (e: any) { this.error.set(`給与情報を取得できませんでした：${e.message ?? '再読み込みしてください'}`); }
+    finally { this.loading.set(false); }
   }
 }
