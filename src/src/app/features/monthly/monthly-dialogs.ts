@@ -53,6 +53,8 @@ export class NoPayDialogComponent {
     <mat-dialog-content>
       @if (r.hold) { <p class="hold">保留中：{{ r.hold.reason }}</p> }
       @for (i of r.issues; track i) { <p class="bad">{{ i }}</p> }
+      @if (r.rejected?.salary) { <p class="bad">給与が差し戻されました。理由：{{ r.rejected?.salary }}</p> }
+      @if (r.rejected?.premium) { <p class="bad">保険料が差し戻されました。理由：{{ r.rejected?.premium }}</p> }
       @for (w of r.warnings; track w) { <p class="warn">{{ w }}</p> }
 
       <h3>{{ month(data.payMonth) }}支給の給与</h3>

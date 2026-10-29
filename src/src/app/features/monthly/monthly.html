@@ -88,8 +88,35 @@
                   <input type="file" accept=".csv,text/csv" (change)="pickCsv($event)" [disabled]="busy()">
                 </label>
               </div>
+              <div class="items">
+                <span class="items-label">給与項目（CSVの手当の列）：</span>
+                @for (item of salaryItems(); track item.name) {
+                  <span class="item-chip">{{ item.name }}（{{ item.kind === 'fixed' ? '固定的' : '非固定的' }}）</span>
+                }
+                @if (!itemsEditing()) { <button mat-button type="button" (click)="editItems()" [disabled]="busy()">給与項目を編集</button> }
+              </div>
+              @if (itemsEditing(); as list) {
+                <div class="items-editor">
+                  <p class="hint">固定的＝基本給・住宅手当・通勤手当など毎月決まって支払うもの（変わると随時改定の対象）。非固定的＝残業手当など月によって変わるもの。</p>
+                  @for (item of list; track $index; let i = $index) {
+                    <div class="item-row">
+                      <input type="text" [(ngModel)]="item.name" maxlength="30" placeholder="項目名（例：住宅手当）" [attr.aria-label]="'給与項目' + (i + 1) + 'の名前'">
+                      <select [(ngModel)]="item.kind" [attr.aria-label]="'給与項目' + (i + 1) + 'の区分'">
+                        <option value="fixed">固定的</option>
+                        <option value="variable">非固定的</option>
+                      </select>
+                      <button mat-icon-button type="button" (click)="removeItem(i)" [attr.aria-label]="(item.name || '項目') + 'を消す'"><mat-icon>delete</mat-icon></button>
+                    </div>
+                  }
+                  <div class="import-actions">
+                    <button mat-stroked-button type="button" (click)="addItem()"><mat-icon>add</mat-icon>項目を足す</button>
+                    <button mat-flat-button type="button" (click)="saveItems()" [disabled]="busy()">保存する</button>
+                    <button mat-button type="button" (click)="itemsEditing.set(null)">やめる</button>
+                  </div>
+                </div>
+              }
               <p class="hint">
-                ダウンロードしたCSVに金額を入れて取り込みます。手当は「固定:住宅手当」「非固定:残業手当」のように列を足せます。
+                ダウンロードしたCSVに金額を入れて取り込みます。手当の列は上の給与項目です（「固定:〇〇」「非固定:〇〇」と書けば、登録していない手当も使えます）。
                 給与がない月の人は「無給」の列に 1 を入れるか、一覧で「無給として記録」を押します。<app-term key="paymentBasisDays" />
               </p>
               @if (importResult(); as res) {

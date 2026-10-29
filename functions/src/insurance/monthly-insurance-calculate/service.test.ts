@@ -49,6 +49,7 @@ jest.mock('../../config', () => ({
 const mockFindAllRates = jest.fn();
 jest.mock('../../utils/insurance-rate', () => ({
   findAllRates: (...args: any[]) => mockFindAllRates(...args),
+  rateFingerprint: jest.requireActual('../../utils/insurance-rate').rateFingerprint,
 }));
 
 jest.mock('../../utils/age', () => ({

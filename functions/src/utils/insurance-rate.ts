@@ -103,3 +103,10 @@ export async function findAllRates(
 
   return { health, pension, childSupport, longTermCare, childSupportPayment };
 }
+
+/** 計算に使った料率を表す文字列。計算後に料率マスタが変わったか（計算し直しが要るか）を見分ける */
+export function rateFingerprint(rates: AllRates): string {
+  return (['health', 'pension', 'longTermCare', 'childSupport', 'childSupportPayment'] as const)
+    .map(k => { const r = rates[k]; return r ? `${k}:${r.appliedFrom}:${r.employeeRate}/${r.employerRate}/${r.totalRate ?? ''}` : `${k}:-`; })
+    .join('|');
+}

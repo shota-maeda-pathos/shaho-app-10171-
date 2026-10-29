@@ -1,4 +1,5 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, effect, inject, signal, untracked } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
@@ -41,11 +42,12 @@ const STATUS_LABELS: Record<string, string> = {
     CommonModule,
     MatTableModule, MatButtonModule, MatIconModule, MatCardModule,
     MatChipsModule, MatTabsModule, MatProgressSpinnerModule,
-    MatSnackBarModule, MatDialogModule,
+    MatSnackBarModule, MatDialogModule, RouterLink,
   ],
   template: `
     <div class="page-container">
       <h1>承認管理</h1>
+      <p class="hint">毎月の給与・保険料は、<a routerLink="/monthly">毎月の処理</a>の画面で内容を確かめて、まとめて承認できます。</p>
       @if (error()) {
         <p role="alert">{{ error() }}</p>
         <button mat-stroked-button (click)="loadApprovals()" [disabled]="loading()">再読み込み</button>
@@ -68,7 +70,9 @@ const STATUS_LABELS: Record<string, string> = {
                     <th mat-header-cell *matHeaderCellDef>対象従業員</th>
                     <td mat-cell *matCellDef="let row">{{ row.employeeName }}
                       @if (row.summary; as summary) {
-                        <div>{{ summary.yearMonth }} ／ 賞与額：{{ summary.totalAmount | number }} 円</div>
+                        @if (row.requestType === 'salary') { <div>{{ summary.yearMonth }}支給 ／ {{ summary.totalAmount === 0 ? '無給' : '支給額：' + (summary.totalAmount | number) + ' 円' }}</div> }
+                        @else if (row.requestType === 'monthlyInsurance') { <div>{{ summary.yearMonth }}分 ／ 本人負担：{{ summary.totalEmployee | number }} 円 ／ 会社負担：{{ summary.totalEmployer | number }} 円</div> }
+                        @else { <div>{{ summary.yearMonth }} ／ 賞与額：{{ summary.totalAmount | number }} 円</div> }
                         @if (row.requestType === 'bonus') { <div>年度標準賞与累計：{{ summary.cumulativeBonusAmount | number }} 円</div> }
                         @if (row.requestType === 'bonusInsurance') { <div>本人負担：{{ summary.totalEmployee | number }} 円 ／ 会社負担：{{ summary.totalEmployer | number }} 円</div> }
                       }
@@ -157,7 +161,9 @@ const STATUS_LABELS: Record<string, string> = {
   `,
   styles: [`
     .page-container { padding: 24px; }
-    h1 { margin: 0 0 24px; font-size: 24px; font-weight: 500; }
+    h1 { margin: 0 0 8px; font-size: 24px; font-weight: 500; }
+    .hint { margin: 0 0 16px; color: var(--app-color-text-sub); }
+    .hint a { color: var(--app-color-link); }
     .full-width-table { width: 100%; }
     .loading-container { display: flex; justify-content: center; padding: 48px; }
     .empty-state { text-align: center; padding: 48px; color: #666; }
@@ -171,7 +177,7 @@ const STATUS_LABELS: Record<string, string> = {
     .own-request-label { font-size: 12px; color: #888; font-style: italic; }
   `],
 })
-export class ApprovalListComponent implements OnInit {
+export class ApprovalListComponent {
   office = inject(OfficeContextService);
   private functions = inject(Functions);
   private snackBar = inject(MatSnackBar);
@@ -183,8 +189,12 @@ export class ApprovalListComponent implements OnInit {
   pendingColumns = ['requestType', 'employeeName', 'requestedAt', 'actions'];
   processedColumns = ['requestType', 'employeeName', 'status', 'requestedAt'];
 
-  ngOnInit() {
-    this.loadApprovals();
+  constructor() {
+    // 上部の事業所を選んだ・切り替えたら読み込み直す（承認待ちの見落としを防ぐ）
+    effect(() => {
+      this.office.selected();
+      untracked(() => void this.loadApprovals());
+    });
   }
 
   pendingRequests() {

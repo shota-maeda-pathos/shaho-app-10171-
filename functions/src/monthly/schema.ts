@@ -37,3 +37,10 @@ export type JobStartInput = z.infer<typeof JobStartSchema>;
 
 export const JobGetSchema = RunSchema.extend({ jobId: id }).strict();
 export type JobGetInput = z.infer<typeof JobGetSchema>;
+
+export const SalaryItemsSchema = z.object({
+  companyId: id,
+  items: z.array(z.object({ name: z.string().trim().min(1).max(30), kind: z.enum(['fixed', 'variable']) }).strict()).max(50),
+  expectedVersion: z.number().int().min(0),
+}).strict();
+export type SalaryItemsInput = z.infer<typeof SalaryItemsSchema>;

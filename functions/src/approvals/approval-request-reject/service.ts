@@ -44,7 +44,11 @@ export async function rejectApprovalRequest(
       const targetRef = db.doc(reqData.targetPath);
       const target = await tx.get(targetRef);
       if (!target.exists || target.data()!.version !== reqData.targetVersion) throw invalidArg('承認対象が変更されています');
-      tx.update(targetRef, { approvalPending: false, version: target.data()!.version + 1, updatedAt: Timestamp.now() });
+      // 差し戻しの理由を対象にも残し、毎月の処理などの一覧で「差し戻し」と理由を出せるようにする
+      tx.update(targetRef, {
+        approvalPending: false, version: target.data()!.version + 1, updatedAt: Timestamp.now(),
+        lastRejection: { comment: input.comment ?? '', by: auth.uid, at: Timestamp.now() },
+      });
     }
     if (reqData.requestType === 'filing') {
       const targetRef = db.doc(reqData.targetPath);

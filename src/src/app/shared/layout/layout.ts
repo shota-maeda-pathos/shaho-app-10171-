@@ -56,7 +56,7 @@ export class LayoutComponent {
       this.auth.hasAnyRole(...item.roles as any[]),
     );
   }
-  active(route:string) {return route==='/operations'&&['/salary','/premium','/santei'].some(prefix=>this.router.url.startsWith(prefix))||route==='/analytics'&&this.router.url.startsWith('/simulation');}
+  active(route:string) {return route==='/monthly'&&this.router.url.startsWith('/salary')||route==='/operations'&&['/premium','/santei'].some(prefix=>this.router.url.startsWith(prefix))||route==='/analytics'&&this.router.url.startsWith('/simulation');}
   async changeOffice(event:Event){const select=event.target as HTMLSelectElement;await this.office.change(select.value);select.value=this.office.selected();}
 
   private getDeepestTitle(route: ActivatedRoute): string {

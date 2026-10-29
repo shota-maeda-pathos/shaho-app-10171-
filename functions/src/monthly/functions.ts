@@ -2,9 +2,10 @@ import { onCall } from 'firebase-functions/v2/https';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { getAuthContext, requireRole } from '../middleware/auth';
 import { validate } from '../middleware/validation';
-import { CollectionEntrySchema, HoldSchema, ImportSchema, JobGetSchema, JobStartSchema, NoPaySchema, RunSchema } from './schema';
+import { CollectionEntrySchema, HoldSchema, ImportSchema, JobGetSchema, JobStartSchema, NoPaySchema, RunSchema, SalaryItemsSchema } from './schema';
 import {
   addCollectionEntry, getMonthlyJob, importMonthlySalary, markNoPay, monthlyOverview, processMonthlyChunk, setMonthlyHold, startMonthlyJob,
+  updateSalaryItems,
 } from './service';
 
 async function staff(request: { data: unknown; auth?: unknown }, companyId: string, withApprover = false) {
@@ -34,6 +35,12 @@ export const monthlySalaryImport = onCall({ timeoutSeconds: 300, memory: '512MiB
 export const monthlySalaryNoPay = onCall(async (request) => {
   const input = validate(NoPaySchema, request.data);
   return markNoPay(input, await staff(request, input.companyId));
+});
+
+/** 給与項目マスタ（CSVの列名と、固定的／非固定的の区分）の保存 */
+export const monthlySalaryItemsUpdate = onCall(async (request) => {
+  const input = validate(SalaryItemsSchema, request.data);
+  return updateSalaryItems(input, await staff(request, input.companyId));
 });
 
 export const monthlyCollectionEntry = onCall(async (request) => {

@@ -112,6 +112,37 @@ interface AllowanceEntry {
           </button>
 
           <mat-divider></mat-divider>
+          <h2>現物給与・遡及差額</h2>
+          <div class="form-row">
+            <mat-form-field appearance="outline">
+              <mat-label>現物給与（社宅・食事など）</mat-label>
+              <input matInput type="number" [(ngModel)]="inKindAmount" min="0" (ngModelChange)="recalculate()">
+              <span matSuffix>円</span>
+              <mat-hint>報酬月額には含めます。支給額には含めません</mat-hint>
+            </mat-form-field>
+          </div>
+          <div class="form-row">
+            <mat-form-field appearance="outline">
+              <mat-label>遡及差額（昇給の差額のうち過去の月の分）</mat-label>
+              <input matInput type="number" [(ngModel)]="retroAmount" min="0">
+              <span matSuffix>円</span>
+              <mat-hint>手当に含めた金額のうちの差額分。等級の判定からは除きます</mat-hint>
+            </mat-form-field>
+            @if (retroAmount > 0) {
+              <mat-form-field appearance="outline">
+                <mat-label>差額の対象（開始月）</mat-label>
+                <input matInput type="month" [(ngModel)]="retroFrom">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>差額の対象（終了月）</mat-label>
+                <input matInput type="month" [(ngModel)]="retroTo">
+              </mat-form-field>
+            }
+          </div>
+          @if (noPay) { <p class="note">この月は無給として記録されています。金額を入れて保存すると、無給の記録は外れます。</p> }
+          @if (locked) { <p class="note">承認済み、または確認の依頼中のため変更できません。直すときは承認の画面で差し戻してください。</p> }
+
+          <mat-divider></mat-divider>
           <div class="summary-section">
             <div class="summary-row">
               <span>固定給合計</span>
@@ -129,7 +160,7 @@ interface AllowanceEntry {
 
           <div class="form-actions">
             <button mat-stroked-button (click)="goBack()">キャンセル</button>
-            <button mat-flat-button color="primary" (click)="save()" [disabled]="saving()">
+            <button mat-flat-button color="primary" (click)="save()" [disabled]="saving() || locked">
               {{ isEdit ? '更新' : '登録' }}
             </button>
           </div>
@@ -138,6 +169,7 @@ interface AllowanceEntry {
     </div>
   `,
   styles: [`
+    .note { color: var(--app-color-text-sub); background: var(--app-color-surface-sub); padding: 8px 12px; border-radius: var(--app-radius); }
     .page-container { padding: 24px; }
     .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
     .page-header h1 { margin: 0; font-size: 24px; font-weight: 500; flex: 1; }
@@ -177,6 +209,15 @@ export class SalaryEditComponent implements OnInit {
   fixedAllowances: AllowanceEntry[] = [];
   variableAllowances: AllowanceEntry[] = [];
 
+  inKindAmount = 0;
+  retroAmount = 0;
+  retroFrom = '';
+  retroTo = '';
+  noPay = false;
+  locked = false;
+  /** 毎月の処理から開いたときは、保存後にそこへ戻る */
+  private returnTo: { officeId: string } | null = null;
+
   isEdit = false;
   private salaryId = '';
   private expectedVersion = 0;
@@ -192,6 +233,9 @@ export class SalaryEditComponent implements OnInit {
     this.employeeId = this.route.snapshot.paramMap.get('employeeId') ?? '';
     this.yearMonth = this.route.snapshot.queryParamMap.get('yearMonth') ?? this.route.snapshot.queryParamMap.get('month') ?? this.getCurrentMonth();
     this.selectedMonth.set(this.yearMonth);
+    const officeId = this.route.snapshot.queryParamMap.get('officeId');
+    if (officeId && officeId !== 'all') this.returnTo = { officeId };
+    if (!this.months.includes(this.yearMonth)) this.months = [this.yearMonth, ...this.months];
     this.loadSalary();
   }
 
@@ -220,28 +264,37 @@ export class SalaryEditComponent implements OnInit {
     this.selectedMonth.set(this.yearMonth);
     try {
       const fn = httpsCallable<any, any>(this.functions, 'salaryList');
-      const result = await fn({
-        companyId: this.auth.companyId,
-        yearMonth: this.yearMonth,
-      });
-      const items: any[] = result.data.items ?? [];
-      const match = items.find((i: any) => i.employeeId === this.employeeId);
-      if (match) {
-        this.employeeName.set(match.employeeName);
-        this.baseSalary = match.baseSalary || 0;
-        this.isEdit = match.baseSalary > 0;
-        this.salaryId = this.yearMonth;
-        this.expectedVersion = match.version ?? 1;
-      } else {
-        this.employeeName.set(this.employeeId);
-        this.isEdit = false;
-      }
+      const result = await fn({ companyId: this.auth.companyId, yearMonth: this.yearMonth, employeeId: this.employeeId });
+      const match = (result.data.items ?? [])[0];
+      const d = match?.detail;
+      this.employeeName.set(match?.employeeName ?? this.employeeId);
+      this.isEdit = !!d?.exists;
+      this.salaryId = this.yearMonth;
+      this.expectedVersion = match?.version ?? 0;
+      this.locked = !!match && (match.isConfirmed || match.approvalPending);
+      this.baseSalary = match?.baseSalary ?? 0;
+      this.paymentBasisDays = d?.paymentBasisDays ?? 0;
+      this.fixedAllowances = Object.entries(d?.fixedAllowances ?? {}).map(([name, amount]) => ({ name, amount: amount as number }));
+      this.variableAllowances = Object.entries(d?.variableAllowances ?? {}).map(([name, amount]) => ({ name, amount: amount as number }));
+      this.inKindAmount = d?.inKindAmount ?? 0;
+      this.retroAmount = d?.retroactivePay?.amount ?? 0;
+      this.retroFrom = d?.retroactivePay?.fromMonth ?? '';
+      this.retroTo = d?.retroactivePay?.toMonth ?? '';
+      this.noPay = d?.noPay === true;
       this.recalculate();
-    } catch {
+    } catch (e: any) {
       this.employeeName.set(this.employeeId);
+      this.snackBar.open(`給与を読み込めませんでした：${e.message ?? ''}`, '閉じる', { duration: 5000 });
     } finally {
       this.loading.set(false);
     }
+  }
+
+  private extra() {
+    const retroactivePay = this.retroAmount > 0
+      ? { amount: Number(this.retroAmount), fromMonth: this.retroFrom, toMonth: this.retroTo || this.retroFrom }
+      : null;
+    return { inKindAmount: Number(this.inKindAmount) || 0, retroactivePay };
   }
 
   async save() {
@@ -250,6 +303,10 @@ export class SalaryEditComponent implements OnInit {
     });
     const confirmed = await ref.afterClosed().toPromise();
     if (!confirmed) return;
+    if (this.retroAmount > 0 && (!/^\d{4}-\d{2}$/.test(this.retroFrom) || (this.retroTo && this.retroTo < this.retroFrom))) {
+      this.snackBar.open('遡及差額の対象の月（開始月・終了月）を確かめてください', '閉じる', { duration: 5000 });
+      return;
+    }
 
     this.saving.set(true);
     try {
@@ -264,6 +321,7 @@ export class SalaryEditComponent implements OnInit {
           baseSalary: this.baseSalary,
           fixedAllowances: this.toRecord(this.fixedAllowances),
           variableAllowances: this.toRecord(this.variableAllowances),
+          ...this.extra(),
         });
       } else {
         const fn = httpsCallable(this.functions, 'salaryCreate');
@@ -275,6 +333,7 @@ export class SalaryEditComponent implements OnInit {
           baseSalary: this.baseSalary,
           fixedAllowances: this.toRecord(this.fixedAllowances),
           variableAllowances: this.toRecord(this.variableAllowances),
+          ...this.extra(),
         });
       }
       this.snackBar.open('給与を保存しました', '閉じる', { duration: 3000 });
@@ -287,7 +346,8 @@ export class SalaryEditComponent implements OnInit {
   }
 
   goBack() {
-    this.router.navigate(['/salary']);
+    if (this.returnTo) this.router.navigate(['/monthly'], { queryParams: { officeId: this.returnTo.officeId, payMonth: this.yearMonth } });
+    else this.router.navigate(['/salary']);
   }
 
   private toRecord(entries: AllowanceEntry[]): Record<string, number> {

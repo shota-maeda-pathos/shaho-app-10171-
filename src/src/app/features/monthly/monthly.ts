@@ -15,7 +15,7 @@ import {
   BulkAction, BulkRun, ErrorStateComponent, LoadingStateComponent, StatusTone, TargetCellDirective,
   TargetListComponent, TargetRow, TermComponent,
 } from '../../shared/ui';
-import { ACTION_STEP, ImportResult, JobSummary, MonthlyAction, MonthlyRow, Overview, StepKey, stepState } from './monthly.types';
+import { ACTION_STEP, ImportResult, JobSummary, MonthlyAction, MonthlyRow, Overview, SalaryItem, StepKey, stepState } from './monthly.types';
 import { MonthlyDetailDialogComponent, NoPayDialogComponent } from './monthly-dialogs';
 
 interface StepDef { key: StepKey; label: string; what: string; why: string; next: string }
@@ -92,13 +92,22 @@ export class MonthlyComponent implements OnInit {
 
   /** ステップごとの人数と状態 */
   summaries = computed(() => STEPS.map(step => {
-    const rows = (this.data()?.rows ?? []).filter(r => !r.hold).map(r => stepState(step.key, r)).filter(s => s !== null);
+    const rows = (this.data()?.rows ?? []).filter(r => !r.hold).map(r => this.stateFor(step.key, r)).filter(s => s !== null);
     const todo = rows.filter(s => s!.tone === 'action' || s!.tone === 'yours').length;
     const waiting = rows.filter(s => s!.tone === 'waiting').length;
     return { key: step.key, total: rows.length, todo, waiting, done: rows.length > 0 && todo === 0 && waiting === 0, empty: rows.length === 0 };
   }));
-  /** 自分がやることのある最初のステップ。なければ（他の人の承認待ちだけなら）最初の未完了ステップ。全部終わっていれば最後 */
-  firstOpen = computed(() => this.summaries().find(s => s.todo > 0)?.key ?? this.summaries().find(s => !s.done && !s.empty)?.key ?? 'collection');
+  /**
+   * 開くステップ。承認者に承認を頼まれていればその確認のステップ、なければ自分がやることのある最初のステップ、
+   * それもなければ（他の人の承認待ちだけなら）最初の未完了ステップ。全部終わっていれば最後
+   */
+  firstOpen = computed(() => {
+    const sums = this.summaries();
+    const rows = (this.data()?.rows ?? []).filter(r => !r.hold);
+    const pendingIn = (k: 'salaryReview' | 'premiumReview') => rows.some(r => k === 'salaryReview' ? r.salary?.pending : r.premium?.pending);
+    const review = (['salaryReview', 'premiumReview'] as const).find(k => this.approvesStep(k) && pendingIn(k));
+    return review ?? sums.find(s => s.todo > 0)?.key ?? sums.find(s => !s.done && !s.empty)?.key ?? 'collection';
+  });
   current = computed(() => this.selectedStep() ?? this.firstOpen());
   currentDef = computed(() => STEPS.find(s => s.key === this.current())!);
   currentSummary = computed(() => this.summaries().find(s => s.key === this.current())!);
@@ -111,7 +120,7 @@ export class MonthlyComponent implements OnInit {
     const step = this.current();
     const fails = this.failures()?.step === step ? this.failures()!.byId : {};
     return (this.data()?.rows ?? []).flatMap(r => {
-      const state = stepState(step, r);
+      const state = this.stateFor(step, r);
       if (!state) return [];
       return [{
         id: r.employeeId, name: r.name, sub: r.employeeNumber, tone: state.tone as StatusTone, statusLabel: state.label, reason: state.reason,
@@ -120,13 +129,25 @@ export class MonthlyComponent implements OnInit {
     });
   });
 
+  /** 承認を頼まれている確認のステップか（自分が依頼したものは除く） */
+  approvesStep(step: StepKey) {
+    return (step === 'salaryReview' && this.canApproveReview('salary')) || (step === 'premiumReview' && this.canApproveReview('premium'));
+  }
+
+  /** 1人分の状態。承認者には、承認待ちの人を「あなたの番」として見せる */
+  stateFor(step: StepKey, r: MonthlyRow) {
+    const state = stepState(step, r);
+    if (state?.tone === 'waiting' && state.label === '承認待ち' && this.approvesStep(step)) return { ...state, tone: 'yours' as StatusTone, label: 'あなたの承認待ち' };
+    return state;
+  }
+
   /** 承認待ちの確認を、自分が依頼したかどうか */
   reviewNote = computed(() => {
     const d = this.data();
     const step = this.current();
     if (!d || (step !== 'salaryReview' && step !== 'premiumReview')) return null;
     const review = step === 'salaryReview' ? d.reviews.salary : d.reviews.premium;
-    const waiting = this.currentSummary().waiting;
+    const waiting = d.rows.filter(r => !r.hold && (step === 'salaryReview' ? r.salary?.pending : r.premium?.pending)).length;
     if (!waiting) return null;
     if (review?.mine || !this.canApprove()) return { mine: true, text: `${waiting}名が承認待ちです。別の担当者（管理者・承認者）の承認を待っています。承認者には通知が届いています。` };
     return { mine: false, text: `${waiting}名の確認を頼まれています。一覧で内容を確かめ、問題がなければ「承認する」を押してください。直したい人は、名前を押して承認の画面から差し戻せます。` };
@@ -178,6 +199,7 @@ export class MonthlyComponent implements OnInit {
       this.data.set(data);
       this.job.set(data.job);
       if (data.job?.status === 'running') this.startPolling(data.job.id);
+      else if (data.job && data.job.failed > 0 && !this.failures()) await this.restoreFailures(data.job);
     } catch (e) {
       this.error.set(message(e, '状況を読み込めませんでした'));
     } finally {
@@ -187,6 +209,25 @@ export class MonthlyComponent implements OnInit {
 
   chooseOffice(id: string) {
     void this.office.change(id);
+  }
+
+  /** 画面を開き直しても、直前の一括処理で失敗した人を一覧に出し、その人だけ再実行できるようにする */
+  private async restoreFailures(job: JobSummary) {
+    try {
+      const { data } = await httpsCallable<object, { failures: { employeeId: string; message: string }[] }>(this.functions, 'monthlyJobGet')({
+        companyId: this.auth.companyId, officeId: this.office.selected(), payMonth: this.payMonth, jobId: job.id,
+      });
+      // まだ直っていない人（今の状態でも、その操作の対象に残っている人）だけを出す
+      const step = ACTION_STEP[job.action];
+      const open = new Set((this.data()?.rows ?? []).filter(r => { const st = stepState(step, r); return !!st && st.tone !== 'done'; }).map(r => r.employeeId));
+      const byId = Object.fromEntries(data.failures.filter(f => open.has(f.employeeId)).map(f => [f.employeeId, f.message]));
+      if (Object.keys(byId).length) {
+        this.failures.set({ step, action: job.action, byId });
+        if (!this.selectedStep()) this.selectedStep.set(step);
+      }
+    } catch {
+      // 失敗の一覧が取れなくても、画面の表示は続ける
+    }
   }
 
   selectStep(key: StepKey) {
@@ -276,14 +317,21 @@ export class MonthlyComponent implements OnInit {
   // ---- 保留 ----
 
   async hold(id: string, reason: string | null) {
+    this.busy.set(true);
     try {
       await httpsCallable(this.functions, 'monthlyRunHold')({
         companyId: this.auth.companyId, officeId: this.office.selected(), payMonth: this.payMonth, employeeId: id, reason,
       });
-      await this.load();
+      // 全員分の読み込み直しには数秒かかるため、先にその人の行だけ変えて知らせる
+      this.data.update(d => d && { ...d, rows: d.rows.map(r => r.employeeId === id ? { ...r, hold: reason ? { reason } : null } : r) });
+      const name = this.row(id)?.name ?? '';
+      this.snackBar.open(reason ? `${name}さんを保留にしました。まとめて行う操作の対象から外れます` : `${name}さんの保留を解除しました`, '閉じる', { duration: 4000 });
     } catch (e) {
       this.snackBar.open(message(e, '保留を変更できませんでした'), '閉じる', { duration: 6000 });
+    } finally {
+      this.busy.set(false);
     }
+    await this.load();
   }
 
   // ---- 給与 ----
@@ -307,10 +355,36 @@ export class MonthlyComponent implements OnInit {
     await this.load();
   }
 
+  /** 給与項目マスタ（CSVの列名と区分）。編集中の内容 */
+  itemsEditing = signal<SalaryItem[] | null>(null);
+  salaryItems = computed(() => this.data()?.salaryItems?.items ?? [{ name: '通勤手当', kind: 'fixed' as const }, { name: '残業手当', kind: 'variable' as const }]);
+
+  editItems() { this.itemsEditing.set(this.salaryItems().map(i => ({ ...i }))); }
+  addItem() { this.itemsEditing.update(list => [...(list ?? []), { name: '', kind: 'fixed' }]); }
+  removeItem(index: number) { this.itemsEditing.update(list => (list ?? []).filter((_, i) => i !== index)); }
+
+  async saveItems() {
+    const items = (this.itemsEditing() ?? []).map(i => ({ name: i.name.trim(), kind: i.kind })).filter(i => i.name);
+    this.busy.set(true);
+    try {
+      await httpsCallable(this.functions, 'monthlySalaryItemsUpdate')({
+        companyId: this.auth.companyId, items, expectedVersion: this.data()?.salaryItems?.version ?? 0,
+      });
+      this.itemsEditing.set(null);
+      this.snackBar.open('給与項目を保存しました。取込用のCSVの列にも入ります', '閉じる', { duration: 4000 });
+      await this.load();
+    } catch (e) {
+      this.snackBar.open(message(e, '給与項目を保存できませんでした'), '閉じる', { duration: 6000 });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   downloadTemplate() {
     const rows = (this.data()?.rows ?? []).filter(r => r.salaryRequired);
-    const header = '社員番号,氏名,支払基礎日数,基本給,固定:通勤手当,非固定:残業手当,現物給与,遡及差額,遡及開始月,遡及終了月,無給';
-    const lines = rows.map(r => [r.employeeNumber, r.name, '', '', '', '', '', '', '', '', ''].map(csvCell).join(','));
+    const items = this.salaryItems().map(i => i.name);
+    const header = ['社員番号', '氏名', '支払基礎日数', '基本給', ...items, '現物給与', '遡及差額', '遡及開始月', '遡及終了月', '無給'].map(csvCell).join(',');
+    const lines = rows.map(r => [r.employeeNumber, r.name, '', '', ...items.map(() => ''), '', '', '', '', ''].map(csvCell).join(','));
     const blob = new Blob(['﻿' + [header, ...lines].join('\r\n')], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

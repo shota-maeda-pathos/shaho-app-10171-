@@ -75,8 +75,11 @@ export interface SalaryCsvRow {
 
 export interface CsvError { line: number; employeeNumber: string; message: string }
 
+/** 給与項目マスタ（CSVの列名と、固定的／非固定的の区分） */
+export interface SalaryItem { name: string; kind: 'fixed' | 'variable' }
+export const DEFAULT_SALARY_ITEMS: SalaryItem[] = [{ name: '通勤手当', kind: 'fixed' }, { name: '残業手当', kind: 'variable' }];
+
 const KNOWN = ['社員番号', '氏名', '支払基礎日数', '基本給', '現物給与', '遡及差額', '遡及開始月', '遡及終了月', '無給', '備考'];
-export const SALARY_CSV_HEADER = ['社員番号', '氏名', '支払基礎日数', '基本給', '固定:通勤手当', '非固定:残業手当', '現物給与', '遡及差額', '遡及開始月', '遡及終了月', '無給'];
 
 /** 1行をカンマで区切る（ダブルクォートの囲みと "" に対応） */
 export function splitCsvLine(line: string): string[] {
@@ -107,13 +110,21 @@ function amount(value: string, label: string): number {
 }
 
 /** 給与CSVを読み、行ごとの誤りを集める。見出し行は必須。「固定:」「非固定:」で始まる列は手当 */
-export function parseSalaryCsv(text: string): { rows: SalaryCsvRow[]; errors: CsvError[] } {
+export function parseSalaryCsv(text: string, items: SalaryItem[] = DEFAULT_SALARY_ITEMS): { rows: SalaryCsvRow[]; errors: CsvError[] } {
+  const kindOf = new Map(items.map(i => [i.name, i.kind]));
+  // 列の手当の区分：「固定:」「非固定:」が付いていればそれ、なければ給与項目マスタ
+  const allowanceOf = (h: string): { name: string; kind: SalaryItem['kind'] } | null => {
+    const m = /^(固定|非固定)[:：](.+)$/.exec(h);
+    if (m) return { name: m[2], kind: m[1] === '固定' ? 'fixed' : 'variable' };
+    const kind = kindOf.get(h);
+    return kind ? { name: h, kind } : null;
+  };
   const lines = text.replace(/^﻿/, '').split(/\r?\n/);
   const header = splitCsvLine(lines[0] ?? '');
   const errors: CsvError[] = [];
   if (!header.includes('社員番号')) return { rows: [], errors: [{ line: 1, employeeNumber: '', message: '1行目に見出し（社員番号・基本給など）を入れてください' }] };
-  const unknown = header.filter(h => h && !KNOWN.includes(h) && !/^(固定|非固定)[:：].+/.test(h));
-  if (unknown.length) return { rows: [], errors: [{ line: 1, employeeNumber: '', message: `使えない列があります：${unknown.join('、')}（手当は「固定:通勤手当」「非固定:残業手当」のように書きます）` }] };
+  const unknown = header.filter(h => h && !KNOWN.includes(h) && !allowanceOf(h));
+  if (unknown.length) return { rows: [], errors: [{ line: 1, employeeNumber: '', message: `給与項目に登録されていない列があります：${unknown.join('、')}（給与項目に登録するか、「固定:${unknown[0]}」のように区分を付けてください）` }] };
   const rows: SalaryCsvRow[] = [];
   const seen = new Map<string, number>();
   for (let i = 1; i < lines.length; i++) {
@@ -130,10 +141,11 @@ export function parseSalaryCsv(text: string): { rows: SalaryCsvRow[]; errors: Cs
       const fixedAllowances: Record<string, number> = {};
       const variableAllowances: Record<string, number> = {};
       header.forEach((h, index) => {
-        const m = /^(固定|非固定)[:：](.+)$/.exec(h);
-        if (!m) return;
-        const value = amount(cells[index] ?? '', m[2]);
-        if (value > 0) (m[1] === '固定' ? fixedAllowances : variableAllowances)[m[2]] = value;
+        if (KNOWN.includes(h)) return;
+        const item = allowanceOf(h);
+        if (!item) return;
+        const value = amount(cells[index] ?? '', item.name);
+        if (value > 0) (item.kind === 'fixed' ? fixedAllowances : variableAllowances)[item.name] = value;
       });
       const baseSalary = amount(get('基本給'), '基本給');
       const inKindAmount = amount(get('現物給与'), '現物給与');

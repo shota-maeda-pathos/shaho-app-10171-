@@ -90,6 +90,10 @@ export async function updateSalary(
       updatedAt: now,
       version: current.version + 1,
     };
+    // 金額を入れたら無給の記録は外す。直したので差し戻しの理由も消す（出し直しを待つ状態になる）
+    if (totalSalary > 0) { updateData.noPay = false; updateData.noPayReason = null; }
+    updateData.lastRejection = null;
+    if (input.retroactivePay && input.retroactivePay.amount > totalSalary) throw invalidArg('遡及差額が支給額を超えています（遡及差額は手当に含めた金額のうちの差額分です）');
     if (input.inKindAmount !== undefined) updateData.inKindAmount = input.inKindAmount;
     if (input.retroactivePay !== undefined) updateData.retroactivePay = input.retroactivePay;
     if (revisionFlag) {

@@ -73,6 +73,15 @@ describe('毎月の処理：給与CSV', () => {
     ]);
   });
 
+  it('給与項目マスタに登録した列は、区分を付けなくても手当として読む', () => {
+    const items = [{ name: '住宅手当', kind: 'fixed' as const }, { name: '深夜手当', kind: 'variable' as const }];
+    const { rows, errors } = parseSalaryCsv('社員番号,支払基礎日数,基本給,住宅手当,深夜手当,非固定:臨時手当\nT-1,20,200000,30000,5000,1000', items);
+    expect(errors).toEqual([]);
+    expect(rows[0].fixedAllowances).toEqual({ 住宅手当: 30_000 });
+    expect(rows[0].variableAllowances).toEqual({ 深夜手当: 5_000, 臨時手当: 1_000 });
+    expect(parseSalaryCsv('社員番号,基本給,資格手当\nT-1,1', items).errors[0].message).toContain('給与項目に登録されていない列があります：資格手当');
+  });
+
   it('見出しがない・知らない列があるときはファイル全体を止める', () => {
     expect(parseSalaryCsv('T-1,20,300000').errors[0].message).toContain('見出し');
     expect(parseSalaryCsv('社員番号,基本給,住宅手当\nT-1,1,1').errors[0].message).toContain('住宅手当');

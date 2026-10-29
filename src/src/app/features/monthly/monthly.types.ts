@@ -1,5 +1,7 @@
 import { StatusTone } from '../../shared/ui';
 
+export interface SalaryItem { name: string; kind: 'fixed' | 'variable' }
+
 export type MonthlyAction = 'requestSalaryApproval' | 'approveSalary' | 'calculate' | 'requestPremiumApproval' | 'approvePremium' | 'publish' | 'recordPayroll';
 export type StepKey = 'salary' | 'salaryReview' | 'calculate' | 'premiumReview' | 'publish' | 'collection';
 
@@ -22,6 +24,9 @@ export interface MonthlyRow {
     entries: { method: string; amount: number; date: string; note: string }[];
   };
   hold: null | { reason: string };
+  stale?: boolean;
+  // 古いサーバーは返さないため省略可
+  rejected?: { salary: string | null; premium: string | null };
 }
 
 export interface JobSummary {
@@ -47,6 +52,8 @@ export interface Overview {
   totals: { employee: number; employer: number; previousEmployee: number; previousEmployer: number; salary: number; collected: number; due: number };
   reviews: { salary: Review | null; premium: Review | null };
   me: { uid: string; canApprove: boolean };
+  /** 給与項目マスタ（古いサーバーは返さない） */
+  salaryItems?: { items: SalaryItem[]; version: number };
   rows: MonthlyRow[];
   job: JobSummary | null;
 }
@@ -81,16 +88,19 @@ export function stepState(step: StepKey, r: MonthlyRow): StepState | null {
       if (!s) return null;
       if (s.confirmed) return { tone: 'done', label: '承認済み' };
       if (s.pending) return { tone: 'waiting', label: '承認待ち' };
+      if (r.rejected?.salary) return { tone: 'action', label: '差し戻し', reason: `理由：${r.rejected?.salary}。給与を直して（取り込み直すか名前から入力）、もう一度確認を依頼してください` };
       return { tone: 'yours', label: '確認の依頼前' };
     case 'calculate':
       if (r.issues.length) return { tone: 'action', label: '計算できません', reason: r.issues.join('／') };
       if (!r.premiumDue) return null;
       if (!p) return { tone: 'yours', label: '未計算' };
+      if (r.stale) return { tone: 'action', label: '計算し直しが必要', reason: '計算した後に料率が変わりました' };
       return { tone: 'done', label: `本人 ${yen(p.employee)}` };
     case 'premiumReview':
       if (!p) return null;
       if (p.confirmed) return { tone: 'done', label: '承認済み' };
       if (p.pending) return { tone: 'waiting', label: '承認待ち' };
+      if (r.rejected?.premium) return { tone: 'action', label: '差し戻し', reason: `理由：${r.rejected?.premium}。内容を確かめ、必要なら計算し直してから、もう一度確認を依頼してください` };
       if (r.warnings.length) return { tone: 'action', label: '確認が必要', reason: r.warnings.join('／') };
       return { tone: 'yours', label: '確認の依頼前', reason: r.diffReasons.join('／') || undefined };
     case 'publish':

@@ -208,8 +208,9 @@ export class TargetListComponent {
   filter = signal<Filter>('attention');
   selected = signal<ReadonlySet<string>>(new Set());
 
-  attention = computed(() => this.rows().filter(r => !r.held && (this.needsAction(r) || r.error)));
-  held = computed(() => this.rows().filter(r => r.held));
+  // 失敗した人は、保留中でも要対応に出す（失敗の理由を見つけられるように）。人数が重ならないよう保留中からは外す
+  attention = computed(() => this.rows().filter(r => r.error || (!r.held && this.needsAction(r))));
+  held = computed(() => this.rows().filter(r => r.held && !r.error));
   ok = computed(() => this.rows().filter(r => !r.held && !this.needsAction(r) && !r.error));
   failed = computed(() => this.rows().filter(r => r.error));
   failedIds = computed(() => this.failed().map(r => r.id));

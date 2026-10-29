@@ -11,7 +11,7 @@ import {
 import { MutationResponse } from '../../types/response';
 import { notFound, invalidArg } from '../../utils/errors';
 import { isLongTermCareAge, isPensionExcluded, isHealthExcluded } from '../../utils/age';
-import { findAllRates } from '../../utils/insurance-rate';
+import { findAllRates, rateFingerprint } from '../../utils/insurance-rate';
 import { calculateChildSupportPayment } from '../../utils/child-support-payment';
 import { normalizeEmployment, qualificationDates } from '../../utils/employment';
 import { decideExemption } from '../../utils/exemption-period';
@@ -187,6 +187,8 @@ export async function calculateMonthlyInsurance(
       exemptionIds: exemption.exemptionIds,
       sameMonthAcquisitionAndLoss: coverage.sameMonthAcquisitionAndLoss,
       roundingRule,
+      rateFingerprint: rateFingerprint(rates),
+      lastRejection: null,
       isConfirmed: false,
       approvalPending: false,
       version,

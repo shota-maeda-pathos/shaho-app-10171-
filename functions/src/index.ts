@@ -3,6 +3,7 @@ export { collectionRecord } from './collections/collection-record/functions';
 export { operationsMonthlyStatus, operationsMonthlyHold, operationsMonthlyAction } from './operations/functions';
 export {
   monthlyRunOverview, monthlyRunHold, monthlySalaryImport, monthlySalaryNoPay, monthlyCollectionEntry, monthlyJobStart, monthlyJobGet, monthlyJobChunk,
+  monthlySalaryItemsUpdate,
 } from './monthly/functions';
 export { procedureAction } from './procedures/procedure-action/functions';
 
@@ -101,6 +102,7 @@ export { dependentDelete } from './dependents/dependent-delete/functions';
 export { monthlyInsuranceGet } from './insurance/monthly-insurance-get/functions';
 
 export { sampleTigersCreate, tigersRegister } from './samples/tigers/functions';
+export { sampleLoadCreate } from './samples/load/functions';
 
 export { employeeHistoryList } from './employees/employee-history-list/functions';
 

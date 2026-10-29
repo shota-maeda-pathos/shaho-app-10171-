@@ -1,7 +1,18 @@
 import { mapConcurrent } from '../../utils/parallel';
 import { db } from '../../config';
 import { AuthContext, requireOffice } from '../../middleware/auth';
+import { notFound } from '../../utils/errors';
 import { SalaryListInput } from './schema';
+
+interface SalaryDetail {
+  exists: boolean;
+  paymentBasisDays: number;
+  fixedAllowances: Record<string, number>;
+  variableAllowances: Record<string, number>;
+  inKindAmount: number;
+  retroactivePay: { amount: number; fromMonth: string; toMonth: string } | null;
+  noPay: boolean;
+}
 
 interface SalaryListItem {
   employeeId: string;
@@ -13,6 +24,7 @@ interface SalaryListItem {
   approvalPending:boolean;
   isPublished:boolean;
   version: number;
+  detail?: SalaryDetail;
 }
 
 export interface SalaryListResponse {
@@ -26,6 +38,7 @@ export async function listSalaries(
   auth: AuthContext,
 ): Promise<SalaryListResponse> {
   if(input.officeId) requireOffice(auth,input.officeId);
+  if (input.employeeId) return { items: [await salaryOf(input.employeeId, input.yearMonth, auth)], hasMore: false };
   if (!auth.roles.includes('admin') && auth.officeIds.length === 0) return { items: [], hasMore: false };
   let empQuery: FirebaseFirestore.Query = db
     .collection(`companies/${auth.companyId}/employees`)
@@ -80,5 +93,25 @@ export async function listSalaries(
     items,
     hasMore,
     lastDocId: empDocs.length > 0 ? empDocs[empDocs.length - 1].id : undefined,
+  };
+}
+
+/** 1人分の給与の詳細。入力画面で手当や遡及差額まで読み込むために使う */
+async function salaryOf(employeeId: string, yearMonth: string, auth: AuthContext): Promise<SalaryListItem> {
+  const base = `companies/${auth.companyId}/employees/${employeeId}`;
+  const [employee, salary] = await Promise.all([db.doc(base).get(), db.doc(`${base}/salaries/${yearMonth}`).get()]);
+  if (!employee.exists || employee.data()!.deletedAt != null) throw notFound('従業員');
+  requireOffice(auth, employee.data()!.officeId);
+  const e = employee.data()!;
+  const s = salary.data();
+  return {
+    employeeId, employeeName: `${e.lastName} ${e.firstName}`, yearMonth,
+    baseSalary: s?.baseSalary ?? 0, totalSalary: s?.totalSalary ?? 0, isConfirmed: s?.isConfirmed === true,
+    approvalPending: s?.approvalPending === true, isPublished: s?.isPublished === true, version: s?.version ?? 0,
+    detail: {
+      exists: salary.exists, paymentBasisDays: s?.paymentBasisDays ?? 0,
+      fixedAllowances: s?.fixedAllowances ?? {}, variableAllowances: s?.variableAllowances ?? {},
+      inKindAmount: s?.inKindAmount ?? 0, retroactivePay: s?.retroactivePay ?? null, noPay: s?.noPay === true,
+    },
   };
 }

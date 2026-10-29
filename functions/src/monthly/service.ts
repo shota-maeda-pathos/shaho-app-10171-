@@ -11,12 +11,13 @@ import { calculateMonthlyInsurance } from '../insurance/monthly-insurance-calcul
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
 import { approveApprovalRequest } from '../approvals/approval-request-approve/service';
 import { periodTarget } from '../operations/service';
+import { findAllRates, rateFingerprint } from '../utils/insurance-rate';
 import {
-  CollectionPlan, CollectionStatus, DeductionMethod, PremiumFacts, collectionPlan, collectionStatus, diffReasons,
+  CollectionPlan, CollectionStatus, DEFAULT_SALARY_ITEMS, DeductionMethod, PremiumFacts, SalaryItem, collectionPlan, collectionStatus, diffReasons,
   parseSalaryCsv, premiumMonthFor, remunerationWarning,
 } from './rules';
 import {
-  CollectionEntryInput, HoldInput, ImportInput, JobGetInput, JobStartInput, MonthlyAction, NoPayInput, RunInput,
+  CollectionEntryInput, HoldInput, ImportInput, JobGetInput, JobStartInput, MonthlyAction, NoPayInput, RunInput, SalaryItemsInput,
 } from './schema';
 
 /** 1回の一括処理で扱える人数の上限 */
@@ -27,6 +28,32 @@ const CHUNK_SIZE = 25;
 const STALE_MS = 10 * 60_000;
 
 function runId(officeId: string, payMonth: string) { return `${officeId}_${payMonth}`; }
+
+/** 給与項目マスタ（会社ごと）。未登録なら既定の2項目 */
+async function salaryItemsOf(companyId: string): Promise<{ items: SalaryItem[]; version: number }> {
+  const d = (await db.doc(`companies/${companyId}/settings/salaryItems`).get()).data();
+  return { items: Array.isArray(d?.items) ? d!.items : DEFAULT_SALARY_ITEMS, version: d?.version ?? 0 };
+}
+
+export async function updateSalaryItems(input: SalaryItemsInput, auth: AuthContext) {
+  const names = input.items.map(i => i.name);
+  if (new Set(names).size !== names.length) throw invalidArg('同じ名前の給与項目があります');
+  const reserved = ['社員番号', '氏名', '支払基礎日数', '基本給', '現物給与', '遡及差額', '遡及開始月', '遡及終了月', '無給', '備考'];
+  const bad = names.find(n => reserved.includes(n) || /^(固定|非固定)[:：]/.test(n));
+  if (bad) throw invalidArg(`「${bad}」は給与項目の名前に使えません`);
+  const ref = db.doc(`companies/${auth.companyId}/settings/salaryItems`);
+  await db.runTransaction(async tx => {
+    const current = await tx.get(ref);
+    if ((current.data()?.version ?? 0) !== input.expectedVersion) throw invalidArg('給与項目が更新されています。画面を読み込み直してください');
+    const now = Timestamp.now();
+    tx.set(ref, { items: input.items, version: input.expectedVersion + 1, updatedBy: auth.uid, updatedAt: now });
+    tx.set(db.collection(`companies/${auth.companyId}/auditLogs`).doc(), {
+      entity: 'salaryItems', entityId: 'salaryItems', action: 'update',
+      changes: { items: { from: current.data()?.items ?? null, to: input.items } }, performedBy: auth.uid, performedAt: now,
+    });
+  });
+  return { success: true };
+}
 
 async function loadRun(input: RunInput, auth: AuthContext) {
   requireOffice(auth, input.officeId);
@@ -81,6 +108,10 @@ export interface MonthlyRow {
   warnings: string[];
   collection: { plan: CollectionPlan; due: number; collected: number | null; status: CollectionStatus; version: number; entries: { method: string; amount: number; date: string; note: string }[] };
   hold: null | { reason: string };
+  /** 計算した後に料率マスタが変わった（承認前なら計算し直す） */
+  stale: boolean;
+  /** 差し戻しの理由（直して出し直すまで出す） */
+  rejected: { salary: string | null; premium: string | null };
 }
 
 /** 事業所と支給月の状況（全員分）。数百〜数千人でも1回で返す */
@@ -101,7 +132,7 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
       db.doc(`${e}/collectionReceipts/${premiumMonth}`), db.doc(`${runRef.path}/holds/${d.id}`),
     ];
   });
-  const [snaps, run] = await Promise.all([getAllChunked(refs), runRef.get()]);
+  const [snaps, run, salaryItems] = await Promise.all([getAllChunked(refs), runRef.get(), salaryItemsOf(auth.companyId)]);
 
   // 未計算の人だけ、等級と雇用条件（適用・適用外）を調べる
   const facts = await mapConcurrent(employees, 20, async (doc, i) => {
@@ -118,6 +149,18 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
       enrolled: !emp || emp.healthInsuranceEnrolled || emp.pensionEnrolled,
     };
   });
+
+  // 今の料率（この事業所・この月は全員同じ）。単位の誤りや未登録は、計算する前に知らせる
+  let currentFingerprint: string | null = null;
+  let rateIssue = '';
+  try {
+    const rates = await findAllRates(auth.companyId, premiumMonth, office.prefectureCode, office.insurerId);
+    currentFingerprint = rateFingerprint(rates);
+    if (!rates.health) rateIssue = `${premiumMonth}に使える健康保険料率が登録されていません（設定の料率マスタを確認してください）`;
+    else if (!rates.pension) rateIssue = `${premiumMonth}に使える厚生年金保険料率が登録されていません`;
+  } catch (e) {
+    rateIssue = (e as Error).message;
+  }
 
   const rows: MonthlyRow[] = employees.map((doc, i) => {
     const employee = doc.data() as EmployeeDoc;
@@ -141,6 +184,7 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
         premiumDue = true;
         if (!facts[i].hasGrade) issues.push('適用中の等級がありません（入社の手続きで等級を決めてください）');
         if (!employee.birthDate) issues.push('生年月日が未入力');
+        if (rateIssue) issues.push(rateIssue);
       }
     }
     if (salaryRequired && lossDate && lossDate.slice(0, 7) === addMonths(payMonth, 1) && deductionMethod === 'previous' && premiumDue) {
@@ -159,6 +203,10 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
     } : null;
     if (p && premiumMonth >= '2026-04' && !p.childSupportPayment && !p.isConfirmed) issues.push('子ども・子育て支援金を含めて計算し直してください');
 
+    const stale = !!p && !p.isConfirmed && !p.approvalPending && typeof p.rateFingerprint === 'string' && currentFingerprint !== null && p.rateFingerprint !== currentFingerprint;
+    if (stale) warnings.push('計算した後に料率が変わりました。計算し直してください');
+    const rejectionOf = (d: FirebaseFirestore.DocumentData | undefined) =>
+      d?.lastRejection && !d.isConfirmed && !d.approvalPending ? String(d.lastRejection.comment || '理由の記入なし') : null;
     const reasons = p ? diffReasons(premiumFacts(p), prev ? premiumFacts(prev) : null) : [];
     const standard = p ? (p.healthStandardRemuneration ?? 0) : facts[i].standard;
     if (salary && !salary.noPay) {
@@ -182,6 +230,8 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
         entries: Array.isArray(r?.entries) ? r!.entries : (collected !== null ? [{ method: 'legacy', amount: collected, date: '', note: r?.note ?? '' }] : []),
       },
       hold: h?.reason ? { reason: h.reason } : null,
+      stale,
+      rejected: { salary: rejectionOf(s), premium: rejectionOf(p) },
     };
   });
 
@@ -202,6 +252,7 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
       premium: runData.premiumReview ? { requestedBy: runData.premiumReview.requestedBy, requestedAt: iso(runData.premiumReview.requestedAt), mine: runData.premiumReview.requestedBy === auth.uid } : null,
     },
     me: { uid: auth.uid, canApprove: auth.roles.some(r => r === 'admin' || r === 'approver') },
+    salaryItems,
     rows,
     job,
   };
@@ -233,7 +284,7 @@ const sumOf = (m: Record<string, number>) => Object.values(m).reduce((a, b) => a
 /** 給与CSVの確認（dryRun）と取込。誤りのある行は取り込まず、一覧で返す */
 export async function importMonthlySalary(input: ImportInput, auth: AuthContext) {
   const { base } = await loadRun(input, auth);
-  const parsed = parseSalaryCsv(input.csv);
+  const parsed = parseSalaryCsv(input.csv, (await salaryItemsOf(auth.companyId)).items);
   const errors = [...parsed.errors];
   const employees = await db.collection(`${base}/employees`).where('officeId', '==', input.officeId).where('deletedAt', '==', null).get();
   const byNumber = new Map(employees.docs.map(d => [String(d.data().employeeNumber ?? ''), d]));
