@@ -12,8 +12,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { ConfirmDialogComponent } from '../../../shared/confirm-dialog/confirm-dialog';
 
 interface AllowanceEntry {
   name: string;
@@ -27,7 +29,7 @@ interface AllowanceEntry {
     CommonModule, FormsModule,
     MatButtonModule, MatIconModule, MatCardModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatProgressSpinnerModule, MatSnackBarModule, MatDividerModule, MatChipsModule,
+    MatProgressSpinnerModule, MatSnackBarModule, MatDividerModule, MatChipsModule, MatDialogModule,
   ],
   template: `
     <div class="page-container">
@@ -161,6 +163,7 @@ export class SalaryEditComponent implements OnInit {
   private router = inject(Router);
   private functions = inject(Functions);
   private snackBar = inject(MatSnackBar);
+  private dialog = inject(MatDialog);
   private auth = inject(AuthService);
 
   employeeName = signal('');
@@ -242,6 +245,12 @@ export class SalaryEditComponent implements OnInit {
   }
 
   async save() {
+    const ref = this.dialog.open(ConfirmDialogComponent, {
+      data: { title: '給与データの保存', message: '給与データを保存します。よろしいですか？', confirmLabel: '保存' },
+    });
+    const confirmed = await ref.afterClosed().toPromise();
+    if (!confirmed) return;
+
     this.saving.set(true);
     try {
       if (this.isEdit) {

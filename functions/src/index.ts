@@ -13,6 +13,7 @@ export { employeeUpdate } from './employees/employee-update/functions';
 export { employeeDelete } from './employees/employee-delete/functions';
 export { employeeTransfer } from './employees/employee-transfer/functions';
 export { employeeResign } from './employees/employee-resign/functions';
+export { employeeSecretsGet, employeeSecretsUpdate } from './employees/employee-secrets/functions';
 
 // 組織マスタAPI
 export { officeList } from './offices/office-list/functions';
@@ -116,6 +117,9 @@ export { notificationMarkRead } from './notifications/notification-mark-read/fun
 export { collectionCreate } from './collections/collection-create/functions';
 export { collectionList } from './collections/collection-list/functions';
 export { collectionSummary } from './collections/collection-summary/functions';
+
+// バッチ処理API
+export { ageEventCheck } from './batch/age-event-check/functions';
 
 // セットアップ
 export { seedMasterData } from './seed/seed-master/functions';

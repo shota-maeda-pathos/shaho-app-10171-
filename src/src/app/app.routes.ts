@@ -41,12 +41,14 @@ export const routes: Routes = [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       {
         path: 'dashboard',
+        data: { title: 'ダッシュボード' },
         loadComponent: () =>
           import('./features/dashboard/dashboard').then((m) => m.DashboardComponent),
       },
       {
         path: 'employees',
         canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '従業員' },
         children: [
           {
             path: '',
@@ -57,6 +59,7 @@ export const routes: Routes = [
           },
           {
             path: ':id',
+            data: { title: '従業員詳細' },
             loadComponent: () =>
               import('./features/employees/employee-detail/employee-detail').then(
                 (m) => m.EmployeeDetailComponent,
@@ -64,6 +67,7 @@ export const routes: Routes = [
           },
           {
             path: ':id/grade',
+            data: { title: '等級決定' },
             loadComponent: () =>
               import('./features/employees/grade-decide/grade-decide').then(
                 (m) => m.GradeDecideComponent,
@@ -71,6 +75,7 @@ export const routes: Routes = [
           },
           {
             path: ':id/revision',
+            data: { title: '随時改定' },
             loadComponent: () =>
               import('./features/employees/grade-revision/grade-revision').then(
                 (m) => m.GradeRevisionComponent,
@@ -81,6 +86,7 @@ export const routes: Routes = [
       {
         path: 'salary',
         canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '給与' },
         children: [
           {
             path: '',
@@ -91,6 +97,7 @@ export const routes: Routes = [
           },
           {
             path: ':employeeId',
+            data: { title: '給与編集' },
             loadComponent: () =>
               import('./features/salary/salary-edit/salary-edit').then(
                 (m) => m.SalaryEditComponent,
@@ -101,9 +108,11 @@ export const routes: Routes = [
       {
         path: 'premium',
         canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '保険料' },
         children: [
           {
             path: 'monthly',
+            data: { title: '月額保険料' },
             loadComponent: () =>
               import('./features/premium/premium-monthly/premium-monthly').then(
                 (m) => m.PremiumMonthlyComponent,
@@ -111,6 +120,7 @@ export const routes: Routes = [
           },
           {
             path: 'collection',
+            data: { title: '徴収' },
             loadComponent: () =>
               import('./features/premium/premium-collection/premium-collection').then(
                 (m) => m.PremiumCollectionComponent,
@@ -118,6 +128,7 @@ export const routes: Routes = [
           },
           {
             path: 'bonus',
+            data: { title: '賞与保険料' },
             loadComponent: () =>
               import('./features/premium/premium-bonus/premium-bonus').then(
                 (m) => m.PremiumBonusComponent,
@@ -128,6 +139,7 @@ export const routes: Routes = [
       {
         path: 'filings',
         canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '届出' },
         children: [
           {
             path: '',
@@ -138,6 +150,7 @@ export const routes: Routes = [
           },
           {
             path: ':filingId',
+            data: { title: '届出詳細' },
             loadComponent: () =>
               import('./features/filings/filing-detail/filing-detail').then(
                 (m) => m.FilingDetailComponent,
@@ -148,6 +161,7 @@ export const routes: Routes = [
       {
         path: 'approvals',
         canActivate: [roleGuard('admin', 'approver', 'operator')],
+        data: { title: '承認' },
         loadComponent: () =>
           import('./features/approvals/approval-list/approval-list').then(
             (m) => m.ApprovalListComponent,
@@ -156,6 +170,7 @@ export const routes: Routes = [
       {
         path: 'santei',
         canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '算定' },
         children: [
           {
             path: '',
@@ -166,6 +181,7 @@ export const routes: Routes = [
           },
           {
             path: ':employeeId',
+            data: { title: '算定詳細' },
             loadComponent: () =>
               import('./features/santei/santei-detail/santei-detail').then(
                 (m) => m.SanteiDetailComponent,
@@ -176,6 +192,7 @@ export const routes: Routes = [
       {
         path: 'portal',
         canActivate: [portalGuard],
+        data: { title: 'マイポータル' },
         children: [
           {
             path: '',
@@ -184,6 +201,7 @@ export const routes: Routes = [
           },
           {
             path: 'payslip/:id',
+            data: { title: '給与明細' },
             loadComponent: () =>
               import('./features/portal/portal-detail').then((m) => m.PortalDetailComponent),
           },
@@ -192,6 +210,7 @@ export const routes: Routes = [
       {
         path: 'settings',
         canActivate: [roleGuard('admin')],
+        data: { title: '設定' },
         loadComponent: () =>
           import('./features/settings/settings').then(
             (m) => m.SettingsComponent,

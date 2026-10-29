@@ -133,5 +133,16 @@ export async function approveApprovalRequest(
     return input.requestId;
   });
 
+  const { notify } = await import('../../utils/notify');
+  await notify({
+    companyId: auth.companyId,
+    title: '承認完了',
+    body: '承認依頼が承認されました',
+    category: 'approval',
+    targetType: 'approvalRequest',
+    targetId: result,
+    createdBy: auth.uid,
+  });
+
   return { success: true, id: result };
 }

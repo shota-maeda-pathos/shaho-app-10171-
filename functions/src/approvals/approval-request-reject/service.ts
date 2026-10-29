@@ -87,5 +87,16 @@ export async function rejectApprovalRequest(
     return input.requestId;
   });
 
+  const { notify } = await import('../../utils/notify');
+  await notify({
+    companyId: auth.companyId,
+    title: '承認却下',
+    body: `承認依頼が却下されました`,
+    category: 'approval',
+    targetType: 'approvalRequest',
+    targetId: result,
+    createdBy: auth.uid,
+  });
+
   return { success: true, id: result };
 }

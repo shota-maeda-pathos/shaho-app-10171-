@@ -125,5 +125,16 @@ export async function createLeave(
     });
   }
 
+  const { notify } = await import('../../utils/notify');
+  await notify({
+    companyId: auth.companyId,
+    title: '休業登録',
+    body: `${input.leaveType === 'maternity' ? '産前産後休業' : '育児休業'}が登録されました`,
+    category: 'leave',
+    targetType: 'leave',
+    targetId: leaveRef.id,
+    createdBy: auth.uid,
+  });
+
   return { id: leaveRef.id, exemptionId, filingId };
 }

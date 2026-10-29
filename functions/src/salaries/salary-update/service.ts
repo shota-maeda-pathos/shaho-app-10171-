@@ -73,6 +73,11 @@ export async function updateSalary(
       changes.variableAllowances = { from: current.variableAllowances, to: input.variableAllowances };
     }
 
+    // 随時改定の自動検知: 固定的賃金（基本給＋固定手当）が変動した場合フラグを立てる
+    const prevFixed = current.totalFixedWage;
+    const fixedChanged = prevFixed !== totalFixedWage;
+    const revisionFlag = fixedChanged && !current.revisionFlag;
+
     const updateData: Record<string, unknown> = {
       paymentBasisDays: input.paymentBasisDays ?? current.paymentBasisDays,
       baseSalary,
@@ -84,6 +89,11 @@ export async function updateSalary(
       updatedAt: now,
       version: current.version + 1,
     };
+    if (revisionFlag) {
+      updateData.revisionFlag = true;
+      updateData.revisionDetectedAt = now;
+      updateData.previousTotalFixedWage = prevFixed;
+    }
     if (input.isConfirmed !== undefined) {
       updateData.isConfirmed = input.isConfirmed;
       updateData.confirmedAt = input.isConfirmed ? now : null;

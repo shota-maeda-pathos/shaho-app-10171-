@@ -126,8 +126,12 @@ export interface SalaryDoc {
   totalVariableWage: number;
   totalSalary: number;
   isConfirmed: boolean;
+  isPublished?: boolean;
   confirmedAt: Timestamp | null;
   confirmedBy: string | null;
+  revisionFlag?: boolean;
+  revisionDetectedAt?: Timestamp | null;
+  previousTotalFixedWage?: number | null;
   version: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;

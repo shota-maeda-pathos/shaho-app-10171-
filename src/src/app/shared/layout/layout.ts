@@ -1,12 +1,15 @@
 import { Component, inject } from '@angular/core';
-import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterOutlet, RouterLink, RouterLinkActive, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
+import { BreadcrumbComponent } from '../breadcrumb/breadcrumb';
 
 @Component({
   selector: 'app-layout',
@@ -15,13 +18,23 @@ import { AuthService } from '../../core/services/auth.service';
     RouterOutlet, RouterLink, RouterLinkActive,
     MatSidenavModule, MatToolbarModule, MatListModule,
     MatIconModule, MatButtonModule, MatMenuModule,
+    BreadcrumbComponent,
   ],
   templateUrl: './layout.html',
   styleUrl: './layout.scss',
 })
 export class LayoutComponent {
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   auth = inject(AuthService);
+
+  pageTitle = toSignal(
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => this.getDeepestTitle(this.route)),
+    ),
+    { initialValue: '' },
+  );
 
   navItems = [
     { icon: 'dashboard', label: 'ダッシュボード', route: '/dashboard', roles: ['admin', 'approver', 'operator', 'viewer'] },
@@ -41,6 +54,18 @@ export class LayoutComponent {
     return this.navItems.filter((item) =>
       this.auth.hasAnyRole(...item.roles as any[]),
     );
+  }
+
+  private getDeepestTitle(route: ActivatedRoute): string {
+    let title = '';
+    let r: ActivatedRoute | null = route;
+    while (r) {
+      if (r.snapshot.data['title']) {
+        title = r.snapshot.data['title'];
+      }
+      r = r.firstChild;
+    }
+    return title;
   }
 
   async logout() {

@@ -7,7 +7,8 @@
       @for (item of visibleNavItems; track item.route) {
         <a mat-list-item
            [routerLink]="item.route"
-           routerLinkActive="active">
+           routerLinkActive="active"
+           [routerLinkActiveOptions]="{ exact: false }">
           <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
           <span matListItemTitle>{{ item.label }}</span>
         </a>
@@ -25,9 +26,7 @@
 
   <div class="main-area">
     <mat-toolbar class="top-bar">
-      <span class="page-title">
-        <!-- Filled by child routes -->
-      </span>
+      <span class="page-title">{{ pageTitle() }}</span>
       <span class="spacer"></span>
       <button mat-icon-button [matMenuTriggerFor]="userMenu">
         <mat-icon>account_circle</mat-icon>
@@ -43,6 +42,7 @@
       </mat-menu>
     </mat-toolbar>
 
+    <app-breadcrumb />
     <main class="content">
       <router-outlet />
     </main>

@@ -96,5 +96,16 @@ export async function createApprovalRequest(
     return reqRef.id;
   });
 
+  const { notify } = await import('../../utils/notify');
+  await notify({
+    companyId: auth.companyId,
+    title: '承認依頼',
+    body: `${input.requestType}の承認依頼が作成されました`,
+    category: 'approval',
+    targetType: 'approvalRequest',
+    targetId: result,
+    createdBy: auth.uid,
+  });
+
   return { success: true, id: result };
 }
