@@ -296,18 +296,24 @@ export class MockQuery {
     private filters: Filter[] = [],
     private orders: { field: string; dir: 'asc' | 'desc' }[] = [],
     private max: number | null = null,
+    private after: string | null = null,
   ) {}
 
   where(field: string, op: string, value: unknown) {
-    return new MockQuery(this.path, this.store, [...this.filters, { field, op, value }], this.orders, this.max);
+    return new MockQuery(this.path, this.store, [...this.filters, { field, op, value }], this.orders, this.max, this.after);
   }
 
   orderBy(field: string, dir: 'asc' | 'desc' = 'asc') {
-    return new MockQuery(this.path, this.store, this.filters, [...this.orders, { field, dir }], this.max);
+    return new MockQuery(this.path, this.store, this.filters, [...this.orders, { field, dir }], this.max, this.after);
   }
 
   limit(n: number) {
-    return new MockQuery(this.path, this.store, this.filters, this.orders, n);
+    return new MockQuery(this.path, this.store, this.filters, this.orders, n, this.after);
+  }
+
+  /** 文書スナップショット（id を持つもの）の次から */
+  startAfter(doc: { id: string }) {
+    return new MockQuery(this.path, this.store, this.filters, this.orders, this.max, doc.id);
   }
 
   async get() {
@@ -318,6 +324,10 @@ export class MockQuery {
       .filter(r => this.filters.every(f => matches(r.data, f)));
     for (const o of [...this.orders].reverse()) {
       rows = [...rows].sort((a, b) => compare(a.data[o.field], b.data[o.field]) * (o.dir === 'desc' ? -1 : 1));
+    }
+    if (this.after !== null) {
+      const index = rows.findIndex(r => r.path.split('/').pop() === this.after);
+      rows = rows.slice(index + 1);
     }
     if (this.max !== null) rows = rows.slice(0, this.max);
     const docs = rows.map(r => ({ id: r.path.split('/').pop()!, ref: { path: r.path }, exists: true, data: () => r.data }));

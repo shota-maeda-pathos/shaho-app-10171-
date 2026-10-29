@@ -8,7 +8,7 @@ export const GradeCreateSchema = z.object({
   healthStandardRemuneration: z.number().int().min(0),
   pensionGradeNumber: z.number().int().min(1).max(32),
   pensionStandardRemuneration: z.number().int().min(0),
-  determinationType: z.enum(['regular', 'occasional', 'initial', 'specific']),
+  determinationType: z.enum(['regular', 'occasional', 'initial', 'leaveEnd', 'specific']),
   reason: z.string().optional(),
 });
 

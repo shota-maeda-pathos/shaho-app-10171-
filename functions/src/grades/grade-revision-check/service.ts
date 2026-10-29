@@ -1,7 +1,8 @@
 import { db } from '../../config';
 import { AuthContext, requireOffice } from '../../middleware/auth';
 import { EmployeeDoc, SalaryDoc, GradeDoc, EmploymentDoc } from '../../types/firestore';
-import { notFound } from '../../utils/errors';
+import { invalidArg, notFound } from '../../utils/errors';
+import { createApprovalRequest } from '../../approvals/approval-request-create/service';
 import { findApplicableRate } from '../../utils/insurance-rate';
 import { normalizeEmployment } from '../../utils/employment';
 import {
@@ -262,4 +263,35 @@ export async function checkGradeRevision(
     needsReview,
     insuredCategory,
   };
+}
+
+/**
+ * 随時改定（終了時改定）の承認申請。画面から送られた値は使わず、サーバーで再判定した結果で申請する。
+ * 承認されると変動月から4か月目を適用開始月とする等級が作られる。
+ */
+export async function submitGradeRevision(input: GradeRevisionCheckInput, auth: AuthContext): Promise<{ requestId: string; effectiveMonth: string }> {
+  const result = await checkGradeRevision(input, auth);
+  if (result.needsReview) throw invalidArg(`担当者の確認が必要です：${result.failReasons.join('／')}`);
+  if (!result.eligible || !result.effectiveMonth) throw invalidArg(`改定の対象ではありません：${result.failReasons.join('／')}`);
+  const isLeaveEnd = input.revisionType === 'leaveEnd';
+  const response = await createApprovalRequest({
+    companyId: auth.companyId,
+    employeeId: input.employeeId,
+    targetPath: `companies/${auth.companyId}/employees/${input.employeeId}/grades/${result.effectiveMonth}`,
+    targetVersion: 0,
+    requestType: 'grade',
+    metadata: {
+      effectiveMonth: result.effectiveMonth,
+      determinationType: isLeaveEnd ? 'leaveEnd' : 'occasional',
+      healthGradeNumber: result.newHealthGrade,
+      healthStandardRemuneration: result.newHealthStandardRemuneration,
+      pensionGradeNumber: result.newPensionGrade,
+      pensionStandardRemuneration: result.newPensionStandardRemuneration,
+      basisRemuneration: result.averageSalary,
+      basisMonths: result.months.map(m => m.yearMonth),
+      reason: `${isLeaveEnd ? '産休・育休終了時改定' : '随時改定'} 変動月${result.changeMonth} 3か月平均${result.averageSalary?.toLocaleString()}円`,
+      source: isLeaveEnd ? 'leaveEndRevision' : 'occasionalRevision',
+    },
+  }, auth);
+  return { requestId: response.id, effectiveMonth: result.effectiveMonth };
 }

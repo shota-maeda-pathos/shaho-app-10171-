@@ -9,15 +9,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
-
-interface MonthData {
-  yearMonth: string;
-  label: string;
-  totalSalary: number;
-  baseSalary: number;
-  paymentBasisDays: number;
-  isValid: boolean;
-}
+import {
+  defaultSanteiYear, INSURED_CATEGORY_LABELS, SANTEI_STATUS_LABELS, SanteiPreviewResponse, SanteiRow, SanteiSubmitResult,
+} from '../santei.types';
 
 @Component({
   selector: 'app-santei-detail',
@@ -30,36 +24,28 @@ interface MonthData {
   template: `
     <div class="page-container">
       <div class="page-header">
-        <button mat-icon-button (click)="goBack()"><mat-icon>arrow_back</mat-icon></button>
-        <h1>算定基礎届 — {{ employeeName() }}</h1>
+        <button mat-icon-button (click)="goBack()" aria-label="算定基礎届の一覧に戻る"><mat-icon>arrow_back</mat-icon></button>
+        <h1>算定基礎届 — {{ row()?.employeeName ?? '' }}（{{ year }}年）</h1>
       </div>
 
       @if (loading()) {
         <div class="loading-container"><mat-spinner diameter="40"></mat-spinner></div>
-      } @else {
+      } @else if (error()) {
+        <p role="alert" class="error">{{ error() }}</p>
+        <button mat-stroked-button (click)="load()">再読み込み</button>
+      } @else if (row(); as r) {
+        <p class="guide">
+          被保険者の区分：{{ categoryLabel(r.insuredCategory) }}。支払基礎日数が基準に満たない月は平均に含めません。
+        </p>
+
         <div class="month-cards">
-          @for (m of monthData(); track m.yearMonth) {
-            <mat-card [class.excluded]="!m.isValid">
-              <h2>{{ m.label }}</h2>
-              <div class="month-detail">
-                <div class="detail-row">
-                  <span class="label">支払基礎日数</span>
-                  <span [class.warn]="m.paymentBasisDays < 17">{{ m.paymentBasisDays }} 日</span>
-                </div>
-                <div class="detail-row">
-                  <span class="label">基本給</span>
-                  <span>{{ m.baseSalary | number }} 円</span>
-                </div>
-                <div class="detail-row total">
-                  <span class="label">総支給額</span>
-                  <span>{{ m.totalSalary | number }} 円</span>
-                </div>
-              </div>
-              @if (!m.isValid) {
-                <div class="excluded-badge">
-                  <mat-icon>warning</mat-icon>
-                  日数不足のため除外
-                </div>
+          @for (m of r.months; track m.yearMonth) {
+            <mat-card [class.excluded]="!m.used">
+              <h2>{{ +m.yearMonth.slice(5) }}月</h2>
+              <div class="detail-row"><span class="label">支払基礎日数</span><span>{{ m.paymentBasisDays === null ? '—' : m.paymentBasisDays + ' 日' }}</span></div>
+              <div class="detail-row total"><span class="label">報酬月額</span><span>{{ m.remuneration === null ? '未登録' : (m.remuneration | number) + ' 円' }}</span></div>
+              @if (!m.used && m.remuneration !== null) {
+                <div class="excluded-badge"><mat-icon>info</mat-icon>日数が基準に満たないため平均に含めません</div>
               }
             </mat-card>
           }
@@ -67,38 +53,37 @@ interface MonthData {
 
         <mat-card class="result-card">
           <h2>算定結果</h2>
+          <div class="status-line">
+            <span class="status-chip" [attr.data-status]="r.status">{{ statusLabel(r.status) }}</span>
+            <span>{{ r.reason }}</span>
+          </div>
           <div class="result-grid">
-            <div class="result-item">
-              <label>有効月数</label>
-              <span>{{ validMonthCount() }} か月</span>
+            <div class="result-item"><label>平均（円未満切捨て）</label><span class="large">{{ r.average === null ? '—' : (r.average | number) + ' 円' }}</span></div>
+            <div class="result-item"><label>健康保険</label>
+              <span>{{ r.current?.healthGradeNumber ?? '—' }}等級 → <strong [class.changed]="r.changed">{{ r.proposed?.healthGradeNumber ?? '—' }}等級</strong></span>
+              <span class="sub">{{ (r.proposed?.healthStandardRemuneration ?? null) === null ? '' : (r.proposed!.healthStandardRemuneration | number) + ' 円' }}</span>
             </div>
-            <div class="result-item">
-              <label>3か月平均</label>
-              <span class="large">{{ average() | number }} 円</span>
-            </div>
-            <div class="result-item">
-              <label>現在の等級</label>
-              <span>{{ currentGrade() }} 等級</span>
-            </div>
-            <div class="result-item highlight">
-              <label>新等級（案）</label>
-              <span class="large" [class.changed]="gradeChanged()">{{ proposedGrade() }} 等級</span>
+            <div class="result-item"><label>厚生年金</label>
+              <span>{{ r.current?.pensionGradeNumber ?? '—' }}等級 → <strong [class.changed]="r.changed">{{ r.proposed?.pensionGradeNumber ?? '—' }}等級</strong></span>
+              <span class="sub">{{ (r.proposed?.pensionStandardRemuneration ?? null) === null ? '' : (r.proposed!.pensionStandardRemuneration | number) + ' 円' }}</span>
             </div>
           </div>
 
-          @if (gradeChanged()) {
-            <div class="change-notice">
-              <mat-icon>info</mat-icon>
-              等級が変更されます。9月分から新等級が適用されます。
+          @if (r.status === 'ok') {
+            <div class="change-notice"><mat-icon>info</mat-icon>
+              承認されると、{{ year }}年9月分の保険料から{{ r.changed ? '新しい等級' : '同じ等級（定時決定）' }}が適用されます。
             </div>
           }
 
           <mat-divider></mat-divider>
-
           <div class="actions">
-            <button mat-flat-button color="primary" (click)="confirmGrade()" [disabled]="confirming()">
-              <mat-icon>check</mat-icon> 等級を確定
-            </button>
+            @if (r.approvalStatus !== 'none') {
+              <span>{{ r.approvalStatus === 'pending' ? '承認待ちです' : '承認済みです' }}</span>
+            } @else if (r.status === 'ok') {
+              <button mat-flat-button color="primary" (click)="submit()" [disabled]="submitting()">
+                <mat-icon>send</mat-icon> 承認を申請
+              </button>
+            }
           </div>
         </mat-card>
       }
@@ -106,35 +91,37 @@ interface MonthData {
   `,
   styles: [`
     .page-container { padding: 24px; }
-    .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
     .page-header h1 { margin: 0; font-size: 24px; font-weight: 500; }
+    .guide { color: #555; margin: 0 0 16px; }
     .loading-container { display: flex; justify-content: center; padding: 48px; }
-    .month-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .month-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
     .month-cards mat-card { padding: 20px; }
-    .month-cards mat-card.excluded { opacity: 0.6; border: 1px dashed #e0e0e0; }
+    .month-cards mat-card.excluded { opacity: 0.7; border: 1px dashed #e0e0e0; }
     .month-cards h2 { margin: 0 0 12px; font-size: 16px; font-weight: 500; }
-    .month-detail { display: flex; flex-direction: column; gap: 8px; }
-    .detail-row { display: flex; justify-content: space-between; font-size: 14px; }
+    .detail-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
     .detail-row.total { font-weight: 600; border-top: 1px solid #e0e0e0; padding-top: 8px; }
     .label { color: #666; }
-    .warn { color: #c62828; font-weight: 500; }
     .excluded-badge { display: flex; align-items: center; gap: 4px; margin-top: 12px; padding: 8px; background: #fff3e0; border-radius: 8px; font-size: 12px; color: #e65100; }
     .excluded-badge mat-icon { font-size: 16px; width: 16px; height: 16px; }
     .result-card { padding: 24px; }
-    .result-card h2 { margin: 0 0 16px; font-size: 18px; font-weight: 500; }
-    .result-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .result-card h2 { margin: 0 0 12px; font-size: 18px; font-weight: 500; }
+    .status-line { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .status-chip { padding: 2px 10px; border-radius: 12px; font-size: 12px; background: #f5f5f5; }
+    .status-chip[data-status="ok"] { background: #e8f5e9; color: #2e7d32; }
+    .status-chip[data-status="pending"], .status-chip[data-status="needsAction"] { background: #ffebee; color: #c62828; }
+    .result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
     .result-item { display: flex; flex-direction: column; gap: 4px; padding: 12px; background: #f5f5f5; border-radius: 8px; }
     .result-item label { font-size: 12px; color: #666; }
-    .result-item span { font-size: 16px; font-weight: 500; }
     .result-item .large { font-size: 22px; font-weight: 700; }
-    .result-item.highlight { background: #e3f2fd; }
+    .sub { font-size: 12px; color: #666; }
     .changed { color: #e65100; }
-    .change-notice { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #fff3e0; border-radius: 8px; margin-bottom: 24px; font-size: 14px; color: #e65100; }
+    .error { color: #c62828; }
+    .change-notice { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #e3f2fd; border-radius: 8px; margin-bottom: 24px; font-size: 14px; color: #1565c0; }
     mat-divider { margin: 0 -24px 24px; }
-    .actions { display: flex; justify-content: flex-end; }
+    .actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
     @media (max-width: 768px) {
-      .month-cards { grid-template-columns: 1fr; }
-      .result-grid { grid-template-columns: 1fr 1fr; }
+      .month-cards, .result-grid { grid-template-columns: 1fr; }
     }
   `],
 })
@@ -145,120 +132,62 @@ export class SanteiDetailComponent implements OnInit {
   private snackBar = inject(MatSnackBar);
   private auth = inject(AuthService);
 
-  employeeName = signal('');
-  monthData = signal<MonthData[]>([]);
+  employeeId = '';
+  year = defaultSanteiYear();
+  row = signal<SanteiRow | null>(null);
   loading = signal(false);
-  confirming = signal(false);
-  average = signal(0);
-  currentGrade = signal(0);
-  proposedGrade = signal(0);
-  gradeChanged = signal(false);
-  validMonthCount = signal(0);
-
-  private employeeId = '';
+  submitting = signal(false);
+  error = signal('');
 
   ngOnInit() {
     this.employeeId = this.route.snapshot.paramMap.get('employeeId') ?? '';
-    this.loadData();
+    const year = Number(this.route.snapshot.queryParamMap.get('year'));
+    if (Number.isInteger(year) && year > 2000) this.year = year;
+    void this.load();
+  }
+
+  statusLabel(status: SanteiRow['status']) {
+    return SANTEI_STATUS_LABELS[status];
+  }
+
+  categoryLabel(category: SanteiRow['insuredCategory']) {
+    return INSURED_CATEGORY_LABELS[category];
   }
 
   goBack() {
-    this.router.navigate(['/santei']);
+    void this.router.navigate(['/santei'], { queryParamsHandling: 'preserve' });
   }
 
-  async confirmGrade() {
-    this.confirming.set(true);
-    try {
-      const year = new Date().getFullYear();
-      const fn = httpsCallable(this.functions, 'gradeCreate');
-      await fn({
-        companyId: this.auth.companyId,
-        employeeId: this.employeeId,
-        effectiveMonth: `${year}-09`,
-        determinationType: 'regular',
-        healthGradeNumber: this.proposedGrade(),
-        healthStandardRemuneration: this.average(),
-        pensionGradeNumber: this.proposedGrade(),
-        pensionStandardRemuneration: this.average(),
-        reason: '算定基礎届による定時決定',
-      });
-      this.snackBar.open('等級を確定しました', '閉じる', { duration: 3000 });
-      this.goBack();
-    } catch (e: any) {
-      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
-    } finally {
-      this.confirming.set(false);
-    }
-  }
-
-  private async loadData() {
+  async load() {
     this.loading.set(true);
-    const year = new Date().getFullYear();
+    this.error.set('');
     try {
-      const fn = httpsCallable<any, any>(this.functions, 'employeeGet');
-      const empResult = await fn({
-        companyId: this.auth.companyId,
-        employeeId: this.employeeId,
+      const { data } = await httpsCallable<object, SanteiPreviewResponse>(this.functions, 'santeiPreview')({
+        companyId: this.auth.companyId, year: this.year, employeeIds: [this.employeeId],
       });
-      this.employeeName.set(`${empResult.data.lastName} ${empResult.data.firstName}`);
-
-      const months = [
-        { ym: `${year}-04`, label: '4月' },
-        { ym: `${year}-05`, label: '5月' },
-        { ym: `${year}-06`, label: '6月' },
-      ];
-      const data: MonthData[] = [];
-
-      for (const m of months) {
-        const salaryFn = httpsCallable<any, any>(this.functions, 'salaryList');
-        const result = await salaryFn({
-          companyId: this.auth.companyId,
-          yearMonth: m.ym,
-          limit: 200,
-        });
-        const items: any[] = result.data.items ?? [];
-        const match = items.find((i: any) => i.employeeId === this.employeeId);
-        const basisDays = match?.paymentBasisDays ?? 0;
-        data.push({
-          yearMonth: m.ym,
-          label: m.label,
-          totalSalary: match?.totalSalary ?? 0,
-          baseSalary: match?.baseSalary ?? 0,
-          paymentBasisDays: basisDays,
-          isValid: basisDays >= 17,
-        });
-      }
-
-      this.monthData.set(data);
-      const validData = data.filter((d) => d.isValid && d.totalSalary > 0);
-      this.validMonthCount.set(validData.length);
-      const avg = validData.length > 0
-        ? Math.round(validData.reduce((s, d) => s + d.totalSalary, 0) / validData.length)
-        : 0;
-      this.average.set(avg);
-      const current = this.estimateGrade(avg > 0 ? avg * 0.8 : 0);
-      const proposed = this.estimateGrade(avg);
-      this.currentGrade.set(current);
-      this.proposedGrade.set(proposed);
-      this.gradeChanged.set(current !== proposed);
-    } catch {
-      this.monthData.set([]);
+      if (!data.items[0]) throw new Error('従業員が見つかりません');
+      this.row.set(data.items[0]);
+    } catch (e: unknown) {
+      this.error.set(e instanceof Error ? e.message : '算定結果を取得できませんでした');
     } finally {
       this.loading.set(false);
     }
   }
 
-  private estimateGrade(amount: number): number {
-    const boundaries = [
-      58000, 68000, 78000, 88000, 98000, 104000, 110000, 118000, 126000, 134000,
-      142000, 150000, 160000, 170000, 180000, 190000, 200000, 220000, 240000, 260000,
-      280000, 300000, 320000, 340000, 360000, 380000, 410000, 450000, 490000, 530000,
-      590000, 650000, 710000, 770000, 830000, 890000, 950000, 1010000, 1090000, 1150000,
-      1210000, 1270000, 1330000, 1390000,
-    ];
-    for (let i = 0; i < boundaries.length; i++) {
-      if (amount < boundaries[i]) return i + 1;
+  async submit() {
+    this.submitting.set(true);
+    try {
+      const { data } = await httpsCallable<object, { results: SanteiSubmitResult[] }>(this.functions, 'santeiSubmit')({
+        companyId: this.auth.companyId, year: this.year, employeeIds: [this.employeeId],
+      });
+      const result = data.results[0];
+      if (!result?.ok) throw new Error(result?.error ?? '申請できませんでした');
+      this.snackBar.open('承認を申請しました。別の担当者の承認後に等級が確定します', '閉じる', { duration: 4000 });
+      await this.load();
+    } catch (e: unknown) {
+      this.snackBar.open(e instanceof Error ? e.message : '申請できませんでした', '閉じる', { duration: 5000 });
+    } finally {
+      this.submitting.set(false);
     }
-    return boundaries.length + 1;
   }
 }

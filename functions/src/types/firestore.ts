@@ -172,7 +172,12 @@ export interface GradeDoc {
   healthStandardRemuneration: number;
   pensionGradeNumber: number;
   pensionStandardRemuneration: number;
-  determinationType: 'regular' | 'occasional' | 'initial' | 'specific';
+  /** regular=定時決定、occasional=随時改定、initial=資格取得時決定、leaveEnd=産休・育休終了時改定、specific=その他 */
+  determinationType: 'regular' | 'occasional' | 'initial' | 'leaveEnd' | 'specific';
+  /** 決定の根拠となった報酬月額 */
+  basisRemuneration?: number | null;
+  basisMonths?: string[] | null;
+  approvalRequestId?: string;
   reason: string;
   version: number;
   createdAt: Timestamp;

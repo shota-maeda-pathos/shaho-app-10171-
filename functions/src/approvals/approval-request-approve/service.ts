@@ -79,9 +79,8 @@ export async function approveApprovalRequest(
 
     if (reqData.requestType === 'grade' && reqData.metadata) {
       const meta = reqData.metadata as Record<string, unknown>;
-      const gradeRef = db.collection(
-        `companies/${auth.companyId}/employees/${input.employeeId}/grades`,
-      ).doc();
+      // 等級の文書IDは承認対象パス（定時決定は適用開始月）。同じ申請の再承認で二重に作らない
+      const gradeRef = db.doc(reqData.targetPath);
       tx.set(gradeRef, {
         effectiveMonth: meta.effectiveMonth,
         determinationType: meta.determinationType ?? 'regular',
@@ -90,6 +89,9 @@ export async function approveApprovalRequest(
         pensionGradeNumber: meta.pensionGradeNumber,
         pensionStandardRemuneration: meta.pensionStandardRemuneration,
         reason: meta.reason ?? '',
+        basisRemuneration: meta.basisRemuneration ?? null,
+        basisMonths: meta.basisMonths ?? null,
+        approvalRequestId: reqRef.id,
         isConfirmed: true,
         confirmedAt: now,
         confirmedBy: auth.uid,

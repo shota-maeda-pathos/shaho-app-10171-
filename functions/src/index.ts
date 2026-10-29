@@ -31,7 +31,8 @@ export { employmentCreate } from './employments/employment-create/functions';
 // 等級API
 export { gradeCreate } from './grades/grade-create/functions';
 export { gradeUpdate } from './grades/grade-update/functions';
-export { gradeRevisionCheck } from './grades/grade-revision-check/functions';
+export { gradeRevisionCheck, gradeRevisionSubmit } from './grades/grade-revision-check/functions';
+export { santeiPreview, santeiSubmit } from './santei/functions';
 
 // 給与API
 export { salaryCreate } from './salaries/salary-create/functions';
@@ -137,3 +138,4 @@ export { procedureCancel } from './procedures/procedure-cancel/functions';
 // セットアップ
 export { seedMasterData } from './seed/seed-master/functions';
 export { seedGrades } from './seed/seed-grades/functions';
+export { migrateOfficeRoundingRule } from './migrations/rounding-rule';

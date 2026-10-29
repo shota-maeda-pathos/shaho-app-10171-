@@ -34,6 +34,9 @@ interface RevisionResult {
   effectiveMonth: string | null;
   reasons: string[];
   failReasons: string[];
+  healthEligible?: boolean;
+  pensionEligible?: boolean;
+  needsReview?: boolean;
 }
 
 @Component({
@@ -118,7 +121,7 @@ interface RevisionResult {
             <p class="effective">適用月: <strong>{{ result()!.effectiveMonth }}</strong></p>
             <div class="result-actions">
               <button mat-flat-button color="primary" (click)="confirmRevision()" [disabled]="confirming()">
-                @if (confirming()) { <mat-spinner diameter="20"></mat-spinner> } @else { 改定を確定して月額変更届を生成 }
+                @if (confirming()) { <mat-spinner diameter="20"></mat-spinner> } @else { 承認を申請して月額変更届の下書きを作成 }
               </button>
             </div>
           }
@@ -208,17 +211,11 @@ export class GradeRevisionComponent implements OnInit {
     if (!r || !r.eligible || this.confirming()) return;
     this.confirming.set(true);
     try {
-      const gradeFn = httpsCallable(this.functions, 'gradeCreate');
-      await gradeFn({
+      // 等級はサーバーで再判定した値で承認申請する。別の担当者の承認後に確定する
+      await httpsCallable(this.functions, 'gradeRevisionSubmit')({
         companyId: this.auth.companyId,
         employeeId: this.employeeId,
-        effectiveMonth: r.effectiveMonth,
-        healthGradeNumber: r.newHealthGrade,
-        healthStandardRemuneration: r.newHealthStandardRemuneration,
-        pensionGradeNumber: r.newPensionGrade,
-        pensionStandardRemuneration: r.newPensionStandardRemuneration,
-        determinationType: 'occasional',
-        reason: `随時改定 変動月${r.changeMonth} 3か月平均${r.averageSalary}円`,
+        changeMonth: r.changeMonth,
       });
 
       const filingFn = httpsCallable(this.functions, 'filingAutoGenerate');
@@ -230,10 +227,10 @@ export class GradeRevisionComponent implements OnInit {
         yearMonth: r.changeMonth,
       });
 
-      this.snackBar.open('改定を確定し、月額変更届を下書き生成しました', '閉じる', { duration: 5000 });
+      this.snackBar.open('改定の承認を申請し、月額変更届の下書きを作成しました。承認後に新しい等級が確定します', '閉じる', { duration: 6000 });
       this.router.navigate(['/filings']);
     } catch (e: any) {
-      this.snackBar.open(`確定処理に失敗しました：${e.message ?? ''}`, '閉じる', { duration: 5000 });
+      this.snackBar.open(`申請できませんでした：${e.message ?? ''}`, '閉じる', { duration: 6000 });
     } finally {
       this.confirming.set(false);
     }
