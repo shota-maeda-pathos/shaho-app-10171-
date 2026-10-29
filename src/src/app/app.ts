@@ -1,5 +1,6 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { SessionTimeoutService } from './core/services/session-timeout.service';
 
 @Component({
   imports: [RouterOutlet],
@@ -7,6 +8,11 @@ import { RouterOutlet } from '@angular/router';
   styleUrl: './app.scss',
   templateUrl: './app.html',
 })
-export class App {
+export class App implements OnInit {
+  private sessionTimeout = inject(SessionTimeoutService);
   protected readonly title = signal('src');
+
+  ngOnInit() {
+    this.sessionTimeout.start();
+  }
 }

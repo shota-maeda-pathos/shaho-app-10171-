@@ -46,6 +46,7 @@ export class LayoutComponent {
     { icon: 'card_giftcard', label: '賞与保険料', route: '/premium/bonus', roles: ['admin', 'operator'] },
     { icon: 'account_balance', label: '徴収', route: '/premium/collection', roles: ['admin', 'operator'] },
     { icon: 'assessment', label: '算定', route: '/santei', roles: ['admin', 'operator'] },
+    { icon: 'trending_up', label: 'シミュレーション', route: '/simulation', roles: ['admin', 'operator', 'viewer'] },
     { icon: 'person', label: 'マイポータル', route: '/portal', roles: ['admin', 'approver', 'operator', 'viewer', 'employee'] },
     { icon: 'settings', label: '設定', route: '/settings', roles: ['admin'] },
   ];

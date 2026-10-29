@@ -72,6 +72,7 @@ interface AnalyticsData {
   filingStats: FilingStats;
   recentFilings: { id: string; employeeId: string; employeeName: string; filingType: string; status: string; effectiveDate: string }[];
   monthOverMonth: { currentMonth: string; previousMonth: string; currentTotal: number; previousTotal: number; changePercent: number | null } | null;
+  forecast: { nextMonth: string; estimatedTotal: number; estimatedEmployee: number; estimatedEmployer: number; basis: string } | null;
 }
 
 @Component({
@@ -272,6 +273,18 @@ interface AnalyticsData {
               </div>
             }
 
+            @if (a.forecast; as fc) {
+              <mat-card class="forecast-card">
+                <h3><mat-icon>auto_graph</mat-icon> 来月の予測（{{ fc.nextMonth }}）</h3>
+                <div class="forecast-body">
+                  <div class="fc-item"><span class="fc-label">合計（推定）</span><span class="fc-value">{{ fc.estimatedTotal | number }}円</span></div>
+                  <div class="fc-item"><span class="fc-label">被保険者</span><span class="fc-value">{{ fc.estimatedEmployee | number }}円</span></div>
+                  <div class="fc-item"><span class="fc-label">事業主</span><span class="fc-value">{{ fc.estimatedEmployer | number }}円</span></div>
+                </div>
+                <div class="fc-note">※ {{ fc.basis === 'trend' ? '直近2か月の推移に基づく概算' : '直近月のデータに基づく概算' }}です</div>
+              </mat-card>
+            }
+
             <mat-card class="trends-card">
               <h2><mat-icon>trending_up</mat-icon> 保険料推移（月別）</h2>
               <div class="trends-table-wrap">
@@ -393,6 +406,13 @@ interface AnalyticsData {
     .fs-item { text-align: center; flex: 1; min-width: 60px; }
     .fs-num { display: block; font-size: 24px; font-weight: 600; }
     .fs-label { font-size: 12px; color: #666; }
+    .forecast-card { padding: 24px; }
+    .forecast-card h3 { margin: 0 0 16px; font-size: 15px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+    .forecast-body { display: flex; gap: 24px; flex-wrap: wrap; }
+    .fc-item { text-align: center; flex: 1; min-width: 120px; }
+    .fc-label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
+    .fc-value { display: block; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .fc-note { margin-top: 12px; font-size: 12px; color: #999; }
     .trends-card { padding: 24px; }
     .trends-table-wrap { overflow-x: auto; }
     .trends-table { width: 100%; border-collapse: collapse; font-size: 13px; }

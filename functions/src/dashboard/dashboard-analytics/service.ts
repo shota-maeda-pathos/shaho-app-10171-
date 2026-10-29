@@ -21,6 +21,14 @@ interface FilingStats {
   accepted: number;
 }
 
+interface Forecast {
+  nextMonth: string;
+  estimatedTotal: number;
+  estimatedEmployee: number;
+  estimatedEmployer: number;
+  basis: 'trend' | 'latest';
+}
+
 export interface DashboardAnalyticsResponse {
   insuranceTrends: MonthlyTrend[];
   filingStats: FilingStats;
@@ -32,6 +40,7 @@ export interface DashboardAnalyticsResponse {
     previousTotal: number;
     changePercent: number | null;
   } | null;
+  forecast: Forecast | null;
 }
 
 function generateMonthKeys(count: number): string[] {
@@ -130,5 +139,35 @@ export async function getDashboardAnalytics(
     };
   }
 
-  return { insuranceTrends: trends, filingStats, recentFilings, monthOverMonth };
+  let forecast: Forecast | null = null;
+  if (trends.length >= 2) {
+    const last = trends[trends.length - 1];
+    const prev = trends[trends.length - 2];
+    const lastTotal = last.totalEmployee + last.totalEmployer;
+    const prevTotal = prev.totalEmployee + prev.totalEmployer;
+    const nextDate = new Date(Number(last.yearMonth.split('-')[0]), Number(last.yearMonth.split('-')[1]), 1);
+    const nextMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+
+    if (prevTotal > 0 && lastTotal > 0) {
+      const growthRate = lastTotal / prevTotal;
+      const estimated = Math.round(lastTotal * growthRate);
+      forecast = {
+        nextMonth,
+        estimatedTotal: estimated,
+        estimatedEmployee: Math.round(last.totalEmployee * growthRate),
+        estimatedEmployer: Math.round(last.totalEmployer * growthRate),
+        basis: 'trend',
+      };
+    } else if (lastTotal > 0) {
+      forecast = {
+        nextMonth,
+        estimatedTotal: lastTotal,
+        estimatedEmployee: last.totalEmployee,
+        estimatedEmployer: last.totalEmployer,
+        basis: 'latest',
+      };
+    }
+  }
+
+  return { insuranceTrends: trends, filingStats, recentFilings, monthOverMonth, forecast };
 }

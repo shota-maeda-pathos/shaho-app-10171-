@@ -118,6 +118,9 @@ export { collectionCreate } from './collections/collection-create/functions';
 export { collectionList } from './collections/collection-list/functions';
 export { collectionSummary } from './collections/collection-summary/functions';
 
+// シミュレーションAPI
+export { premiumSimulate } from './simulation/premium-simulate/functions';
+
 // バッチ処理API
 export { ageEventCheck } from './batch/age-event-check/functions';
 

@@ -208,6 +208,13 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'simulation',
+        canActivate: [roleGuard('admin', 'operator', 'viewer')],
+        data: { title: 'シミュレーション' },
+        loadComponent: () =>
+          import('./features/simulation/simulation').then((m) => m.SimulationComponent),
+      },
+      {
         path: 'settings',
         canActivate: [roleGuard('admin')],
         data: { title: '設定' },

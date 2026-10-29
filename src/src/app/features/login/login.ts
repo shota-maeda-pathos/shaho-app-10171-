@@ -1,5 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, inject, signal, OnInit } from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -25,6 +25,9 @@ import { AuthService } from '../../core/services/auth.service';
           <mat-card-subtitle>ログイン</mat-card-subtitle>
         </mat-card-header>
         <mat-card-content>
+          @if (timeoutMessage()) {
+            <p class="timeout-msg">セッションがタイムアウトしました。再度ログインしてください。</p>
+          }
           <form (ngSubmit)="onLogin()">
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>メールアドレス</mat-label>
@@ -67,16 +70,23 @@ import { AuthService } from '../../core/services/auth.service';
     .full-width { width: 100%; }
     .login-btn { height: 48px; margin-top: 8px; }
     .error { color: #d32f2f; font-size: 14px; margin: 8px 0; }
+    .timeout-msg { color: #f57c00; font-size: 14px; margin: 0 0 16px; padding: 8px 12px; background: #fff3e0; border-radius: 4px; }
   `],
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   email = '';
   password = '';
   error = signal('');
   submitting = signal(false);
+  timeoutMessage = signal(false);
+
+  ngOnInit() {
+    this.timeoutMessage.set(this.route.snapshot.queryParams['reason'] === 'timeout');
+  }
 
   async onLogin() {
     this.error.set('');

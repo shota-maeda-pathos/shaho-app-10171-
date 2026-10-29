@@ -33,6 +33,12 @@ export interface FilingMockSubmitResponse {
   id: string;
   mockStatus: 'completed' | 'failed';
   validationErrors: string[];
+  eGovResponse: {
+    responseCode: string;
+    responseMessage: string;
+    acceptanceNumber: string | null;
+    processedAt: string;
+  };
 }
 
 export async function mockSubmitFiling(
@@ -69,11 +75,15 @@ export async function mockSubmitFiling(
     const errors = validateFormData(filing.filingType, filing.formData);
     const mockStatus = errors.length === 0 ? 'completed' : 'failed';
     const now = Timestamp.now();
+    const acceptanceNumber = mockStatus === 'completed'
+      ? `MOCK-${now.toDate().getFullYear()}${String(now.toDate().getMonth() + 1).padStart(2, '0')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+      : null;
 
     tx.update(filingRef, {
       mockStatus,
       mockValidationErrors: errors,
       mockSubmittedAt: now,
+      mockAcceptanceNumber: acceptanceNumber,
       version: filing.version + 1,
       updatedAt: now,
     });
@@ -89,8 +99,24 @@ export async function mockSubmitFiling(
       version: filing.version + 1,
     });
 
-    return { mockStatus: mockStatus as 'completed' | 'failed', validationErrors: errors };
+    return {
+      mockStatus: mockStatus as 'completed' | 'failed',
+      validationErrors: errors,
+      acceptanceNumber,
+      processedAt: now.toDate().toISOString(),
+    };
   });
 
-  return { success: true, id: input.filingId, ...result };
+  return {
+    success: true,
+    id: input.filingId,
+    mockStatus: result.mockStatus,
+    validationErrors: result.validationErrors,
+    eGovResponse: {
+      responseCode: result.mockStatus === 'completed' ? '0000' : '9001',
+      responseMessage: result.mockStatus === 'completed' ? '正常に受け付けました（模擬）' : `必須項目が不足しています: ${result.validationErrors.join(', ')}`,
+      acceptanceNumber: result.acceptanceNumber,
+      processedAt: result.processedAt,
+    },
+  };
 }
