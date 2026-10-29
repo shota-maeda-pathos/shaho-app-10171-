@@ -107,6 +107,9 @@ export async function mockSubmitFiling(
     };
   });
 
+  const { refreshEmployeeProcedures } = await import('../../procedures/hooks');
+  await refreshEmployeeProcedures(auth.companyId, input.employeeId);
+
   return {
     success: true,
     id: input.filingId,

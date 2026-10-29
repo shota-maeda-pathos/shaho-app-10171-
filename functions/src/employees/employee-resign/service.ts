@@ -203,6 +203,24 @@ export async function resignEmployee(
     ? input.resignationDate.slice(0, 10)
     : input.resignationDate;
 
+  const lossDateObj = new Date(resignationDate);
+  lossDateObj.setDate(lossDateObj.getDate() + 1);
+  const lossDate = lossDateObj.toISOString().slice(0, 10);
+
+  const { createLossProcedure } = await import('../../procedures/hooks');
+  await createLossProcedure({
+    companyId: auth.companyId,
+    employeeId: input.employeeId,
+    employeeName: name,
+    officeId: emp.officeId,
+    resignationDate,
+    lossDate,
+    filingId: result.filingId,
+    hasFinalSettlement: true,
+    userSuspended: result.userSuspended,
+    createdBy: auth.uid,
+  });
+
   return {
     success: true,
     employeeId: input.employeeId,

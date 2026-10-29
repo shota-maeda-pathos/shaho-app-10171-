@@ -15,6 +15,7 @@ export async function updateSalary(
   input: SalaryUpdateInput,
   auth: AuthContext,
 ): Promise<MutationResponse> {
+  if(input.isConfirmed!==undefined) throw invalidArg('給与の承認・差戻しは承認画面から行ってください');
   const salaryRef = db.doc(
     `companies/${auth.companyId}/employees/${input.employeeId}/salaries/${input.salaryId}`,
   );
@@ -39,7 +40,7 @@ export async function updateSalary(
     }
     const current = salaryDoc.data()! as SalaryDoc;
 
-    if (current.isConfirmed && input.isConfirmed === undefined) {
+    if (current.isConfirmed || salaryDoc.data()!.approvalPending===true) {
       throw invalidArg('承認済みの給与データは直接編集できません');
     }
 
@@ -93,11 +94,6 @@ export async function updateSalary(
       updateData.revisionFlag = true;
       updateData.revisionDetectedAt = now;
       updateData.previousTotalFixedWage = prevFixed;
-    }
-    if (input.isConfirmed !== undefined) {
-      updateData.isConfirmed = input.isConfirmed;
-      updateData.confirmedAt = input.isConfirmed ? now : null;
-      updateData.confirmedBy = input.isConfirmed ? auth.uid : null;
     }
     tx.update(salaryRef, updateData);
 

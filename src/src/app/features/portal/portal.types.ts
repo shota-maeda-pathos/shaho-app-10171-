@@ -3,7 +3,7 @@ export interface PortalInsurance {
   health: number | null;
   pension: number | null;
   longTermCare: number | null;
-  childSupport: number | null;
+  childSupportPayment: number | null;
   totalEmployee: number | null;
   isExempted: boolean;
 }

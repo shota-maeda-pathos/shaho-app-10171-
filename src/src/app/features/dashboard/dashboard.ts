@@ -1,4 +1,4 @@
-import { Component, inject, signal, effect } from '@angular/core';
+import { Component, inject, signal, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -9,6 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { OfficeContextService } from '../../core/services/office-context.service';
 
 interface FilingAlert {
   employeeId: string;
@@ -86,9 +87,23 @@ interface AnalyticsData {
   template: `
     <div class="dashboard-container">
       <div class="welcome-section">
-        <h1>ダッシュボード</h1>
+        <h1>ホーム</h1>
         <p class="subtitle">{{ greeting() }}、{{ auth.profile()?.displayName ?? 'ユーザー' }}さん</p>
       </div>
+
+      @if (auth.hasAnyRole('admin','operator','approver')) {
+        <section class="procedure-home">
+          <h2>進行中の手続き</h2>
+          @if (auth.hasAnyRole('admin','operator')) { <button mat-flat-button (click)="navigate('/procedures/new')">手続きを始める</button> }
+          <button mat-stroked-button (click)="navigate('/procedures')">手続き一覧</button>
+          @if (procedureLoading()) { <p>手続きを読み込んでいます…</p> }
+          @if (procedureError()) { <p role="alert">{{procedureError()}}</p><button mat-stroked-button (click)="loadProcedures()">再読み込み</button> }
+          @for (procedure of procedures(); track procedure.id) {
+            <button class="procedure-home-row" (click)="navigate('/procedures/' + procedure.id)"><strong>{{procedure.title}}</strong><span>{{procedure.statusReason}}</span><span>{{procedure.deadline ? '期限：' + procedure.deadline : ''}}</span></button>
+          }
+          @if (!procedureLoading() && !procedureError() && procedures().length === 0) { <p>進行中の手続きはありません。</p> }
+        </section>
+      }
 
       @if (auth.loading()) {
         <div class="loading"><mat-spinner diameter="32"></mat-spinner></div>
@@ -144,7 +159,7 @@ interface AnalyticsData {
                 </div>
                 <div class="alert-body">
                   @for (f of alerts.filingDeadlines; track f.filingId) {
-                    <div class="alert-row" (click)="navigate('/employees/' + f.employeeId + '/filings/' + f.filingId)">
+                    <div class="alert-row" (click)="openFiling(f.employeeId, f.filingId)">
                       <span class="alert-name">{{ f.employeeName }}</span>
                       <span class="alert-type">{{ filingTypeLabel(f.filingType) }}</span>
                       <span class="alert-days">{{ f.daysElapsed }}日経過</span>
@@ -197,35 +212,36 @@ interface AnalyticsData {
             } @else {
               <div class="task-list">
                 @for (task of tasks(); track task.label) {
-                  <div class="task-item" (click)="navigate(task.route)">
+                  <button mat-button class="task-item" (click)="navigate(task.route)">
                     <mat-icon [style.color]="task.color">{{ task.icon }}</mat-icon>
                     <span class="task-label">{{ task.label }}</span>
                     @if (task.count > 0) {
                       <span class="task-badge" [style.background]="task.color">{{ task.count }}</span>
                     }
-                  </div>
+                  </button>
                 }
               </div>
             }
           </mat-card>
 
+          @if(auth.hasAnyRole('admin','operator')) {
           <mat-card class="shortcut-card">
             <h2>
               <mat-icon>bolt</mat-icon>
               クイック操作
             </h2>
             <div class="shortcut-grid">
-              <button mat-stroked-button (click)="navigate('/employees')">
+              <button mat-stroked-button (click)="navigate('/procedures/new')">
                 <mat-icon>person_add</mat-icon>
-                従業員登録
+                手続きを始める
               </button>
-              <button mat-stroked-button (click)="navigate('/salary')">
-                <mat-icon>payments</mat-icon>
-                給与入力
+              <button mat-stroked-button (click)="navigate('/operations')">
+                <mat-icon>event_repeat</mat-icon>
+                今月の定例業務を進める
               </button>
-              <button mat-stroked-button (click)="navigate('/premium/monthly')">
-                <mat-icon>calculate</mat-icon>
-                保険料計算
+              <button mat-stroked-button (click)="navigate('/analytics')">
+                <mat-icon>trending_up</mat-icon>
+                集計・試算を確認
               </button>
               <button mat-stroked-button (click)="navigate('/premium/bonus')">
                 <mat-icon>card_giftcard</mat-icon>
@@ -247,6 +263,7 @@ interface AnalyticsData {
               }
             </div>
           </mat-card>
+          }
         </div>
 
         @if (analytics(); as a) {
@@ -313,7 +330,7 @@ interface AnalyticsData {
                 <h2><mat-icon>history</mat-icon> 最近の届出</h2>
                 <mat-list>
                   @for (f of a.recentFilings; track f.id) {
-                    <mat-list-item (click)="navigate('/employees/' + f.employeeId + '/filings/' + f.id)">
+                    <mat-list-item (click)="openFiling(f.employeeId, f.id)">
                       <mat-icon matListItemIcon>description</mat-icon>
                       <div matListItemTitle>{{ f.employeeName }} — {{ f.filingType }}</div>
                       <div matListItemLine>{{ f.effectiveDate }} ／ {{ f.status }}</div>
@@ -326,7 +343,8 @@ interface AnalyticsData {
         }
       }
 
-      @if (auth.hasRole('employee')) {
+      @if(auth.hasRole('employee')&&!auth.profile()?.employeeId) {<p role="alert">従業員情報とアカウントが紐付いていません。管理者に確認してください。</p>}
+      @if (auth.hasRole('employee')&&auth.profile()?.employeeId) {
         <mat-card class="portal-banner" (click)="navigate('/portal')">
           <mat-icon>account_circle</mat-icon>
           <div>
@@ -339,6 +357,7 @@ interface AnalyticsData {
     </div>
   `,
   styles: [`
+    .procedure-home{padding:20px 0;margin-bottom:24px;border-bottom:1px solid #ddd}.procedure-home button{margin-right:12px}.procedure-home-row{display:flex;width:100%;gap:16px;align-items:center;flex-wrap:wrap;text-align:left;padding:16px;margin:12px 0;border:1px solid #ddd;border-radius:8px;background:transparent;cursor:pointer;font:inherit}.procedure-home-row:hover{background:#f0f5fa}.procedure-home-row span{font-size:14px}
     .dashboard-container { padding: 24px; }
     .welcome-section { margin-bottom: 24px; }
     .welcome-section h1 { margin: 0; font-size: 28px; font-weight: 500; }
@@ -428,6 +447,7 @@ interface AnalyticsData {
   `],
 })
 export class DashboardComponent  {
+  office = inject(OfficeContextService);
   auth = inject(AuthService);
   private router = inject(Router);
   private functions = inject(Functions);
@@ -437,13 +457,15 @@ export class DashboardComponent  {
   loading = signal(false);
   error = signal('');
   analytics = signal<AnalyticsData | null>(null);
+  procedures = signal<{id:string;title:string;statusReason:string;deadline:string|null}[]>([]);
+  procedureLoading = signal(false); procedureError = signal('');
 
   constructor() {
     effect(() => {
       const profile = this.auth.profile();
+      if (!this.auth.loading() && profile && this.auth.hasAnyRole('admin','operator','approver')) untracked(() => void this.loadProcedures());
       if (!this.auth.loading() && profile && this.auth.hasAnyRole('admin', 'operator')) {
         void this.loadStats();
-        void this.loadAnalytics();
       }
     });
   }
@@ -456,7 +478,18 @@ export class DashboardComponent  {
   }
 
   navigate(route: string) {
-    this.router.navigate([route]);
+    this.router.navigateByUrl(route);
+  }
+
+  openFiling(employeeId:string, filingId:string) { this.router.navigate(['/filings',filingId],{queryParams:{employeeId}}); }
+  async loadProcedures() {
+    if (this.procedureLoading()) return;
+    this.procedureLoading.set(true); this.procedureError.set('');
+    try {
+      const {data} = await httpsCallable<object,{items:{id:string;title:string;statusReason:string;deadline:string|null}[]}>(this.functions,'procedureList')({companyId:this.auth.companyId,...this.office.params(),status:'in_progress',limit:6});
+      this.procedures.set(data.items);
+    } catch(e:any) { this.procedureError.set(e.message==='INTERNAL'?'手続きを取得できませんでした。少し待って再読み込みしてください。':e.message ?? '手続きを取得できませんでした'); }
+    finally { this.procedureLoading.set(false); }
   }
 
   async loadStats() {
@@ -466,14 +499,13 @@ export class DashboardComponent  {
     this.tasks.set([]);
     try {
       const fn = httpsCallable<{ companyId: string }, DashboardStats>(this.functions, 'dashboardStats');
-      const { data } = await fn({ companyId: this.auth.companyId });
+      const { data } = await fn({ companyId: this.auth.companyId, ...this.office.params() });
       this.stats.set(data);
       this.tasks.set([
-        { icon: 'payments', label: '給与入力', route: '/salary', count: 0, color: '#1976d2' },
-        { icon: 'calculate', label: '保険料計算', route: '/premium/monthly', count: 0, color: '#2e7d32' },
+        ...(this.auth.hasAnyRole('admin','operator')?[{ icon: 'event_repeat', label: '定例業務（給与・保険料・公開）', route: '/operations', count: 0, color: '#1976d2' }]:[]),
         { icon: 'pending_actions', label: '承認処理', route: '/approvals', count: data.pendingApprovals, color: '#e65100' },
-        { icon: 'description', label: '届出提出', route: '/filings', count: data.pendingFilings, color: '#7b1fa2' },
-      ]);
+        ...(this.auth.hasAnyRole('admin','operator')?[{ icon: 'description', label: '届出提出', route: '/filings', count: data.pendingFilings, color: '#7b1fa2' }]:[]),
+      ].filter(task=>task.route!=='/approvals'||this.auth.hasAnyRole('admin','operator','approver')));
     } catch {
       this.error.set('統計情報を取得できませんでした。接続状況・権限・APIの公開状況を確認してください。');
     } finally {

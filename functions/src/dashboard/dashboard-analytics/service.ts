@@ -1,5 +1,5 @@
 import { db } from '../../config';
-import { AuthContext } from '../../middleware/auth';
+import { AuthContext, requireOffice } from '../../middleware/auth';
 import { mapConcurrent } from '../../utils/parallel';
 import { DashboardAnalyticsInput } from './schema';
 
@@ -57,6 +57,7 @@ export async function getDashboardAnalytics(
   input: DashboardAnalyticsInput,
   auth: AuthContext,
 ): Promise<DashboardAnalyticsResponse> {
+  if (input.officeId) requireOffice(auth, input.officeId);
   const base = `companies/${auth.companyId}`;
   const monthKeys = generateMonthKeys(input.months);
 
@@ -66,7 +67,7 @@ export async function getDashboardAnalytics(
     .get();
 
   const employees = empSnap.docs.filter(doc =>
-    auth.roles.includes('admin') || auth.officeIds.includes(doc.data().officeId),
+    (!input.officeId || doc.data().officeId === input.officeId) && (auth.roles.includes('admin') || auth.officeIds.includes(doc.data().officeId)),
   );
 
   const trends: MonthlyTrend[] = await mapConcurrent(monthKeys, 4, async (ym) => {
@@ -80,6 +81,7 @@ export async function getDashboardAnalytics(
       const insSnap = await db.doc(`${base}/employees/${empDoc.id}/monthlyInsurance/${ym}`).get();
       if (!insSnap.exists) return;
       const ins = insSnap.data()!;
+      if (ins.isConfirmed !== true) return;
       totalEmployee += ins.totalEmployeeAmount ?? 0;
       totalEmployer += ins.totalEmployerAmount ?? 0;
       healthTotal += (ins.healthInsurance?.employeeAmount ?? 0) + (ins.healthInsurance?.employerAmount ?? 0);
@@ -95,19 +97,19 @@ export async function getDashboardAnalytics(
   const recentFilings: DashboardAnalyticsResponse['recentFilings'] = [];
 
   await mapConcurrent(employees, 8, async (empDoc) => {
-    const filingsSnap = await db.collection(`${base}/employees/${empDoc.id}/filings`)
+    const collection=db.collection(`${base}/employees/${empDoc.id}/filings`);
+    const counts=await Promise.all([collection.count().get(),
+      collection.where('workflowStatus','==','draft').count().get(),collection.where('workflowStatus','==','pending').count().get(),collection.where('workflowStatus','==','approved').count().get(),
+      collection.where('submissionStatus','==','submitted').count().get(),collection.where('submissionStatus','==','accepted').count().get()]);
+    const keys=['total','draft','pending','approved','submitted','accepted'] as const;
+    keys.forEach((key,index)=>filingStats[key]+=counts[index].data().count);
+    const filingsSnap = await collection
       .orderBy('createdAt', 'desc').limit(10).get();
 
     for (const fDoc of filingsSnap.docs) {
       const f = fDoc.data();
-      filingStats.total++;
-      if (f.workflowStatus === 'draft') filingStats.draft++;
-      if (f.workflowStatus === 'pending') filingStats.pending++;
-      if (f.workflowStatus === 'approved') filingStats.approved++;
-      if (f.submissionStatus === 'submitted') filingStats.submitted++;
-      if (f.submissionStatus === 'accepted') filingStats.accepted++;
 
-      if (recentFilings.length < 10) {
+      {
         const emp = empDoc.data();
         recentFilings.push({
           id: fDoc.id,
@@ -169,5 +171,6 @@ export async function getDashboardAnalytics(
     }
   }
 
-  return { insuranceTrends: trends, filingStats, recentFilings, monthOverMonth, forecast };
+  recentFilings.sort((a,b)=>String(b.effectiveDate??'').localeCompare(String(a.effectiveDate??'')));
+  return { insuranceTrends: trends, filingStats, recentFilings:recentFilings.slice(0,10), monthOverMonth, forecast };
 }

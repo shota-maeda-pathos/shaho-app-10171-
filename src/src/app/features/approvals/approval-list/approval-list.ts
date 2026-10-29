@@ -11,6 +11,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { OfficeContextService } from '../../../core/services/office-context.service';
 
 interface ApprovalRow {
   id: string;
@@ -171,6 +172,7 @@ const STATUS_LABELS: Record<string, string> = {
   `],
 })
 export class ApprovalListComponent implements OnInit {
+  office = inject(OfficeContextService);
   private functions = inject(Functions);
   private snackBar = inject(MatSnackBar);
   private auth = inject(AuthService);
@@ -246,7 +248,7 @@ export class ApprovalListComponent implements OnInit {
     this.error.set('');
     try {
       const fn = httpsCallable<any, any>(this.functions, 'approvalRequestList');
-      const result = await fn({ companyId: this.auth.companyId });
+      const result = await fn({ companyId: this.auth.companyId, ...this.office.params() });
       this.approvals.set(result.data.items ?? []);
     } catch {
       this.error.set('承認情報を取得できませんでした。再読み込みしてください。');

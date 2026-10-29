@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const InsuranceRateListSchema = z.object({
   companyId: z.string(),
   insuranceType: z
-    .enum(['health', 'pension', 'childSupport', 'longTermCare'])
+    .enum(['health', 'pension', 'childSupport', 'childSupportPayment', 'longTermCare'])
     .optional(),
   insurerId: z.string().optional(),
   prefectureCode: z.string().optional(),

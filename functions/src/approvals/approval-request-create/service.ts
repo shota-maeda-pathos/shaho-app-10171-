@@ -5,6 +5,7 @@ import { EmployeeDoc } from '../../types/firestore';
 import { MutationResponse } from '../../types/response';
 import { notFound, invalidArg } from '../../utils/errors';
 import { ApprovalRequestCreateInput } from './schema';
+import { validateApprovalTarget } from '../target';
 
 export async function createApprovalRequest(
   input: ApprovalRequestCreateInput,
@@ -25,12 +26,8 @@ export async function createApprovalRequest(
       requireOffice(auth, employee.officeId);
     }
 
-    const locked = ['monthlyInsurance', 'bonus', 'bonusInsurance'].includes(input.requestType);
-    const collection = input.requestType === 'bonus' ? 'bonuses' : input.requestType;
-    const prefix = `companies/${auth.companyId}/employees/${input.employeeId}/${collection}/`;
-    if (locked && (!input.targetPath.startsWith(prefix) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(input.targetPath.slice(prefix.length)))) {
-      throw invalidArg('承認対象パスが不正です');
-    }
+    const locked = ['salary','monthlyInsurance', 'bonus', 'bonusInsurance'].includes(input.requestType);
+    validateApprovalTarget(input.targetPath,input.requestType,auth.companyId,input.employeeId);
     const targetRef = db.doc(input.targetPath);
     const isDeferred = input.requestType === 'grade' && input.targetVersion === 0;
     let targetData: FirebaseFirestore.DocumentData | null = null;
@@ -95,6 +92,19 @@ export async function createApprovalRequest(
 
     return reqRef.id;
   });
+
+  if (input.requestType === 'filing') {
+    const filingId = input.targetPath.split('/').pop();
+    if (filingId) {
+      const { linkApprovalToProcedure } = await import('../../procedures/hooks');
+      await linkApprovalToProcedure({
+        companyId: auth.companyId,
+        employeeId: input.employeeId,
+        filingId,
+        approvalRequestId: result,
+      });
+    }
+  }
 
   const { notify } = await import('../../utils/notify');
   await notify({

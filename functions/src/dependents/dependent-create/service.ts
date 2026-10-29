@@ -48,5 +48,21 @@ export async function createDependent(
     });
   });
 
+  const empSnap = await db.doc(`companies/${auth.companyId}/employees/${input.employeeId}`).get();
+  if (empSnap.exists) {
+    const emp = empSnap.data()!;
+    const { createSimpleProcedure } = await import('../../procedures/hooks');
+    await createSimpleProcedure({
+      companyId: auth.companyId,
+      procedureType: 'dependent_change',
+      employeeId: input.employeeId,
+      employeeName: `${emp.lastName} ${emp.firstName}`,
+      officeId: emp.officeId,
+      effectiveDate: input.qualificationDate,
+      completedStepId: 'data_entry',
+      createdBy: auth.uid,
+    });
+  }
+
   return { success: true, id: docRef.id };
 }

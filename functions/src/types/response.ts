@@ -69,7 +69,7 @@ export interface DepartmentResponse {
 
 export interface InsuranceRateResponse {
   id: string;
-  insuranceType: 'health' | 'pension' | 'childSupport' | 'longTermCare';
+  insuranceType: 'health' | 'pension' | 'childSupport' | 'childSupportPayment' | 'longTermCare';
   insurerId: string;
   prefectureCode: string;
   appliedFrom: string;
@@ -168,6 +168,7 @@ export interface MonthlyInsuranceResponse {
   longTermCareInsurance: InsurancePremiumBreakdownResponse | null;
   pensionInsurance: InsurancePremiumBreakdownResponse;
   childSupportContribution: InsurancePremiumBreakdownResponse;
+  childSupportPayment?: InsurancePremiumBreakdownResponse;
   totalEmployeeAmount: number;
   totalEmployerAmount: number;
   isExempted: boolean;
@@ -188,6 +189,7 @@ export interface BonusInsuranceResponse {
   longTermCareInsurance: InsurancePremiumBreakdownResponse | null;
   pensionInsurance: InsurancePremiumBreakdownResponse;
   childSupportContribution: InsurancePremiumBreakdownResponse;
+  childSupportPayment?: InsurancePremiumBreakdownResponse;
   totalEmployeeAmount: number;
   totalEmployerAmount: number;
   isExempted: boolean;

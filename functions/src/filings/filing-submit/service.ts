@@ -75,5 +75,8 @@ export async function submitFiling(
     return input.filingId;
   });
 
+  const { refreshEmployeeProcedures } = await import('../../procedures/hooks');
+  await refreshEmployeeProcedures(auth.companyId, input.employeeId);
+
   return { success: true, id: result };
 }

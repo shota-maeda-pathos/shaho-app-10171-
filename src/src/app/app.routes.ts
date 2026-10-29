@@ -1,8 +1,13 @@
 import { Routes } from '@angular/router';
-import { authGuard, roleGuard, portalGuard } from './core/guards/auth.guard';
+import { authGuard, roleGuard, portalGuard, homeGuard } from './core/guards/auth.guard';
+import { PortalLayoutComponent } from './features/portal/portal-layout';
 import { LayoutComponent } from './shared/layout/layout';
 
 export const routes: Routes = [
+  {path:'portal',component:PortalLayoutComponent,canActivate:[portalGuard],children:[
+    {path:'',loadComponent:()=>import('./features/portal/portal').then(m=>m.PortalComponent)},
+    {path:'payslip/:id',loadComponent:()=>import('./features/portal/portal-detail').then(m=>m.PortalDetailComponent)},
+  ]},
   {
     path: 'onboard/:token',
     children: [
@@ -38,13 +43,17 @@ export const routes: Routes = [
     component: LayoutComponent,
     canActivate: [authGuard],
     children: [
-      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: '', redirectTo: 'home', pathMatch: 'full' },
+      { path: 'dashboard', redirectTo: 'home', pathMatch: 'full' },
       {
-        path: 'dashboard',
-        data: { title: 'ダッシュボード' },
+        path: 'home',
+        canActivate:[homeGuard],
+        data: { title: 'ホーム' },
         loadComponent: () =>
           import('./features/dashboard/dashboard').then((m) => m.DashboardComponent),
       },
+      {path:'operations',canActivate:[roleGuard('admin','operator')],data:{title:'定例業務'},loadComponent:()=>import('./features/operations/operations').then(m=>m.OperationsComponent)},
+      {path:'analytics',canActivate:[roleGuard('admin','operator','viewer')],data:{title:'集計・試算'},loadComponent:()=>import('./features/analytics/analytics').then(m=>m.AnalyticsComponent)},
       {
         path: 'employees',
         canActivate: [roleGuard('admin', 'operator')],
@@ -137,6 +146,32 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'procedures',
+        canActivate: [roleGuard('admin', 'operator', 'approver')],
+        data: { title: '手続き' },
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/procedures/procedure-list').then(
+                (m) => m.ProcedureListComponent,
+              ),
+          },
+            {
+              path: 'new', canActivate: [roleGuard('admin', 'operator')], data: {title: '手続きを始める'},
+              loadComponent: () => import('./features/procedures/procedure-start').then(m => m.ProcedureStartComponent),
+            },
+          {
+            path: ':id',
+            data: { title: '手続き詳細' },
+            loadComponent: () =>
+              import('./features/procedures/procedure-detail').then(
+                (m) => m.ProcedureDetailComponent,
+              ),
+          },
+        ],
+      },
+      {
         path: 'filings',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '届出' },
@@ -186,24 +221,6 @@ export const routes: Routes = [
               import('./features/santei/santei-detail/santei-detail').then(
                 (m) => m.SanteiDetailComponent,
               ),
-          },
-        ],
-      },
-      {
-        path: 'portal',
-        canActivate: [portalGuard],
-        data: { title: 'マイポータル' },
-        children: [
-          {
-            path: '',
-            loadComponent: () =>
-              import('./features/portal/portal').then((m) => m.PortalComponent),
-          },
-          {
-            path: 'payslip/:id',
-            data: { title: '給与明細' },
-            loadComponent: () =>
-              import('./features/portal/portal-detail').then((m) => m.PortalDetailComponent),
           },
         ],
       },

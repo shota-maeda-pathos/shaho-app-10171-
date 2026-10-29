@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '../../config';
-import { AuthContext } from '../../middleware/auth';
+import { AuthContext, requireOffice } from '../../middleware/auth';
 import { MutationResponse } from '../../types/response';
 import { invalidArg } from '../../utils/errors';
 import { CollectionCreateInput } from './schema';
@@ -10,6 +10,8 @@ export async function createCollection(
   auth: AuthContext,
 ): Promise<MutationResponse> {
   const base = `companies/${auth.companyId}`;
+  if(input.officeId) requireOffice(auth,input.officeId);
+  else if(!auth.roles.includes('admin')) throw invalidArg('対象事業所を選択してください');
   const collectionType = input.collectionType ?? 'monthly';
   const docId = `${collectionType}-${input.yearMonth}${input.officeId ? `-${input.officeId}` : ''}`;
   const ref = db.doc(`${base}/insuranceCollections/${docId}`);
@@ -41,12 +43,15 @@ export async function createCollection(
     for (const empDoc of empSnap.docs) {
       const emp = empDoc.data();
       if (input.officeId && emp.officeId !== input.officeId) continue;
+      if(!auth.roles.includes('admin')&&!auth.officeIds.includes(emp.officeId)) continue;
 
       const insRef = db.doc(`${base}/employees/${empDoc.id}/${insuranceCollection}/${input.yearMonth}`);
       const insSnap = await tx.get(insRef);
       if (!insSnap.exists) continue;
 
       const ins = insSnap.data()!;
+      if(ins.isConfirmed!==true) throw invalidArg('未承認の保険料があります。承認後に徴収記録を作成してください');
+      if(input.yearMonth>='2026-04'&&!ins.childSupportPayment) throw invalidArg('支援金を含む保険料の再計算・承認を確認してください');
       details.push({
         employeeId: empDoc.id,
         employeeName: `${emp.lastName} ${emp.firstName}`,
@@ -60,6 +65,7 @@ export async function createCollection(
       employeeCount++;
     }
 
+    if(!employeeCount) throw invalidArg('対象の承認済み保険料がありません');
     const now = Timestamp.now();
     tx.set(ref, {
       yearMonth: input.yearMonth,

@@ -7,6 +7,6 @@ import { getDashboardAnalytics } from './service';
 export const dashboardAnalytics = onCall(async (request) => {
   const input = validate(DashboardAnalyticsSchema, request.data);
   const auth = await getAuthContext(request, input.companyId);
-  requireRole(auth, 'admin', 'operator');
+  requireRole(auth, 'admin', 'operator', 'viewer');
   return getDashboardAnalytics(input, auth);
 });

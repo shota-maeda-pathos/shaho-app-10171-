@@ -94,6 +94,7 @@ describe('calculateMonthlyInsurance', () => {
     });
 
     mockTxGet.mockImplementation(async (ref: any) => {
+      if (ref.path.includes('/salaries/')) return { exists: true, data: () => ({ isConfirmed: true }) };
       if (ref.path.endsWith('/premiumExemptions')) {
         return { docs: exemptions.map((d, i) => ({ id: `exemption-${i}`, data: () => d })) };
       }
@@ -173,10 +174,36 @@ describe('calculateMonthlyInsurance', () => {
   const calculate = () => calculateMonthlyInsurance({ companyId: 'company-001', employeeId: 'emp-001', yearMonth: '2026-10' }, makeAuth());
   const exemption = { exemptionType: 'childcare', startMonth: '2026-10', endMonth: '2026-10', status: 'active', approvedAt: 'approved', isMonthlyExempted: true };
   const storedData = () => mockTxSet.mock.calls.find((c: any) => c[0].path.includes('/monthlyInsurance/'))?.[1];
+  it('支援金を本人・会社に計上し、拠出金を会社負担だけに含める', async () => {
+    mockFindAllRates.mockResolvedValue({ health: healthRate, pension: pensionRate, longTermCare: null,
+      childSupport: { employeeRate: 99, employerRate: 3.6 } });
+    await calculate();
+    const d = storedData();
+    expect(d.childSupportPayment).toEqual({ employeeAmount: 345, employerAmount: 345 });
+    expect(d.childSupportContribution).toEqual({ employeeAmount: 0, employerAmount: 1080 });
+    expect(d.totalEmployeeAmount).toBe(d.healthInsurance.employeeAmount + d.pensionInsurance.employeeAmount + 345);
+    expect(d.totalEmployerAmount).toBe(d.healthInsurance.employerAmount + d.pensionInsurance.employerAmount + 345 + 1080);
+  });
   it('開始月と終了月を含む免除を自動反映し根拠IDを保存する', async () => {
     exemptions = [exemption];
     await calculate();
     expect(storedData()).toMatchObject({ isExempted: true, totalEmployeeAmount: 0, totalEmployerAmount: 0, exemptionIds: ['exemption-0'] });
+  });
+  it('支援金は健保、拠出金は厚年の標準報酬を使う', async () => {
+    mockQueryGet.mockResolvedValue({ empty: false, docs: [{ id: '2026-09', data: () => ({ ...gradeDoc, healthStandardRemuneration: 500000 }) }] });
+    mockFindAllRates.mockResolvedValue({ health: healthRate, pension: pensionRate, longTermCare: null,
+      childSupport: { employeeRate: 0, employerRate: 3.6 } });
+    await calculate();
+    expect(storedData()).toMatchObject({ childSupportPayment: { employeeAmount: 575, employerAmount: 575 },
+      childSupportContribution: { employeeAmount: 0, employerAmount: 1080 } });
+  });
+  it('厚年の対象外でも健保対象なら支援金を計上する', async () => {
+    jest.requireMock('../../utils/age').isPensionExcluded.mockReturnValueOnce(true);
+    mockFindAllRates.mockResolvedValue({ health: healthRate, pension: pensionRate, longTermCare: null,
+      childSupport: { employeeRate: 0, employerRate: 3.6 } });
+    await calculate();
+    expect(storedData()).toMatchObject({ childSupportPayment: { employeeAmount: 345, employerAmount: 345 },
+      childSupportContribution: { employeeAmount: 0, employerAmount: 0 } });
   });
   it.each([
     { approvedAt: null }, { isMonthlyExempted: false }, { isMonthlyExempted: undefined },

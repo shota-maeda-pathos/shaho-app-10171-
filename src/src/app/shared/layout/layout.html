@@ -7,6 +7,7 @@
       @for (item of visibleNavItems; track item.route) {
         <a mat-list-item
            [routerLink]="item.route"
+           [queryParams]="office.queryParams()" [class.active]="active(item.route)"
            routerLinkActive="active"
            [routerLinkActiveOptions]="{ exact: false }">
           <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
@@ -28,6 +29,12 @@
     <mat-toolbar class="top-bar">
       <span class="page-title">{{ pageTitle() }}</span>
       <span class="spacer"></span>
+      <label style="font-size:14px;margin-right:24px">事業所
+        <select aria-label="表示する事業所" [value]="office.selected()" (change)="changeOffice($event)" [disabled]="!office.ready() || office.busy()" style="margin-left:8px;padding:8px;max-width:220px">
+          <option value="">{{auth.hasRole('admin') ? '全事業所' : '担当事業所すべて'}}</option>
+          @for (item of office.offices(); track item.id) { <option [value]="item.id">{{item.name}}</option> }
+        </select>
+      </label>
       <button mat-icon-button [matMenuTriggerFor]="userMenu">
         <mat-icon>account_circle</mat-icon>
       </button>
@@ -35,6 +42,7 @@
         <div class="user-info" mat-menu-item disabled>
           {{ auth.profile()?.displayName }}
         </div>
+        @if (auth.profile()?.employeeId) { <a mat-menu-item routerLink="/portal">マイポータルへ</a> }
         <button mat-menu-item (click)="logout()">
           <mat-icon>logout</mat-icon>
           ログアウト
@@ -44,7 +52,8 @@
 
     <app-breadcrumb />
     <main class="content">
-      <router-outlet />
+      @if(office.error()) { <p role="alert">{{office.error()}}</p><button mat-stroked-button (click)="office.load()">事業所を再読み込み</button> }
+      @if(office.ready()) { <router-outlet /> } @else if(!office.error()) { <p>事業所情報を読み込んでいます…</p> }
     </main>
   </div>
 </div>

@@ -190,7 +190,7 @@ export class SalaryEditComponent implements OnInit {
 
   ngOnInit() {
     this.employeeId = this.route.snapshot.paramMap.get('employeeId') ?? '';
-    this.yearMonth = this.route.snapshot.queryParamMap.get('month') ?? this.getCurrentMonth();
+    this.yearMonth = this.route.snapshot.queryParamMap.get('yearMonth') ?? this.route.snapshot.queryParamMap.get('month') ?? this.getCurrentMonth();
     this.selectedMonth.set(this.yearMonth);
     this.loadSalary();
   }

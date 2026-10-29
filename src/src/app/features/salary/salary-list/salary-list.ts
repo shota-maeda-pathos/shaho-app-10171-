@@ -1,6 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -12,6 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { OfficeContextService } from '../../../core/services/office-context.service';
 
 interface SalaryRow {
   employeeId: string;
@@ -20,6 +21,7 @@ interface SalaryRow {
   baseSalary: number;
   totalSalary: number;
   isConfirmed: boolean;
+  approvalPending?:boolean;
   version: number;
 }
 
@@ -48,7 +50,7 @@ interface SalaryRow {
             <mat-icon>auto_fix_high</mat-icon> 等級一括作成
           </button>
           <button mat-flat-button color="primary" (click)="confirmAll()" [disabled]="confirming() || !hasUnconfirmed()">
-            <mat-icon>check_circle</mat-icon> 一括確定
+            <mat-icon>check_circle</mat-icon> 表示中の給与を承認申請
           </button>
           <button mat-flat-button color="accent" (click)="publishAll()" [disabled]="publishing() || !hasPublishable()">
             <mat-icon>visibility</mat-icon> 明細公開
@@ -92,7 +94,7 @@ interface SalaryRow {
               <th mat-header-cell *matHeaderCellDef>状態</th>
               <td mat-cell *matCellDef="let row">
                 <span class="status-chip" [class.confirmed]="row.isConfirmed">
-                  {{ row.isConfirmed ? '確定' : '未確定' }}
+                  {{ row.isConfirmed ? '承認済み' : row.approvalPending ? '承認待ち' : '未承認' }}
                 </span>
               </td>
             </ng-container>
@@ -129,8 +131,10 @@ interface SalaryRow {
   `],
 })
 export class SalaryListComponent implements OnInit {
+  office = inject(OfficeContextService);
   private functions = inject(Functions);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private snackBar = inject(MatSnackBar);
   private auth = inject(AuthService);
 
@@ -148,6 +152,8 @@ export class SalaryListComponent implements OnInit {
   months = this.generateMonths();
 
   ngOnInit() {
+    const month=this.route.snapshot.queryParamMap.get('yearMonth')??this.route.snapshot.queryParamMap.get('month');
+    if(month) this.selectedMonth.set(month);
     this.loadSalaries();
   }
 
@@ -165,12 +171,13 @@ export class SalaryListComponent implements OnInit {
     try {
       const fn = httpsCallable<any, any>(this.functions, 'salaryList');
       const result = await fn({
-        companyId: 'company-001',
+        companyId: this.auth.companyId,
+        ...this.office.params(),
         yearMonth: this.selectedMonth(),
       });
       const items = result.data.items ?? [];
       this.salaries.set(items);
-      this.hasUnconfirmed.set(items.some((s: SalaryRow) => !s.isConfirmed && s.baseSalary > 0));
+      this.hasUnconfirmed.set(items.some((s: SalaryRow) => !s.isConfirmed && !s.approvalPending && s.baseSalary > 0));
       this.hasPublishable.set(items.some((s: any) => s.isConfirmed && !s.isPublished));
     } catch {
       this.salaries.set([]);
@@ -187,18 +194,16 @@ export class SalaryListComponent implements OnInit {
   async confirmAll() {
     this.confirming.set(true);
     try {
-      const fn = httpsCallable<any, any>(this.functions, 'salaryUpdate');
-      const targets = this.salaries().filter(s => !s.isConfirmed && s.baseSalary > 0);
+      const fn = httpsCallable<any, any>(this.functions, 'approvalRequestCreate');
+      const targets = this.salaries().filter(s => !s.isConfirmed && !s.approvalPending && s.baseSalary > 0);
       for (const s of targets) {
         await fn({
           companyId: this.auth.companyId,
           employeeId: s.employeeId,
-          salaryId: s.yearMonth,
-          expectedVersion: s.version,
-          isConfirmed: true,
+          requestType:'salary',targetPath:`companies/${this.auth.companyId}/employees/${s.employeeId}/salaries/${s.yearMonth}`,targetVersion:s.version,
         });
       }
-      this.snackBar.open(`${targets.length}件の給与を確定しました`, '閉じる', { duration: 3000 });
+      this.snackBar.open(`${targets.length}件の給与の承認を申請しました。別担当者による承認を進めてください`, '閉じる', { duration: 5000 });
       await this.loadSalaries();
     } catch (e: any) {
       this.snackBar.open(`確定に失敗: ${e.message}`, '閉じる', { duration: 5000 });
@@ -231,7 +236,7 @@ export class SalaryListComponent implements OnInit {
         employeeIds: targets.map(s => s.employeeId),
       });
       const d = result.data;
-      this.snackBar.open(`${d.published}件の明細を公開しました`, '閉じる', { duration: 3000 });
+      this.snackBar.open(`${d.published}件公開${d.errors?.length?'。未公開：'+d.errors.join('、'):''}`, '閉じる', { duration: 6000 });
       await this.loadSalaries();
     } catch (e: any) {
       this.snackBar.open(`公開に失敗: ${e.message}`, '閉じる', { duration: 5000 });

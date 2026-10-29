@@ -3,7 +3,7 @@ import { InsuranceRateDoc } from '../types/firestore';
 
 export interface RateQuery {
   companyId: string;
-  insuranceType: 'health' | 'pension' | 'childSupport' | 'longTermCare';
+  insuranceType: 'health' | 'pension' | 'childSupport' | 'childSupportPayment' | 'longTermCare';
   yearMonth: string;
   prefectureCode?: string;
   insurerId?: string;
@@ -67,6 +67,7 @@ export interface AllRates {
   health: InsuranceRateDoc | null;
   pension: InsuranceRateDoc | null;
   childSupport: InsuranceRateDoc | null;
+  childSupportPayment: InsuranceRateDoc | null;
   longTermCare: InsuranceRateDoc | null;
 }
 
@@ -77,12 +78,13 @@ export async function findAllRates(
   insurerId?: string,
 ): Promise<AllRates> {
   const base = { companyId, yearMonth, prefectureCode, insurerId };
-  const [health, pension, childSupport, longTermCare] = await Promise.all([
+  const [health, pension, childSupport, longTermCare, childSupportPayment] = await Promise.all([
     findApplicableRate({ ...base, insuranceType: 'health' }),
     findApplicableRate({ ...base, insuranceType: 'pension' }),
     findApplicableRate({ ...base, insuranceType: 'childSupport' }),
     findApplicableRate({ ...base, insuranceType: 'longTermCare' }),
+    findApplicableRate({ companyId, yearMonth, insuranceType: 'childSupportPayment' }),
   ]);
 
-  return { health, pension, childSupport, longTermCare };
+  return { health, pension, childSupport, longTermCare, childSupportPayment };
 }

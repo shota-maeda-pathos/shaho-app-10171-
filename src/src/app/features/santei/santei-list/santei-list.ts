@@ -10,6 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { OfficeContextService } from '../../../core/services/office-context.service';
 
 interface SanteiRow {
   employeeId: string;
@@ -149,6 +150,7 @@ interface SanteiRow {
   `],
 })
 export class SanteiListComponent implements OnInit {
+  office = inject(OfficeContextService);
   private router = inject(Router);
   private functions = inject(Functions);
   private snackBar = inject(MatSnackBar);
@@ -214,8 +216,9 @@ export class SanteiListComponent implements OnInit {
         const fn = httpsCallable<any, any>(this.functions, 'salaryList');
         const result = await fn({
           companyId: this.auth.companyId,
+          ...this.office.params(),
           yearMonth: months[i],
-          limit: 200,
+          limit: 100,
         });
         for (const item of result.data.items ?? []) {
           if (!salaryData[item.employeeId]) {

@@ -1,6 +1,8 @@
 import { makeAuth, makeEmployeeDoc } from '../../__tests__/helpers';
 const mockDocs = new Map<string, any>();
 const mockWrites = jest.fn();
+jest.mock('../../utils/notify', () => ({ notify: jest.fn(async () => 'notification-1') }));
+jest.mock('../../procedures/hooks', () => ({ refreshEmployeeProcedures: jest.fn(async () => undefined) }));
 jest.mock('../../config', () => {
   const doc = (path: string) => ({ path, id: path.split('/').pop() });
   const snap = (path: string) => ({ exists: mockDocs.has(path), data: () => mockDocs.get(path) });
@@ -41,6 +43,16 @@ test('gets only allowlisted saved amounts and statuses', async () => {
 test('missing source or result returns null, not fabricated zero amounts', async () => {
   mockDocs.delete(path); mockDocs.delete(insurancePath);
   expect(await getBonus(lookup, makeAuth())).toEqual({ bonus: null, insurance: null });
+});
+
+test('returns support payments separately from employer-only contributions', async () => {
+  Object.assign(mockDocs.get(insurancePath), {
+    childSupportPayment: { employeeAmount: 575, employerAmount: 575 },
+    childSupportContribution: { employeeAmount: 0, employerAmount: 1800 },
+  });
+  expect((await getBonus(lookup, makeAuth())).insurance).toMatchObject({
+    childSupportPaymentEmployee: 575, childSupportPaymentEmployer: 575, childSupportContributionEmployer: 1800,
+  });
 });
 test('updates a draft using server-derived standard amount, version and receipt', async () => {
   expect(await updateBonus(update, makeAuth())).toMatchObject({ version: 2 });

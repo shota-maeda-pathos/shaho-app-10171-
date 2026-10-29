@@ -11,6 +11,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { OfficeContextService } from '../../../core/services/office-context.service';
 import { CsvImportDialogComponent } from '../csv-import-dialog/csv-import-dialog';
 
 interface Employee {
@@ -141,6 +142,7 @@ interface Employee {
   `],
 })
 export class EmployeeListComponent implements OnInit {
+  office = inject(OfficeContextService);
   private functions = inject(Functions);
   private router = inject(Router);
   private auth = inject(AuthService);
@@ -170,6 +172,7 @@ export class EmployeeListComponent implements OnInit {
         companyId: this.auth.companyId,
         limit: 20,
         ...(this.lastDocId ? { lastDocId: this.lastDocId } : {}),
+        ...this.office.params(),
       });
       const items: Employee[] = result.data.items;
       this.hasMore.set(result.data.hasMore);

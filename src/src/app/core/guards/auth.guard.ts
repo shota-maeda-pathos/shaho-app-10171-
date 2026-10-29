@@ -23,6 +23,12 @@ export const authGuard: CanActivateFn = () => {
   );
 };
 
+export const homeGuard:CanActivateFn=()=>{
+  const auth=inject(AuthService),router=inject(Router);
+  return toObservable(auth.loading).pipe(filter(loading=>!loading),take(1),map(()=>
+    auth.profile()?.employeeId&&!auth.hasAnyRole('admin','operator','approver','viewer')?router.createUrlTree(['/portal']):true));
+};
+
 export function roleGuard(...requiredRoles: Role[]): CanActivateFn {
   return () => {
     const auth = inject(AuthService);

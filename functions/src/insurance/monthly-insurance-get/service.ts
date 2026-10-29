@@ -14,6 +14,9 @@ export async function getMonthlyInsurance(input: MonthlyInsuranceGetInput, auth:
     yearMonth: d.yearMonth, version: d.version,
     healthGradeNumber: d.healthGradeNumber, pensionGradeNumber: d.pensionGradeNumber,
     healthEmployee: d.healthInsurance.employeeAmount, pensionEmployee: d.pensionInsurance.employeeAmount,
+    childSupportPaymentEmployee: d.childSupportPayment?.employeeAmount ?? null,
+    childSupportPaymentEmployer: d.childSupportPayment?.employerAmount ?? null,
+    childSupportContributionEmployer: d.childSupportContribution?.employerAmount ?? null,
     totalEmployee: d.totalEmployeeAmount, totalEmployer: d.totalEmployerAmount,
     isExempted: d.isExempted === true, isConfirmed: d.isConfirmed === true, approvalPending: d.approvalPending === true,
   } };

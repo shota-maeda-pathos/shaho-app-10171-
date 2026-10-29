@@ -1,5 +1,5 @@
 import { db } from '../../config';
-import { AuthContext } from '../../middleware/auth';
+import { AuthContext, requireOffice } from '../../middleware/auth';
 import { ApprovalRequestListInput } from './schema';
 
 interface ApprovalRequestListItem {
@@ -23,6 +23,7 @@ export async function listApprovalRequests(
   auth: AuthContext,
 ): Promise<ApprovalRequestListResponse> {
   const effectiveLimit = input.limit ?? 50;
+  if (input.officeId) requireOffice(auth, input.officeId);
 
   const empSnap = await db
     .collection(`companies/${auth.companyId}/employees`)
@@ -33,6 +34,7 @@ export async function listApprovalRequests(
 
   for (const empDoc of empSnap.docs) {
     const empData = empDoc.data();
+    if (input.officeId && empData.officeId !== input.officeId) continue;
 
     if (!auth.roles.includes('admin') && !auth.officeIds.includes(empData.officeId)) {
       continue;

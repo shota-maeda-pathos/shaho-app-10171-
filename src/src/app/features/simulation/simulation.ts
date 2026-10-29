@@ -12,6 +12,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatTableModule } from '@angular/material/table';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { OfficeContextService } from '../../core/services/office-context.service';
 
 interface Office { id: string; name: string; }
 interface SimResult {
@@ -125,6 +126,7 @@ interface SimResult {
   `,
 })
 export class SimulationComponent implements OnInit {
+  office = inject(OfficeContextService);
   private functions = inject(Functions);
   auth = inject(AuthService);
 
@@ -161,7 +163,7 @@ export class SimulationComponent implements OnInit {
     const fn = httpsCallable(this.functions, 'officeList');
     const res: any = await fn({ companyId: this.auth.companyId });
     this.offices.set(res.data.items ?? []);
-    if (this.offices().length > 0) this.officeId = this.offices()[0].id;
+    if (this.offices().length > 0) this.officeId = this.office.selected() || this.offices()[0].id;
   }
 
   async simulate() {

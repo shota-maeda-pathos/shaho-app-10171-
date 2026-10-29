@@ -216,6 +216,18 @@ export async function onboardEmployee(
   });
 
   const name = `${input.lastName} ${input.firstName}`;
+
+  const { createAcquisitionProcedure } = await import('../../procedures/hooks');
+  await createAcquisitionProcedure({
+    companyId: auth.companyId,
+    employeeId: result.employeeId,
+    employeeName: name,
+    officeId: input.officeId,
+    effectiveDate: hireDate,
+    filingId: result.filingId,
+    createdBy: auth.uid,
+  });
+
   return {
     success: true,
     employeeId: result.employeeId,

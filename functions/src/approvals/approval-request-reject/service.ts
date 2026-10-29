@@ -5,6 +5,7 @@ import { EmployeeDoc, ApprovalRequestDoc } from '../../types/firestore';
 import { MutationResponse } from '../../types/response';
 import { notFound, invalidArg } from '../../utils/errors';
 import { ApprovalRequestRejectInput } from './schema';
+import { validateApprovalTarget } from '../target';
 
 export async function rejectApprovalRequest(
   input: ApprovalRequestRejectInput,
@@ -38,12 +39,8 @@ export async function rejectApprovalRequest(
       throw invalidArg(`この承認リクエストは既に処理済みです（状態: ${reqData.status}）`);
     }
 
-    if (['monthlyInsurance', 'bonus', 'bonusInsurance'].includes(reqData.requestType)) {
-      if (reqData.requestType !== 'monthlyInsurance') {
-        const collection = reqData.requestType === 'bonus' ? 'bonuses' : 'bonusInsurance';
-        const prefix = `companies/${auth.companyId}/employees/${input.employeeId}/${collection}/`;
-        if (!reqData.targetPath.startsWith(prefix) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(reqData.targetPath.slice(prefix.length))) throw invalidArg('承認対象パスが不正です');
-      }
+    validateApprovalTarget(reqData.targetPath,reqData.requestType,auth.companyId,input.employeeId);
+    if (['salary','monthlyInsurance', 'bonus', 'bonusInsurance'].includes(reqData.requestType)) {
       const targetRef = db.doc(reqData.targetPath);
       const target = await tx.get(targetRef);
       if (!target.exists || target.data()!.version !== reqData.targetVersion) throw invalidArg('承認対象が変更されています');
@@ -86,6 +83,9 @@ export async function rejectApprovalRequest(
 
     return input.requestId;
   });
+
+  const { refreshEmployeeProcedures } = await import('../../procedures/hooks');
+  await refreshEmployeeProcedures(auth.companyId, input.employeeId);
 
   const { notify } = await import('../../utils/notify');
   await notify({

@@ -26,18 +26,19 @@ const auth = () => makeAuth({ employeeId: 'emp-001', roles: ['employee'], office
 const input = { companyId: 'company-001', limit: 12 };
 const detail = { companyId: 'company-001', yearMonth: '2026-10' };
 let docs: Map<string, Record<string, unknown>>;
-const row = (id: string, confirmed: boolean) => ({ id, data: () => makeSalaryDoc({ yearMonth: id, isConfirmed: confirmed }) });
+const row = (id: string, confirmed: boolean) => ({ id, data: () => ({ ...makeSalaryDoc({ yearMonth: id, isConfirmed: confirmed }), isPublished: true }) });
 beforeEach(() => {
   jest.clearAllMocks();
   docs = new Map([
     [root, { ...makeEmployeeDoc({ userId: 'user-001' }), secret: 'private' }],
     ['companies/company-001/offices/office-001', { name: '本社' }],
-    [`${root}/salaries/2026-10`, { ...makeSalaryDoc({ isConfirmed: true }), privateNote: 'private' }],
+    [`${root}/salaries/2026-10`, { ...makeSalaryDoc({ isConfirmed: true }), isPublished: true, privateNote: 'private' }],
     [`${root}/monthlyInsurance/2026-10`, {
       yearMonth: '2026-10', isConfirmed: true,
       healthInsurance: { employeeAmount: 16000, employerAmount: 16000 },
       pensionInsurance: { employeeAmount: 30000 }, longTermCareInsurance: null,
-      childSupportContribution: { employeeAmount: 500 }, totalEmployeeAmount: 46500,
+      childSupportContribution: { employeeAmount: 0, employerAmount: 1080 },
+      childSupportPayment: { employeeAmount: 500, employerAmount: 500 }, totalEmployeeAmount: 46500,
       secret: 'private',
     }],
   ]);
@@ -80,7 +81,9 @@ test('returns allowlisted actual amounts and only queries the authenticated empl
   const result = await getPortalOverview(input, auth());
   expect(result.profile).toMatchObject({ employeeName: '山田 太郎', officeName: '本社', hireDate: '2020-04-01' });
   expect(result.profile).not.toHaveProperty('secret');
-  expect(result.payslips[0]).toMatchObject({ totalSalary: 335000, insurance: { health: 16000, pension: 30000, longTermCare: 0, childSupport: 500, totalEmployee: 46500 } });
+  expect(result.payslips[0]).toMatchObject({ totalSalary: 335000, insurance: { health: 16000, pension: 30000, longTermCare: 0, childSupportPayment: 500, totalEmployee: 46500 } });
+  expect(result.payslips[0].insurance).not.toHaveProperty('childSupport');
+  expect(result.payslips[0].insurance).not.toHaveProperty('childSupportContribution');
   expect(result.payslips[0]).not.toHaveProperty('netPay');
   expect(result.payslips[0].insurance).not.toHaveProperty('secret');
   expect(mockCollection).toHaveBeenCalledWith(`${root}/salaries`);
@@ -97,6 +100,20 @@ test('raw-month pagination does not reveal drafts or skip their cursor', async (
   expect(second.hasMore).toBe(false);
   expect(mockStartAfter).toHaveBeenCalledWith(expect.objectContaining({ id: '2026-10' }));
 });
+
+test('旧計算の拠出金0円を支援金0円として表示しない', async () => {
+  const insurance = docs.get(`${root}/monthlyInsurance/2026-10`)!;
+  delete insurance.childSupportPayment;
+  const result = await getPortalPayslip(detail, auth());
+  expect(result.insurance?.childSupportPayment).toBeNull();
+  expect(result.insurance?.totalEmployee).toBe(46500);
+  expect(result.insurance).not.toHaveProperty('childSupportContribution');
+});
+
+test('未公開給与は承認済みでも本人に公開しない', async () => {
+  docs.get(`${root}/salaries/2026-10`)!.isPublished = false;
+  await expect(getPortalPayslip(detail, auth())).rejects.toMatchObject({ code: 'not-found' });
+});
 test.each(['missing', 'draft'])('detail hides %s salaries', async state => {
   if (state === 'missing') docs.delete(`${root}/salaries/2026-10`);
   else docs.get(`${root}/salaries/2026-10`)!.isConfirmed = false;
@@ -109,7 +126,7 @@ test.each(['missing', 'draft'])('missing or unapproved insurance %s remains unkn
   expect((await getPortalPayslip(detail, auth())).insurance).toBeNull();
 });
 test('does not fabricate missing amounts and filters invalid allowance values', async () => {
-  docs.set(`${root}/salaries/2026-10`, { isConfirmed: true, baseSalary: NaN, fixedAllowances: { housing: 20000, invalid: 'secret', bad: Infinity } });
+  docs.set(`${root}/salaries/2026-10`, { isConfirmed: true, isPublished: true, baseSalary: NaN, fixedAllowances: { housing: 20000, invalid: 'secret', bad: Infinity } });
   docs.set(`${root}/monthlyInsurance/2026-10`, { isConfirmed: true, yearMonth: '2026-10' });
   const result = await getPortalPayslip(detail, auth());
   expect(result).toMatchObject({ baseSalary: null, totalSalary: null, fixedAllowances: { housing: 20000 }, variableAllowances: {}, insurance: { health: null, longTermCare: null, totalEmployee: null } });

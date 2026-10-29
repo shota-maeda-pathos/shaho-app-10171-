@@ -1,4 +1,7 @@
 import './config';
+export { collectionRecord } from './collections/collection-record/functions';
+export { operationsMonthlyStatus, operationsMonthlyHold, operationsMonthlyAction } from './operations/functions';
+export { procedureAction } from './procedures/procedure-action/functions';
 
 // 会社API
 export { companyGet } from './companies/company-get/functions';
@@ -123,6 +126,13 @@ export { premiumSimulate } from './simulation/premium-simulate/functions';
 
 // バッチ処理API
 export { ageEventCheck } from './batch/age-event-check/functions';
+
+// 案件（手続き）API
+export { procedureCreate } from './procedures/procedure-create/functions';
+export { procedureGet } from './procedures/procedure-get/functions';
+export { procedureList } from './procedures/procedure-list/functions';
+export { procedureUpdate } from './procedures/procedure-update/functions';
+export { procedureCancel } from './procedures/procedure-cancel/functions';
 
 // セットアップ
 export { seedMasterData } from './seed/seed-master/functions';

@@ -1,5 +1,5 @@
 import { db } from '../../config';
-import { AuthContext } from '../../middleware/auth';
+import { AuthContext, requireOffice } from '../../middleware/auth';
 import { EmployeeDoc } from '../../types/firestore';
 import { EmployeeResponse, ListResponse } from '../../types/response';
 import { toEmployeeResponse } from '../../utils/firestore';
@@ -9,6 +9,7 @@ export async function listEmployees(
   input: EmployeeListInput,
   auth: AuthContext,
 ): Promise<ListResponse<EmployeeResponse>> {
+  if(input.officeId) requireOffice(auth,input.officeId);
   const { companyId } = auth;
   const collRef = db.collection(`companies/${companyId}/employees`);
 
@@ -85,6 +86,7 @@ async function searchByKana(
   if (targetOfficeIds) {
     query = query.where('officeId', 'in', targetOfficeIds);
   }
+  if(input.officeId) query=query.where('officeId','==',input.officeId);
   if (input.departmentId) {
     query = query.where('departmentId', '==', input.departmentId);
   }

@@ -1,3 +1,5 @@
+jest.mock('../../utils/notify',()=>({notify:jest.fn(async()=>{})}));
+jest.mock('../../procedures/hooks',()=>({refreshEmployeeProcedures:jest.fn(async()=>{})}));
 import { makeAuth, makeEmployeeDoc, MockFirestore } from '../../__tests__/helpers';
 
 let mockDb: MockFirestore;
@@ -30,6 +32,7 @@ describe('rejectApprovalRequest', () => {
       },
     );
 
+    mockDb.setDoc('companies/company-001/employees/emp-001/salaries/2026-10', {version:1,approvalPending:true});
     const auth = makeAuth();
     const result = await rejectApprovalRequest(
       {

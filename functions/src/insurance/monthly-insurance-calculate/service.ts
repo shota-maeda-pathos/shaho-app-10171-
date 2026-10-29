@@ -11,6 +11,7 @@ import { MutationResponse } from '../../types/response';
 import { notFound, invalidArg } from '../../utils/errors';
 import { isLongTermCareAge, isPensionExcluded, isHealthExcluded } from '../../utils/age';
 import { findAllRates } from '../../utils/insurance-rate';
+import { calculateChildSupportPayment } from '../../utils/child-support-payment';
 import { MonthlyInsuranceCalculateInput } from './schema';
 
 function calcPremium(
@@ -144,14 +145,19 @@ export async function calculateMonthlyInsurance(
       ? ZERO
       : calcPremium(grade.pensionStandardRemuneration, rates.pension.employeeRate, rates.pension.employerRate, roundingRule);
 
-    // 子ども・子育て拠出金（事業主のみ）
+    const childSupportPayment = calculateChildSupportPayment(
+      grade.healthStandardRemuneration, input.yearMonth, healthExcluded || isExempted,
+      roundingRule, rates.childSupportPayment,
+    );
+
+    // 子ども・子育て拠出金（事業主のみ、厚生年金の標準報酬月額が基礎）
     let childSupportContribution: InsurancePremiumBreakdown;
     if (!rates.childSupport || isExempted || pensionExcluded) {
       childSupportContribution = ZERO;
     } else {
       childSupportContribution = calcPremium(
-        grade.healthStandardRemuneration,
-        rates.childSupport.employeeRate,
+        grade.pensionStandardRemuneration,
+        0,
         rates.childSupport.employerRate,
         roundingRule,
       );
@@ -161,13 +167,13 @@ export async function calculateMonthlyInsurance(
       healthInsurance.employeeAmount +
       (longTermCareInsurance?.employeeAmount ?? 0) +
       pensionInsurance.employeeAmount +
-      childSupportContribution.employeeAmount;
+      childSupportPayment.employeeAmount;
 
     const totalEmployerAmount =
       healthInsurance.employerAmount +
       (longTermCareInsurance?.employerAmount ?? 0) +
       pensionInsurance.employerAmount +
-      childSupportContribution.employerAmount;
+      childSupportContribution.employerAmount + childSupportPayment.employerAmount;
 
     const now = Timestamp.now();
     const insuranceRef = db.doc(
@@ -194,6 +200,7 @@ export async function calculateMonthlyInsurance(
       longTermCareInsurance,
       pensionInsurance,
       childSupportContribution,
+      childSupportPayment,
       totalEmployeeAmount,
       totalEmployerAmount,
       isExempted,

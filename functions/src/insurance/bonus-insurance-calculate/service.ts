@@ -10,6 +10,7 @@ import { MutationResponse } from '../../types/response';
 import { notFound, invalidArg } from '../../utils/errors';
 import { isLongTermCareAge, isPensionExcluded, isHealthExcluded } from '../../utils/age';
 import { findAllRates } from '../../utils/insurance-rate';
+import { calculateChildSupportPayment } from '../../utils/child-support-payment';
 import { BonusInsuranceCalculateInput } from './schema';
 
 const HEALTH_BONUS_CAP = 5_730_000;
@@ -131,14 +132,19 @@ export async function calculateBonusInsurance(
       ? ZERO
       : calcPremium(pensionCappedAmount, rates.pension.employeeRate, rates.pension.employerRate, roundingRule);
 
-    // 子ども・子育て拠出金
+    const childSupportPayment = calculateChildSupportPayment(
+      healthCappedAmount, input.yearMonth, healthExcl || isExempted,
+      roundingRule, rates.childSupportPayment,
+    );
+
+    // 子ども・子育て拠出金（事業主のみ）
     let childSupportContribution: InsurancePremiumBreakdown;
     if (!rates.childSupport || isExempted || pensionExcl) {
       childSupportContribution = ZERO;
     } else {
       childSupportContribution = calcPremium(
         pensionCappedAmount,
-        rates.childSupport.employeeRate,
+        0,
         rates.childSupport.employerRate,
         roundingRule,
       );
@@ -148,13 +154,13 @@ export async function calculateBonusInsurance(
       healthInsurance.employeeAmount +
       (longTermCareInsurance?.employeeAmount ?? 0) +
       pensionInsurance.employeeAmount +
-      childSupportContribution.employeeAmount;
+      childSupportPayment.employeeAmount;
 
     const totalEmployerAmount =
       healthInsurance.employerAmount +
       (longTermCareInsurance?.employerAmount ?? 0) +
       pensionInsurance.employerAmount +
-      childSupportContribution.employerAmount;
+      childSupportContribution.employerAmount + childSupportPayment.employerAmount;
 
     const now = Timestamp.now();
     const insuranceRef = db.doc(
@@ -180,6 +186,7 @@ export async function calculateBonusInsurance(
       longTermCareInsurance,
       pensionInsurance,
       childSupportContribution,
+      childSupportPayment,
       totalEmployeeAmount,
       totalEmployerAmount,
       isExempted,

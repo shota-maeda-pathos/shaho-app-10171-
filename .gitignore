@@ -1,0 +1,10 @@
+node_modules/
+.firebase/
+*.log
+firebase-debug*.log
+
+# 作業用の大きな生成物（デプロイ用コピー・キャッシュ・PDF検証の出力）
+work/jest-cache/
+work/*-deploy/
+work/official-pdf-check/
+work/pdf-python-deps/

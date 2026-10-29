@@ -1,7 +1,7 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { mapConcurrent } from '../../utils/parallel';
 import { db } from '../../config';
-import { AuthContext } from '../../middleware/auth';
+import { AuthContext, requireOffice } from '../../middleware/auth';
 
 export interface FilingAlert {
   employeeId: string;
@@ -45,7 +45,9 @@ function prevYearMonth(ym: string): string {
 
 export async function getDashboardStats(
   auth: AuthContext,
+  officeId?: string,
 ): Promise<DashboardStatsResponse> {
+  if (officeId) requireOffice(auth, officeId);
   const base = `companies/${auth.companyId}`;
 
   const empDocs = await db
@@ -54,7 +56,7 @@ export async function getDashboardStats(
     .select('officeId', 'isActive', 'lastName', 'firstName')
     .get();
   const employees = empDocs.docs.filter((doc) =>
-    auth.roles.includes('admin') || auth.officeIds.includes(doc.data().officeId),
+    (!officeId || doc.data().officeId === officeId) && (auth.roles.includes('admin') || auth.officeIds.includes(doc.data().officeId)),
   );
   const employeeCount = employees.filter((doc) => doc.data().isActive === true).length;
   const empIds = employees.map((doc) => doc.id);
@@ -120,17 +122,15 @@ export async function getDashboardStats(
       if (!insSnap.exists) continue;
       const ins = insSnap.data()!;
       if (ins.isConfirmed !== true || ins.isExempted === true) continue;
-      const total = (ins.totalEmployeeAmount ?? 0) + (ins.totalEmployerAmount ?? 0);
+      const total = ins.totalEmployeeAmount ?? 0;
       if (total <= 0) continue;
-      const collSnap = await db.collection(`${base}/employees/${employeeId}/premiumCollections`)
-        .where('yearMonth', '==', checkYm)
-        .limit(1)
-        .get();
-      if (collSnap.empty) {
+      const receipt = await db.doc(`${base}/employees/${employeeId}/collectionReceipts/${checkYm}`).get();
+      const collected = receipt.data()?.collectedAmount ?? 0;
+      if (collected < total) {
         uncollected.push({
           yearMonth: checkYm, employeeId,
           employeeName: empNameMap.get(employeeId) ?? '',
-          totalAmount: total,
+          totalAmount: total - collected,
         });
       }
     }

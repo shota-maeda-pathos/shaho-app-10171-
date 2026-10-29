@@ -3,6 +3,9 @@ import { AuthContext, requireOffice } from '../../middleware/auth';
 import { CollectionSummaryInput } from './schema';
 
 interface EmployeePremiumRow {
+  officeId:string;
+  collectedAmount:number|null;
+  collectionVersion:number;
   employeeId: string;
   employeeName: string;
   healthEmployee: number;
@@ -41,6 +44,7 @@ export async function getCollectionSummary(
   input: CollectionSummaryInput,
   auth: AuthContext,
 ): Promise<CollectionSummaryResponse> {
+  if(input.officeId) requireOffice(auth,input.officeId);
   const base = `companies/${auth.companyId}`;
 
   const empSnap = await db
@@ -72,8 +76,12 @@ export async function getCollectionSummary(
 
     if (!insSnap.exists) continue;
     const ins = insSnap.data()!;
+    const receipt=await db.doc(`${base}/employees/${empDoc.id}/collectionReceipts/${input.yearMonth}`).get();
 
     const row: EmployeePremiumRow = {
+      officeId:emp.officeId,
+      collectedAmount:typeof receipt.data()?.collectedAmount==='number'?receipt.data()!.collectedAmount:null,
+      collectionVersion:receipt.data()?.version??0,
       employeeId: empDoc.id,
       employeeName: `${emp.lastName} ${emp.firstName}`,
       healthEmployee: ins.healthInsurance?.employeeAmount ?? 0,

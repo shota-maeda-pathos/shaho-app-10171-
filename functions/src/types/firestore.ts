@@ -67,7 +67,7 @@ export interface DepartmentDoc {
 }
 
 export interface InsuranceRateDoc {
-  insuranceType: 'health' | 'pension' | 'childSupport' | 'longTermCare';
+  insuranceType: 'health' | 'pension' | 'childSupport' | 'childSupportPayment' | 'longTermCare';
   insurerId: string;
   prefectureCode: string;
   appliedFrom: string;
@@ -167,6 +167,7 @@ export interface MonthlyInsuranceDoc {
   longTermCareInsurance: InsurancePremiumBreakdown | null;
   pensionInsurance: InsurancePremiumBreakdown;
   childSupportContribution: InsurancePremiumBreakdown;
+  childSupportPayment?: InsurancePremiumBreakdown;
   totalEmployeeAmount: number;
   totalEmployerAmount: number;
   isExempted: boolean;
@@ -185,6 +186,7 @@ export interface BonusInsuranceDoc {
   longTermCareInsurance: InsurancePremiumBreakdown | null;
   pensionInsurance: InsurancePremiumBreakdown;
   childSupportContribution: InsurancePremiumBreakdown;
+  childSupportPayment?: InsurancePremiumBreakdown;
   totalEmployeeAmount: number;
   totalEmployerAmount: number;
   isExempted: boolean;
@@ -249,6 +251,105 @@ export interface InvitationDoc {
   expiresAt: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// --- 案件（Procedure）---
+
+export type ProcedureType =
+  | 'acquisition'
+  | 'loss'
+  | 'dependent_change'
+  | 'maternity_leave'
+  | 'childcare_leave'
+  | 'monthly_change'
+  | 'annual_review'
+  | 'bonus_payment'
+  | 'transfer'
+  | 'age_event';
+
+export type ProcedureStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled';
+
+export type ProcedureScope = 'individual' | 'batch';
+
+export type StepType =
+  | 'data_entry'
+  | 'document_create'
+  | 'approval'
+  | 'mock_filing'
+  | 'paper_submit'
+  | 'notification'
+  | 'calculation'
+  | 'account_control'
+  | 'confirmation';
+
+export type StepStatus =
+  | 'blocked'
+  | 'available'
+  | 'in_progress'
+  | 'completed'
+  | 'skipped'
+  | 'returned';
+
+export interface ProcedureStep {
+  id: string;
+  label: string;
+  type: StepType;
+  dependsOn: string[];
+  isConditional: boolean;
+  condition: string | null;
+  status: StepStatus;
+  statusDetail: string | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  referenceStatus: string | null;
+  actionLabel: string | null;
+  actionRoute: string | null;
+  completedAt: Timestamp | null;
+  completedBy: string | null;
+}
+
+export interface ProcedureReference {
+  type: 'filing' | 'approval' | 'salary' | 'leave' | 'exemption' | 'employee' | 'grade' | 'collection';
+  documentId: string;
+  employeeId: string | null;
+  documentSubtype: string | null;
+  stepId: string;
+  createdAt: Timestamp;
+}
+
+export interface ProcedureBatchMeta {
+  targetYearMonth: string;
+  targetEmployeeIds: string[];
+  processedCount: number;
+  totalCount: number;
+}
+
+export interface ProcedureDoc {
+  procedureType: ProcedureType;
+  title: string;
+  priority: 'high' | 'normal' | 'low';
+  status: ProcedureStatus;
+  statusReason: string;
+  employeeId: string | null;
+  employeeName: string;
+  officeId: string;
+  targetOfficeId: string | null;
+  scope: ProcedureScope;
+  batchMeta: ProcedureBatchMeta | null;
+  invitationId: string | null;
+  onboardToken: string | null;
+  steps: ProcedureStep[];
+  deadline: Timestamp | null;
+  effectiveDate: Timestamp | null;
+  assignedTo: string;
+  createdBy: string;
+  references: ProcedureReference[];
+  notes: string;
+  version: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  completedAt: Timestamp | null;
+  deletedAt: Timestamp | null;
 }
 
 export interface AuditLogDoc {

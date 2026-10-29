@@ -1,4 +1,5 @@
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
@@ -11,6 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { OfficeContextService } from '../../../core/services/office-context.service';
 
 interface PremiumRow {
   employeeId: string;
@@ -20,6 +22,9 @@ interface PremiumRow {
   pensionGrade: number;
   healthEmployee: number;
   pensionEmployee: number;
+  childSupportPaymentEmployee?: number | null;
+  childSupportPaymentEmployer?: number | null;
+  childSupportContributionEmployer?: number | null;
   totalEmployee: number;
   totalEmployer: number;
   selected: boolean;
@@ -138,6 +143,18 @@ interface PremiumRow {
                   <td mat-cell *matCellDef="let row" class="text-right">{{ row.pensionEmployee | number }}</td>
                 </ng-container>
 
+                <ng-container matColumnDef="childSupportPaymentEmployee">
+                  <th mat-header-cell *matHeaderCellDef>支援金(本人)</th>
+                  <td mat-cell *matCellDef="let row">{{ row.childSupportPaymentEmployee == null ? '未計算' : (row.childSupportPaymentEmployee | number) }}</td>
+                </ng-container>
+                <ng-container matColumnDef="childSupportPaymentEmployer">
+                  <th mat-header-cell *matHeaderCellDef>支援金(会社)</th>
+                  <td mat-cell *matCellDef="let row">{{ row.childSupportPaymentEmployer == null ? '未計算' : (row.childSupportPaymentEmployer | number) }}</td>
+                </ng-container>
+                <ng-container matColumnDef="childSupportContributionEmployer">
+                  <th mat-header-cell *matHeaderCellDef>拠出金(会社のみ)</th>
+                  <td mat-cell *matCellDef="let row">{{ row.childSupportContributionEmployer == null ? '未登録' : (row.childSupportContributionEmployer | number) }}</td>
+                </ng-container>
                 <ng-container matColumnDef="totalEmployee">
                   <th mat-header-cell *matHeaderCellDef>本人合計</th>
                   <td mat-cell *matCellDef="let row" class="text-right bold">{{ row.totalEmployee | number }}</td>
@@ -209,6 +226,8 @@ interface PremiumRow {
   `],
 })
 export class PremiumMonthlyComponent implements OnInit {
+  private route=inject(ActivatedRoute);
+  office = inject(OfficeContextService);
   private functions = inject(Functions);
   private snackBar = inject(MatSnackBar);
   private auth = inject(AuthService);
@@ -233,9 +252,10 @@ export class PremiumMonthlyComponent implements OnInit {
 
 
   step1Columns = ['select', 'employeeName', 'healthGrade', 'pensionGrade'];
-  step2Columns = ['employeeName', 'healthEmployee', 'pensionEmployee', 'totalEmployee', 'totalEmployer'];
+  step2Columns = ['employeeName', 'healthEmployee', 'pensionEmployee', 'childSupportPaymentEmployee', 'childSupportPaymentEmployer', 'childSupportContributionEmployer', 'totalEmployee', 'totalEmployer'];
 
   ngOnInit() {
+    const month=this.route.snapshot.queryParamMap.get('yearMonth');if(month&&/^\d{4}-(0[1-9]|1[0-2])$/.test(month))this.yearMonth=month;
     this.loadEmployees();
   }
 
@@ -345,7 +365,7 @@ export class PremiumMonthlyComponent implements OnInit {
       let lastDocId: string | undefined;
       const fn = httpsCallable<object, { items: { id: string; employeeNumber: string; lastName: string; firstName: string }[]; hasMore: boolean; lastDocId?: string }>(this.functions, 'employeeList');
       do {
-        const { data } = await fn({ companyId: this.auth.companyId, limit: 100, ...(lastDocId ? { lastDocId } : {}) });
+        const { data } = await fn({ companyId: this.auth.companyId, ...this.office.params(), limit: 100, ...(lastDocId ? { lastDocId } : {}) });
         output.push(...data.items.map(e => ({ employeeId: e.id, employeeName: `${e.lastName} ${e.firstName}`, employeeNumber: e.employeeNumber, healthGrade: 0, pensionGrade: 0, healthEmployee: 0, pensionEmployee: 0, totalEmployee: 0, totalEmployer: 0, selected: true, version: 0, isExempted: false, isConfirmed: false, approvalPending: false })));
         if (!data.hasMore) break;
         const cursor = data.lastDocId ?? data.items.at(-1)?.id;

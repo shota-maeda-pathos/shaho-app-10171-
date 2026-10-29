@@ -1,5 +1,5 @@
 import { db } from '../../config';
-import { AuthContext } from '../../middleware/auth';
+import { AuthContext, requireOffice } from '../../middleware/auth';
 import { FilingListInput } from './schema';
 
 interface FilingListItem {
@@ -23,9 +23,10 @@ export async function listFilings(
   auth: AuthContext,
 ): Promise<FilingListResponse> {
   const effectiveLimit = input.limit ?? 20;
+  if (input.officeId) requireOffice(auth, input.officeId);
 
   if (input.employeeId) {
-    return listForEmployee(auth.companyId, input.employeeId, input, effectiveLimit);
+    return listForEmployee(auth.companyId, input.employeeId, input, effectiveLimit, auth);
   }
 
   const empSnap = await db
@@ -39,6 +40,7 @@ export async function listFilings(
 
   for (const empDoc of empSnap.docs) {
     const empData = empDoc.data();
+    if (input.officeId && empData.officeId !== input.officeId) continue;
 
     if (!auth.roles.includes('admin') && !auth.officeIds.includes(empData.officeId)) {
       continue;
@@ -87,12 +89,15 @@ async function listForEmployee(
   employeeId: string,
   input: FilingListInput,
   limit: number,
+  auth: AuthContext,
 ): Promise<FilingListResponse> {
   const empRef = db.doc(`companies/${companyId}/employees/${employeeId}`);
   const empSnap = await empRef.get();
   if (!empSnap.exists) return { items: [], hasMore: false };
 
   const empData = empSnap.data()!;
+  requireOffice(auth, empData.officeId);
+  if (empData.deletedAt != null || (input.officeId && empData.officeId !== input.officeId)) return {items:[],hasMore:false};
 
   let query: FirebaseFirestore.Query = db.collection(
     `companies/${companyId}/employees/${employeeId}/filings`,

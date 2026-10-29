@@ -279,5 +279,13 @@ export async function autoGenerateFiling(
     version: 1,
   });
 
+  const { linkFilingToProcedure } = await import('../../procedures/hooks');
+  await linkFilingToProcedure({
+    companyId: auth.companyId,
+    employeeId: input.employeeId,
+    filingId: filingRef.id,
+    filingType: input.filingType,
+  });
+
   return { success: true, id: filingRef.id };
 }

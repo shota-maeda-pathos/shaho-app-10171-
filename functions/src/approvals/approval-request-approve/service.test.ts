@@ -1,3 +1,5 @@
+jest.mock('../../utils/notify',()=>({notify:jest.fn(async()=>{})}));
+jest.mock('../../procedures/hooks',()=>({refreshEmployeeProcedures:jest.fn(async()=>{})}));
 import { makeAuth, makeEmployeeDoc, MockFirestore } from '../../__tests__/helpers';
 
 let mockDb: MockFirestore;

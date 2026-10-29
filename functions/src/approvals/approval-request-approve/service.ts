@@ -5,6 +5,7 @@ import { EmployeeDoc, ApprovalRequestDoc } from '../../types/firestore';
 import { MutationResponse } from '../../types/response';
 import { notFound, invalidArg } from '../../utils/errors';
 import { ApprovalRequestApproveInput } from './schema';
+import { validateApprovalTarget } from '../target';
 
 export async function approveApprovalRequest(
   input: ApprovalRequestApproveInput,
@@ -42,11 +43,7 @@ export async function approveApprovalRequest(
       throw invalidArg('自分が作成した承認リクエストを自分で承認することはできません');
     }
 
-    if (['bonus', 'bonusInsurance'].includes(reqData.requestType)) {
-      const collection = reqData.requestType === 'bonus' ? 'bonuses' : 'bonusInsurance';
-      const prefix = `companies/${auth.companyId}/employees/${input.employeeId}/${collection}/`;
-      if (!reqData.targetPath.startsWith(prefix) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(reqData.targetPath.slice(prefix.length))) throw invalidArg('承認対象パスが不正です');
-    }
+    validateApprovalTarget(reqData.targetPath,reqData.requestType,auth.companyId,input.employeeId);
     const targetRef = db.doc(reqData.targetPath);
     const isDeferred = reqData.requestType === 'grade' && reqData.targetVersion === 0;
     let targetData: FirebaseFirestore.DocumentData = {};
@@ -109,7 +106,7 @@ export async function approveApprovalRequest(
     } else {
       tx.update(targetRef, {
         isConfirmed: true,
-        ...(['monthlyInsurance', 'bonus', 'bonusInsurance'].includes(reqData.requestType) ? { approvalPending: false } : {}),
+        ...(['salary','monthlyInsurance', 'bonus', 'bonusInsurance'].includes(reqData.requestType) ? { approvalPending: false } : {}),
         confirmedAt: now,
         confirmedBy: auth.uid,
         version: targetData.version + 1,
@@ -132,6 +129,9 @@ export async function approveApprovalRequest(
 
     return input.requestId;
   });
+
+  const { refreshEmployeeProcedures } = await import('../../procedures/hooks');
+  await refreshEmployeeProcedures(auth.companyId, input.employeeId);
 
   const { notify } = await import('../../utils/notify');
   await notify({

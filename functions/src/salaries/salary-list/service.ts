@@ -1,6 +1,6 @@
 import { mapConcurrent } from '../../utils/parallel';
 import { db } from '../../config';
-import { AuthContext } from '../../middleware/auth';
+import { AuthContext, requireOffice } from '../../middleware/auth';
 import { SalaryListInput } from './schema';
 
 interface SalaryListItem {
@@ -10,6 +10,8 @@ interface SalaryListItem {
   baseSalary: number;
   totalSalary: number;
   isConfirmed: boolean;
+  approvalPending:boolean;
+  isPublished:boolean;
   version: number;
 }
 
@@ -23,6 +25,7 @@ export async function listSalaries(
   input: SalaryListInput,
   auth: AuthContext,
 ): Promise<SalaryListResponse> {
+  if(input.officeId) requireOffice(auth,input.officeId);
   if (!auth.roles.includes('admin') && auth.officeIds.length === 0) return { items: [], hasMore: false };
   let empQuery: FirebaseFirestore.Query = db
     .collection(`companies/${auth.companyId}/employees`)
@@ -67,6 +70,8 @@ export async function listSalaries(
       baseSalary: salarySnap.exists ? salarySnap.data()!.baseSalary : 0,
       totalSalary: salarySnap.exists ? salarySnap.data()!.totalSalary : 0,
       isConfirmed: salarySnap.exists ? salarySnap.data()!.isConfirmed : false,
+      approvalPending:salarySnap.data()?.approvalPending===true,
+      isPublished:salarySnap.data()?.isPublished===true,
       version: salarySnap.exists ? salarySnap.data()!.version : 0,
     };
   });

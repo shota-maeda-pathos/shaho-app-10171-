@@ -25,6 +25,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatListModule } from '@angular/material/list';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { OfficeContextService } from '../../../core/services/office-context.service';
 
 interface Office {
   id: string;
@@ -225,9 +226,10 @@ interface OnboardResult {
           <mat-card-content>
             <div class="complete-header">
               <mat-icon class="complete-icon">check_circle</mat-icon>
-              <h2>入社手続きが完了しました</h2>
+              <h2>従業員登録と届出準備が完了しました</h2>
             </div>
-            <p class="complete-desc">以下の処理が自動的に実行されました。</p>
+            <p class="complete-desc">以下の処理が自動的に実行されました。社内承認・提出は、手続き画面から続けてください。</p>
+            <a mat-stroked-button [routerLink]="['/procedures']" [queryParams]="{employeeId:onboardResult()!.employeeId}">承認・提出へ進む</a>
             <mat-list>
               <mat-list-item>
                 <mat-icon matListItemIcon style="color:#2e7d32">person_add</mat-icon>
@@ -396,7 +398,7 @@ interface OnboardResult {
         </mat-stepper>
       }
     } @else {
-      <mat-tab-group (selectedTabChange)="onTabChange($event.tab.textLabel)">
+      <mat-tab-group [selectedIndex]="initialTab" (selectedTabChange)="onTabChange($event.tab.textLabel)">
         <mat-tab label="基本情報">
           <div class="tab-content">
             <mat-card>
@@ -801,6 +803,7 @@ interface OnboardResult {
   `],
 })
 export class EmployeeDetailComponent implements OnInit {
+  office = inject(OfficeContextService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private functions = inject(Functions);
@@ -871,15 +874,20 @@ export class EmployeeDetailComponent implements OnInit {
 
   ngOnInit() {
     this.loadOffices();
+    if(this.office.selected()) this.form.officeId=this.office.selected();
     const id = this.route.snapshot.paramMap.get('id');
     if (id && id !== 'new') {
       this.isNew = false;
       this.employeeId = id;
+      const action = this.route.snapshot.queryParamMap.get('action');
+      this.showResignPanel = action === 'loss'; this.showTransferPanel = action === 'transfer';
+      this.initialTab = action === 'dependent_change' ? 1 : action === 'leave' ? 5 : 0;
       this.loadEmployee();
     }
   }
 
   tabLoading = signal<Record<string, boolean>>({});
+  initialTab = 0;
   tabErrors = signal<Record<string, string>>({});
   tabMore = signal<Record<string, boolean>>({});
   private tabCursors: Record<string, string | null> = {};
@@ -1012,7 +1020,7 @@ export class EmployeeDetailComponent implements OnInit {
         ...this.empForm,
       });
       this.onboardResult.set(result.data);
-      this.snackBar.open('入社手続きが完了しました', '閉じる', { duration: 3000 });
+      this.snackBar.open('従業員を登録しました。続けて社内承認・提出を進めてください', '閉じる', { duration: 5000 });
     } catch (e: any) {
       const detail = e?.message ?? e?.code ?? '';
       this.snackBar.open(`入社手続きに失敗しました: ${detail}`, '閉じる', { duration: 8000 });

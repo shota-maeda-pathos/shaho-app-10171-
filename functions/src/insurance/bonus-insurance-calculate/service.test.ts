@@ -178,7 +178,7 @@ describe('calculateBonusInsurance', () => {
   const saved = () => mockTxSet.mock.calls.find((c: any) => c[0].path.includes('/bonusInsurance/'))![1];
   it('defaults to normal calculation without an approved bonus exemption', async () => {
     await calculateBonusInsurance(input, makeAuth());
-    expect(saved()).toMatchObject({ isExempted: false, exemptionIds: [], totalEmployeeAmount: 70700, healthInsurance: { employeeAmount: 24950 }, pensionInsurance: { employeeAmount: 45750 } });
+    expect(saved()).toMatchObject({ isExempted: false, exemptionIds: [], totalEmployeeAmount: 71275, childSupportPayment: { employeeAmount: 575, employerAmount: 575 }, healthInsurance: { employeeAmount: 24950 }, pensionInsurance: { employeeAmount: 45750 } });
   });
   it('derives exemption without a client flag and stores evidence IDs', async () => {
     exemptions = [approved];
@@ -192,7 +192,7 @@ describe('calculateBonusInsurance', () => {
   ])('does not exempt non-applicable records %j', async overrides => {
     exemptions = [{ ...approved, ...overrides }];
     await calculateBonusInsurance(input, makeAuth());
-    expect(saved()).toMatchObject({ isExempted: false, exemptionIds: [], totalEmployeeAmount: 70700 });
+    expect(saved()).toMatchObject({ isExempted: false, exemptionIds: [], totalEmployeeAmount: 71275 });
   });
   it.each([false, true])('rejects client exemption override %s when it differs from approved records', async flag => {
     exemptions = flag ? [] : [approved];
@@ -247,6 +247,7 @@ describe('calculateBonusInsurance', () => {
     });
     await calculateBonusInsurance(input, makeAuth());
     expect(saved().childSupportContribution).toEqual({ employeeAmount: 0, employerAmount: 1800 });
+    expect(saved().childSupportPayment).toEqual({ employeeAmount: 264, employerAmount: 264 });
   });
   it.each([{ cumulativeBonusAmount: 499000 }, { standardBonusAmount: 1 }, { cumulativeBonusAmount: 500001 }])('refuses inconsistent saved amounts %j', async override => {
     Object.assign(sourceBonus, override);

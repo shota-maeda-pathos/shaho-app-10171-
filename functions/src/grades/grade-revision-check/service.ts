@@ -229,6 +229,30 @@ export async function checkGradeRevision(
     reasons.push(`新等級適用月: ${effectiveMonth}`);
   }
 
+  if (eligible) {
+    const { createSimpleProcedure } = await import('../../procedures/hooks');
+    const existingProcs = await db
+      .collection(`companies/${companyId}/procedures`)
+      .where('employeeId', '==', input.employeeId)
+      .where('procedureType', '==', 'monthly_change')
+      .where('status', 'in', ['draft', 'in_progress'])
+      .where('deletedAt', '==', null)
+      .limit(1)
+      .get();
+    if (existingProcs.empty) {
+      await createSimpleProcedure({
+        companyId,
+        procedureType: 'monthly_change',
+        employeeId: input.employeeId,
+        employeeName,
+        officeId: emp.officeId,
+        effectiveDate: `${effectiveMonth}-01`,
+        completedStepId: 'detect',
+        createdBy: auth.uid,
+      });
+    }
+  }
+
   return {
     eligible,
     employeeId: input.employeeId,

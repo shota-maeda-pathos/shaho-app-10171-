@@ -4,6 +4,7 @@ import { AuthContext, requireLoginEnabled } from '../middleware/auth';
 import { mapConcurrent } from '../utils/parallel';
 import { notFound } from '../utils/errors';
 import { PortalOverviewInput, PortalPayslipGetInput } from './schema';
+import { portalAccessDeadline } from './access-period';
 async function self(auth: AuthContext) {
   requireLoginEnabled(auth);
   if (!auth.employeeId) return null;
@@ -13,6 +14,8 @@ async function self(auth: AuthContext) {
   if (!employee.exists || employee.data()!.deletedAt !== null) throw notFound('本人の従業員情報');
   const data = employee.data()!;
   if (data.userId !== auth.uid) throw new HttpsError('permission-denied', '本人の従業員情報との紐付けが一致しません');
+  const deadline=portalAccessDeadline(data);
+  if(deadline&&deadline.getTime()<=Date.now()) throw new HttpsError('permission-denied','退職後の本人ポータル閲覧期間が終了しています。管理者にお問い合わせください。');
   return { path, data };
 }
 function amount(value: unknown): number | null { return typeof value === 'number' && Number.isFinite(value) ? value : null; }
@@ -27,7 +30,7 @@ function insuranceResult(data: FirebaseFirestore.DocumentData | undefined) {
     health: amount(data.healthInsurance?.employeeAmount),
     pension: amount(data.pensionInsurance?.employeeAmount),
     longTermCare: data.longTermCareInsurance === null ? 0 : amount(data.longTermCareInsurance?.employeeAmount),
-    childSupport: amount(data.childSupportContribution?.employeeAmount),
+    childSupportPayment: amount(data.childSupportPayment?.employeeAmount),
     totalEmployee: amount(data.totalEmployeeAmount), isExempted: data.isExempted === true,
   };
 }

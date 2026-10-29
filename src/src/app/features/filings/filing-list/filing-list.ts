@@ -1,6 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -15,6 +15,7 @@ import { MatInputModule } from '@angular/material/input';
 import { FormsModule } from '@angular/forms';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { OfficeContextService } from '../../../core/services/office-context.service';
 
 interface FilingRow {
   id: string;
@@ -223,8 +224,10 @@ const SUBMISSION_LABELS: Record<string, string> = {
   `],
 })
 export class FilingListComponent implements OnInit {
+  office = inject(OfficeContextService);
   private functions = inject(Functions);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private snackBar = inject(MatSnackBar);
   private auth = inject(AuthService);
 
@@ -245,6 +248,8 @@ export class FilingListComponent implements OnInit {
   displayedColumns = ['filingType', 'employeeName', 'effectiveDate', 'workflowStatus', 'submissionStatus'];
 
   ngOnInit() {
+    this.autoGenEmployeeId = this.route.snapshot.queryParamMap.get('employeeId') ?? '';
+    if (this.autoGenEmployeeId) this.showAutoGen.set(true);
     this.loadFilings();
     this.loadEmployees();
   }
@@ -255,7 +260,7 @@ export class FilingListComponent implements OnInit {
     this.employeesError.set('');
     try {
       const fn = httpsCallable<object, { items: EmployeeListItem[] }>(this.functions, 'employeeList');
-      const { data } = await fn({ companyId: this.auth.companyId, limit: 100 });
+      const { data } = await fn({ companyId: this.auth.companyId, ...this.office.params(), limit: 100 });
       this.employees.set((data.items ?? []).map(e => ({
         id: e.id, name: `${e.lastName} ${e.firstName}`, number: e.employeeNumber || '-',
       })));
@@ -315,7 +320,8 @@ export class FilingListComponent implements OnInit {
     this.loading.set(true);
     try {
       const fn = httpsCallable<any, any>(this.functions, 'filingList');
-      const result = await fn({ companyId: this.auth.companyId });
+      const employeeId = this.route.snapshot.queryParamMap.get('employeeId');
+      const result = await fn({ companyId: this.auth.companyId, ...this.office.params(), ...(employeeId ? {employeeId}: {}) });
       this.filings.set(result.data.items ?? []);
     } catch {
       this.filings.set([]);

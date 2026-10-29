@@ -44,7 +44,12 @@ import { AuthService } from '../../core/services/auth.service';
               <div class="line-item"><span>健康保険料</span><span>{{ premium.health === null ? '未登録' : (premium.health | number) + ' 円' }}</span></div>
               <div class="line-item"><span>厚生年金保険料</span><span>{{ premium.pension === null ? '未登録' : (premium.pension | number) + ' 円' }}</span></div>
               <div class="line-item"><span>介護保険料</span><span>{{ premium.longTermCare === null ? '未登録' : (premium.longTermCare | number) + ' 円' }}</span></div>
-              <div class="line-item"><span>子ども・子育て関連拠出</span><span>{{ premium.childSupport === null ? '未登録' : (premium.childSupport | number) + ' 円' }}</span></div>
+              @if (yearMonth() >= '2026-04') {
+                <div class="line-item"><span>子ども・子育て支援金</span><span>{{ premium.childSupportPayment == null ? '未計算' : (premium.childSupportPayment | number) + ' 円' }}</span></div>
+                @if (premium.childSupportPayment == null) {
+                  <p role="alert">この計算結果には子ども・子育て支援金が含まれていません。担当者による再計算・再承認が必要です。本人負担合計は再計算前の金額です。</p>
+                }
+              }
               <div class="line-item total"><span>本人負担合計</span><span>{{ premium.totalEmployee === null ? '未登録' : (premium.totalEmployee | number) + ' 円' }}</span></div>
               @if (premium.isExempted) { <p>この発生月には免除が適用されています。</p> }
             } @else { <p>同月分の社会保険料は未計算または未承認です。</p> }

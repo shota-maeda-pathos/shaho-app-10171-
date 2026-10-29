@@ -22,6 +22,9 @@ export async function getBonus(input: BonusGetInput, auth: AuthContext) {
         healthEmployee: i.healthInsurance?.employeeAmount ?? null, pensionEmployee: i.pensionInsurance?.employeeAmount ?? null,
         longTermCareEmployee: i.longTermCareInsurance === null ? 0 : i.longTermCareInsurance?.employeeAmount ?? null,
         childSupportEmployer: i.childSupportContribution?.employerAmount ?? null,
+        childSupportPaymentEmployee: i.childSupportPayment?.employeeAmount ?? null,
+        childSupportPaymentEmployer: i.childSupportPayment?.employerAmount ?? null,
+        childSupportContributionEmployer: i.childSupportContribution?.employerAmount ?? null,
         totalEmployee: i.totalEmployeeAmount, totalEmployer: i.totalEmployerAmount,
         isExempted: i.isExempted === true, isConfirmed: i.isConfirmed === true, approvalPending: i.approvalPending === true } : null,
     };

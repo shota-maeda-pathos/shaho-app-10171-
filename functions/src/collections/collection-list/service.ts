@@ -1,6 +1,7 @@
 import { db } from '../../config';
-import { AuthContext } from '../../middleware/auth';
+import { AuthContext, requireOffice } from '../../middleware/auth';
 import { CollectionListInput } from './schema';
+import { invalidArg } from '../../utils/errors';
 
 interface CollectionListItem {
   id: string;
@@ -25,9 +26,14 @@ export async function listCollections(
   auth: AuthContext,
 ): Promise<CollectionListResponse> {
   const effectiveLimit = input.limit ?? 20;
+  if(input.officeId) requireOffice(auth,input.officeId);
+  if(!auth.roles.includes('admin')&&!auth.officeIds.length) return {items:[],hasMore:false};
+  if(!input.officeId&&!auth.roles.includes('admin')&&auth.officeIds.length>30) throw invalidArg('事業所を選択してください');
   let query: FirebaseFirestore.Query = db
     .collection(`companies/${auth.companyId}/insuranceCollections`)
     .orderBy('yearMonth', 'desc');
+  if(input.officeId) query=query.where('officeId','==',input.officeId);
+  else if(!auth.roles.includes('admin')) query=query.where('officeId','in',auth.officeIds.slice(0,30));
 
   if (input.collectionType) {
     query = query.where('collectionType', '==', input.collectionType);
