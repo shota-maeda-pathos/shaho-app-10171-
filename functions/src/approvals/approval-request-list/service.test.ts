@@ -71,11 +71,13 @@ describe('listApprovalRequests', () => {
     expect(result.items).toHaveLength(0);
   });
 
-  it('limit で件数を制限できる', async () => {
+  it('limit は処理済みの件数に効き、承認待ちは件数で切らない', async () => {
+    const req3 = makeApprovalRequestDoc({ requestType: 'bonus', status: 'approved' });
     mockReqQueryDocs.mockResolvedValue({
       docs: [
         { id: 'req-001', data: () => req1 },
         { id: 'req-002', data: () => req2 },
+        { id: 'req-003', data: () => req3 },
       ],
     });
 
@@ -85,6 +87,11 @@ describe('listApprovalRequests', () => {
       auth,
     );
 
-    expect(result.items).toHaveLength(1);
+    expect(result.items.map(i => i.status)).toEqual(['pending', 'approved']);
+  });
+
+  it('承認待ちと処理済みを両方読んでも同じ申請を重ねない', async () => {
+    const result = await listApprovalRequests({ companyId: 'company-001' }, makeAuth());
+    expect(result.items.map(i => i.id)).toEqual(['req-001', 'req-002']);
   });
 });
