@@ -54,12 +54,13 @@ export async function unsuspendUser(
     if (!userSnap.exists) throw notFound('ユーザー');
 
     const userData = userSnap.data()! as UserDoc;
-    if (!userData.isSuspended) {
+    if (!userData.isSuspended && !userData.suspendFrom) {
       throw invalidArg('このユーザーは停止されていません');
     }
 
+    // 退職による予定の停止も取り消す（再入社など）
     const now = Timestamp.now();
-    tx.update(userRef, { isSuspended: false, updatedAt: now });
+    tx.update(userRef, { isSuspended: false, suspendFrom: null, loginDisabledFrom: null, updatedAt: now });
 
     const auditRef = db.collection(`companies/${auth.companyId}/auditLogs`).doc();
     tx.set(auditRef, {

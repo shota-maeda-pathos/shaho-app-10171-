@@ -5,7 +5,7 @@ export type TodoTone = 'action' | 'yours' | 'waiting';
 
 export interface HomeTodo {
   id: string;
-  kind: 'onboarding' | 'procedure' | 'monthly';
+  kind: 'onboarding' | 'resignation' | 'procedure' | 'monthly';
   /** 何の件か（例：前田 翔太さんの入社） */
   title: string;
   /** 次にやること */

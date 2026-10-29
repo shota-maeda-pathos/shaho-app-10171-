@@ -52,6 +52,9 @@ export class AuthService {
     const snap = await getDoc(ref);
     if (snap.exists()) {
       const data = snap.data();
+      // 退職した人は、喪失日から閲覧専用、閲覧期間の翌日からログイン停止（サーバーと同じ判定）
+      const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+      const reached = (v: unknown) => typeof v === 'string' && v <= today;
       this._profile.set({
         uid,
         email: data['email'],
@@ -59,8 +62,8 @@ export class AuthService {
         roles: Array.isArray(data['roles']) ? data['roles'] : [],
         officeIds: data['officeIds'] ?? [],
         employeeId: data['employeeId'] ?? null,
-        isSuspended: data['isSuspended'] ?? false,
-        isLoginDisabled: data['isLoginDisabled'] ?? false,
+        isSuspended: (data['isSuspended'] ?? false) || reached(data['suspendFrom']),
+        isLoginDisabled: (data['isLoginDisabled'] ?? false) || reached(data['loginDisabledFrom']),
         companyId: this.companyId,
       });
     }

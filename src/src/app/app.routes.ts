@@ -187,6 +187,13 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'resignation/:id',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '退職手続き' },
+        loadComponent: () =>
+          import('./features/resignation/resignation-wizard').then((m) => m.ResignationWizardComponent),
+      },
+      {
         path: 'filings',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '届出' },

@@ -309,6 +309,10 @@ export interface UserDoc {
   employeeId: string | null;
   isSuspended: boolean;
   isLoginDisabled: boolean;
+  /** 退職による閲覧専用の開始日（YYYY-MM-DD。この日から isSuspended と同じ扱い） */
+  suspendFrom?: string | null;
+  /** 退職後の閲覧期間が終わり、ログインを止める日（YYYY-MM-DD） */
+  loginDisabledFrom?: string | null;
   lastLoginAt: Timestamp | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -425,6 +429,33 @@ export interface ProcedureDoc {
   deletedAt: Timestamp | null;
   /** 入社手続き（ウィザード）の状態。旧方式の入社手続きにはない */
   onboarding?: OnboardingState;
+  /** 退職手続き（ウィザード）の状態。旧方式の退職手続きにはない */
+  resignation?: ResignationState;
+}
+
+/** 退職手続き（ウィザード）の状態 */
+export interface ResignationState {
+  /** 退職日（死亡の場合は死亡日）YYYY-MM-DD。入れるまでは null */
+  resignationDate: string | null;
+  reason: 'resignation' | 'death';
+  /** 退職理由のメモ（自己都合・定年など。届出には載せない） */
+  note: string;
+  /** 台帳に退職を登録した日時 */
+  appliedAt: Timestamp | null;
+  /** 最後の保険料の集め方（決めたときの内容） */
+  settlement: {
+    /** 最後の給与の支給月。null は退職後に支給する給与がない（最後の給与は支給済み） */
+    lastPayMonth: string | null;
+    rows: { month: string; due: number; dueSource: string; collected: number; plan: string; payMonth: string | null }[];
+    totals: { payroll: number; final: number; transfer: number; over: number };
+    decidedAt: Timestamp;
+    decidedBy: string;
+  } | null;
+  /** 資格喪失届に書く被保険者証の回収状況 */
+  cards: { returned: number; unreturnable: number } | null;
+  filingId: string | null;
+  /** 退職後のポータル閲覧の最終日 YYYY-MM-DD */
+  accessUntil: string | null;
 }
 
 /** 本人が招待リンクから入力した内容。台帳への登録は担当者が確かめてから行う */

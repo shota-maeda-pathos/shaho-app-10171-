@@ -1,0 +1,6 @@
+.settlement { max-width: 760px; }
+.settlement thead th { width: auto; }
+.num { text-align: right; white-space: nowrap; }
+.settlement td:first-child { white-space: nowrap; }
+.block { display: block; }
+.pay-month { margin-bottom: var(--app-space-4); }

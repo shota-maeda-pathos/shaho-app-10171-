@@ -1,0 +1,248 @@
+<div class="app-page">
+  <a routerLink="/procedures" class="back"><mat-icon>arrow_back</mat-icon>進行中の手続き</a>
+
+  @if (loading()) {
+    <app-loading-state />
+  } @else if (loadError()) {
+    <app-error-state [message]="loadError()" (retry)="load(true)" />
+  } @else if (view(); as v) {
+    <app-wizard [heading]="v.procedure.title"
+                [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.entry ? '・退職日 ' + (v.entry.resignationDate | date:'yyyy年M月d日') : '') + (v.facts?.filingDeadline ? '・資格喪失届の期限 ' + (v.facts!.filingDeadline | date:'M月d日') : '')"
+                [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                (advance)="advance()">
+
+      @switch (key()) {
+
+        <!-- ① 退職日と理由を入れる -->
+        @case ('entry') {
+          @if (v.locked) {
+            <p class="note">資格喪失届の承認を申請済みのため、ここでは直せません。直す場合は承認者に差し戻してもらってください。</p>
+          } @else if (v.entry && !entryDirty()) {
+            <p><app-status-badge tone="done" label="登録済み" /> 従業員台帳に退職を登録しました。日付を直すと、保険料の集め方と届出は決め直しになります。</p>
+          }
+          <fieldset class="form-grid" [disabled]="v.locked">
+            <mat-radio-group class="radios wide" [(ngModel)]="reason" (ngModelChange)="entryChanged()" aria-label="喪失の原因" [disabled]="v.locked">
+              <mat-radio-button value="resignation">退職する</mat-radio-button>
+              <mat-radio-button value="death">亡くなった</mat-radio-button>
+            </mat-radio-group>
+            <mat-form-field appearance="outline"><mat-label>{{ reason === 'death' ? '亡くなった日' : '退職日（最後に在籍する日）' }}</mat-label>
+              <input matInput type="date" [(ngModel)]="resignationDate" (ngModelChange)="entryChanged()" required></mat-form-field>
+            @if (reason === 'resignation') {
+              <mat-form-field appearance="outline"><mat-label>退職理由のメモ（任意）</mat-label>
+                <input matInput [(ngModel)]="note" (ngModelChange)="entryDirty.set(true)" maxlength="200" placeholder="自己都合・定年・契約満了など">
+                <mat-hint>社内の記録用です。届出には載りません</mat-hint></mat-form-field>
+            }
+          </fieldset>
+
+          <section class="result" aria-live="polite">
+            <h3>退職日から決まること</h3>
+            @if (factsLoading()) {
+              <p class="sub">計算しています…</p>
+            } @else if (factsError()) {
+              <p class="error">{{ factsError() }}</p>
+            } @else if (facts(); as f) {
+              <table class="summary">
+                <tr><th><app-term key="lossDate" /></th><td>{{ f.lossDate | date:'yyyy年M月d日' }}（{{ f.lossCause }}）</td></tr>
+                <tr><th>資格を失う保険</th><td>{{ insuranceText(f) }}{{ f.over70Worker ? '（70歳以上被用者の不該当も届け出ます）' : '' }}</td></tr>
+                <tr><th>保険料がかかる最後の月</th><td>{{ f.lastChargedMonth ? monthLabel(f.lastChargedMonth) + '分まで' : 'かかりません' }}</td></tr>
+                <tr><th><app-term key="lossFiling" /></th><td>{{ f.needsFiling ? (f.filingDeadline | date:'M月d日') + 'までに提出' : '不要（社会保険に加入していません）' }}</td></tr>
+                <tr><th>ポータル</th><td>{{ f.account.viewOnlyFrom | date:'M月d日' }}から閲覧だけ・{{ f.account.accessUntil | date:'yyyy年M月d日' }}まで閲覧できます</td></tr>
+              </table>
+              @for (n of f.notes; track n) { <p class="sub">{{ n }}</p> }
+              @if (f.foreignNotice) { <p class="note"><app-term key="withdrawalLumpSum" />：{{ f.foreignNotice }}</p> }
+            } @else {
+              <p class="sub">退職日を入れると計算します。</p>
+            }
+          </section>
+        }
+
+        <!-- ② 最後の保険料の集め方を決める -->
+        @case ('settlement') {
+          @if (settlementSkipped()) {
+            <p>保険料がかかる月がないため、決める必要はありません。</p>
+          } @else if (settlement(); as s) {
+            <p>翌月控除・当月控除の設定（この事業所は<strong>{{ v.office.deductionMethod === 'previous' ? '翌月控除' : '当月控除' }}</strong>）と、最後の給与の支給月から、どの給与から引くかを決めます。</p>
+            <mat-radio-group class="radios" [(ngModel)]="salaryAfter" (ngModelChange)="lastPayMonthChanged()" aria-label="退職後の給与">
+              <mat-radio-button [value]="true">退職後に支給する給与がある（または最後の給与をまだ支給していない）</mat-radio-button>
+              <mat-radio-button [value]="false">退職後に支給する給与はない（最後の給与は支給済み）</mat-radio-button>
+            </mat-radio-group>
+            @if (salaryAfter) {
+              <mat-form-field appearance="outline" class="pay-month"><mat-label>最後の給与の支給月</mat-label>
+                <input matInput type="month" [(ngModel)]="lastPayMonth" (ngModelChange)="lastPayMonthChanged()" required></mat-form-field>
+            }
+
+            <table class="summary settlement" aria-label="保険料の月ごとの集め方">
+              <thead><tr><th>保険料の月</th><th class="num">本人負担</th><th class="num">集めた額</th><th>集め方</th></tr></thead>
+              <tbody>
+                @for (r of s.rows; track r.month) {
+                  <tr>
+                    <td>{{ monthLabel(r.month) }}分</td>
+                    <td class="num">{{ r.due | number }}円<span class="sub block">{{ dueSourceLabel[r.dueSource] }}</span></td>
+                    <td class="num">{{ r.collected | number }}円</td>
+                    <td><app-status-badge [tone]="planTone(r)" [label]="planText(r)" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            @if (settlementLoading()) { <p class="sub">計算しています…</p> }
+            @if (s.unknownMonths?.length) {
+              <div class="alert" role="alert">
+                <strong>等級が登録されていないため、保険料を計算できません。</strong>
+                <a [routerLink]="['/employees', v.employee.id]">従業員台帳</a>で等級を登録してから、この画面に戻って決めてください。
+              </div>
+            }
+            @if (s.totals.final > 0) {
+              <p class="sub">退職するときは、前月分とその月分の保険料を最後の給与からまとめて引けます。給与計算ソフトで控除額を確かめてください。</p>
+            }
+            @if (s.totals.transfer > 0) {
+              <div class="alert" role="alert">
+                <strong>{{ s.totals.transfer | number }}円は給与から引けません。</strong>
+                本人に振込などで払ってもらいます（<app-term key="separateCollection" />）。決めると担当者に通知します。
+                入金されたら、毎月の処理の「徴収を記録」で記録してください。
+              </div>
+            }
+            @if (s.totals.over > 0) {
+              <div class="alert" role="alert"><strong>{{ s.totals.over | number }}円を取りすぎています。</strong>本人に返金して、毎月の処理で返金を記録してください。</div>
+            }
+            @if (s.hasEstimate) {
+              <p class="sub">まだ承認されていない月は見込みの額です。毎月の処理で保険料を計算・承認すると、ここにも反映されます。</p>
+            }
+          }
+        }
+
+        <!-- ③ 退職後のアカウントを確かめる -->
+        @case ('account') {
+          @if (!v.account.hasUser) {
+            <p>この人にはポータルのアカウントがありません。そのまま「この期間で決める」で進めてください。</p>
+          } @else {
+            <p>本人のアカウント（{{ v.account.email }}）は、<strong>{{ v.account.viewOnlyFrom | date:'yyyy年M月d日' }}</strong>から申請などができなくなり、閲覧だけになります。
+              閲覧できる最終日を過ぎると、ログインできなくなります。</p>
+            <mat-form-field appearance="outline"><mat-label>閲覧できる最終日</mat-label>
+              <input matInput type="date" [(ngModel)]="accessUntil" [min]="v.entry?.resignationDate ?? ''">
+              <mat-hint>決まりでは退職日から3か月（{{ v.facts?.account?.accessUntil | date:'yyyy年M月d日' }}）です</mat-hint></mat-form-field>
+            <p class="sub">再入社した場合は、利用者の管理画面で停止を解除できます。</p>
+          }
+        }
+
+        <!-- ④ 資格喪失届を作る -->
+        @case ('filing') {
+          @if (filingSkipped()) {
+            <p>社会保険に加入していないため、資格喪失届は不要です。</p>
+          } @else if (v.facts; as f) {
+            @if (v.approval?.status === 'rejected') {
+              <div class="alert" role="alert">
+                <strong>承認者から差し戻されました。</strong>
+                @if (v.approval?.comment) { 理由：{{ v.approval!.comment }} }
+                退職日を直す場合は「戻る」で最初のステップへ戻ってください。直したら、もう一度届出を作って依頼します。
+              </div>
+            }
+            <table class="summary">
+              <tr><th>資格喪失年月日</th><td>{{ f.lossDate | date:'yyyy年M月d日' }}</td></tr>
+              <tr><th>喪失原因</th><td>{{ f.lossCause }}（{{ v.entry?.reason === 'death' ? '死亡日' : '退職日' }} {{ v.entry?.resignationDate | date:'yyyy年M月d日' }}）</td></tr>
+              <tr><th>資格を失う保険</th><td>{{ insuranceText(f) }}</td></tr>
+              @if (f.over70Worker) { <tr><th>70歳以上被用者</th><td>不該当として届け出ます</td></tr> }
+            </table>
+            <h3>被保険者証の回収</h3>
+            <p class="sub">マイナ保険証だけを使っていて回収する保険証がない場合は、どちらも0のままにします。</p>
+            <fieldset class="form-grid" [disabled]="v.locked">
+              <mat-form-field appearance="outline"><mat-label>回収して添付する枚数</mat-label>
+                <input matInput type="number" min="0" max="20" [(ngModel)]="cardsReturned"><span matTextSuffix>枚</span></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>回収できない枚数</mat-label>
+                <input matInput type="number" min="0" max="20" [(ngModel)]="cardsUnreturnable"><span matTextSuffix>枚</span>
+                <mat-hint>紛失などで返せない保険証</mat-hint></mat-form-field>
+            </fieldset>
+          }
+        }
+
+        <!-- ⑤ 承認者が確認する -->
+        @case ('approval') {
+          @if (filingSkipped()) {
+            <p>社会保険に加入していないため、承認は不要です。</p>
+          } @else if (v.approval?.status === 'pending') {
+            <p>承認者に確認を依頼しました。承認者は「承認」の画面から確認します。</p>
+            <button mat-stroked-button type="button" (click)="load(true)" [disabled]="busy()"><mat-icon>refresh</mat-icon>最新の状態にする</button>
+          } @else if (v.approval?.status === 'approved' || v.filing?.workflowStatus === 'approved') {
+            <p><app-status-badge tone="done" label="承認済み" /> 資格喪失届が承認されました。</p>
+          }
+        }
+
+        <!-- ⑥ 提出する -->
+        @case ('submit') {
+          @if (filingSkipped()) {
+            <p>社会保険に加入していないため、提出は不要です。</p>
+          } @else if (v.filing; as fl) {
+            @if (submitDone()) {
+              <p><app-status-badge tone="done" label="提出済み" />
+                {{ fl.mockStatus === 'completed' ? '模擬電子申請が完了しました。' : '紙の届出が受理されました。' }}</p>
+            } @else {
+              <mat-radio-group [(ngModel)]="method" class="radios" aria-label="提出方法">
+                <mat-radio-button value="electronic">電子申請（模擬）で提出する</mat-radio-button>
+                <mat-radio-button value="paper">紙で提出する</mat-radio-button>
+              </mat-radio-group>
+              @if (method === 'electronic') {
+                <p class="sub">このシステムの電子申請は模擬です。実際の提出は、e-Govや紙で別に行ってください。</p>
+                <button mat-flat-button type="button" (click)="mockSubmit()" [disabled]="busy()">模擬電子申請する</button>
+              } @else {
+                <p class="sub">届出の画面でPDFを印刷し、年金事務所へ郵送か窓口で提出します。回収した保険証を添えます。
+                  <a [routerLink]="['/filings', fl.id]" [queryParams]="{ employeeId: v.employee.id }">届出の画面を開く</a></p>
+                @if (fl.submissionStatus === 'notSubmitted') {
+                  <button mat-flat-button type="button" (click)="paper('submit')" [disabled]="busy()">提出したことを記録する</button>
+                } @else if (fl.submissionStatus === 'submitted') {
+                  <p>提出済み（結果待ち）です。年金事務所から結果が届いたら記録してください。</p>
+                  <div class="row-actions">
+                    <button mat-flat-button type="button" (click)="paper('accepted')" [disabled]="busy()">受理された</button>
+                    <button mat-stroked-button type="button" (click)="paper('returned')" [disabled]="busy()">返戻された</button>
+                  </div>
+                } @else if (fl.submissionStatus === 'returned') {
+                  <div class="alert" role="alert">返戻されました。{{ fl.resultNote }} 内容を直して出し直す方法は、届出の画面で確認してください。</div>
+                }
+              }
+              @if (mockResult()) { <p class="note">{{ mockResult() }}</p> }
+            }
+          }
+        }
+
+        <!-- ⑦ 完了を確認する -->
+        @case ('confirm') {
+          @if (isDone()) {
+            <div class="complete" role="status">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+              <div>
+                <strong>退職の手続きは完了しています。</strong>
+                <a [routerLink]="['/employees', v.employee.id]">従業員台帳を開く</a>
+              </div>
+            </div>
+          }
+          <table class="summary">
+            <tr><th>従業員</th><td>{{ v.employee.employeeNumber }} {{ v.employee.name }}</td></tr>
+            <tr><th>{{ v.entry?.reason === 'death' ? '亡くなった日' : '退職日' }}</th><td>{{ v.entry?.resignationDate | date:'yyyy年M月d日' }}</td></tr>
+            @if (v.facts?.needsFiling) {
+              <tr><th>資格喪失日</th><td>{{ v.facts?.lossDate | date:'yyyy年M月d日' }}</td></tr>
+              <tr><th>資格喪失届</th><td>
+                {{ v.filing?.mockStatus === 'completed' ? '模擬電子申請 完了' : v.filing?.submissionStatus === 'accepted' ? '紙で提出・受理' : '未提出' }}
+              </td></tr>
+            }
+            @if (v.settlement; as s) {
+              <tr><th>最後の保険料</th><td>
+                @if (s.totals.transfer > 0) { 別途回収が残っています：{{ s.totals.transfer | number }}円 }
+                @else if (s.totals.over > 0) { 返金が残っています：{{ s.totals.over | number }}円 }
+                @else if (s.totals.payroll + s.totals.final > 0) { 給与から控除の予定：{{ s.totals.payroll + s.totals.final | number }}円 }
+                @else { 集め終わっています }
+              </td></tr>
+            }
+            @if (v.account.hasUser) {
+              <tr><th>ポータル</th><td>{{ v.account.accessUntil | date:'yyyy年M月d日' }}まで閲覧のみ</td></tr>
+            }
+          </table>
+          @if (v.facts?.foreignNotice) {
+            <p class="note">本人に伝えてください（<app-term key="withdrawalLumpSum" />）：{{ v.facts!.foreignNotice }}</p>
+          }
+          @if (v.settlement && v.settlement.totals.transfer > 0 && !isDone()) {
+            <p class="sub">別途回収が残っていても手続きは完了できます。入金されたら毎月の処理で記録してください。</p>
+          }
+        }
+      }
+    </app-wizard>
+  }
+</div>

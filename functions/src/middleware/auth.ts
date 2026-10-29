@@ -28,14 +28,17 @@ export async function getAuthContext(
     throw new HttpsError('permission-denied', 'この会社へのアクセス権がありません');
   }
   const data = userDoc.data()!;
+  // 退職した人は、喪失日（退職日の翌日）から閲覧専用、閲覧期間の翌日からログイン停止（日付は東京の今日で比べる）
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+  const reached = (v: unknown) => typeof v === 'string' && v <= today;
   return {
     uid,
     companyId,
     roles: data.roles ?? [],
     officeIds: data.officeIds ?? [],
     employeeId: typeof data.employeeId === 'string' ? data.employeeId : null,
-    isSuspended: data.isSuspended ?? false,
-    isLoginDisabled: data.isLoginDisabled ?? false,
+    isSuspended: (data.isSuspended ?? false) || reached(data.suspendFrom),
+    isLoginDisabled: (data.isLoginDisabled ?? false) || reached(data.loginDisabledFrom),
   };
 }
 

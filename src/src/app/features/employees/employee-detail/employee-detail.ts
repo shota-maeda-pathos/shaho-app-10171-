@@ -146,40 +146,15 @@ interface OnboardResult {
           <button mat-stroked-button [routerLink]="['/employees', employeeId, 'revision']">
             <mat-icon>trending_up</mat-icon> 随時改定
           </button>
-          <button mat-stroked-button color="primary" (click)="showTransferPanel = !showTransferPanel; showResignPanel = false">
+          <button mat-stroked-button color="primary" (click)="showTransferPanel = !showTransferPanel">
             <mat-icon>swap_horiz</mat-icon> 異動
           </button>
-          <button mat-stroked-button color="warn" (click)="showResignPanel = !showResignPanel; showTransferPanel = false">
+          <button mat-stroked-button color="warn" (click)="startResignation()" [disabled]="resigning()">
             <mat-icon>exit_to_app</mat-icon> 退職
           </button>
         }
       }
     </div>
-
-    @if (showResignPanel) {
-      <mat-card class="action-panel warn-panel">
-        <mat-card-content>
-          <h3>退職処理</h3>
-          <p class="panel-desc">退職日を設定すると退職処理を実行します。社会保険加入者の場合、資格喪失届が自動生成されます（資格喪失日＝退職日の翌日）。</p>
-          <div class="form-row">
-            <mat-form-field appearance="outline">
-              <mat-label>退職日</mat-label>
-              <input matInput [(ngModel)]="resignDate" name="resignDate" placeholder="YYYY-MM-DD" required>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="flex-grow">
-              <mat-label>退職理由</mat-label>
-              <input matInput [(ngModel)]="resignReason" name="resignReason" placeholder="自己都合、定年退職 等">
-            </mat-form-field>
-          </div>
-          <div class="panel-actions">
-            <button mat-flat-button color="warn" (click)="onResign()" [disabled]="resigning() || !resignDate">
-              @if (resigning()) { <mat-spinner diameter="20"></mat-spinner> } @else { 退職処理を実行 }
-            </button>
-            <button mat-stroked-button (click)="showResignPanel = false">キャンセル</button>
-          </div>
-        </mat-card-content>
-      </mat-card>
-    }
 
     @if (showTransferPanel) {
       <mat-card class="action-panel">
@@ -816,10 +791,7 @@ export class EmployeeDetailComponent implements OnInit {
   transferring = signal(false);
   employeeStatus = signal<string>('active');
 
-  showResignPanel = false;
   showTransferPanel = false;
-  resignDate = '';
-  resignReason = '';
   transferDate = '';
   transferOfficeId = '';
   transferReason = '';
@@ -880,7 +852,8 @@ export class EmployeeDetailComponent implements OnInit {
       this.isNew = false;
       this.employeeId = id;
       const action = this.route.snapshot.queryParamMap.get('action');
-      this.showResignPanel = action === 'loss'; this.showTransferPanel = action === 'transfer';
+      this.showTransferPanel = action === 'transfer';
+      if (action === 'loss') void this.startResignation();
       this.initialTab = action === 'dependent_change' ? 1 : action === 'leave' ? 5 : 0;
       this.loadEmployee();
     }
@@ -1092,28 +1065,17 @@ export class EmployeeDetailComponent implements OnInit {
     return labels[type] ?? type;
   }
 
-  async onResign() {
-    if (this.resigning() || !this.resignDate) return;
+  /** 退職はウィザードで進める。同じ人の進行中の手続きがあれば、それを開く */
+  async startResignation() {
+    if (this.resigning()) return;
     this.resigning.set(true);
     try {
-      const dateStr = this.resignDate.includes('T') ? this.resignDate : `${this.resignDate}T00:00:00.000Z`;
-      const fn = httpsCallable<any, any>(this.functions, 'employeeResign');
-      const result = await fn({
-        companyId: this.auth.companyId,
-        employeeId: this.employeeId,
-        expectedVersion: this.version,
-        resignationDate: dateStr,
-        ...(this.resignReason ? { reason: this.resignReason } : {}),
+      const { data } = await httpsCallable<object, { procedureId: string }>(this.functions, 'resignationStart')({
+        companyId: this.auth.companyId, employeeId: this.employeeId,
       });
-      this.version++;
-      this.employeeStatus.set('resigned');
-      this.showResignPanel = false;
-      const msg = result.data?.summary?.filing
-        ? `退職処理が完了しました。${result.data.summary.filing}`
-        : '退職処理が完了しました。';
-      this.snackBar.open(msg, '閉じる', { duration: 5000 });
+      void this.router.navigate(['/resignation', data.procedureId]);
     } catch (e: any) {
-      this.snackBar.open(`退職処理に失敗しました：${e.message ?? ''}`, '閉じる', { duration: 5000 });
+      this.snackBar.open(`退職の手続きを始められませんでした：${e.message ?? ''}`, '閉じる', { duration: 5000 });
     } finally {
       this.resigning.set(false);
     }

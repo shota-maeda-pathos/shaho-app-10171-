@@ -35,7 +35,7 @@ interface Employee { id: string; lastName: string; firstName: string; employeeNu
         @if (hasMore()) { <button mat-stroked-button (click)="loadEmployees()" [disabled]="loading()">従業員をさらに読み込む</button> }
         @if (error()) { <p role="alert">{{error()}}</p><button mat-stroked-button (click)="loadEmployees()">再読み込み</button> }
         <p class="note">この画面では従業員の情報を変更しません。次の画面で入力・確認してから登録します。</p>
-        <button mat-flat-button (click)="start()" [disabled]="!canStart()">入力画面へ進む</button>
+        <button mat-flat-button (click)="start()" [disabled]="!canStart() || starting()">入力画面へ進む</button>
       </section>
     }
   </section>`,
@@ -62,6 +62,7 @@ export class ProcedureStartComponent implements OnInit {
   event = computed(() => LIFE_EVENTS.find(e => e.type === this.type() && !e.route) ?? null);
   employeeId = ''; keyword = '';
   employees = signal<Employee[]>([]); loading = signal(false); error = signal(''); hasMore = signal(true); private cursor = '';
+  starting = signal(false);
 
   ngOnInit() {
     const params = this.route.snapshot.queryParamMap;
@@ -92,9 +93,18 @@ export class ProcedureStartComponent implements OnInit {
     } catch(e:any) { this.error.set(e.message ?? '従業員を取得できませんでした'); } finally { this.loading.set(false); }
   }
 
-  start() {
+  async start() {
     if (!this.canStart()) return;
     if (this.type() === 'monthly_change') { void this.router.navigate(['/employees', this.employeeId, 'revision']); return; }
+    if (this.type() === 'loss') {
+      // 退職はウィザードで進める。同じ人の進行中の手続きがあれば、それを開く
+      this.starting.set(true); this.error.set('');
+      try {
+        const {data} = await httpsCallable<object,{procedureId:string}>(this.functions,'resignationStart')({companyId:this.auth.companyId,employeeId:this.employeeId});
+        void this.router.navigate(['/resignation', data.procedureId]);
+      } catch(e:any) { this.error.set(e.message ?? '退職の手続きを始められませんでした'); } finally { this.starting.set(false); }
+      return;
+    }
     void this.router.navigate(['/employees', this.employeeId], { queryParams: { action: this.type() } });
   }
 }
