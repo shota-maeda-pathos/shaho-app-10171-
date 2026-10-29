@@ -85,8 +85,12 @@ export async function previewSantei(input: SanteiPreviewInput, auth: AuthContext
     let query: FirebaseFirestore.Query = db.collection(`${base(auth.companyId)}/employees`)
       .where('deletedAt', '==', null)
       .orderBy('employeeNumber', 'asc');
-    if (input.officeId) query = query.where('officeId', '==', input.officeId);
-    else if (targetOfficeIds) query = query.where('officeId', 'in', targetOfficeIds);
+    // 本番に既にある索引（deletedAt・officeId・employeeNumber）を使うため、管理者も事業所で絞り込む
+    const officeIds = input.officeId ? [input.officeId]
+      : targetOfficeIds ?? (await db.collection(`${base(auth.companyId)}/offices`).get()).docs.map(d => d.id);
+    if (officeIds.length === 0) return empty;
+    if (officeIds.length > 30) throw invalidArg('事業所が多いため、事業所を選択してください');
+    query = officeIds.length === 1 ? query.where('officeId', '==', officeIds[0]) : query.where('officeId', 'in', officeIds);
     if (input.lastDocId) {
       const last = await db.doc(`${base(auth.companyId)}/employees/${input.lastDocId}`).get();
       if (last.exists) query = query.startAfter(last);
