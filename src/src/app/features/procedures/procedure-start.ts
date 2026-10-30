@@ -130,6 +130,7 @@ export class ProcedureStartComponent implements OnInit {
       leave: { fn: 'leaveProcedureStart', route: '/leaves' },
       monthly_change: { fn: 'gradeRevisionStart', route: '/revisions' },
       age_event: { fn: 'ageEventStart', route: '/age-events' },
+      transfer: { fn: 'transferStart', route: '/transfers' },
     };
     const w = wizard[this.type()];
     if (w) {

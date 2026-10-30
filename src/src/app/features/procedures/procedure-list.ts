@@ -40,6 +40,7 @@ const PROCEDURE_TYPE_LABELS: Record<string, string> = {
   bonus_payment: '賞与支払届',
   transfer: '異動手続き',
   age_event: '年齢到達手続き',
+  employment_change: '雇用条件の変更',
 };
 
 const STATUS_LABELS: Record<string, string> = {

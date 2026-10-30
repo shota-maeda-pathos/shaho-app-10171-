@@ -56,6 +56,7 @@ export class NoPayDialogComponent {
       @if (r.rejected?.salary) { <p class="bad">給与が差し戻されました。理由：{{ r.rejected?.salary }}</p> }
       @if (r.rejected?.premium) { <p class="bad">保険料が差し戻されました。理由：{{ r.rejected?.premium }}</p> }
       @for (w of r.warnings; track w) { <p class="warn">{{ w }}</p> }
+      @if (r.otherEmployer) { <p class="warn">二以上事業所勤務（ほかに「{{ r.otherEmployer }}」）です。本システムでは保険料の按分をしないため、別途確かめてください。</p> }
       @if (r.revision; as rv) {
         <div class="row-actions">
           @if (rv.procedureId) {

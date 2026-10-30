@@ -168,7 +168,7 @@ export async function getAgeEvent(companyId: string, procedureId: string, auth: 
     },
     current: currentAgeStep(proc),
     steps: proc.steps.map(s => ({ id: s.id, label: s.label, status: s.status, statusDetail: s.statusDetail })),
-    employee: { id: proc.employeeId!, employeeNumber: ctx.employee.employeeNumber, name: nameOf(ctx.employee), birthDate: ae.birthDate },
+    employee: { id: proc.employeeId!, employeeNumber: ctx.employee.employeeNumber, name: nameOf(ctx.employee), birthDate: ae.birthDate, otherEmployer: ctx.employee.otherEmployer?.name ?? null },
     facts: {
       reachDate: ae.reachDate, lossDate: ae.lossDate, effect: facts.effect,
       lastChargedMonth: addMonths(facts.changeMonth, -1), deadline: deadlineOf(ae.lossDate),

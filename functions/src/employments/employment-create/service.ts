@@ -101,6 +101,9 @@ export async function createEmployment(
       updatedAt: now,
     });
 
+    // 満了の通知（ホーム）が従業員だけを読めば済むように、契約を従業員にも写す
+    tx.update(empRef, { contract: { type: contractType, endDate: input.contractEndDate ?? null, renewalExpected: input.renewalExpected ?? false } });
+
     const auditRef = db
       .collection(`companies/${auth.companyId}/auditLogs`)
       .doc();

@@ -144,10 +144,13 @@ interface OnboardResult {
         @if (employeeStatus() === 'resigned') {
           <mat-chip-set><mat-chip color="warn" highlighted>退職済</mat-chip></mat-chip-set>
         } @else {
+          <button mat-stroked-button [routerLink]="['/employment-changes', 'new']" [queryParams]="{ employeeId }">
+            <mat-icon>edit_note</mat-icon> 雇用条件を変える
+          </button>
           <button mat-stroked-button [routerLink]="['/revisions', 'new']" [queryParams]="{ employeeId }">
             <mat-icon>trending_up</mat-icon> 随時改定
           </button>
-          <button mat-stroked-button color="primary" (click)="showTransferPanel = !showTransferPanel">
+          <button mat-stroked-button color="primary" [routerLink]="['/transfers', 'new']" [queryParams]="{ employeeId }">
             <mat-icon>swap_horiz</mat-icon> 異動
           </button>
           <button mat-stroked-button color="warn" (click)="startResignation()" [disabled]="resigning()">
@@ -156,6 +159,47 @@ interface OnboardResult {
         }
       }
     </div>
+
+    @if (!isNew && employeeStatus() !== 'resigned' && contract()?.type === 'fixed' && contract()?.endDate) {
+      <div class="notice-banner" role="status">
+        <mat-icon>event</mat-icon>
+        <div class="notice-text">有期雇用の契約期間は <strong>{{ contract()!.endDate }}</strong> までです{{ contract()!.renewalExpected ? '（更新の見込みあり）' : '' }}。
+          更新する場合は新しい契約期間を雇用条件に入れ、更新しない場合は退職の手続きをします。</div>
+        <a mat-stroked-button [routerLink]="['/employment-changes', 'new']" [queryParams]="{ employeeId, reason: 'renewal' }">契約を更新する</a>
+        <button mat-stroked-button color="warn" (click)="startResignation()" [disabled]="resigning()">更新しない（退職の手続き）</button>
+      </div>
+    }
+    @if (!isNew && otherEmployer(); as oe) {
+      <div class="notice-banner warn" role="alert">
+        <mat-icon>warning</mat-icon>
+        <div class="notice-text"><strong>二以上事業所勤務</strong>：ほかに「{{ oe.name }}」{{ oe.since ? '（' + oe.since + 'から）' : '' }}にも勤めています。{{ oe.note }}
+          本システムは二以上事業所勤務に対応していません。保険料の按分と、被保険者所属選択・二以上事業所勤務届などは別途手続きしてください。</div>
+        <button mat-stroked-button (click)="saveOtherEmployer(null)" [disabled]="savingOther()">登録を外す</button>
+      </div>
+    } @else if (!isNew && employeeStatus() !== 'resigned') {
+      @if (showOtherPanel) {
+        <mat-card class="action-panel">
+          <mat-card-content>
+            <h3>ほかの事業所にも勤めている（二以上事業所勤務）</h3>
+            <p class="panel-desc">登録しても保険料や届出は変わりません。手続きの画面で「別途手続きが必要」と警告を出すための記録です。</p>
+            <div class="form-row">
+              <mat-form-field appearance="outline"><mat-label>ほかの勤め先の名前</mat-label>
+                <input matInput [(ngModel)]="otherForm.name" name="otherName" maxlength="100"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>勤め始めた日（任意）</mat-label>
+                <input matInput type="date" [(ngModel)]="otherForm.since" name="otherSince"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>メモ（任意）</mat-label>
+                <input matInput [(ngModel)]="otherForm.note" name="otherNote" maxlength="200"></mat-form-field>
+            </div>
+            <div class="panel-actions">
+              <button mat-flat-button color="primary" (click)="saveOtherEmployer(otherForm)" [disabled]="savingOther() || !otherForm.name.trim()">登録する</button>
+              <button mat-stroked-button (click)="showOtherPanel = false">キャンセル</button>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      } @else {
+        <button mat-button class="other-link" (click)="showOtherPanel = true"><mat-icon>add</mat-icon>ほかの事業所にも勤めている場合は登録する</button>
+      }
+    }
 
     @if (showTransferPanel) {
       <mat-card class="action-panel">
@@ -759,6 +803,10 @@ interface OnboardResult {
     table { width: 100%; }
     .spacer { flex: 1; }
     .action-panel { margin-bottom: 16px; border-left: 4px solid #1976d2; }
+    .notice-banner { display: flex; align-items: center; gap: var(--app-space-3); flex-wrap: wrap; margin-bottom: var(--app-space-3); padding: var(--app-space-3) var(--app-space-4); border-radius: var(--app-radius); background: var(--app-status-yours-bg); }
+    .notice-banner.warn { background: var(--app-status-action-bg); }
+    .notice-text { flex: 1; min-width: 240px; line-height: 1.7; }
+    .other-link { margin-bottom: var(--app-space-2); }
     .action-panel.warn-panel { border-left-color: #f44336; }
     .action-panel h3 { margin: 0 0 8px; font-size: 16px; font-weight: 500; }
     .panel-desc { margin: 0 0 16px; color: rgba(0,0,0,.6); font-size: 13px; }
@@ -793,6 +841,11 @@ export class EmployeeDetailComponent implements OnInit {
   employeeStatus = signal<string>('active');
 
   showTransferPanel = false;
+  showOtherPanel = false;
+  otherForm = { name: '', since: '', note: '' };
+  savingOther = signal(false);
+  contract = signal<{ type: 'indefinite' | 'fixed'; endDate: string | null; renewalExpected: boolean } | null>(null);
+  otherEmployer = signal<{ name: string; since: string | null; note: string } | null>(null);
   transferDate = '';
   transferOfficeId = '';
   transferReason = '';
@@ -920,6 +973,8 @@ export class EmployeeDetailComponent implements OnInit {
       const data = result.data;
       this.version = data.version;
       this.employeeStatus.set(data.status ?? 'active');
+      this.contract.set(data.contract ?? null);
+      this.otherEmployer.set(data.otherEmployer ?? null);
       this.form = {
         employeeNumber: data.employeeNumber ?? '',
         lastName: data.lastName ?? '',
@@ -1071,6 +1126,26 @@ export class EmployeeDetailComponent implements OnInit {
   }
 
   /** 退職はウィザードで進める。同じ人の進行中の手続きがあれば、それを開く */
+  /** 二以上事業所勤務の登録・解除 */
+  async saveOtherEmployer(value: { name: string; since: string; note: string } | null) {
+    this.savingOther.set(true);
+    try {
+      await httpsCallable(this.functions, 'employeeOtherEmployerSet')({
+        companyId: this.auth.companyId, employeeId: this.employeeId,
+        otherEmployer: value ? { name: value.name.trim(), since: value.since || null, note: value.note.trim() } : null,
+      });
+      this.otherEmployer.set(value ? { name: value.name.trim(), since: value.since || null, note: value.note.trim() } : null);
+      this.showOtherPanel = false;
+      this.otherForm = { name: '', since: '', note: '' };
+      await this.loadEmployee();
+      this.snackBar.open(value ? '二以上事業所勤務を登録しました' : '二以上事業所勤務の登録を外しました', '閉じる', { duration: 4000 });
+    } catch (e: any) {
+      this.snackBar.open(`保存できませんでした：${e.message ?? ''}`, '閉じる', { duration: 6000 });
+    } finally {
+      this.savingOther.set(false);
+    }
+  }
+
   async startResignation() {
     if (this.resigning()) return;
     this.resigning.set(true);

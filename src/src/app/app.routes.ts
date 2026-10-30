@@ -193,6 +193,20 @@ export const routes: Routes = [
           import('./features/leave/leave-wizard').then((m) => m.LeaveWizardComponent),
       },
       {
+        path: 'transfers/:id',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '事業所間異動' },
+        loadComponent: () =>
+          import('./features/transfer/transfer-wizard').then((m) => m.TransferWizardComponent),
+      },
+      {
+        path: 'employment-changes/:id',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '雇用条件の変更' },
+        loadComponent: () =>
+          import('./features/employment-change/employment-change-wizard').then((m) => m.EmploymentChangeWizardComponent),
+      },
+      {
         path: 'age-events/:id',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '年齢到達の手続き' },

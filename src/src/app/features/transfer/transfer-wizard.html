@@ -1,0 +1,100 @@
+<div class="app-page">
+  <a routerLink="/procedures" class="back"><mat-icon>arrow_back</mat-icon>進行中の手続き</a>
+
+  @if (loading()) {
+    <app-loading-state />
+  } @else if (loadError()) {
+    <app-error-state [message]="loadError()" (retry)="load(true)" />
+  } @else if (view(); as v) {
+    <app-wizard [heading]="v.procedure.title"
+                [subtitle]="'社員番号 ' + v.employee.employeeNumber + '・' + v.from.name + (v.to ? ' → ' + v.to.name : '')"
+                [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                (advance)="advance()">
+
+      @if (v.employee.otherEmployer) {
+        <div class="alert" role="alert">二以上事業所勤務（ほかに「{{ v.employee.otherEmployer }}」）として登録されています。本システムは二以上事業所勤務に対応していないため、届出と保険料は別途確かめてください。</div>
+      }
+
+      @switch (key()) {
+        @case ('entry') {
+          @if (v.applied) { <p class="note">台帳の所属事業所を変えたあとは、異動先・異動日は直せません。</p> }
+          <fieldset class="form-grid" [disabled]="v.applied">
+            <mat-form-field appearance="outline"><mat-label>今の事業所</mat-label>
+              <input matInput [value]="v.from.name" disabled></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>異動先の事業所</mat-label>
+              <mat-select [(ngModel)]="toOfficeId" (ngModelChange)="changed()" name="toOffice" [disabled]="v.applied">
+                @for (o of offices(); track o.id) { @if (o.id !== v.from.id) { <mat-option [value]="o.id">{{ o.name }}</mat-option> } }
+              </mat-select></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>異動日（異動先で働き始める日）</mat-label>
+              <input matInput type="date" [(ngModel)]="transferDate" (ngModelChange)="changed()" name="transferDate"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>異動の理由（任意）</mat-label>
+              <input matInput [(ngModel)]="reason" (ngModelChange)="dirty.set(true)" name="reason" maxlength="200"></mat-form-field>
+          </fieldset>
+          <section class="result" aria-live="polite">
+            <h3>異動の影響</h3>
+            @if (factsError()) {
+              <p class="error">{{ factsError() }}</p>
+            } @else if (facts(); as f) {
+              <p>
+                <app-status-badge [tone]="f.filingRequired ? 'yours' : 'done'" [label]="f.filingRequired ? '届出が要ります' : '届出はいりません'" />
+                <app-status-badge [tone]="f.healthRateChanges ? 'yours' : 'done'" [label]="f.healthRateChanges ? '健康保険の料率が変わります' : '料率は変わりません'" />
+              </p>
+              <ul class="plain">@for (n of f.notes; track n) { <li>{{ n }}</li> }</ul>
+            } @else {
+              <p class="sub">異動先と異動日を入れると判定します。</p>
+            }
+          </section>
+        }
+
+        @case ('apply') {
+          @if (v.applied) {
+            <p><app-status-badge tone="done" label="変更済み" /> 台帳の所属事業所を{{ v.to?.name }}に変えました。</p>
+          } @else if (v.facts; as f) {
+            <table class="summary">
+              <tbody>
+                <tr><th>異動</th><td>{{ v.from.name }} → {{ v.to?.name }}（{{ v.transferDate | date:'yyyy年M月d日' }}）</td></tr>
+                <tr><th>届出</th><td>{{ f.filingRequired ? '資格喪失届（' + v.from.name + '）と資格取得届（' + v.to?.name + '）を作り、承認を依頼します。等級は今の等級を引き継ぎます' : 'なし' }}</td></tr>
+              </tbody>
+            </table>
+            <p class="sub">毎月の処理は、台帳を変えたあとは異動先の事業所に出ます。異動日より前の月の処理が残っていれば、先に済ませてください。</p>
+          }
+        }
+
+        @case ('filings') {
+          @if (!v.facts?.filingRequired) {
+            <p class="sub">同じ適用事業所の中の異動のため、届出はいりません。</p>
+          } @else {
+            <p>届出の画面で、承認者の承認のあと、模擬電子申請または紙で提出してください。2件とも提出すると次へ進めます。</p>
+            <table class="summary">
+              <tbody>
+                @if (v.lossFiling; as f) {
+                  <tr><th>資格喪失届（{{ v.from.name }}）</th><td><app-status-badge [tone]="f.done ? 'done' : 'waiting'" [label]="filingStatus(f)" />
+                    <a [routerLink]="['/filings', f.id]" [queryParams]="{ employeeId: v.employee.id }">届出を開く</a></td></tr>
+                }
+                @if (v.acquisitionFiling; as f) {
+                  <tr><th>資格取得届（{{ v.to?.name }}）</th><td><app-status-badge [tone]="f.done ? 'done' : 'waiting'" [label]="filingStatus(f)" />
+                    <a [routerLink]="['/filings', f.id]" [queryParams]="{ employeeId: v.employee.id }">届出を開く</a></td></tr>
+                }
+              </tbody>
+            </table>
+            <button mat-stroked-button type="button" (click)="load(true)" [disabled]="busy()"><mat-icon>refresh</mat-icon>最新の状態にする</button>
+          }
+        }
+
+        @case ('confirm') {
+          @if (isDone()) {
+            <div class="complete" role="status"><mat-icon aria-hidden="true">check_circle</mat-icon><div><strong>異動の手続きは完了しました。</strong></div></div>
+          }
+          <table class="summary">
+            <tbody>
+              <tr><th>異動</th><td>{{ v.from.name }} → {{ v.to?.name }}（{{ v.transferDate | date:'yyyy年M月d日' }}）</td></tr>
+              @if (v.facts; as f) { <tr><th>保険料</th><td>{{ f.notes[f.notes.length - 1] }}</td></tr> }
+            </tbody>
+          </table>
+          <a mat-stroked-button [routerLink]="['/employees', v.employee.id]">従業員の画面を開く</a>
+        }
+      }
+    </app-wizard>
+  }
+</div>

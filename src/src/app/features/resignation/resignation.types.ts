@@ -37,6 +37,8 @@ export interface ResignationView {
   employee: {
     id: string; employeeNumber: string; name: string; birthDate: string | null; hireDate: string | null;
     acquisitionDate: string | null; isForeign: boolean; enrolled: { health: boolean; pension: boolean };
+    /** 二以上事業所勤務のほかの勤め先（古いサーバーは返さない） */
+    otherEmployer?: string | null;
   };
   office: { deductionMethod: 'previous' | 'current'; paymentDay: number | null };
   entry: { resignationDate: string; reason: LossReason; note: string } | null;

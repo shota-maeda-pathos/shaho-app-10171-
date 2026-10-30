@@ -73,6 +73,25 @@ const REVISION_WIZARD_STEPS: StepTemplate[] = [
   { id: 'confirm', label: '完了を確認する', type: 'confirmation', dependsOn: ['mock_filing', 'paper_submit'], isConditional: false, condition: null },
 ];
 
+// 届出は旧事業所の喪失届と新事業所の取得届の2件。届出の画面で承認・提出し、この手続きは状態を読んで進める
+const TRANSFER_WIZARD_STEPS: StepTemplate[] = [
+  { id: 'entry', label: '異動先と異動日を入れて影響を確かめる', type: 'data_entry', dependsOn: [], isConditional: false, condition: null },
+  { id: 'apply', label: '台帳の所属事業所を変える', type: 'data_entry', dependsOn: ['entry'], isConditional: false, condition: null },
+  { id: 'filings', label: '資格喪失届・資格取得届を出す', type: 'data_entry', dependsOn: ['apply'], isConditional: false, condition: null },
+  { id: 'confirm', label: '完了を確認する', type: 'confirmation', dependsOn: ['filings'], isConditional: false, condition: null },
+];
+
+const EMPLOYMENT_CHANGE_STEPS: StepTemplate[] = [
+  { id: 'entry', label: '新しい雇用条件を入れる', type: 'data_entry', dependsOn: [], isConditional: false, condition: null },
+  // 雇用条件の承認は手続きの状態（employmentChange.approvalId）で追う。type を approval にすると届出の承認と混ざる
+  { id: 'change_approval', label: '承認者が雇用条件を確認する', type: 'data_entry', dependsOn: ['entry'], isConditional: false, condition: null },
+  { id: 'filing_create', label: '届出を作る', type: 'document_create', dependsOn: ['change_approval'], isConditional: false, condition: null },
+  { id: 'approval', label: '承認者が届出を確認する', type: 'approval', dependsOn: ['filing_create'], isConditional: false, condition: null },
+  { id: 'mock_filing', label: '電子申請する（模擬）', type: 'mock_filing', dependsOn: ['approval'], isConditional: false, condition: null },
+  { id: 'paper_submit', label: '紙で提出して記録する', type: 'paper_submit', dependsOn: ['approval'], isConditional: false, condition: null },
+  { id: 'confirm', label: '完了を確認する', type: 'confirmation', dependsOn: ['mock_filing', 'paper_submit'], isConditional: false, condition: null },
+];
+
 const AGE_WIZARD_STEPS: StepTemplate[] = [
   { id: 'check', label: '到達日と届出の要否を確かめる', type: 'data_entry', dependsOn: [], isConditional: false, condition: null },
   { id: 'filing_create', label: '届出を作る', type: 'document_create', dependsOn: ['check'], isConditional: false, condition: null },
@@ -179,6 +198,7 @@ const TEMPLATE_MAP: Record<ProcedureType, StepTemplate[]> = {
   bonus_payment: BONUS_PAYMENT_STEPS,
   transfer: TRANSFER_STEPS,
   age_event: AGE_EVENT_STEPS,
+  employment_change: EMPLOYMENT_CHANGE_STEPS,
 };
 
 const PROCEDURE_TYPE_LABELS: Record<ProcedureType, string> = {
@@ -192,6 +212,7 @@ const PROCEDURE_TYPE_LABELS: Record<ProcedureType, string> = {
   bonus_payment: '賞与支払届',
   transfer: '異動手続き',
   age_event: '年齢到達手続き',
+  employment_change: '雇用条件の変更',
 };
 
 /** 入社手続き（ウィザード）のステップ */
@@ -212,6 +233,16 @@ export function buildLeaveWizardSteps(): ProcedureStep[] {
 /** 随時改定・終了時改定（ウィザード）のステップ */
 export function buildRevisionWizardSteps(): ProcedureStep[] {
   return toSteps(REVISION_WIZARD_STEPS);
+}
+
+/** 事業所間異動（ウィザード）のステップ */
+export function buildTransferWizardSteps(): ProcedureStep[] {
+  return toSteps(TRANSFER_WIZARD_STEPS);
+}
+
+/** 雇用条件の変更（ウィザード）のステップ */
+export function buildEmploymentChangeSteps(): ProcedureStep[] {
+  return toSteps(EMPLOYMENT_CHANGE_STEPS);
 }
 
 /** 年齢到達（ウィザード）のステップ */

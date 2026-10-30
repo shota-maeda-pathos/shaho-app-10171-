@@ -17,6 +17,8 @@ export interface EmployeeResponse {
   version: number;
   createdAt: string;
   updatedAt: string;
+  contract?: { type: 'indefinite' | 'fixed'; endDate: string | null; renewalExpected: boolean } | null;
+  otherEmployer?: { name: string; since: string | null; note: string } | null;
 }
 
 export interface DependentResponse {

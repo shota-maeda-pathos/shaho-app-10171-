@@ -44,6 +44,8 @@ export function toEmployeeResponse(
     version: data.version,
     createdAt: toISOString(data.createdAt),
     updatedAt: toISOString(data.updatedAt),
+    contract: data.contract ?? null,
+    otherEmployer: data.otherEmployer ? { name: data.otherEmployer.name, since: data.otherEmployer.since, note: data.otherEmployer.note } : null,
   };
 }
 

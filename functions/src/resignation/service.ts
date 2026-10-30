@@ -253,7 +253,7 @@ export async function getResignation(companyId: string, procedureId: string, aut
       birthDate: e.birthDate ? toDateString(e.birthDate) : null,
       hireDate: e.hireDate ? toDateString(e.hireDate) : null,
       acquisitionDate: qualificationDates({ ...e, resignationDate: null } as EmployeeDoc).acquisitionDate,
-      isForeign: !!e.foreignInfo, enrolled,
+      isForeign: !!e.foreignInfo, enrolled, otherEmployer: e.otherEmployer?.name ?? null,
     },
     office: { deductionMethod: ctx.office.deductionMethod ?? 'previous', paymentDay: ctx.office.paymentDay ?? null },
     entry: rs.resignationDate ? { resignationDate: rs.resignationDate, reason: rs.reason, note: rs.note } : null,

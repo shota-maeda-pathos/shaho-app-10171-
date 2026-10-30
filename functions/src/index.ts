@@ -157,4 +157,7 @@ export { resignationStart, resignationGet, resignationPreview, resignationUpdate
 export { dependentChangeStart, dependentChangeGet, dependentChangePreview, dependentChangeUpdate } from './dependent-change/functions';
 export { leaveProcedureStart, leaveProcedureGet, leaveProcedurePreview, leaveProcedureUpdate } from './leave-procedure/functions';
 export { gradeRevisionStart, gradeRevisionGet, gradeRevisionPreview, gradeRevisionUpdate, sampleRevisionCreate } from './grade-revision/functions';
+export { employmentChangeStart, employmentChangeGet, employmentChangePreview, employmentChangeUpdate, sampleChangeCreate } from './employment-change/functions';
+export { transferStart, transferGet, transferPreview, transferUpdate } from './transfer/functions';
+export { employeeOtherEmployerSet } from './employees/employee-other-employer/functions';
 export { ageEventStart, ageEventGet, ageEventPreview, ageEventUpdate, sampleAgeCreate } from './age-event/functions';

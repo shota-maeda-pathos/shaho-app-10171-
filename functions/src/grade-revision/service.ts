@@ -292,7 +292,7 @@ export async function getRevision(companyId: string, procedureId: string, auth: 
     },
     current: currentRevisionStep(proc),
     steps: proc.steps.map(s => ({ id: s.id, label: s.label, status: s.status, statusDetail: s.statusDetail })),
-    employee: { id: proc.employeeId!, employeeNumber: e.employeeNumber, name: nameOf(e) },
+    employee: { id: proc.employeeId!, employeeNumber: e.employeeNumber, name: nameOf(e), otherEmployer: e.otherEmployer?.name ?? null },
     form: {
       startMonth: gr.startMonth, manualDirection: gr.manualDirection, previousRemuneration: gr.previousRemuneration, note: gr.note, leave: gr.leave,
     },

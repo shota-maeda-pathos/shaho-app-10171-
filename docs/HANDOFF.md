@@ -1,6 +1,6 @@
 # 引継ぎ（最新）
 
-更新：2026-10-30（段階6 年齢到達を個人型のウィザードにし、70歳・75歳の届出の提出・完了まで画面で確認。段階6の業務はすべて型に当てはめた。次は段階7）。新しいセッションは最初にこのファイルを読む。応答は日本語で行う。
+更新：2026-10-30（段階6 年齢到達に続き、有期雇用の満了・二以上事業所・雇用条件の変更・事業所間異動を作り、画面で完了まで確認。段階6の残りは画面での確認不足の項目。次は段階7）。新しいセッションは最初にこのファイルを読む。応答は日本語で行う。
 
 ## 1. 目的と前提
 
@@ -126,6 +126,14 @@
 - 届出：75歳は `lossNotification`（喪失原因「75歳到達」→ 様式の「7.」に丸）。70歳は新しい種類 `pensionLoss70`（公式様式 `src/public/filing-forms/pension-loss-70.pdf`、出所は `sources.json`。喪失原因「6. 70歳到達」は様式に印刷済み。記入は `official-filing-pdf.ts` の `pensionLoss70`）。
 - 入口：ライフイベントのカード「70歳・75歳になる」（`procedure-start.ts` で従業員と年齢を選ぶ）、ホームのやること（`/age-events/new?employeeId=&kind=` を開くと手続きを作る）。ホーム：`home/service.ts` の `ageNoticeTodos`（まだ始めていない到達）と `ageTodo`（手続き）。従業員を全員読む（`select` で生年月日などだけ）。
 
+## 4-10. 重要な仕様（段階6 雇用条件の変更・有期雇用・二以上事業所・事業所間異動）
+
+- 雇用条件の変更 `/employment-changes/:id`（`procedureType: 'employment_change'` に `employmentChange`）：新しい条件を入れる→承認者が雇用条件を確認する→届出→承認→提出→完了。サーバー `functions/src/employment-change/`（`employmentChangeStart`・`Get`・`Preview`・`Update`（entry／filing／complete）・`sampleChangeCreate`）。判定は入社の `evaluateContract` を新しい条件の初日で使う。保存すると `employments` に **effectiveDate を持たない下書き**（`plannedEffectiveDate`）を作り、`requestType: 'employment'` で承認を依頼する（日付で探す計算・判定から見えない）。承認されたら、次に手続きを開いたときに effectiveDate を付けて有効にし、従業員の `contract` を書き換える（`applyIfApproved`）。加入が切り替われば資格取得届（取得日＝初日、`metadata.grade` で資格取得時決定）・資格喪失届（喪失日＝初日の翌日、健康保険法第36条）。雇用条件の承認のステップは type を data_entry にしてある（approval にすると届出の承認と混ざる）。入口は従業員詳細の「雇用条件を変える」と、有期の満了の案内の「契約を更新する」（`reason: 'renewal'`）。
+- 有期雇用：`createEmployment` が契約を従業員に写す（`contract: {type, endDate, renewalExpected}`）。ホームの `contractTodo`（従業員を読む `ageNoticeTodos` の中で、先月〜来月末の満了）。従業員詳細に満了の案内。
+- 二以上事業所：`employeeOtherEmployerSet` で従業員に `otherEmployer` を記録（保険料・届出は変えない）。`employeeGet`・`monthlyRunOverview`（行の `otherEmployer`）・各ウィザードの取得で返し、警告を出す。
+- 事業所間異動 `/transfers/:id`（`procedureType: 'transfer'` に `transfer`）：異動先と異動日→台帳の所属事業所を変える→資格喪失届・資格取得届を出す→完了。サーバー `functions/src/transfer/`（`transferStart`・`Get`・`Preview`・`Update`（entry／apply／complete））。届出は2件で、届出の画面で承認・提出し、手続きは2件とも提出済み（模擬申請の完了か紙の受理）になると次へ進む。取得届の等級は今の等級を引き継ぎ、届出の承認で異動月の等級として確定。従業員詳細の旧い異動パネル（`employeeTransfer`）はボタンから外した（関数は残る）。
+- 届出の画面の模擬申請・提出記録は確認ダイアログを通るため、ブラウザーペインでは押せない（今回は関数を直接呼んで確かめた件がある）。
+
 ## 5. 現在の状態（本番）
 
 - 段階4の関数と `homeTodos` はデプロイ済み。段階6の `resignationStart`・`resignationGet`・`resignationPreview`・`resignationUpdate`・`userUnsuspend`（今回が初公開）、扶養の `dependentChangeStart`・`dependentChangeGet`・`dependentChangePreview`・`dependentChangeUpdate`、直した `dependentList` もデプロイ済み。産休・育休の `leaveProcedureStart`・`leaveProcedureGet`・`leaveProcedurePreview`・`leaveProcedureUpdate` と、変更した `leaveList`・`homeTodos`・`filingMockSubmit`・`filingPdfData`・`monthlyJobChunk`・`monthlyInsuranceCalculate`・`bonusInsuranceCalculate` も 2026-10-29 にデプロイ済み（ただし `homeTodos` の期間の表示（「6月30日〜10月10日」の形）の直しは未デプロイ）。旧画面の `operationsMonthlyAction` は免除の変更を反映していない。認証（`middleware/auth.ts`）の変更は、これらの関数にだけ反映されている。**Hosting（画面）は未公開**（ローカルの開発サーバーで確認している）。
@@ -142,16 +150,18 @@
 - 賞与（2026-10-30）：`bonusRunOverview`・`bonusRunHold`・`bonusRunImport`・`bonusRunEntry`・`bonusRunNonPayment`・`bonusJobStart`・`bonusJobGet`・`bonusJobChunk`（asia-northeast1）・`bonusFilingCreate`・`bonusFilingUpdate`・`bonusFilingGet`・`sampleBonusCreate` を新規デプロイ。`bonusInsuranceCalculate`・`homeTodos`・`officeList`・`officeUpdate` を再デプロイ。
 - 随時改定・終了時改定（2026-10-30）：`gradeRevisionStart`・`gradeRevisionGet`・`gradeRevisionPreview`・`gradeRevisionUpdate`・`sampleRevisionCreate` を新規デプロイ。`monthlyRunOverview`・`homeTodos`・`approvalRequestApprove`・`filingMockSubmit`・`filingPdfData`・`filingCreate` を再デプロイ。`homeTodos` の期間の表示の直しも、この再デプロイより前に反映済み（別セッションで確認）。
 - 年齢到達（2026-10-30）：`ageEventStart`・`ageEventGet`・`ageEventPreview`・`ageEventUpdate`・`sampleAgeCreate` を新規デプロイ。75歳の直しで `monthlyInsuranceCalculate`・`monthlyJobChunk`・`bonusInsuranceCalculate`・`bonusJobChunk`・`resignationGet`・`resignationPreview`・`resignationUpdate`・`employeeResign` を、ほかに `homeTodos`・`filingMockSubmit`・`filingPdfData`・`filingCreate` を再デプロイ。
+- 雇用条件の変更など（2026-10-30）：`employmentChangeStart`・`employmentChangeGet`・`employmentChangePreview`・`employmentChangeUpdate`・`sampleChangeCreate`・`transferStart`・`transferGet`・`transferPreview`・`transferUpdate`・`employeeOtherEmployerSet` を新規デプロイ。`homeTodos`・`employeeGet`・`employmentCreate`・`onboardingUpdate`・`monthlyRunOverview`・`resignationGet`・`gradeRevisionGet`・`ageEventGet` を再デプロイ。
 - 端数処理の移行（`migrateOfficeRoundingRule`）は未実行。会社設定の「特定適用事業所」は未登録（3/4未満の人の加入判定が「担当者の判断が必要」になる）。
 - 賞与のテスト（2026-10-30）：`sampleBonusCreate` で「サンプル賞与テスト事業所」（`sample-bonus-office`、300名、`BONUS-0001`〜、支給予定月 7・9・12月、2026年4・7・8月の賞与つき。50人ごとに同月2回・上限に近い・上限超え・4回目・育休免除・70歳以上・喪失月・喪失日以後・支給なし・現物・7月未承認・適用外の人）を作成。12月支給を表の貼り付けで294名取り込み（1人分の入力で BONUS-0011 に2回目 100,500円を追加）、賞与額を承認、282名の保険料を計算（7月未承認の6名は失敗→保留）、276名の保険料を承認、届出（276名）を承認→模擬電子申請→完了。9月は不支給のアラートが出たまま（記録の操作は未確認）。7月の未承認6名のため、ホームに「賞与（2026年7月支給）：賞与額の承認を依頼する」が出る。この事業所はホームの「毎月の処理（2026年10月支給）」にも出る（給与なし300名）。
 - 改定のテスト（2026-10-30）：`sampleRevisionCreate` で「サンプル改定テスト事業所」（`sample-revision-office`、11名 `REV-0001`〜。2025年9月の定時決定の等級、2026年6〜9月支給の給与。昇給・降給・1等級差・向き違い・日数不足・遡及・上限・下限・短時間・9月未承認・育休明け）を作成。2026年9月支給の保険料を計算（未承認）。REV-0001 の随時改定（健保22→25・厚年19→22、10月から）と REV-0011 の育休終了時改定（健保22→21・厚年19→18、10月から）は承認→模擬電子申請→完了。REV-0003 は「改定しない」で終えた。ホームに「毎月の処理（2026年9月・10月支給）」が増えている。
 - 年齢到達のテスト（2026-10-30）：`sampleAgeCreate` で「サンプル年齢到達テスト事業所」（`sample-age-office`、7名 `AGE-0001`〜。40・65歳、70歳（報酬が同じ／再雇用で下がった・12月1日生まれ／10月に到達済み）、75歳（配偶者が被扶養者／11月1日生まれ）。2026年9月の等級と8〜10月支給の承認済みの給与）を作成。AGE-0003（70歳・届出なし）は完了、AGE-0004（70歳・届出あり）と AGE-0006（75歳）は承認→模擬電子申請→完了。AGE-0005（10月到達・期限切れ）と AGE-0007（75歳・11月1日生まれ）はホームのやることに残っている。この事業所はホームの「毎月の処理（2026年10月支給）」にも出る。
-- テスト：587件中578件成功。失敗9件は改修前から（各テスト独自のモックが手続き機能に追随していない。段階10で対応）。
+- 変更のテスト（2026-10-30）：`sampleChangeCreate` で「サンプル変更テスト事業所」（`sample-change-office`、東京）と「サンプル変更テスト大阪事業所」（`sample-change-office-osaka`）、6名 `CHG-0001`〜 を作成。CHG-0001 は契約を2027-11-30まで更新（完了）、CHG-0002 は11月15日満了の知らせが出たまま、CHG-0003 は12月からパート（資格喪失届を提出・完了）、CHG-0004 は12月から正社員（資格取得届を提出・完了、12月の資格取得時決定の等級）、CHG-0005 は12月1日に大阪へ異動（届出2件を提出・完了、所属は大阪）、CHG-0006 は二以上事業所（株式会社サンプル物流）を登録。CHG-0001 には、最初の保存のエラーの前に作られた余分な雇用条件の承認依頼（effectiveDate のない下書き）が1件ある（ユーザーに差し戻しを依頼）。
+- テスト：593件中584件成功。失敗9件は改修前から（各テスト独自のモックが手続き機能に追随していない。段階10で対応）。
 
 ## 6. 次にやるべきタスク
 
 1. **段階6 退職の任意の確認**：紙の提出・差し戻しの表示、アカウントのある人での閲覧専用・ログイン停止、70歳・75歳・外国人の人（いずれも該当するテストデータがない）。
-2. **段階6は完了**（7業務すべてを型に当てはめた）。次は段階7（届出・承認の横断機能）。年齢到達の任意の確認：紙の提出・差し戻し、退職の画面で70歳・75歳の人を通す、毎月の処理で75歳の月初生まれの保険料（10月分まで健保）を計算して確かめる。随時改定・終了時改定の任意の確認：産休・育休の完了画面から始める流れ（休業の引き継ぎ）と産休終了時の改定（⑪の画面確認）、下限の特例で従前の報酬月額を入れて判定する操作、紙の提出・差し戻し、改定した月の保険料の計算し直しの案内、毎月の処理で手続きを始めた後の表示。賞与の任意の確認：不支給報告書の提出日の記録と取り消し、紙の提出・届出や賞与額の差し戻し後の出し直し、承認者だけのアカウントでのホーム表示、7月の未承認6名を承認して12月を計算し直す流れ（年度累計が変わり「計算し直し」になる）。算定基礎届の任意の確認：9月分の保険料に新しい等級が使われること（毎月の処理）、紙の提出・届出の差し戻し・等級の差し戻し後の出し直し、承認者だけのアカウントでのホーム表示。扶養の任意の確認：非該当・変更・紙の提出、入社から引き継ぐ流れ。産休・育休の任意の確認：紙の提出・差し戻し、産休の終了届（判定は単体テストのみ）、育休の延長の提出（判定は画面で確認）、免除が毎月の計算結果に出ること（テスト用の人に給与がないため未確認）。
+2. **段階6の残り**：チェックリストで段階6が担当の 🟡・🔵 のうち画面での確認が足りない項目（外国人の退職案内、閲覧期間・アカウント停止、免除の計算結果、扶養の非該当・変更、⑪、等級履歴から届出を開く）を確かめる。そのあと段階7（届出・承認の横断機能）。年齢到達の任意の確認：紙の提出・差し戻し、退職の画面で70歳・75歳の人を通す、毎月の処理で75歳の月初生まれの保険料（10月分まで健保）を計算して確かめる。随時改定・終了時改定の任意の確認：産休・育休の完了画面から始める流れ（休業の引き継ぎ）と産休終了時の改定（⑪の画面確認）、下限の特例で従前の報酬月額を入れて判定する操作、紙の提出・差し戻し、改定した月の保険料の計算し直しの案内、毎月の処理で手続きを始めた後の表示。賞与の任意の確認：不支給報告書の提出日の記録と取り消し、紙の提出・届出や賞与額の差し戻し後の出し直し、承認者だけのアカウントでのホーム表示、7月の未承認6名を承認して12月を計算し直す流れ（年度累計が変わり「計算し直し」になる）。算定基礎届の任意の確認：9月分の保険料に新しい等級が使われること（毎月の処理）、紙の提出・届出の差し戻し・等級の差し戻し後の出し直し、承認者だけのアカウントでのホーム表示。扶養の任意の確認：非該当・変更・紙の提出、入社から引き継ぐ流れ。産休・育休の任意の確認：紙の提出・差し戻し、産休の終了届（判定は単体テストのみ）、育休の延長の提出（判定は画面で確認）、免除が毎月の計算結果に出ること（テスト用の人に給与がないため未確認）。
 3. **産休・育休の残り**：ウィザードの読み込みが10〜15秒かかることがある（新しい関数の初回起動。速さの判断とあわせて見る）。
 4. **速さの判断（ユーザーに確認）**：ホーム約5秒、毎月の処理の状況5〜6.5秒、承認一覧約8秒（関数が us-central1・Firestore が東京のため）。読み込みの多い関数を asia-northeast1 に移す案（画面の呼び出し先の変更も必要）。
 5. 任意の確認：承認者だけのアカウントでのホーム表示（段階5）。料率が変わったときの「計算し直しが必要」、差し戻しの表示、ポータルの明細（段階4）。いずれも別アカウントが要る。

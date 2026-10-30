@@ -13,6 +13,7 @@ export function filingMatchesProcedure(type: ProcedureType, filingType: string):
     childcare_leave: ['childcareLeaveStart', 'childcareLeaveEnd'],
     monthly_change: ['remunerationMonthlyChange', 'maternityLeaveEndChange', 'childcareLeaveEndChange'], annual_review: ['remunerationMonthlyAlgorithm'],
     bonus_payment: ['bonusPayment'], age_event: ['lossNotification', 'pensionLoss70'],
+    employment_change: ['acquisitionNotification', 'lossNotification'],
   };
   return allowed[type]?.includes(filingType) ?? false;
 }

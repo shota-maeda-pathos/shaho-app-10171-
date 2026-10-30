@@ -84,7 +84,7 @@ export interface RevisionView {
   };
   current: RevisionKey;
   steps: { id: string; label: string; status: string; statusDetail: string | null }[];
-  employee: { id: string; employeeNumber: string; name: string };
+  employee: { id: string; employeeNumber: string; name: string; otherEmployer?: string | null };
   form: {
     startMonth: string | null; manualDirection: Direction | null; previousRemuneration: number | null; note: string; leave: LeaveFacts | null;
   };

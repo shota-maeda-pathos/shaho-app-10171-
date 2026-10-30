@@ -17,7 +17,7 @@ export interface AgeView {
   };
   current: AgeKey;
   steps: { id: string; label: string; status: string; statusDetail: string | null }[];
-  employee: { id: string; employeeNumber: string; name: string; birthDate: string };
+  employee: { id: string; employeeNumber: string; name: string; birthDate: string; otherEmployer?: string | null };
   facts: { reachDate: string; lossDate: string; effect: string; lastChargedMonth: string; deadline: string };
   state: {
     remuneration: number | null; inKind: number; filingRequired: boolean | null;

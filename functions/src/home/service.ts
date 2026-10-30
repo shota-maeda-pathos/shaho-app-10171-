@@ -11,6 +11,8 @@ import { currentLeaveStep } from '../leave-procedure/service';
 import { currentRevisionStep } from '../grade-revision/service';
 import { FILING_LABEL as REVISION_FILING_LABEL, KIND_LABEL as REVISION_KIND_LABEL } from '../grade-revision/rules';
 import { currentAgeStep } from '../age-event/service';
+import { currentChangeStep } from '../employment-change/service';
+import { currentTransferStep } from '../transfer/service';
 import { deadlineOf, FILING_LABEL as AGE_FILING_LABEL, KIND_LABEL as AGE_KIND_LABEL, milestonesBetween } from '../age-event/rules';
 import { FILING_LABEL } from '../leave-procedure/rules';
 import { mapConcurrent } from '../utils/parallel';
@@ -219,6 +221,73 @@ function ageTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName
   });
 }
 
+const CHANGE_NEXT: Record<string, string> = {
+  entry: '新しい雇用条件を入れる',
+  filing: '届出を作って承認を依頼する',
+  submit: '届出を提出する',
+  confirm: '完了を確認する',
+};
+
+/** 雇用条件の変更。雇用条件の承認は手続きの状態で追う（届出の承認は wizardTodo） */
+async function employmentChangeTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string): Promise<HomeTodo | null> {
+  const ec = p.employmentChange!;
+  const step = currentChangeStep(p);
+  const base = {
+    id: `procedure-${p.id}`, kind: 'employment' as const, title: `${p.employeeName}さんの${ec.reason === 'renewal' ? '契約の更新' : '雇用条件の変更'}`, officeName,
+    route: `/employment-changes/${p.id}`, queryParams: { officeId: p.officeId }, updatedAt: iso(p.updatedAt),
+  };
+  const detail = ec.effectiveDate ? `${ec.effectiveDate}から` : null;
+  if (step === 'change_approval') {
+    const a = ec.approvalId && p.employeeId
+      ? (await db.doc(`companies/${auth.companyId}/employees/${p.employeeId}/approvalRequests/${ec.approvalId}`).get()).data()
+      : undefined;
+    if (a?.status === 'rejected') return { ...base, next: '差し戻された雇用条件を直す', detail: a.comment ? `理由：${a.comment}` : detail, tone: 'action', deadline: null };
+    if (a?.status === 'approved') return { ...base, next: '承認された雇用条件を台帳に反映する', detail, tone: 'yours', deadline: null };
+    const tone = approvalTone(auth, a?.requestedBy);
+    return { ...base, next: tone === 'yours' ? '雇用条件を承認する' : '承認者の確認を待っています', detail, tone, deadline: null };
+  }
+  return wizardTodo(p, auth, { base, step, next: CHANGE_NEXT, filingName: ec.effect === 'acquire' ? '資格取得届' : '資格喪失届', detail });
+}
+
+const TRANSFER_NEXT: Record<string, string> = {
+  entry: '異動先と異動日を入れる',
+  apply: '台帳の所属事業所を変える',
+  filings: '資格喪失届・資格取得届を承認・提出する',
+  confirm: '完了を確認する',
+};
+
+/** 事業所間異動。届出は届出の画面で承認・提出する */
+function transferTodo(p: ProcedureDoc & { id: string }, officeName: string): HomeTodo | null {
+  const step = currentTransferStep(p);
+  const next = TRANSFER_NEXT[step];
+  if (!next) return null;
+  const t = p.transfer!;
+  return {
+    id: `procedure-${p.id}`, kind: 'transfer', title: `${p.employeeName}さんの事業所間異動`, officeName, next,
+    detail: t.transferDate ? `${t.transferDate}に異動${t.filingRequired ? '（届出あり）' : ''}` : null,
+    tone: 'yours', deadline: step === 'filings' || step === 'apply' ? date(p.deadline) : null,
+    route: `/transfers/${p.id}`, queryParams: { officeId: p.officeId }, updatedAt: iso(p.updatedAt),
+  };
+}
+
+/**
+ * 有期雇用の契約の満了（カタログ：期間満了が近づくと通知し、更新しないなら退職処理へ移る導線を出す）。
+ * 先月から来月末までに満了する人。従業員に写した契約（`contract`）だけを見る
+ */
+function contractTodo(id: string, e: FirebaseFirestore.DocumentData, today: string, officeName: string): HomeTodo | null {
+  const c = e.contract as { type?: string; endDate?: string | null; renewalExpected?: boolean } | undefined;
+  if (c?.type !== 'fixed' || !c.endDate) return null;
+  const thisMonth = today.slice(0, 7);
+  if (c.endDate < `${addMonths(thisMonth, -1)}-01` || c.endDate > lastDayOfMonth(addMonths(thisMonth, 1))) return null;
+  const md = `${Number(c.endDate.slice(5, 7))}月${Number(c.endDate.slice(8))}日`;
+  return {
+    id: `contract-${id}`, kind: 'contract', title: `${`${e.lastName ?? ''} ${e.firstName ?? ''}`.trim()}さんの契約満了`, officeName,
+    next: '契約を更新するか決める', detail: `${md}に契約期間が満了します${c.renewalExpected ? '（更新の見込みあり）' : ''}。更新しない場合は退職の手続きへ`,
+    tone: c.endDate < today ? 'action' : 'yours', deadline: c.endDate,
+    route: `/employees/${id}`, queryParams: {}, updatedAt: null,
+  };
+}
+
 /**
  * まだ手続きを始めていない年齢到達（カタログ：翌月の到達者を事前に表示する）。
  * 40・65歳は届出がないため「待ち」で知らせるだけ。70・75歳は、2か月前から来月末までに起きる人の手続きを促す
@@ -232,7 +301,7 @@ async function ageNoticeTodos(auth: AuthContext, inScope: (officeId: string) => 
   // 等価条件だけにして複合索引に頼らない。生年月日だけを読む
   const [employees, started] = await Promise.all([
     db.collection(`${base}/employees`).where('isActive', '==', true).where('deletedAt', '==', null)
-      .select('birthDate', 'lastName', 'firstName', 'officeId').get(),
+      .select('birthDate', 'lastName', 'firstName', 'officeId', 'contract').get(),
     db.collection(`${base}/procedures`).where('procedureType', '==', 'age_event').get(),
   ]);
   const done = new Set(started.docs.map(d => d.data() as ProcedureDoc)
@@ -240,7 +309,10 @@ async function ageNoticeTodos(auth: AuthContext, inScope: (officeId: string) => 
   const todos: HomeTodo[] = [];
   for (const d of employees.docs) {
     const e = d.data();
-    if (!e.birthDate || !inScope(e.officeId)) continue;
+    if (!inScope(e.officeId)) continue;
+    const contract = contractTodo(d.id, e, today, officeName(e.officeId));
+    if (contract) todos.push(contract);
+    if (!e.birthDate) continue;
     const birth = (e.birthDate as Timestamp).toDate().toISOString().slice(0, 10);
     for (const m of milestonesBetween(birth, from, to)) {
       const name = `${e.lastName ?? ''} ${e.firstName ?? ''}`.trim();
@@ -293,6 +365,8 @@ async function procedureTodos(auth: AuthContext, inScope: (officeId: string) => 
     : p.leaveProcedure ? leaveTodo(p, auth, officeName(p.officeId))
     : p.gradeRevision ? revisionTodo(p, auth, officeName(p.officeId))
     : p.ageEvent ? ageTodo(p, auth, officeName(p.officeId))
+    : p.employmentChange ? employmentChangeTodo(p, auth, officeName(p.officeId))
+    : p.transfer ? Promise.resolve(transferTodo(p, officeName(p.officeId)))
     : Promise.resolve(procedureTodo(p, auth, officeName(p.officeId))));
   return todos.filter((t): t is HomeTodo => t !== null);
 }

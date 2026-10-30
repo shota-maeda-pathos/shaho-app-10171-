@@ -1,0 +1,205 @@
+<div class="app-page">
+  <a routerLink="/procedures" class="back"><mat-icon>arrow_back</mat-icon>進行中の手続き</a>
+
+  @if (loading()) {
+    <app-loading-state />
+  } @else if (loadError()) {
+    <app-error-state [message]="loadError()" (retry)="load(true)" />
+  } @else if (view(); as v) {
+    <app-wizard [heading]="v.procedure.title"
+                [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.effectiveDate ? '・' + (v.effectiveDate | date:'yyyy年M月d日') + 'から' : '')"
+                [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                (advance)="advance()">
+
+      @if (v.employee.otherEmployer) {
+        <div class="alert" role="alert">二以上事業所勤務（ほかに「{{ v.employee.otherEmployer }}」）として登録されています。本システムは二以上事業所勤務に対応していないため、届出と保険料は別途確かめてください。</div>
+      }
+
+      @switch (key()) {
+
+        <!-- ① 新しい雇用条件を入れる -->
+        @case ('entry') {
+          @if (v.changeApproval?.status === 'rejected') {
+            <div class="alert" role="alert"><strong>承認者から差し戻されました。</strong>
+              @if (v.changeApproval?.comment) { 理由：{{ v.changeApproval!.comment }} } 直して、もう一度保存してください。</div>
+          }
+          @if (locked()) {
+            <p class="note">承認を依頼したあとは直せません。直す場合は承認者に差し戻してもらってください。</p>
+          }
+          @if (v.before; as b) {
+            <h3>今の雇用条件</h3>
+            <table class="summary">
+              <tbody>
+                <tr><th>雇用区分</th><td>{{ typeLabel(b.employmentType) }}・週{{ b.weeklyHours }}時間・月{{ b.monthlyDays }}日</td></tr>
+                <tr><th>固定的賃金（基本給）</th><td>{{ b.baseSalary | number }}円</td></tr>
+                <tr><th>契約期間</th><td>{{ b.contractType === 'fixed' ? (b.contractEndDate ? b.contractEndDate + 'まで' : '期間の定めあり') : '期間の定めなし' }}</td></tr>
+                <tr><th>社会保険</th><td>{{ b.health || b.pension ? '加入している' : '加入していない' }}</td></tr>
+              </tbody>
+            </table>
+          }
+          <h3>新しい雇用条件</h3>
+          <fieldset class="form-grid" [disabled]="locked()">
+            <mat-form-field appearance="outline"><mat-label>新しい条件の初日</mat-label>
+              <input matInput type="date" [(ngModel)]="effectiveDate" (ngModelChange)="changed()" name="effectiveDate"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>雇用区分</mat-label>
+              <mat-select [(ngModel)]="form.employmentType" (ngModelChange)="changed()" name="employmentType" [disabled]="locked()">
+                @for (t of employmentTypes; track t.value) { <mat-option [value]="t.value">{{ t.label }}</mat-option> }
+              </mat-select></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>契約期間</mat-label>
+              <mat-select [(ngModel)]="form.contractType" (ngModelChange)="changed()" name="contractType" [disabled]="locked()">
+                <mat-option value="indefinite">期間の定めなし</mat-option><mat-option value="fixed">期間の定めあり</mat-option>
+              </mat-select></mat-form-field>
+            @if (form.contractType === 'fixed') {
+              <mat-form-field appearance="outline"><mat-label>契約の終了日</mat-label>
+                <input matInput type="date" [(ngModel)]="form.contractEndDate" (ngModelChange)="changed()" name="contractEnd"></mat-form-field>
+              <mat-checkbox [(ngModel)]="form.renewalExpected" (ngModelChange)="changed()" name="renewal" [disabled]="locked()">更新する見込みがある</mat-checkbox>
+            }
+            <mat-form-field appearance="outline"><mat-label>週の所定労働時間</mat-label>
+              <input matInput type="number" min="0" max="168" step="0.5" [(ngModel)]="form.weeklyHours" (ngModelChange)="changed()" name="weeklyHours"><span matTextSuffix>時間</span></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>月の所定労働日数</mat-label>
+              <input matInput type="number" min="0" max="31" [(ngModel)]="form.monthlyDays" (ngModelChange)="changed()" name="monthlyDays"><span matTextSuffix>日</span></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>給与の形</mat-label>
+              <mat-select [(ngModel)]="form.wageType" (ngModelChange)="changed()" name="wageType" [disabled]="locked()">
+                <mat-option value="monthly">月給</mat-option><mat-option value="daily">日給</mat-option><mat-option value="hourly">時給</mat-option>
+              </mat-select></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>{{ form.wageType === 'monthly' ? '月給' : form.wageType === 'daily' ? '日給' : '時給' }}</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="form.wageAmount" (ngModelChange)="changed()" name="wageAmount"><span matTextSuffix>円</span></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>固定的な手当（通勤手当を含む・月額）</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="form.allowances" (ngModelChange)="changed()" name="allowances"><span matTextSuffix>円</span></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>現物給与（月額）</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="form.inKind" (ngModelChange)="changed()" name="inKind"><span matTextSuffix>円</span></mat-form-field>
+            <mat-checkbox [(ngModel)]="form.isStudent" (ngModelChange)="changed()" name="student" [disabled]="locked()">昼間の学生である</mat-checkbox>
+            <mat-form-field appearance="outline" class="wide"><mat-label>変更の理由（任意）</mat-label>
+              <input matInput [(ngModel)]="note" (ngModelChange)="dirty.set(true)" name="note" maxlength="200" placeholder="例：パートへの転換、契約の更新"></mat-form-field>
+          </fieldset>
+
+          <section class="result" aria-live="polite">
+            <h3><app-term key="applicability" /></h3>
+            @if (!effectiveDate) {
+              <p class="sub">新しい条件の初日を入れると判定します。</p>
+            } @else if (judgeError()) {
+              <p class="error">{{ judgeError() }}</p>
+            } @else if (judged(); as j) {
+              <p>
+                @switch (j.effect) {
+                  @case ('none') { <app-status-badge tone="done" [label]="j.effectLabel" /> }
+                  @default { <app-status-badge tone="yours" [label]="j.effectLabel" /> }
+                }
+              </p>
+              <p>{{ j.judgement.reason }}</p>
+              @if (j.qualificationDate) {
+                <p>{{ j.effect === 'acquire' ? '資格取得日' : '資格喪失日' }}：<strong>{{ j.qualificationDate | date:'yyyy年M月d日' }}</strong>
+                  {{ j.effect === 'lose' ? '（適用されなくなった日の翌日）' : '' }}</p>
+              }
+              @if (j.effect === 'acquire') {
+                <p>資格取得時の報酬月額：<strong>{{ j.remuneration | number }}円</strong>（健保 {{ j.healthGrade.gradeNumber }}等級・厚年 {{ j.pensionGrade.gradeNumber }}等級）</p>
+              }
+              @for (n of j.notes; track n) { <p class="sub">{{ n }}</p> }
+              @for (n of j.ageNotes; track n) { <p class="sub">{{ n }}</p> }
+              @if (j.needsReason && j.judgement.result === 'manual') {
+                <mat-form-field appearance="outline" class="full"><mat-label>担当者の判断の理由</mat-label>
+                  <textarea matInput rows="2" [(ngModel)]="overrideReason" [disabled]="locked()" maxlength="500"></textarea></mat-form-field>
+              }
+            }
+          </section>
+        }
+
+        <!-- ② 承認者が雇用条件を確認する -->
+        @case ('change_approval') {
+          @if (v.applied) {
+            <p><app-status-badge tone="done" label="承認済み" /> 新しい雇用条件を台帳に反映しました（{{ v.effectiveDate | date:'yyyy年M月d日' }}から）。</p>
+            <p>{{ v.effectLabel }}</p>
+          } @else if (v.changeApproval?.status === 'pending') {
+            <p>承認者に雇用条件の確認を依頼しました。承認者は「承認」の画面から確認します。</p>
+            <button mat-stroked-button type="button" (click)="load(true)" [disabled]="busy()"><mat-icon>refresh</mat-icon>最新の状態にする</button>
+          } @else if (v.changeApproval?.status === 'rejected') {
+            <p class="sub">差し戻されました。「戻る」で直してください。</p>
+          }
+        }
+
+        <!-- ③ 届出を作る -->
+        @case ('filing') {
+          @if (noFiling()) {
+            <p><app-status-badge tone="done" label="不要" /> 社会保険の加入が変わらないため、届出はいりません。</p>
+          } @else {
+            @if (v.approval?.status === 'rejected') {
+              <div class="alert" role="alert"><strong>承認者から差し戻されました。</strong> @if (v.approval?.comment) { 理由：{{ v.approval!.comment }} } 内容を確かめて、もう一度届出を作って依頼します。</div>
+            }
+            <table class="summary">
+              <tbody>
+                <tr><th>届出</th><td>{{ v.filingLabel }}</td></tr>
+                <tr><th>{{ v.effect === 'acquire' ? '資格取得日' : '資格喪失日' }}</th><td>{{ v.qualificationDate | date:'yyyy年M月d日' }}</td></tr>
+                <tr><th>理由</th><td>労働条件の変更</td></tr>
+              </tbody>
+            </table>
+            <p class="sub">{{ v.effect === 'acquire' ? '届出の承認で、資格取得時決定の等級も確定します。' : '保険証などの回収枚数は、届出の画面で確かめてください。' }}</p>
+          }
+        }
+
+        <!-- ④ 承認者が届出を確認する -->
+        @case ('approval') {
+          @if (noFiling()) {
+            <p class="sub">届出がないため、承認はいりません。</p>
+          } @else if (v.approval?.status === 'pending') {
+            <p>承認者に確認を依頼しました。承認者は「承認」の画面から確認します。</p>
+            <button mat-stroked-button type="button" (click)="load(true)" [disabled]="busy()"><mat-icon>refresh</mat-icon>最新の状態にする</button>
+          } @else if (v.approval?.status === 'approved' || v.filing?.workflowStatus === 'approved') {
+            <p><app-status-badge tone="done" label="承認済み" /> {{ v.filingLabel }}が承認されました。</p>
+          }
+        }
+
+        <!-- ⑤ 提出する -->
+        @case ('submit') {
+          @if (noFiling()) {
+            <p class="sub">届出がないため、提出はいりません。</p>
+          } @else if (v.filing; as fl) {
+            @if (submitDone()) {
+              <p><app-status-badge tone="done" label="提出済み" /> {{ fl.mockStatus === 'completed' ? '模擬電子申請が完了しました。' : '紙の届出が受理されました。' }}</p>
+            } @else {
+              <mat-radio-group [(ngModel)]="method" class="radios" aria-label="提出方法">
+                <mat-radio-button value="electronic">電子申請（模擬）で提出する</mat-radio-button>
+                <mat-radio-button value="paper">紙で提出する</mat-radio-button>
+              </mat-radio-group>
+              @if (method === 'electronic') {
+                <p class="sub">このシステムの電子申請は模擬です。実際の提出は、e-Govや紙で別に行ってください。</p>
+                <button mat-flat-button type="button" (click)="mockSubmit()" [disabled]="busy()">模擬電子申請する</button>
+              } @else {
+                <p class="sub">届出の画面でPDFを印刷し、年金事務所（または健康保険組合）へ提出します。
+                  <a [routerLink]="['/filings', fl.id]" [queryParams]="{ employeeId: v.employee.id }">届出の画面を開く</a></p>
+                @if (fl.submissionStatus === 'notSubmitted') {
+                  <button mat-flat-button type="button" (click)="paper('submit')" [disabled]="busy()">提出したことを記録する</button>
+                } @else if (fl.submissionStatus === 'submitted') {
+                  <div class="row-actions">
+                    <button mat-flat-button type="button" (click)="paper('accepted')" [disabled]="busy()">受理された</button>
+                    <button mat-stroked-button type="button" (click)="paper('returned')" [disabled]="busy()">返戻された</button>
+                  </div>
+                } @else if (fl.submissionStatus === 'returned') {
+                  <div class="alert" role="alert">返戻されました。{{ fl.resultNote }}</div>
+                }
+              }
+              @if (mockResult()) { <p class="note">{{ mockResult() }}</p> }
+            }
+          }
+        }
+
+        <!-- ⑥ 完了を確認する -->
+        @case ('confirm') {
+          @if (isDone()) {
+            <div class="complete" role="status"><mat-icon aria-hidden="true">check_circle</mat-icon>
+              <div><strong>{{ v.procedure.reason === 'renewal' ? '契約の更新' : '雇用条件の変更' }}の手続きは完了しました。</strong></div></div>
+          }
+          <table class="summary">
+            <tbody>
+              <tr><th>新しい条件の初日</th><td>{{ v.effectiveDate | date:'yyyy年M月d日' }}</td></tr>
+              <tr><th>社会保険</th><td>{{ v.effectLabel }}</td></tr>
+              @if (v.filing && submitDone()) { <tr><th>出した届出</th><td>{{ v.filingLabel }}</td></tr> }
+            </tbody>
+          </table>
+          <p class="sub">固定的賃金が変わった場合は、変わった給与を3か月払ったあとに随時改定の対象か確かめます（毎月の処理に知らせが出ます）。</p>
+          <a mat-stroked-button [routerLink]="['/employees', v.employee.id]">従業員の画面を開く</a>
+        }
+      }
+    </app-wizard>
+  }
+</div>

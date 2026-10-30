@@ -34,6 +34,10 @@ export interface EmployeeDoc {
   /** 資格喪失年月日（YYYY-MM-DD）。未設定なら退職日の翌日 */
   qualificationLostDate?: string | null;
   foreignInfo?: ForeignWorkerInfo | null;
+  /** 有期雇用の契約（最後に登録した雇用条件の写し。満了の通知に使う） */
+  contract?: { type: 'indefinite' | 'fixed'; endDate: string | null; renewalExpected: boolean } | null;
+  /** 二以上事業所勤務（ほかの事業所にも勤めている）。本システムでは対応せず、警告を出すだけ */
+  otherEmployer?: { name: string; since: string | null; note: string; registeredAt: Timestamp; registeredBy: string } | null;
 }
 
 export interface ForeignWorkerInfo {
@@ -349,7 +353,8 @@ export type ProcedureType =
   | 'annual_review'
   | 'bonus_payment'
   | 'transfer'
-  | 'age_event';
+  | 'age_event'
+  | 'employment_change';
 
 export type ProcedureStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -446,6 +451,42 @@ export interface ProcedureDoc {
   gradeRevision?: GradeRevisionState;
   /** 年齢到達（70歳・75歳）の手続き（ウィザード）の状態。旧方式の年齢到達にはない */
   ageEvent?: AgeEventState;
+  /** 雇用条件の変更（ウィザード）の状態 */
+  employmentChange?: EmploymentChangeState;
+  /** 事業所間異動（ウィザード）の状態 */
+  transfer?: TransferState;
+}
+
+/** 事業所間異動の手続き（ウィザード）の状態 */
+export interface TransferState {
+  fromOfficeId: string;
+  toOfficeId: string | null;
+  transferDate: string | null;
+  reason: string;
+  /** 別の適用事業所への異動で、資格喪失届・資格取得届が要る */
+  filingRequired: boolean;
+  /** 台帳の所属事業所を付け替えた */
+  applied: boolean;
+  lossFilingId: string | null;
+  acquisitionFilingId: string | null;
+}
+
+/** 雇用条件の変更の手続き（ウィザード）の状態。承認されたら台帳に反映し、加入・喪失が切り替われば届出を作る */
+export interface EmploymentChangeState {
+  /** change：条件の変更、renewal：有期契約の更新 */
+  reason: 'change' | 'renewal';
+  effectiveDate: string | null;
+  /** 入れた雇用条件（画面の入力の形） */
+  input: Record<string, unknown> | null;
+  /** 変更前の雇用条件の要約 */
+  before: { employmentType: string; weeklyHours: number; monthlyDays: number; baseSalary: number; contractType: string; contractEndDate: string | null; health: boolean; pension: boolean; insuredCategory: string } | null;
+  /** none：届出なし、acquire：加入する（資格取得届）、lose：加入から外れる（資格喪失届） */
+  effect: 'none' | 'acquire' | 'lose';
+  /** 承認待ちの雇用条件（承認されるまで effectiveDate を持たないので、計算からは見えない） */
+  draftEmploymentId: string | null;
+  approvalId: string | null;
+  applied: boolean;
+  filingId: string | null;
 }
 
 /** 年齢到達（70歳の厚生年金の喪失・75歳の健康保険の喪失）の手続き（ウィザード）の状態 */

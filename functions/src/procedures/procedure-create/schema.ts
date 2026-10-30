@@ -11,6 +11,7 @@ export const ProcedureTypeEnum = z.enum([
   'bonus_payment',
   'transfer',
   'age_event',
+  'employment_change',
 ]);
 
 export const ProcedureCreateSchema = z.object({

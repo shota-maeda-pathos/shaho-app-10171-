@@ -115,6 +115,8 @@ export interface MonthlyRow {
   rejected: { salary: string | null; premium: string | null };
   /** 随時改定の可能性（この支給月が変動月から3か月目） */
   revision: RevisionAlert | null;
+  /** 二以上事業所勤務のほかの勤め先（本システムでは対応しない） */
+  otherEmployer: string | null;
 }
 
 /** 事業所と支給月の状況（全員分）。数百〜数千人でも1回で返す */
@@ -241,6 +243,7 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
       stale,
       rejected: { salary: rejectionOf(s), premium: rejectionOf(p) },
       revision,
+      otherEmployer: employee.otherEmployer?.name ?? null,
     };
   });
 
