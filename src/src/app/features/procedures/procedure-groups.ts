@@ -29,6 +29,7 @@ export type GroupType = 'loss' | 'age_event';
  */
 interface GroupConfig {
   title: string;
+  kicker: string;
   route: string;
   steps: { key: string; label: string }[];
   /** まとめの鍵（退職日・到達月。未入力は none） */
@@ -43,6 +44,7 @@ const ymd = (date: string) => { const [y, m, d] = date.split('-').map(Number); r
 export const GROUP_CONFIGS: Record<GroupType, GroupConfig> = {
   loss: {
     title: '退職',
+    kicker: '日ごとのまとめ',
     route: '/resignation',
     steps: [
       { key: 'entry', label: '退職日と理由' }, { key: 'settlement', label: '最後の保険料' }, { key: 'account', label: '退職後のアカウント' },
@@ -55,6 +57,7 @@ export const GROUP_CONFIGS: Record<GroupType, GroupConfig> = {
   },
   age_event: {
     title: '年齢到達',
+    kicker: '月ごとのまとめ',
     route: '/age-events',
     steps: [
       { key: 'check', label: '到達日と届出の要否' }, { key: 'filing', label: '届出の作成' }, { key: 'approval', label: '承認' },
@@ -96,7 +99,7 @@ async function loadGroupItems(functions: Functions, companyId: string, type: Gro
     <div class="app-page">
       @if (!groupKey()) {
         <!-- まとめの一覧 -->
-        <app-page-head [heading]="config.title" kicker="日ごとのまとめ">
+        <app-page-head [heading]="config.title" [kicker]="config.kicker">
           <ng-container meta>
             <span>進行中 <b>{{ activeCount() }}名</b></span>
           </ng-container>
