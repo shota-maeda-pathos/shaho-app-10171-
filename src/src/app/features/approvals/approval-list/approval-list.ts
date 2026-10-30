@@ -26,7 +26,7 @@ interface ApprovalItem {
   reviewedAt: string | null; comment: string | null; targetVersion: number; deadline: string | null; deadlineNote: string | null;
   summary: string; mine: boolean; canApprove: boolean; overdue: boolean; dueSoon: boolean; stale: boolean;
 }
-interface SearchResult { items: ApprovalItem[]; total: number; summary: { pending: number; forMe: number; overdue: number; stale: number; mine: number }; staleDays: number }
+interface SearchResult { items: ApprovalItem[]; total: number; summary: { pending: number; forMe: number; overdue: number; stale: number; mine: number; elsewhere: number }; staleDays: number }
 interface Detail {
   status: string; filingType: string | null; content: Record<string, unknown>; metadata: Record<string, unknown> | null;
   diff: { field: string; before: string; after: string }[]; previous: { status: string; requestedAt: string | null; comment: string | null } | null;
@@ -68,6 +68,16 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
           <button type="button" class="card warn" [class.on]="only === 'stale'" (click)="toggleOnly('stale')"><span class="num">{{ s.stale }}</span><span>{{ staleDays() }}日以上止まっている</span></button>
           <button type="button" class="card" [class.on]="only === 'mine'" (click)="toggleOnly('mine')"><span class="num">{{ s.mine }}</span><span>自分が依頼した</span></button>
         </div>
+      }
+
+      @if (officeSelected()) {
+        @if (allOffices()) {
+          <p class="office-note" role="status">上で事業所を選んでいますが、すべての事業所の承認を表示しています。
+            <button mat-button type="button" (click)="setAllOffices(false)">選んだ事業所だけに戻す</button></p>
+        } @else if (summary()?.elsewhere) {
+          <p class="office-note" role="status">ほかの事業所にも承認待ちが{{ summary()!.elsewhere }}件あります（上で選んだ事業所の分だけを表示しています）。
+            <button mat-button type="button" (click)="setAllOffices(true)">すべての事業所を表示</button></p>
+        }
       }
 
       <div class="toolbar">
@@ -258,6 +268,7 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
     .actions, .row-actions { display: flex; flex-wrap: wrap; gap: var(--app-space-2); align-items: center; }
     .alert { margin-bottom: var(--app-space-3); padding: var(--app-space-3) var(--app-space-4); border-radius: 8px; background: var(--app-status-action-bg); }
     .count { color: var(--app-color-text-sub); margin: 0 0 var(--app-space-2); }
+    .office-note { margin: 0 0 var(--app-space-3); padding: var(--app-space-2) var(--app-space-3); border-radius: 8px; background: #fff8e1; }
     .list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--app-color-border); border-radius: 8px; background: var(--app-color-surface); }
     .list > li { padding: var(--app-space-3) var(--app-space-4); border-bottom: 1px solid var(--app-color-border); }
     .list > li:last-child { border-bottom: 0; }
@@ -303,6 +314,10 @@ export class ApprovalListComponent {
   items = signal<ApprovalItem[]>([]);
   total = signal(0);
   summary = signal<SearchResult['summary'] | null>(null);
+  /** 上部で選んだ事業所に関係なく、すべての事業所の承認を出す */
+  allOffices = signal(false);
+  private handled = new Map<string, number>();
+  officeSelected = () => !!this.office.params().officeId;
   staleDays = signal(3);
   loading = signal(false);
   error = signal('');
@@ -358,6 +373,11 @@ export class ApprovalListComponent {
     return null;
   }
 
+  setAllOffices(on: boolean) {
+    this.allOffices.set(on);
+    void this.load();
+  }
+
   setView(v: 'pending' | 'processed') {
     this.view = v;
     this.only = '';
@@ -406,6 +426,7 @@ export class ApprovalListComponent {
     this.busy.set(true);
     this.failures.set([]);
     const companyId = this.auth.companyId;
+    const handled: string[] = [];
     try {
       if (a.kind === 'bulk' || a.kind === 'approve') {
         const list = a.kind === 'bulk' ? this.selectedItems() : [a.item];
@@ -415,6 +436,7 @@ export class ApprovalListComponent {
         const failed = data.results.map((r, n) => (r.ok ? null : `${this.typeLabel(list[n])}（${this.targetLabel(list[n])}）：${r.message}`)).filter((x): x is string => !!x);
         this.failures.set(failed);
         this.snackBar.open(`${data.approved}件を承認しました${failed.length ? `（${failed.length}件はできませんでした）` : ''}`, '閉じる', { duration: 5000 });
+        data.results.forEach((r, n) => { if (r.ok) handled.push(list[n].id); });
         this.selected.set(new Set());
       } else if (a.kind === 'reject') {
         const i = a.item;
@@ -427,14 +449,19 @@ export class ApprovalListComponent {
           });
         }
         this.snackBar.open('差し戻しました', '閉じる', { duration: 4000 });
+        handled.push(i.id);
       } else {
         await httpsCallable(this.functions, 'approvalCancel')({ companyId, target: this.target(a.item), reason: this.note.trim() });
         this.snackBar.open('承認を取り消し、下書きに戻しました', '閉じる', { duration: 4000 });
       }
       this.act.set(null);
       this.openId.set(null);
+      // 一覧は承認の索引を読む。索引はトリガーが少しあとに直すので、処理した案件は先に画面から外し、少し待って読み直す
+      for (const id of handled) this.handled.set(id, Date.now() + 30_000);
       await this.load();
+      setTimeout(() => void this.load(), 3000);
       void this.badge.refresh();
+      setTimeout(() => void this.badge.refresh(), 3000);
     } catch (e) {
       this.snackBar.open(errorMessage(e, '操作できませんでした'), '閉じる', { duration: 8000 });
     } finally {
@@ -462,11 +489,14 @@ export class ApprovalListComponent {
     this.error.set('');
     try {
       const { data } = await httpsCallable<object, SearchResult & { staleDays: number }>(this.functions, 'approvalSearch')({
-        companyId: this.auth.companyId, ...this.office.params(), view: this.view,
+        companyId: this.auth.companyId, ...(this.allOffices() ? {} : this.office.params()), view: this.view,
         ...(this.only ? { only: this.only } : {}), ...(this.requestType ? { requestType: this.requestType } : {}),
         ...(this.keyword.trim() ? { keyword: this.keyword.trim() } : {}), ...(this.view === 'pending' ? { sort: this.sort } : {}),
       });
-      this.items.set(data.items);
+      const now = Date.now();
+      for (const [id, until] of this.handled) if (until < now) this.handled.delete(id);
+      // 処理したばかりの案件は、索引が追いつくまで承認待ちに出さない
+      this.items.set(this.view === 'pending' ? data.items.filter(i => !this.handled.has(i.id)) : data.items);
       this.total.set(data.total);
       this.summary.set(data.summary);
       this.staleDays.set(data.staleDays);

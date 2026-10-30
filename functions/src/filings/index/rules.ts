@@ -73,7 +73,10 @@ const MOCK_TO_STATUS: Record<string, FilingStatus | null> = {
 /** 提出（模擬電子申請・紙）の状態を画面の状態にする。承認済みでなければ null */
 function submissionStatusOf(source: FilingSource, data: Data): { status: FilingStatus | null; paperStatus: PaperStatus } {
   const { mock, paper } = stateOf(source, data);
-  return { status: mock ? MOCK_TO_STATUS[mock.status] : null, paperStatus: paper?.status ?? 'none' };
+  const paperStatus = paper?.status ?? 'none';
+  // 模擬電子申請が送信エラーのまま紙で出したときは、送信エラーを状態に出さない（紙の提出の欄で見せる）
+  const status = mock ? MOCK_TO_STATUS[mock.status] : null;
+  return { status: status === 'mockFailed' && (paperStatus === 'submitted' || paperStatus === 'accepted') ? null : status, paperStatus };
 }
 
 /** 従業員の下の届出（社内承認・模擬申請・紙提出の3軸）を画面の状態にする */

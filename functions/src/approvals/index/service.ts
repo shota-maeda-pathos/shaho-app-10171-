@@ -155,6 +155,8 @@ export async function searchApprovals(input: ApprovalSearchInput, auth: AuthCont
     overdue: scoped.filter(e => e.overdue).length,
     stale: scoped.filter(e => e.stale).length,
     mine: scoped.filter(e => e.mine && e.status === 'pending').length,
+    // 事業所を選んでいるとき、ほかの事業所にある承認待ち（一覧には出ないが、サイドバーの件数には入っている）
+    elsewhere: input.officeId ? all.filter(e => e.status === 'pending' && e.officeId !== input.officeId).length : 0,
   };
   const items = scoped.filter(e => {
     if (input.requestType && e.requestType !== input.requestType) return false;

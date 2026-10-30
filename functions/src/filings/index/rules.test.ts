@@ -73,6 +73,8 @@ describe('状態のそろえ方', () => {
     expect(employeeFilingStatus({ workflowStatus: 'approved', mockStatus: 'completed', submissionStatus: 'notSubmitted' }).status).toBe('completed');
     expect(employeeFilingStatus({ workflowStatus: 'approved', mockStatus: 'failed', submissionStatus: 'notSubmitted' }).status).toBe('mockFailed');
     expect(employeeFilingStatus({ workflowStatus: 'approved', mockStatus: 'notStarted', submissionStatus: 'accepted' })).toEqual({ status: 'approved', paperStatus: 'accepted' });
+    // 送信エラーのあと紙で出したら、送信エラーは状態に出さない
+    expect(employeeFilingStatus({ workflowStatus: 'approved', mockStatus: 'failed', submissionStatus: 'submitted' })).toEqual({ status: 'approved', paperStatus: 'submitted' });
   });
 
   it('run の届出：status と submission から画面の状態', () => {
