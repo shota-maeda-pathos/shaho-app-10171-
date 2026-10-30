@@ -94,8 +94,8 @@ export async function rejectApprovalRequest(
   const { notify } = await import('../../utils/notify');
   await notify({
     companyId: auth.companyId,
-    title: '承認却下',
-    body: `承認依頼が却下されました`,
+    title: '差し戻されました',
+    body: `承認の依頼が差し戻されました。理由：${input.comment}`,
     category: 'approval',
     targetType: 'approvalRequest',
     targetId: result,

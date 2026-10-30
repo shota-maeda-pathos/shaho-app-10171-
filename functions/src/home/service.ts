@@ -72,6 +72,9 @@ async function onboardingTodo(p: ProcedureDoc & { id: string }, auth: AuthContex
     const approval = p.employeeId && approvalId
       ? (await db.doc(`companies/${auth.companyId}/employees/${p.employeeId}/approvalRequests/${approvalId}`).get()).data()
       : undefined;
+    if (approval?.status === 'cancelled') {
+      return { ...base, next: '資格取得届の承認を依頼し直す', detail: approval.cancelReason ? `承認の取消の理由：${approval.cancelReason}` : null, tone: 'action', deadline };
+    }
     if (approval?.status === 'rejected') {
       return { ...base, next: '差し戻された資格取得届を直す', detail: approval.comment ? `理由：${approval.comment}` : null, tone: 'action', deadline };
     }
@@ -107,6 +110,9 @@ async function wizardTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, o
     const approval = p.employeeId && approvalId
       ? (await db.doc(`companies/${auth.companyId}/employees/${p.employeeId}/approvalRequests/${approvalId}`).get()).data()
       : undefined;
+    if (approval?.status === 'cancelled') {
+      return { ...o.base, next: `${o.filingName}の承認を依頼し直す`, detail: approval.cancelReason ? `承認の取消の理由：${approval.cancelReason}` : null, tone: 'action', deadline };
+    }
     if (approval?.status === 'rejected') {
       return { ...o.base, next: `差し戻された${o.filingName}を直す`, detail: approval.comment ? `理由：${approval.comment}` : null, tone: 'action', deadline };
     }

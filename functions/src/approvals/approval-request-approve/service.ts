@@ -6,6 +6,7 @@ import { MutationResponse } from '../../types/response';
 import { notFound, invalidArg } from '../../utils/errors';
 import { ApprovalRequestApproveInput } from './schema';
 import { validateApprovalTarget } from '../target';
+import { filingContentHash } from '../../utils/hash';
 
 export async function approveApprovalRequest(
   input: ApprovalRequestApproveInput,
@@ -85,6 +86,7 @@ export async function approveApprovalRequest(
       status: 'approved',
       reviewedBy: auth.uid,
       reviewedAt: now,
+      approvedHash: reqData.requestType === 'filing' ? filingContentHash(targetData) : null,
       comment: input.comment ?? reqData.comment,
       updatedAt: now,
     });
@@ -114,6 +116,8 @@ export async function approveApprovalRequest(
     } else if (reqData.requestType === 'filing') {
       tx.update(targetRef, {
         workflowStatus: 'approved',
+        // 承認した内容の指紋。送信・提出のときに照らし合わせ、承認後の書き換えを見つける
+        approvedHash: filingContentHash(targetData),
         version: targetData.version + 1,
         updatedAt: now,
       });

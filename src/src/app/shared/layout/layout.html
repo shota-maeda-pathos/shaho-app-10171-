@@ -11,7 +11,11 @@
            [class.active]="activeRoute() === item.route"
            [attr.aria-current]="activeRoute() === item.route ? 'page' : null">
           <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-          <span matListItemTitle>{{ item.label }}</span>
+          <span matListItemTitle>{{ item.label }}
+            @if (item.route === '/approvals' && approvalBadge.count()) {
+              <span class="nav-badge" [attr.aria-label]="'あなたが承認できる件数 ' + approvalBadge.count() + '件'">{{ approvalBadge.count() }}</span>
+            }
+          </span>
         </a>
       }
       @if (visibleMoreItems().length) {

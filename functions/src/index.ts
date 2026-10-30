@@ -124,6 +124,10 @@ export { filingMockSubmit } from './filings/filing-mock-submit/functions';
 export { filingPdfData } from './filings/filing-pdf-data/functions';
 export { filingIndexEmployee, filingIndexSantei, filingIndexBonus, filingSearch, filingIndexRebuild } from './filings/index/functions';
 export { filingSubmissionGet, filingSubmissionAction, filingMockSettings, filingMockAdvance } from './filings/submission/functions';
+export {
+  approvalIndexRequest, approvalSearch, approvalBadgeGet, approvalDetailGet, approvalBulkApprove, approvalCancel, approvalSettingsGet, approvalIndexRebuild,
+  approvalReminder,
+} from './approvals/index/functions';
 
 // 通知API
 export { notificationCreate } from './notifications/notification-create/functions';

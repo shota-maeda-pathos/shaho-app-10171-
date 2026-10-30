@@ -41,6 +41,15 @@ interface MockSettings { auto: boolean; receiveSeconds: number; processSeconds: 
         <p class="sub" role="status">{{ error() || '読み込んでいます…' }}</p>
       }
     </section>
+    <section class="box">
+      <h2>承認待ちの放置</h2>
+      <p class="sub">承認を依頼してから、この日数を過ぎても承認されていないものを、承認の画面で強調し、毎朝の通知に入れます。</p>
+      <div class="fields">
+        <mat-form-field appearance="outline"><mat-label>放置とみなす日数</mat-label>
+          <input matInput type="number" min="1" max="60" [(ngModel)]="staleDays" [disabled]="!isAdmin"></mat-form-field>
+      </div>
+      @if (isAdmin) { <button mat-flat-button type="button" (click)="saveStale()" [disabled]="busy()">保存する</button> }
+    </section>
   `,
   styles: [`
     .box { padding: var(--app-space-5) 0; max-width: 760px; }
@@ -60,12 +69,29 @@ export class MockSubmissionSettingsComponent implements OnInit {
   error = signal('');
   isAdmin = this.auth.hasRole('admin');
 
+  staleDays = 3;
+
   async ngOnInit() {
     try {
+      void httpsCallable<object, { staleDays: number }>(this.functions, 'approvalSettingsGet')({ companyId: this.auth.companyId }).then(r => this.staleDays = r.data.staleDays).catch(() => undefined);
       const { data } = await httpsCallable<object, MockSettings>(this.functions, 'filingMockSettings')({ companyId: this.auth.companyId });
       this.form.set({ ...data });
     } catch (e) {
       this.error.set(errorMessage(e, '設定を読み込めませんでした'));
+    }
+  }
+
+  async saveStale() {
+    this.busy.set(true);
+    try {
+      const n = Math.max(1, Math.min(60, Math.round(Number(this.staleDays) || 3)));
+      const { data } = await httpsCallable<object, { staleDays: number }>(this.functions, 'approvalSettingsGet')({ companyId: this.auth.companyId, update: { staleDays: n } });
+      this.staleDays = data.staleDays;
+      this.snackBar.open('保存しました', '閉じる', { duration: 3000 });
+    } catch (e) {
+      this.snackBar.open(errorMessage(e, '保存できませんでした'), '閉じる', { duration: 8000 });
+    } finally {
+      this.busy.set(false);
     }
   }
 

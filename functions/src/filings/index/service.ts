@@ -38,10 +38,13 @@ export async function syncFilingIndex(path: string, after: FirebaseFirestore.Doc
   const ref = indexCol(src.companyId).doc(indexIdOf(src.source, src.parentId, src.filingId));
   if (!after) {
     await ref.delete();
+    if (src.source !== 'employee') await (await import('../../approvals/index/service')).syncRunFilingApproval(path, undefined);
     return;
   }
   const entry = await entryOf(path, after);
   if (entry) await ref.set({ ...entry, updatedAt: FieldValue.serverTimestamp() });
+  // 算定基礎届・賞与支払届は承認も届出の status で持つため、承認の索引もここで合わせる
+  if (src.source !== 'employee') await (await import('../../approvals/index/service')).syncRunFilingApproval(path, after);
 }
 
 /** 既存の届出をすべて索引に入れ直す（移行用。管理者だけ） */

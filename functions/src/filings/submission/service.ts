@@ -2,6 +2,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../../config';
 import { AuthContext, requireOffice } from '../../middleware/auth';
 import { invalidArg, notFound } from '../../utils/errors';
+import { filingContentHash } from '../../utils/hash';
 import { FilingSource } from '../index/rules';
 import {
   advanceDue, cancelMock, canSend, DEFAULT_MOCK_SETTINGS, employeeMirror, formatAcceptanceNumber, isInTransit, MOCK_STATUS_LABELS, MockSettings,
@@ -213,6 +214,7 @@ export async function actOnSubmission(input: FilingSubmissionActionInput, auth: 
       switch (input.action) {
         case 'mockSend':
           guard(view.approved, '社内の承認が済んでいない届出は送信できません');
+          guard(!data.approvedHash || data.approvedHash === filingContentHash(data), '承認したあとに届出の内容が書き換えられています。承認を取り消して、確かめ直してから承認を受けてください');
           guard(view.canSend, view.submitted ? 'この届出は提出済みです' : isInTransit(mock) ? 'この届出は送信中です（同じ届出を二重に送ることはできません）' : '紙で提出した届出は電子申請できません');
           mock = sendMock({ prev: mock, scenario: input.scenario ?? 'normal', missing, settings, now, uid: auth.uid });
           break;
@@ -229,6 +231,7 @@ export async function actOnSubmission(input: FilingSubmissionActionInput, auth: 
           mock = returnMock(mock!, input.note ?? '', now, auth.uid);
           break;
         case 'paperSubmit':
+          guard(!data.approvedHash || data.approvedHash === filingContentHash(data), '承認したあとに届出の内容が書き換えられています。承認を取り消して、確かめ直してから承認を受けてください');
           guard(view.canPaper, view.approved ? '送信中の届出や、紙で提出済みの届出には記録できません' : '社内の承認が済んでいない届出は提出できません');
           guard(!!input.date, '提出した日を入れてください');
           paper = submitPaper(paper, { date: input.date!, office: input.office ?? '', method: input.method ?? 'counter', now, uid: auth.uid });

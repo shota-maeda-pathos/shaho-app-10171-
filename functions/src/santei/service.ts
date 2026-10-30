@@ -1,4 +1,5 @@
 // 算定基礎届（定時決定）。一括型：事業所×年ごとに、対象者を確かめる → 等級の承認 → 届出を作る → 届出の承認と提出
+import { filingContentHash } from '../utils/hash';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
@@ -480,13 +481,13 @@ export async function updateSanteiFiling(input: SanteiFilingUpdateInput, auth: A
       case 'requestApproval':
         if (!operator) throw invalidArg('承認を依頼できるのは管理者・担当者です');
         if (f.status !== 'draft') throw invalidArg('下書きの届出だけ承認を依頼できます');
-        patch = { status: 'pending', requestedBy: auth.uid, requestedAt: now, rejection: null };
+        patch = { status: 'pending', requestedBy: auth.uid, requestedAt: now, rejection: null, approvalCancelledAt: null };
         break;
       case 'approve':
         if (!approver) throw invalidArg('承認できるのは管理者・承認者です');
         if (f.status !== 'pending') throw invalidArg('承認待ちの届出ではありません');
         if (f.requestedBy === auth.uid) throw invalidArg('自分が依頼した届出は自分では承認できません');
-        patch = { status: 'approved', approvedBy: auth.uid, approvedAt: now };
+        patch = { status: 'approved', approvedBy: auth.uid, approvedAt: now, approvedHash: filingContentHash(f), approvalCancelledAt: null };
         break;
       case 'reject':
         if (!approver) throw invalidArg('差し戻せるのは管理者・承認者です');

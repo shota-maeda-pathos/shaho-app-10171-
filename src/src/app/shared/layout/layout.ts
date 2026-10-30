@@ -11,6 +11,7 @@ import { filter, map } from 'rxjs/operators';
 import { BreadcrumbComponent } from '../breadcrumb/breadcrumb';
 import { OfficeContextService } from '../../core/services/office-context.service';
 import { AuthService, Role } from '../../core/services/auth.service';
+import { ApprovalBadgeService } from '../../core/services/approval-badge.service';
 
 interface NavItem { icon: string; label: string; route: string; roles: Role[]; match: string[] }
 
@@ -31,6 +32,13 @@ export class LayoutComponent {
   private route = inject(ActivatedRoute);
   auth = inject(AuthService);
   office=inject(OfficeContextService);
+  approvalBadge = inject(ApprovalBadgeService);
+
+  constructor() {
+    this.approvalBadge.start();
+    // 画面を移るたびに件数を読み直す（承認したあとに古い件数が残らないように）
+    this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => void this.approvalBadge.refresh());
+  }
 
   pageTitle = toSignal(
     this.router.events.pipe(

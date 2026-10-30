@@ -35,7 +35,7 @@ import { MockSubmissionSettingsComponent } from './mock-submission/mock-submissi
         <mat-tab label="お知らせ管理">
           <ng-template matTabContent><app-notification-management /></ng-template>
         </mat-tab>
-        <mat-tab label="模擬電子申請">
+        <mat-tab label="提出・承認">
           <ng-template matTabContent><app-mock-submission-settings /></ng-template>
         </mat-tab>
         <mat-tab label="監査ログ">
