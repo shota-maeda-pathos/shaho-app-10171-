@@ -278,7 +278,7 @@ export class TargetListComponent {
   /** 主ボタン以外は、対象がいるときだけ出す */
   secondaryActions = computed(() => this.actions().filter(a => a !== this.primaryAction() && this.targetsOf(a).length > 0));
   idleInfo = computed(() => this.emptyInfo() || (this.actions().length
-    ? '選んだ人がいなければ、対象の全員に行います（保留中を除く）'
+    ? '未選択なら対象の全員（保留を除く）'
     : ''));
   emptyMessage = computed(() => this.query().trim() ? '探している人は、この絞り込みにはいません'
     : ({ attention: 'いま対応が必要な人はいません', held: '保留中の人はいません', ok: '問題のない人はまだいません', all: '対象の人はいません' })[this.filter()]);

@@ -161,7 +161,7 @@ export class StepLeadComponent {
 }
 
 /**
- * 下に固定の操作バー（画面の下・本文の幅いっぱい。カードの中に置いても枠とは重ならない）。左に選択中の人数や保存の状態（info）、右に注意の1行（notice）と主ボタン（中に書く。主ボタンは右端に1つ）。
+ * 操作バー。カードの中の最後に置くと、カードの一番下の段になる（別の枠は作らない）。左に選択中の人数や保存の状態（info）、右に注意の1行（notice）と主ボタン（中に書く。主ボタンは右端に1つ）。
  * 注意は、取り返しのつかない操作・期限・法律上の迷いやすい所のときだけ出す
  */
 @Component({
@@ -178,12 +178,12 @@ export class StepLeadComponent {
     </div>
   `,
   styles: [`
-    :host { display: block; height: 72px; }
-    .actionbar {
-      position: fixed; left: var(--app-sidebar-width); right: 0; bottom: 0; z-index: 50; min-height: 60px; box-sizing: border-box;
-      display: flex; align-items: center; gap: var(--app-space-3); flex-wrap: wrap; padding: var(--app-space-3) var(--app-space-5);
-      background: var(--app-color-surface); border-top: 1px solid var(--app-color-border); box-shadow: 0 -4px 16px rgba(16, 24, 40, .06);
+    /* カードの一番下の段。カードの左右・下の余白（--app-space-5）を打ち消して端まで広げ、角はカードに合わせる */
+    :host {
+      display: block; margin: var(--app-space-5) calc(-1 * var(--app-space-5)) calc(-1 * var(--app-space-5));
+      border-top: 1px solid var(--app-color-border); border-radius: 0 0 var(--app-radius) var(--app-radius); background: var(--app-color-surface-sub);
     }
+    .actionbar { display: flex; align-items: center; gap: var(--app-space-3); flex-wrap: wrap; padding: var(--app-space-3) var(--app-space-5); }
     .info { font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
     :host ::ng-deep .info b { color: var(--app-color-text); }
     .right { margin-left: auto; display: flex; gap: var(--app-space-2); align-items: center; flex-wrap: wrap; justify-content: flex-end; }

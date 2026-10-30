@@ -61,22 +61,23 @@ export interface WizardStep {
       }
 
       <div class="step-content"><ng-content /></div>
+
+      <app-action-bar [info]="info()" [notice]="notice() ?? step().caution">
+        <button mat-button type="button" (click)="back()" [disabled]="current() === 0 || busy()">
+          <mat-icon>arrow_back</mat-icon> 戻る
+        </button>
+        @if (step().waitingFor) {
+          <a mat-flat-button routerLink="/home">ホームへ戻る</a>
+        } @else if (!hideNext()) {
+          <button mat-flat-button type="button" (click)="advance.emit(step())" [disabled]="nextDisabled() || busy()">
+            @if (busy()) { <mat-spinner diameter="18"></mat-spinner> }
+            {{ nextLabel() ?? (isLast() ? '完了する' : '次へ') }}
+            @if (!busy() && !isLast()) { <mat-icon iconPositionEnd>arrow_forward</mat-icon> }
+          </button>
+        }
+      </app-action-bar>
     </section>
 
-    <app-action-bar [info]="info()" [notice]="notice() ?? step().caution">
-      <button mat-button type="button" (click)="back()" [disabled]="current() === 0 || busy()">
-        <mat-icon>arrow_back</mat-icon> 戻る
-      </button>
-      @if (step().waitingFor) {
-        <a mat-flat-button routerLink="/home">ホームへ戻る</a>
-      } @else if (!hideNext()) {
-        <button mat-flat-button type="button" (click)="advance.emit(step())" [disabled]="nextDisabled() || busy()">
-          @if (busy()) { <mat-spinner diameter="18"></mat-spinner> }
-          {{ nextLabel() ?? (isLast() ? '完了する' : '次へ') }}
-          @if (!busy() && !isLast()) { <mat-icon iconPositionEnd>arrow_forward</mat-icon> }
-        </button>
-      }
-    </app-action-bar>
   `,
   styleUrl: './wizard.scss',
 })
