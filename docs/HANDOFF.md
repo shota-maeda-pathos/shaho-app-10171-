@@ -137,7 +137,7 @@
 
 ## 4-11. 重要な仕様（段階7 届出の横断一覧）
 
-- 方針と順番は `docs/stage7-plan.md`（ユーザー承認済み）。7-1〜7-5 済み、次は 7-6（添付書類）。
+- 方針と順番は `docs/stage7-plan.md`（ユーザー承認済み）。7-1〜7-6 済み、次は 7-7（PDFの保存原本とZIP）。
 - 届出の索引 `companies/{c}/filingIndex/{source}_{親ID}_{届出ID}`：従業員の下・`santeiRuns`・`bonusRuns` の届出の書き込みを、トリガー `filingIndexEmployee`・`filingIndexSantei`・`filingIndexBonus`（asia-northeast1）が受けて更新する。中身は `filings/index/rules.ts`（純粋関数・テストあり）：カタログの状態名（draft・rejected・pending・approved・sent・received・processing・completed・mockFailed・returned・cancelled）と紙の提出 `paperStatus`、未提出 `open`、期限 `deadline`（種類ごとに計算。「速やかに」は `deadlineNote`）、受付番号、作成日・提出日。**7-2 で状態の持ち方を変えるときは `employeeFilingStatus`・`runFilingStatus` も直す。**
 - 検索 `filingSearch`（admin・operator・approver）：等価条件を1つだけ Firestore に渡し（複合索引なし）、残りは関数内で絞る。上限5000件を読む。未提出・期限超過・7日以内・承認待ちの件数を返す。旧 `filingList` は画面から使わなくなった（関数は残る）。
 - 移行 `filingIndexRebuild`（管理者）：全届出を索引に入れ直し、元のない索引を消す。2026-10-30 に実行（34件）。順に読んでいたため約4分かかったので並行読み込みに直した（7-2 でデプロイ済み）。
@@ -186,6 +186,15 @@
 - 画面：届出の画面に「提出したあとに誤りが見つかったら」（訂正届・取消届を作る）、訂正届の画面に元の届出・理由・訂正箇所・記入の直し・取り下げ、元の届出に訂正・取消のリンク。台帳・等級は自動で直さず従業員の画面へ案内。
 - 画面で確認（2026-10-30）：高橋 三郎の資格取得届（提出済み）から訂正届を作成→報酬月額（通貨・合計）を220,000に直して保存→訂正箇所2件→PDF→承認を依頼→承認一覧に「訂正届・速やかに」→承認者（金本）が承認→模擬電子申請で完了（MOCK-20261030-0004）→元の資格取得届に「この届出には訂正届を出しています」のリンクが出ることを確認。未確認：取消届の流れ（単体の判定のみ）・紙での提出。
 
+## 4-16. 重要な仕様（段階7 添付書類）
+
+- Cloud Storage の既定のバケット `kensyu10171.firebasestorage.app`（もともとあり、画面からの直接の読み書きはルールで拒否）に、関数だけが書く（2026-10-30 ユーザー承認）。置き場所は `{届出のパス}/attachments/{ID}/{ファイル名}`、一覧は届出の下の `attachments`（名前・種類・大きさ・必要書類の key・添付した人と日時・`deletedAt`）。
+- 判定 `filings/attachments/rules.ts`（テストあり）：PDF・JPEG・PNG を中身の先頭のバイトで判定、1ファイル5MB・1件20ファイルまで、ファイル名の危ない文字を置き換え。必要書類のチェックリスト `attachmentChecklist`（取得届の継続再雇用、喪失届の保険証、扶養の続柄・収入・仕送り（別居は原則必要）・住民票（その他の親族）・外れる人の保険証、月額変更届・終了時改定の賃金台帳と出勤簿（60日以上さかのぼる・5等級以上下がる）、訂正届・取消届の理由が分かる書類）。
+- 関数：`filingAttachmentList`（admin・operator・approver）・`filingAttachmentUpload`（base64、7.2MBまで）・`filingAttachmentGet`（base64 で返す）・`filingAttachmentDelete`。対象は提出の部品と同じ `{source, parentId, filingId}` で、3か所の届出のどれにも付けられる。提出を始めた（送信中・完了・紙で提出・受理）あとは追加・削除できない。
+- 提出の部品：`filingSubmissionGet` が `attachmentWarnings`（原則必要で添付のない書類）を返し、送信・紙の提出の前に警告する（止めない）。
+- 画面：共通の部品 `features/filings/attachments/filing-attachments.ts`。届出の画面（「添付書類」のカード）、算定基礎届・賞与の届出のカード（折りたたみ）。削除は `shared/confirm-dialog`。
+- 画面で確認（2026-10-30、森下 翔太の月額変更届・下書き）：チェックリスト（賃金台帳・場合により必要）、テスト用PDFの添付（本番のバケットへの書き込み）、関数での取得（同じPDFが戻る）、中身がPDFでないファイルの拒否、確認ダイアログからの削除。未確認：原則必要な書類が足りないときの提出前の警告（扶養の別居など。単体の判定のみ）、算定・賞与のカードからの添付、承認者の閲覧。
+
 ## 5. 現在の状態（本番）
 
 - 段階4の関数と `homeTodos` はデプロイ済み。段階6の `resignationStart`・`resignationGet`・`resignationPreview`・`resignationUpdate`・`userUnsuspend`（今回が初公開）、扶養の `dependentChangeStart`・`dependentChangeGet`・`dependentChangePreview`・`dependentChangeUpdate`、直した `dependentList` もデプロイ済み。産休・育休の `leaveProcedureStart`・`leaveProcedureGet`・`leaveProcedurePreview`・`leaveProcedureUpdate` と、変更した `leaveList`・`homeTodos`・`filingMockSubmit`・`filingPdfData`・`monthlyJobChunk`・`monthlyInsuranceCalculate`・`bonusInsuranceCalculate` も 2026-10-29 にデプロイ済み（ただし `homeTodos` の期間の表示（「6月30日〜10月10日」の形）の直しは未デプロイ）。旧画面の `operationsMonthlyAction` は免除の変更を反映していない。認証（`middleware/auth.ts`）の変更は、これらの関数にだけ反映されている。**Hosting（画面）は未公開**（ローカルの開発サーバーで確認している）。
@@ -214,7 +223,7 @@
 
 ## 6. 次にやるべきタスク
 
-1. **段階7の続き（7-6 から）**：`docs/stage7-plan.md` の順に進める。以下は着手時のメモ：`docs/roadmap.md` の段階7：不足している届出種別（⑥賞与不支給報告書・⑩訂正届・取消届など）、承認取消・送信取消、模擬申請の段階遷移と受付番号、添付、期限計算、一括承認、差分表示、ZIP。終わりの条件は「12種すべてが作成から提出記録まで通る」。まずチェックリストの段階7の行（届出・承認の章）と、届出一覧・承認一覧に出ない届出（算定基礎届・賞与支払届は run の下にある）の扱いを調べ、方針をユーザーに示して合意を取ってから作る。届出の画面の模擬申請・提出記録は `window.confirm` を通るため、ブラウザーペインで押せない点も段階7で見直す（ダイアログを画面内の確認にするなど）。
+1. **段階7の続き（7-7 から）**：`docs/stage7-plan.md` の順に進める。以下は着手時のメモ：`docs/roadmap.md` の段階7：不足している届出種別（⑥賞与不支給報告書・⑩訂正届・取消届など）、承認取消・送信取消、模擬申請の段階遷移と受付番号、添付、期限計算、一括承認、差分表示、ZIP。終わりの条件は「12種すべてが作成から提出記録まで通る」。まずチェックリストの段階7の行（届出・承認の章）と、届出一覧・承認一覧に出ない届出（算定基礎届・賞与支払届は run の下にある）の扱いを調べ、方針をユーザーに示して合意を取ってから作る。届出の画面の模擬申請・提出記録は `window.confirm` を通るため、ブラウザーペインで押せない点も段階7で見直す（ダイアログを画面内の確認にするなど）。
 2. **段階6で後回しにしたもの**（ユーザー判断で段階8・9と合わせる）：
    - 外国人の退職案内：表示の処理はある。外国人情報（ローマ字氏名・在留資格など）を入れる画面がないため未確認。台帳の項目の画面か、段階9の本人入力と合わせる。
    - 退職後の閲覧期間の延長・短縮、ログイン停止（閲覧専用→停止）：アカウントを持ち、等級がそろった従業員と、そのアカウントでのログイン（ユーザー操作）が要る。段階8のログインまわりと合わせる。
