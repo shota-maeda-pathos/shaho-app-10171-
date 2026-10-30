@@ -18,6 +18,7 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import type { FilingPrintMeta } from '../templates/official-filing-pdf';
 import { FilingSubmissionComponent } from '../submission/filing-submission';
+import { FilingAttachmentsComponent } from '../attachments/filing-attachments';
 
 const FILING_TYPE_LABELS: Record<string, string> = {
   acquisitionNotification: '被保険者資格取得届',
@@ -46,7 +47,7 @@ const WORKFLOW_STATUS_LABELS: Record<string, string> = {
   imports: [
     CommonModule,
     MatButtonModule, MatIconModule, MatCardModule, MatChipsModule,
-    MatDividerModule, MatProgressSpinnerModule, MatSnackBarModule, MatStepperModule, FilingSubmissionComponent,
+    MatDividerModule, MatProgressSpinnerModule, MatSnackBarModule, MatStepperModule, FilingSubmissionComponent, FilingAttachmentsComponent,
     RouterLink, FormsModule, MatFormFieldModule, MatInputModule,
   ],
   template: `
@@ -155,6 +156,11 @@ const WORKFLOW_STATUS_LABELS: Record<string, string> = {
               <mat-icon>picture_as_pdf</mat-icon> {{ processing() ? '処理中…' : '公式PDFを確認・保存' }}
             </button>
           </div>
+        </mat-card>
+
+        <mat-card class="actions-card">
+          <h2>添付書類</h2>
+          <app-filing-attachments [target]="{ source: 'employee', parentId: employeeId, filingId: filingId }" />
         </mat-card>
 
         <mat-card class="actions-card">

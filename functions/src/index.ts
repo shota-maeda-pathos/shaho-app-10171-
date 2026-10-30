@@ -133,6 +133,7 @@ lazy(() => require('./filings/index/functions'), [
 ]);
 lazy(() => require('./filings/submission/functions'), ['filingSubmissionGet', 'filingSubmissionAction', 'filingMockSettings', 'filingMockAdvance']);
 lazy(() => require('./filings/correction/functions'), ['filingCorrectionCreate', 'filingCorrectionUpdate']);
+lazy(() => require('./filings/attachments/functions'), ['filingAttachmentList', 'filingAttachmentUpload', 'filingAttachmentGet', 'filingAttachmentDelete']);
 lazy(() => require('./approvals/index/functions'), [
   'approvalIndexRequest', 'approvalSearch', 'approvalBadgeGet', 'approvalDetailGet', 'approvalBulkApprove', 'approvalCancel', 'approvalSettingsGet', 'approvalIndexRebuild', 'approvalReminder',
 ]);

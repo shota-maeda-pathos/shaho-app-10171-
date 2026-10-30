@@ -145,6 +145,9 @@
                 </div>
                 @if (f.status === 'approved' || f.status === 'submitted') {
                   <app-filing-submission [target]="{ source: 'santei', parentId: runId(), filingId: f.id }" (changed)="load()" />
+                  <details class="attachments"><summary>添付書類</summary>
+                    <app-filing-attachments [target]="{ source: 'santei', parentId: runId(), filingId: f.id }" />
+                  </details>
                 }
               </li>
             }

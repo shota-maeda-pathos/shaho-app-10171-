@@ -69,6 +69,9 @@
             </div>
             @if (r.status === 'approved' || r.status === 'submitted') {
               <app-filing-submission [target]="{ source: 'bonus', parentId: runId(), filingId: r.id }" (changed)="load()" />
+              <details class="attachments"><summary>添付書類</summary>
+                <app-filing-attachments [target]="{ source: 'bonus', parentId: runId(), filingId: r.id }" />
+              </details>
             }
           </section>
         } @else if (np.reported) {
@@ -282,6 +285,9 @@
                   </div>
                   @if (f.status === 'approved' || f.status === 'submitted') {
                     <app-filing-submission [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" (changed)="load()" />
+                    <details class="attachments"><summary>添付書類</summary>
+                      <app-filing-attachments [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" />
+                    </details>
                   }
                 </li>
               }

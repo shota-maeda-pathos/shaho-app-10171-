@@ -1,4 +1,5 @@
 import { FilingSubmissionComponent } from '../filings/submission/filing-submission';
+import { FilingAttachmentsComponent } from '../filings/attachments/filing-attachments';
 import { Component, computed, DestroyRef, effect, inject, OnInit, signal, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -39,7 +40,7 @@ const STEPS: StepDef[] = [
   standalone: true,
   imports: [
     DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule,
-    TargetListComponent, TargetCellDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent,
+    TargetListComponent, TargetCellDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent, FilingAttachmentsComponent,
   ],
   templateUrl: './santei.html',
   styleUrl: './santei.scss',

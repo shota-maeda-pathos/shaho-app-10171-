@@ -33,6 +33,7 @@ export interface SubmissionView {
   source: FilingTarget['source']; filingType: string; version: number; approved: boolean; workflowLabel: string;
   mock: MockState | null; mockLabel: string | null; paper: PaperState | null; submitted: boolean;
   canSend: boolean; canCancel: boolean; canPaper: boolean; canReopen: boolean; isAdmin: boolean;
+  attachmentWarnings: string[];
   settings: { auto: boolean; receiveSeconds: number; processSeconds: number; completeSeconds: number };
 }
 
@@ -130,6 +131,11 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
             <mat-radio-button value="electronic" [disabled]="!v.canSend">電子申請（模擬）で提出する</mat-radio-button>
             <mat-radio-button value="paper" [disabled]="!v.canPaper">紙で提出する</mat-radio-button>
           </mat-radio-group>
+          @if (v.attachmentWarnings.length) {
+            <div class="warn" role="status"><strong>添付書類を確かめてください</strong>
+              <ul>@for (w of v.attachmentWarnings; track w) { <li>{{ w }}</li> }</ul>
+              個人番号で確認できる書類など、添えなくてよい場合もあります。そのまま提出することもできます。</div>
+          }
           @if (method === 'electronic' && v.canSend) {
             <p class="sub">このシステムの電子申請は模擬です。実際の提出は、e-Govや紙で別に行ってください。</p>
             <div class="fields">
@@ -236,6 +242,8 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
     .mock, .paper, .confirm { margin: var(--app-space-2) 0 var(--app-space-3); padding: var(--app-space-3) var(--app-space-4);
       border: 1px solid var(--app-color-border); border-radius: 8px; background: var(--app-color-surface); }
     .confirm { border-color: var(--app-color-link); background: var(--app-status-yours-bg); }
+    .warn { margin: var(--app-space-2) 0; padding: var(--app-space-2) var(--app-space-3); border-radius: 8px; background: #fff8e1; font-size: 14px; }
+    .warn ul { margin: 4px 0; padding-left: 20px; }
     .mock-head { display: flex; gap: var(--app-space-3); flex-wrap: wrap; align-items: baseline; }
     .stages { display: flex; flex-wrap: wrap; gap: var(--app-space-2) var(--app-space-4); list-style: none; padding: 0; margin: var(--app-space-3) 0; }
     .stages li { display: flex; align-items: center; gap: 4px; color: var(--app-color-text-sub); }

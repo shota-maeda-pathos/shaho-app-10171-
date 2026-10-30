@@ -75,3 +75,6 @@ li[data-view='todo'] .mark { background: var(--app-status-yours-bg); color: var(
 .filing-head { display: flex; flex-wrap: wrap; gap: var(--app-space-3); align-items: baseline; }
 .filing-status { color: var(--app-color-text-sub); }
 .filing-actions { display: flex; flex-wrap: wrap; gap: var(--app-space-2); margin-top: var(--app-space-2); }
+
+.attachments { margin-top: var(--app-space-2); }
+.attachments summary { cursor: pointer; color: var(--app-color-link); }

@@ -132,7 +132,7 @@ export async function processMockQueue(): Promise<number> {
   return due.size;
 }
 
-async function loadAndCheck(companyId: string, target: FilingTarget, auth: AuthContext) {
+export async function loadAndCheck(companyId: string, target: FilingTarget, auth: AuthContext) {
   const path = pathOf(companyId, target);
   const snap = await db.doc(path).get();
   if (!snap.exists) throw notFound('届出');
@@ -162,9 +162,11 @@ export interface SubmissionView {
   canReopen: boolean;
   isAdmin: boolean;
   settings: MockSettings;
+  /** 原則必要な添付書類で、まだ添付のないもの（送信前の警告。送信は止めない） */
+  attachmentWarnings: string[];
 }
 
-function viewOf(path: string, data: FirebaseFirestore.DocumentData, settings: MockSettings, auth: AuthContext): SubmissionView {
+function viewOf(path: string, data: FirebaseFirestore.DocumentData, settings: MockSettings, auth: AuthContext): Omit<SubmissionView, 'attachmentWarnings'> {
   const { source } = sourceOf(path);
   const { mock, paper } = stateOf(source, data);
   const approved = isApproved(source, data);
@@ -184,11 +186,16 @@ function viewOf(path: string, data: FirebaseFirestore.DocumentData, settings: Mo
   };
 }
 
+async function withWarnings(path: string, view: Omit<SubmissionView, 'attachmentWarnings'> & { attachmentWarnings?: string[] }, data: FirebaseFirestore.DocumentData): Promise<SubmissionView> {
+  const warn = view.canSend || view.canPaper ? await (await import('../attachments/service')).attachmentWarnings(path, data) : [];
+  return { ...view, attachmentWarnings: warn };
+}
+
 export async function getSubmission(input: { companyId: string } & FilingTarget, auth: AuthContext): Promise<SubmissionView> {
   const { path } = await loadAndCheck(auth.companyId, input, auth);
   await advanceIfDue(path);
   const [snap, settings] = await Promise.all([db.doc(path).get(), settingsRef(auth.companyId).get()]);
-  return viewOf(path, snap.data()!, settingsOf(settings), auth);
+  return withWarnings(path, viewOf(path, snap.data()!, settingsOf(settings), auth), snap.data()!);
 }
 
 const ADMIN_ONLY = new Set(['mockAdvance', 'mockReturn']);
@@ -270,7 +277,7 @@ export async function actOnSubmission(input: FilingSubmissionActionInput, auth: 
   });
   await afterChange(path, result.before, result.after, auth.uid);
   const [snap, settings] = await Promise.all([ref.get(), settingsRef(auth.companyId).get()]);
-  return viewOf(path, snap.data()!, settingsOf(settings), auth);
+  return withWarnings(path, viewOf(path, snap.data()!, settingsOf(settings), auth), snap.data()!);
 }
 
 /** 模擬電子申請の待ち時間の設定。変更は管理者だけ */

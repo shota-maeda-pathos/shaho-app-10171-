@@ -118,3 +118,6 @@ th { background: var(--app-color-surface-sub); position: sticky; top: 0; }
 .np-form fieldset { border: 1px solid var(--app-color-border); border-radius: 8px; padding: var(--app-space-2) var(--app-space-3); display: flex; flex-direction: column; gap: var(--app-space-1); }
 .np-months { display: flex; flex-wrap: wrap; gap: var(--app-space-1) var(--app-space-3); margin-top: var(--app-space-2); }
 .np-field input { margin-left: var(--app-space-2); }
+
+.attachments { margin-top: var(--app-space-2); }
+.attachments summary { cursor: pointer; color: var(--app-color-link); }
