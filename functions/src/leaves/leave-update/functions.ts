@@ -3,7 +3,7 @@ import { getAuthContext } from '../../middleware/auth';
 import { validate } from '../../middleware/validation';
 import { leaveUpdateSchema } from './schema';
 import { updateLeave } from './service';
-export const leaveUpdate = onCall({ region: 'us-central1' }, async request => {
+export const leaveUpdate = onCall(async request => {
   const input = validate(leaveUpdateSchema, request.data);
   return updateLeave(input, await getAuthContext(request, input.companyId));
 });

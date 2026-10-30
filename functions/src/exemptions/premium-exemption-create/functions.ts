@@ -4,7 +4,6 @@ import { createPremiumExemption } from './service';
 import { getAuthContext, requireRole } from '../../middleware/auth';
 
 export const premiumExemptionCreate = onCall(
-  { region: 'us-central1' },
   async (request) => {
     const input = premiumExemptionCreateSchema.parse(request.data);
     const auth = await getAuthContext(request, input.companyId);

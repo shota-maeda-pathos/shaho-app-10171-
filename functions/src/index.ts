@@ -1,170 +1,185 @@
 import './config';
-export { collectionRecord } from './collections/collection-record/functions';
-export { operationsMonthlyStatus, operationsMonthlyHold, operationsMonthlyAction } from './operations/functions';
-export {
-  monthlyRunOverview, monthlyRunHold, monthlySalaryImport, monthlySalaryNoPay, monthlyCollectionEntry, monthlyJobStart, monthlyJobGet, monthlyJobChunk,
-  monthlySalaryItemsUpdate,
-} from './monthly/functions';
-export { procedureAction } from './procedures/procedure-action/functions';
+
+/**
+ * 関数のモジュールは呼ばれたときに読み込む。
+ * 実行時は呼ばれた関数のモジュールだけを読み込み、起動を短くする（デプロイ時の関数の検出では全部読み込まれる）。
+ */
+function lazy(load: () => Record<string, unknown>, names: string[]): void {
+  for (const name of names) Object.defineProperty(exports, name, { enumerable: true, get: () => load()[name] });
+}
+
+lazy(() => require('./collections/collection-record/functions'), ['collectionRecord']);
+lazy(() => require('./operations/functions'), ['operationsMonthlyStatus', 'operationsMonthlyHold', 'operationsMonthlyAction']);
+lazy(() => require('./monthly/functions'), [
+  'monthlyRunOverview', 'monthlyRunHold', 'monthlySalaryImport', 'monthlySalaryNoPay', 'monthlyCollectionEntry', 'monthlyJobStart', 'monthlyJobGet', 'monthlyJobChunk', 'monthlySalaryItemsUpdate',
+]);
+lazy(() => require('./procedures/procedure-action/functions'), ['procedureAction']);
 
 // 会社API
-export { companyGet } from './companies/company-get/functions';
-export { companyUpdate } from './companies/company-update/functions';
+lazy(() => require('./companies/company-get/functions'), ['companyGet']);
+lazy(() => require('./companies/company-update/functions'), ['companyUpdate']);
 
 // 従業員API
-export { employeeCreate } from './employees/employee-create/functions';
-export { employeeOnboard } from './employees/employee-onboard/functions';
-export { employeeList } from './employees/employee-list/functions';
-export { employeeGet } from './employees/employee-get/functions';
-export { employeeUpdate } from './employees/employee-update/functions';
-export { employeeDelete } from './employees/employee-delete/functions';
-export { employeeTransfer } from './employees/employee-transfer/functions';
-export { employeeResign } from './employees/employee-resign/functions';
-export { employeeSecretsGet, employeeSecretsUpdate } from './employees/employee-secrets/functions';
+lazy(() => require('./employees/employee-create/functions'), ['employeeCreate']);
+lazy(() => require('./employees/employee-onboard/functions'), ['employeeOnboard']);
+lazy(() => require('./employees/employee-list/functions'), ['employeeList']);
+lazy(() => require('./employees/employee-get/functions'), ['employeeGet']);
+lazy(() => require('./employees/employee-update/functions'), ['employeeUpdate']);
+lazy(() => require('./employees/employee-delete/functions'), ['employeeDelete']);
+lazy(() => require('./employees/employee-transfer/functions'), ['employeeTransfer']);
+lazy(() => require('./employees/employee-resign/functions'), ['employeeResign']);
+lazy(() => require('./employees/employee-secrets/functions'), ['employeeSecretsGet', 'employeeSecretsUpdate']);
 
 // 組織マスタAPI
-export { officeList } from './offices/office-list/functions';
-export { departmentList } from './offices/department-list/functions';
-export { insuranceRateList } from './offices/insurance-rate-list/functions';
-export { officeUpdate } from './offices/office-update/functions';
-export { officeCreate } from './offices/office-create/functions';
+lazy(() => require('./offices/office-list/functions'), ['officeList']);
+lazy(() => require('./offices/department-list/functions'), ['departmentList']);
+lazy(() => require('./offices/insurance-rate-list/functions'), ['insuranceRateList']);
+lazy(() => require('./offices/office-update/functions'), ['officeUpdate']);
+lazy(() => require('./offices/office-create/functions'), ['officeCreate']);
 
 // 雇用API
-export { employmentCreate } from './employments/employment-create/functions';
+lazy(() => require('./employments/employment-create/functions'), ['employmentCreate']);
 
 // 等級API
-export { gradeCreate } from './grades/grade-create/functions';
-export { gradeUpdate } from './grades/grade-update/functions';
-export {
-  santeiRunOverview, santeiRunHold, santeiDecision, santeiJobStart, santeiJobGet, santeiJobChunk, santeiFilingCreate, santeiFilingUpdate,
-  santeiFilingGet, sampleSanteiCreate,
-} from './santei/functions';
-export {
-  bonusRunOverview, bonusRunHold, bonusRunImport, bonusRunEntry, bonusRunNonPayment, bonusJobStart, bonusJobGet, bonusJobChunk,
-  bonusFilingCreate, bonusFilingUpdate, bonusFilingGet, sampleBonusCreate, bonusNonPaymentFilingCreate,
-} from './bonus/functions';
+lazy(() => require('./grades/grade-create/functions'), ['gradeCreate']);
+lazy(() => require('./grades/grade-update/functions'), ['gradeUpdate']);
+lazy(() => require('./santei/functions'), [
+  'santeiRunOverview', 'santeiRunHold', 'santeiDecision', 'santeiJobStart', 'santeiJobGet', 'santeiJobChunk', 'santeiFilingCreate', 'santeiFilingUpdate', 'santeiFilingGet', 'sampleSanteiCreate',
+]);
+lazy(() => require('./bonus/functions'), [
+  'bonusRunOverview', 'bonusRunHold', 'bonusRunImport', 'bonusRunEntry', 'bonusRunNonPayment', 'bonusJobStart', 'bonusJobGet', 'bonusJobChunk', 'bonusFilingCreate', 'bonusFilingUpdate', 'bonusFilingGet', 'sampleBonusCreate', 'bonusNonPaymentFilingCreate',
+]);
 
 // 給与API
-export { salaryCreate } from './salaries/salary-create/functions';
-export { salaryUpdate } from './salaries/salary-update/functions';
-export { salaryList } from './salaries/salary-list/functions';
-export { salaryCsvImport } from './salaries/salary-csv-import/functions';
-export { salaryPublish } from './salaries/salary-publish/functions';
+lazy(() => require('./salaries/salary-create/functions'), ['salaryCreate']);
+lazy(() => require('./salaries/salary-update/functions'), ['salaryUpdate']);
+lazy(() => require('./salaries/salary-list/functions'), ['salaryList']);
+lazy(() => require('./salaries/salary-csv-import/functions'), ['salaryCsvImport']);
+lazy(() => require('./salaries/salary-publish/functions'), ['salaryPublish']);
 
 // 賞与API
-export { bonusCreate } from './bonuses/bonus-create/functions';
+lazy(() => require('./bonuses/bonus-create/functions'), ['bonusCreate']);
 
 // 保険料計算API
-export { monthlyInsuranceCalculate } from './insurance/monthly-insurance-calculate/functions';
-export { bonusInsuranceCalculate } from './insurance/bonus-insurance-calculate/functions';
+lazy(() => require('./insurance/monthly-insurance-calculate/functions'), ['monthlyInsuranceCalculate']);
+lazy(() => require('./insurance/bonus-insurance-calculate/functions'), ['bonusInsuranceCalculate']);
 
 // 届出API
-export { filingCreate } from './filings/filing-create/functions';
-export { filingSubmit } from './filings/filing-submit/functions';
-export { filingList } from './filings/filing-list/functions';
-export { filingGet } from './filings/filing-get/functions';
-export { filingRecordResult } from './filings/filing-record-result/functions';
+lazy(() => require('./filings/filing-create/functions'), ['filingCreate']);
+lazy(() => require('./filings/filing-submit/functions'), ['filingSubmit']);
+lazy(() => require('./filings/filing-list/functions'), ['filingList']);
+lazy(() => require('./filings/filing-get/functions'), ['filingGet']);
+lazy(() => require('./filings/filing-record-result/functions'), ['filingRecordResult']);
 
 // 承認フローAPI
-export { approvalRequestCreate } from './approvals/approval-request-create/functions';
-export { approvalRequestApprove } from './approvals/approval-request-approve/functions';
-export { approvalRequestReject } from './approvals/approval-request-reject/functions';
-export { approvalRequestList } from './approvals/approval-request-list/functions';
+lazy(() => require('./approvals/approval-request-create/functions'), ['approvalRequestCreate']);
+lazy(() => require('./approvals/approval-request-approve/functions'), ['approvalRequestApprove']);
+lazy(() => require('./approvals/approval-request-reject/functions'), ['approvalRequestReject']);
+lazy(() => require('./approvals/approval-request-list/functions'), ['approvalRequestList']);
 
 // ユーザー管理API
-export { userInvite } from './users/user-invite/functions';
-export { userUpdateRole } from './users/user-update-role/functions';
-export { userList } from './users/user-list/functions';
-export { userSuspend, userUnsuspend, userDisableLogin } from './users/user-suspend/functions';
+lazy(() => require('./users/user-invite/functions'), ['userInvite']);
+lazy(() => require('./users/user-update-role/functions'), ['userUpdateRole']);
+lazy(() => require('./users/user-list/functions'), ['userList']);
+lazy(() => require('./users/user-suspend/functions'), ['userSuspend', 'userUnsuspend', 'userDisableLogin']);
 
 // 招待API
-export { invitationList } from './users/invitation-list/functions';
+lazy(() => require('./users/invitation-list/functions'), ['invitationList']);
 
 // 監査ログAPI
-export { auditLogList } from './audit/audit-log-list/functions';
+lazy(() => require('./audit/audit-log-list/functions'), ['auditLogList']);
 
 // ダッシュボードAPI
-export { dashboardStats } from './dashboard/dashboard-stats/functions';
-export { dashboardAnalytics } from './dashboard/dashboard-analytics/functions';
+lazy(() => require('./dashboard/dashboard-stats/functions'), ['dashboardStats']);
+lazy(() => require('./dashboard/dashboard-analytics/functions'), ['dashboardAnalytics']);
 
 // エクスポートAPI
-export { employeeExport } from './exports/employee-export/functions';
+lazy(() => require('./exports/employee-export/functions'), ['employeeExport']);
 
 // 休業管理API
-export { leaveCreate } from './leaves/leave-create/functions';
-export { leaveList } from './leaves/leave-list/functions';
+lazy(() => require('./leaves/leave-create/functions'), ['leaveCreate']);
+lazy(() => require('./leaves/leave-list/functions'), ['leaveList']);
 
 // 保険料免除API
-export { premiumExemptionCreate } from './exemptions/premium-exemption-create/functions';
-export { premiumExemptionList } from './exemptions/premium-exemption-list/functions';
+lazy(() => require('./exemptions/premium-exemption-create/functions'), ['premiumExemptionCreate']);
+lazy(() => require('./exemptions/premium-exemption-list/functions'), ['premiumExemptionList']);
 
 // 扶養家族API
-export { dependentCreate } from './dependents/dependent-create/functions';
-export { dependentList } from './dependents/dependent-list/functions';
-export { dependentGet } from './dependents/dependent-get/functions';
-export { dependentUpdate } from './dependents/dependent-update/functions';
-export { dependentDelete } from './dependents/dependent-delete/functions';
+lazy(() => require('./dependents/dependent-create/functions'), ['dependentCreate']);
+lazy(() => require('./dependents/dependent-list/functions'), ['dependentList']);
+lazy(() => require('./dependents/dependent-get/functions'), ['dependentGet']);
+lazy(() => require('./dependents/dependent-update/functions'), ['dependentUpdate']);
+lazy(() => require('./dependents/dependent-delete/functions'), ['dependentDelete']);
 
-export { monthlyInsuranceGet } from './insurance/monthly-insurance-get/functions';
+lazy(() => require('./insurance/monthly-insurance-get/functions'), ['monthlyInsuranceGet']);
 
-export { sampleTigersCreate, tigersRegister } from './samples/tigers/functions';
-export { sampleLoadCreate } from './samples/load/functions';
+lazy(() => require('./samples/tigers/functions'), ['sampleTigersCreate', 'tigersRegister']);
+lazy(() => require('./samples/load/functions'), ['sampleLoadCreate']);
 
-export { employeeHistoryList } from './employees/employee-history-list/functions';
+lazy(() => require('./employees/employee-history-list/functions'), ['employeeHistoryList']);
 
-export { leaveUpdate } from './leaves/leave-update/functions';
-export { premiumExemptionUpdate } from './exemptions/premium-exemption-update/functions';
+lazy(() => require('./leaves/leave-update/functions'), ['leaveUpdate']);
+lazy(() => require('./exemptions/premium-exemption-update/functions'), ['premiumExemptionUpdate']);
 
-export { portalOverview, portalPayslipGet } from './portal/functions';
-export { bonusGet, bonusUpdate } from './bonuses/workflow/functions';
+lazy(() => require('./portal/functions'), ['portalOverview', 'portalPayslipGet']);
+lazy(() => require('./bonuses/workflow/functions'), ['bonusGet', 'bonusUpdate']);
 
 // 届出自動生成・模擬申請・PDF
-export { filingAutoGenerate } from './filings/filing-auto-generate/functions';
-export { filingMockSubmit } from './filings/filing-mock-submit/functions';
-export { filingPdfData } from './filings/filing-pdf-data/functions';
-export { filingIndexEmployee, filingIndexSantei, filingIndexBonus, filingSearch, filingIndexRebuild } from './filings/index/functions';
-export { filingSubmissionGet, filingSubmissionAction, filingMockSettings, filingMockAdvance } from './filings/submission/functions';
-export { filingCorrectionCreate, filingCorrectionUpdate } from './filings/correction/functions';
-export {
-  approvalIndexRequest, approvalSearch, approvalBadgeGet, approvalDetailGet, approvalBulkApprove, approvalCancel, approvalSettingsGet, approvalIndexRebuild,
-  approvalReminder,
-} from './approvals/index/functions';
+lazy(() => require('./filings/filing-auto-generate/functions'), ['filingAutoGenerate']);
+lazy(() => require('./filings/filing-mock-submit/functions'), ['filingMockSubmit']);
+lazy(() => require('./filings/filing-pdf-data/functions'), ['filingPdfData']);
+lazy(() => require('./filings/index/functions'), [
+  'filingIndexEmployee', 'filingIndexSantei', 'filingIndexBonus', 'filingSearch', 'filingIndexRebuild',
+]);
+lazy(() => require('./filings/submission/functions'), ['filingSubmissionGet', 'filingSubmissionAction', 'filingMockSettings', 'filingMockAdvance']);
+lazy(() => require('./filings/correction/functions'), ['filingCorrectionCreate', 'filingCorrectionUpdate']);
+lazy(() => require('./approvals/index/functions'), [
+  'approvalIndexRequest', 'approvalSearch', 'approvalBadgeGet', 'approvalDetailGet', 'approvalBulkApprove', 'approvalCancel', 'approvalSettingsGet', 'approvalIndexRebuild', 'approvalReminder',
+]);
 
 // 通知API
-export { notificationCreate } from './notifications/notification-create/functions';
-export { notificationList } from './notifications/notification-list/functions';
-export { notificationMarkRead } from './notifications/notification-mark-read/functions';
+lazy(() => require('./notifications/notification-create/functions'), ['notificationCreate']);
+lazy(() => require('./notifications/notification-list/functions'), ['notificationList']);
+lazy(() => require('./notifications/notification-mark-read/functions'), ['notificationMarkRead']);
 
 // 徴収管理API
-export { collectionCreate } from './collections/collection-create/functions';
-export { collectionList } from './collections/collection-list/functions';
-export { collectionSummary } from './collections/collection-summary/functions';
+lazy(() => require('./collections/collection-create/functions'), ['collectionCreate']);
+lazy(() => require('./collections/collection-list/functions'), ['collectionList']);
+lazy(() => require('./collections/collection-summary/functions'), ['collectionSummary']);
 
 // シミュレーションAPI
-export { premiumSimulate } from './simulation/premium-simulate/functions';
+lazy(() => require('./simulation/premium-simulate/functions'), ['premiumSimulate']);
 
 // バッチ処理API
-export { ageEventCheck } from './batch/age-event-check/functions';
+lazy(() => require('./batch/age-event-check/functions'), ['ageEventCheck']);
 
 // 案件（手続き）API
-export { procedureCreate } from './procedures/procedure-create/functions';
-export { procedureGet } from './procedures/procedure-get/functions';
-export { procedureList } from './procedures/procedure-list/functions';
-export { procedureUpdate } from './procedures/procedure-update/functions';
-export { procedureCancel } from './procedures/procedure-cancel/functions';
+lazy(() => require('./procedures/procedure-create/functions'), ['procedureCreate']);
+lazy(() => require('./procedures/procedure-get/functions'), ['procedureGet']);
+lazy(() => require('./procedures/procedure-list/functions'), ['procedureList']);
+lazy(() => require('./procedures/procedure-update/functions'), ['procedureUpdate']);
+lazy(() => require('./procedures/procedure-cancel/functions'), ['procedureCancel']);
 
 // セットアップ
-export { seedMasterData } from './seed/seed-master/functions';
-export { seedGrades } from './seed/seed-grades/functions';
-export { migrateOfficeRoundingRule } from './migrations/rounding-rule';
-export { migrateInsuranceRates } from './migrations/rate-repair';
-export { onboardingStart, onboardingGet, onboardingList, onboardingPreview, onboardingUpdate, onboardInviteGet, onboardInviteSubmit } from './onboarding/functions';
-export { homeTodos } from './home/functions';
-export { resignationStart, resignationGet, resignationPreview, resignationUpdate } from './resignation/functions';
-export { dependentChangeStart, dependentChangeGet, dependentChangePreview, dependentChangeUpdate } from './dependent-change/functions';
-export { leaveProcedureStart, leaveProcedureGet, leaveProcedurePreview, leaveProcedureUpdate } from './leave-procedure/functions';
-export { gradeRevisionStart, gradeRevisionGet, gradeRevisionPreview, gradeRevisionUpdate, sampleRevisionCreate } from './grade-revision/functions';
-export { employmentChangeStart, employmentChangeGet, employmentChangePreview, employmentChangeUpdate, sampleChangeCreate } from './employment-change/functions';
-export { transferStart, transferGet, transferPreview, transferUpdate } from './transfer/functions';
-export { employeeOtherEmployerSet } from './employees/employee-other-employer/functions';
-export { ageEventStart, ageEventGet, ageEventPreview, ageEventUpdate, sampleAgeCreate } from './age-event/functions';
+lazy(() => require('./seed/seed-master/functions'), ['seedMasterData']);
+lazy(() => require('./seed/seed-grades/functions'), ['seedGrades']);
+lazy(() => require('./migrations/rounding-rule'), ['migrateOfficeRoundingRule']);
+lazy(() => require('./migrations/rate-repair'), ['migrateInsuranceRates']);
+lazy(() => require('./onboarding/functions'), [
+  'onboardingStart', 'onboardingGet', 'onboardingList', 'onboardingPreview', 'onboardingUpdate', 'onboardInviteGet', 'onboardInviteSubmit',
+]);
+lazy(() => require('./home/functions'), ['homeTodos']);
+lazy(() => require('./resignation/functions'), ['resignationStart', 'resignationGet', 'resignationPreview', 'resignationUpdate']);
+lazy(() => require('./dependent-change/functions'), [
+  'dependentChangeStart', 'dependentChangeGet', 'dependentChangePreview', 'dependentChangeUpdate',
+]);
+lazy(() => require('./leave-procedure/functions'), ['leaveProcedureStart', 'leaveProcedureGet', 'leaveProcedurePreview', 'leaveProcedureUpdate']);
+lazy(() => require('./grade-revision/functions'), [
+  'gradeRevisionStart', 'gradeRevisionGet', 'gradeRevisionPreview', 'gradeRevisionUpdate', 'sampleRevisionCreate',
+]);
+lazy(() => require('./employment-change/functions'), [
+  'employmentChangeStart', 'employmentChangeGet', 'employmentChangePreview', 'employmentChangeUpdate', 'sampleChangeCreate',
+]);
+lazy(() => require('./transfer/functions'), ['transferStart', 'transferGet', 'transferPreview', 'transferUpdate']);
+lazy(() => require('./employees/employee-other-employer/functions'), ['employeeOtherEmployerSet']);
+lazy(() => require('./age-event/functions'), ['ageEventStart', 'ageEventGet', 'ageEventPreview', 'ageEventUpdate', 'sampleAgeCreate']);

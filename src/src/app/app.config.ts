@@ -2,7 +2,7 @@ import { ApplicationConfig, ErrorHandler, provideBrowserGlobalErrorListeners } f
 import { provideRouter, RouteReuseStrategy, TitleStrategy } from '@angular/router';
 import { OfficeRouteReuseStrategy } from './core/services/office-route-reuse';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
+import { provideFirebaseApp, initializeApp, getApp } from '@angular/fire/app';
 import { provideAuth, getAuth, connectAuthEmulator } from '@angular/fire/auth';
 import { provideFirestore, getFirestore, connectFirestoreEmulator } from '@angular/fire/firestore';
 import { provideFunctions, getFunctions, connectFunctionsEmulator } from '@angular/fire/functions';
@@ -35,7 +35,8 @@ export const appConfig: ApplicationConfig = {
       return firestore;
     }),
     provideFunctions(() => {
-      const functions = getFunctions();
+      // 関数は Firestore と同じ東京（functions/src/config.ts の既定）
+      const functions = getFunctions(getApp(), 'asia-northeast1');
       if (environment.useEmulators) {
         connectFunctionsEmulator(functions, '127.0.0.1', 5001);
       }

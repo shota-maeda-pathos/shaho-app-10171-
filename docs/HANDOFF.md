@@ -5,7 +5,7 @@
 ## 1. 目的と前提
 
 - 目標：`C:\Users\pluser1\Desktop\社会保険管理システム 機能カタログ ちょーろんぐばーじょん.txt`（機能カタログ第2版）どおりに作り、労務担当の初心者でも迷わず使え、大人数の企業にも対応する。迷ったらカタログを正とする（ユーザー手元の設計書 `Downloads/screen-flow.md` 等はカタログと差がある）。
-- 構成：Angular（`src/`）＋ Cloud Functions 2nd Gen（`functions/`、Callable・Zod）＋ Firestore。Firebase プロジェクト `kensyu10171`（本番だがデータはテスト用のみ）。Firestore は **asia-northeast1**、関数は原則 us-central1。
+- 構成：Angular（`src/`）＋ Cloud Functions 2nd Gen（`functions/`、Callable・Zod）＋ Firestore。Firebase プロジェクト `kensyu10171`（本番だがデータはテスト用のみ）。Firestore も関数も **asia-northeast1**（東京。2026-10-30 に移転。リージョンは `functions/src/config.ts` の `setGlobalOptions` で一括指定し、関数ごとに書かない。画面は `app.config.ts` の `getFunctions(getApp(), 'asia-northeast1')`）。`functions/src/index.ts` は関数のモジュールを呼ばれたときに読み込む（`lazy`）。新しい関数はここに `lazy(() => require(...), [名前])` で足す（`index.test.ts` が名前の誤り・載せ忘れ・リージョンを確かめる）。
 - GitHub：`shota-maeda-pathos/shaho-app-10171-`（公開）。最新コミットは `git log` で確認する。push はユーザーがアプリ外の PowerShell で行う。
 
 ## 2. 経緯（要約）
@@ -44,7 +44,7 @@
 ## 4-2. 重要な仕様（段階5 ホームとナビ）
 
 - ホーム `/home` はやることリスト（期限の近い順、「続きから」／待ちは「状況を見る」）と「新しく始める」のカード。統計の表は外した（集計は段階9）。
-- サーバー `functions/src/home/`：`homeTodos`（us-central1）。
+- サーバー `functions/src/home/`：`homeTodos`。
   - 入社：ウィザードの今のステップから次にやることを出す。期限は資格取得届の期限。本人の入力待ち・承認待ち（自分が依頼したものは待ち）・差し戻しの理由を出す。
   - 退職・扶養：`wizardTodo`（ウィザードの今のステップ・承認待ち・差し戻し・返戻と届出の期限）。それ以外の手続き：返戻→進行中→着手可能の順で最初のステップ（ウィザード化するまでの仮。`procedureTodo`）。
   - 毎月の処理：事業所ごとに当月分と、前後の月で始めて終わっていないもの。`monthlyOverview` を呼び、**画面と同じ判定**（`home/monthly-progress.ts` の `stepTone`、画面の `monthly.types.ts` の `stepState` と対応。判定を変えるときは両方を直す）で次のステップと残り人数を出す。期限は給与の支給日（`paymentDay`）。最初は最後の一括処理から推測したが、承認一覧で承認した場合などに誤ったため改めた。
@@ -55,7 +55,7 @@
 ## 4-3. 重要な仕様（段階6 退職）
 
 - 入口：「人が退職する」のカード（`procedure-start.ts` で従業員を選ぶ）と、従業員詳細の「退職」ボタン（`?action=loss` も同じ）。どちらも `resignationStart` で手続きを作ってウィザードを開く。同じ人の進行中の退職手続きがあればそれを開く。従業員詳細の旧い退職パネル（`employeeResign` を直接呼ぶ）は削除した。`employeeResign` 関数自体は残っている。
-- サーバー `functions/src/resignation/`（us-central1）：`resignationStart`・`resignationGet`・`resignationPreview`（kind: entry／settlement）・`resignationUpdate`（step: entry／settlement／account／filing／complete）。手続きは `procedureType: 'loss'` に `resignation` の状態を持つ（旧方式の退職手続きにはない）。ステップは `templates.ts` の `RESIGNATION_STEPS`。
+- サーバー `functions/src/resignation/`：`resignationStart`・`resignationGet`・`resignationPreview`（kind: entry／settlement）・`resignationUpdate`（step: entry／settlement／account／filing／complete）。手続きは `procedureType: 'loss'` に `resignation` の状態を持つ（旧方式の退職手続きにはない）。ステップは `templates.ts` の `RESIGNATION_STEPS`。
 - 法令の判定は `resignation/rules.ts`（純粋関数・テストあり）：喪失日＝翌日、保険料は喪失月の前月分まで（月末退職は退職月も、同月得喪は1か月分）、喪失届の期限＝喪失日＋5日、閲覧期間＝喪失日から3か月の応当日の前日まで、70歳以上被用者不該当、外国人の脱退一時金の案内。
 - 最後の保険料：最後の月とその前2か月について、`monthlyInsurance`（承認済み・計算済み）と `collectionReceipts` を読み、未計算の月は最新の等級から見込みを出す。等級がない月は「計算できません」で決められない。集め方は「いつもの控除月の給与」→「最後の給与からまとめて（前月分と当月分）」→「別途入金」。「退職後に支給する給与はない」を選ぶと、まとめての控除はできない。別途入金・返金があれば通知する。実際の徴収の記録は毎月の処理の「徴収を記録」で行い、ウィザードは開くたびに最新の残りを出す。
 - 退職日を登録すると、台帳の `isActive=false`・`resignationDate`・`qualificationLostDate`・`portalAccessUntil` を書く（未来の退職日でもすぐ退職済みになるのは旧方式と同じ）。利用者には `suspendFrom`（喪失日）・`loginDisabledFrom`（閲覧期間の翌日）を書き、`middleware/auth.ts` と画面の `auth.service.ts` が東京の今日と比べて閲覧専用・ログイン停止にする。権限（roles）は消さない。喪失日を過ぎていれば `isSuspended=true` も書く（日付を見ない旧い関数のため）。
@@ -75,7 +75,7 @@
 
 - 入口：「産休・育休に入る／戻る」のカード（`procedure-start.ts` で従業員と休業の種類を選ぶ）と、従業員詳細の「休業」タブの「産休の手続きを始める」「育休の手続きを始める」。同じ人の進行中の同じ種類の手続きがあれば、それを開く。産休は女性だけ。社会保険に加入していない人は始められない。「休業」タブの旧い登録フォームは介護休業だけにした（`leaveCreate` は介護用に残る）。
 - 1つの休業につき1つの手続き（`procedureType: 'maternity_leave'／'childcare_leave'` に `leaveProcedure` の状態）。ステップは `LEAVE_WIZARD_STEPS`：期間を決める→申出書を作る→承認→提出→休業中のことと復帰を記録する（`during`）→完了。
-- サーバー `functions/src/leave-procedure/`（us-central1）：`leaveProcedureStart`・`leaveProcedureGet`・`leaveProcedurePreview`（期間・休業中のことの判定。保存しない）・`leaveProcedureUpdate`（step: plan／filing／event／complete）。
+- サーバー `functions/src/leave-procedure/`：`leaveProcedureStart`・`leaveProcedureGet`・`leaveProcedurePreview`（期間・休業中のことの判定。保存しない）・`leaveProcedureUpdate`（step: plan／filing／event／complete）。
 - 判定は `leave-procedure/rules.ts`（純粋関数・テストあり）：産前42日（多胎98日）・産後56日、休み始める日の範囲、子が1歳・1歳6か月・2歳・3歳に達する日（延長の区切り）、本人が出産した子は産後56日の後から、免除の月（月末・14日）と賞与の免除、産休の届出の期限（終了から1か月）、育休は「速やかに」、復帰した月。
 - 休業中のこと（`judgeLeaveEvent`）：産休は出産日（予定日と違えば変更届。出産後に申出書を出していれば不要）と終了（予定より早ければ終了届。産後6週間は休む）。育休は延長（申出書（延長））と終了（早ければ終了届）。**予定どおりの終了は届出不要**。届出が要るときは届出のステップ（作る・承認・提出）をリセットして同じ手続きでもう一度通る。提出済みの届出は `history`。承認を依頼する前なら、届出のステップの「記録を直す」から記録をやり直せる（記録前のステップと参照を `pending` に持って戻す）。
 - 届出の種類：産休の変更届・終了届は同じ様式の新しい種類 `maternityLeaveChange`（産前産後休業取得者変更（終了）届）。育休の延長は `childcareLeaveStart`（区分＝延長）、終了は `childcareLeaveEnd`。
@@ -101,7 +101,7 @@
 - 判定 `bonus/bonus-calc.ts`（純粋関数・テストあり）：年度（4月始まり）、同月合算、上限（健保は年度累計573万円・厚年は月150万円）と上限に近い（8割超）知らせ、保険料と届出の要否（支給日で資格を判定。資格喪失月で喪失日より前の支給は「保険料なし・届出あり」、喪失日以後・適用外・取得前は届出不要）、年度の4回目（支給日ごと）の警告、届出の1人分（備考1＝70歳以上被用者・3＝同一月内の賞与合算と初回支払日）、期限（初回の支給日＋5日）、CSV（同じ人の複数行＝同月の別の支給。誤りのある人は全行取り込まない）。
 - `bonusInsuranceCalculate` を直した：健保の年度累計を**前の月の承認済みの標準賞与額からサーバーで数える**（手入力の `cumulativeBonusAmount` は使わない。前の月に未承認の賞与があれば計算しない）。資格喪失月は0円、届出不要の人は計算しない。計算結果に `priorCumulativeBonusAmount`・`bonusTarget` などを残し、年度累計が変わったら「計算し直し」にする。
 - 4ステップ：賞与を登録する（CSVファイル・**表の貼り付け**・1人ずつの入力。2回目の支給は1人分の入力で足す）→ 賞与額の承認 → 保険料の計算と承認 → 賞与支払届（作成・承認・模擬電子申請／紙）。各ステップの状態は画面の `bonus.types.ts` の `stepState` とサーバーの `bonus/progress.ts` の `bonusStepState` が同じ判定（変えるときは両方を直す）。
-- サーバー `functions/src/bonus/`（us-central1）：`bonusRunOverview`（全員分、上限3000名）・`bonusRunHold`・`bonusRunImport`（dryRun あり）・`bonusRunEntry`・`bonusRunNonPayment`・`bonusJobStart`／`bonusJobGet`／`bonusJobChunk`（`bonusJobs/{id}/chunks` を東京のトリガーで25名ずつ。操作は賞与額の承認依頼・承認、保険料の計算・承認依頼・承認）・`bonusFilingCreate`・`bonusFilingUpdate`・`bonusFilingGet`・`sampleBonusCreate`。承認依頼した人は run の `bonusReview`・`premiumReview` に残し、承認者には「あなたの番」で出す。
+- サーバー `functions/src/bonus/`：`bonusRunOverview`（全員分、上限3000名）・`bonusRunHold`・`bonusRunImport`（dryRun あり）・`bonusRunEntry`・`bonusRunNonPayment`・`bonusJobStart`／`bonusJobGet`／`bonusJobChunk`（`bonusJobs/{id}/chunks` を東京のトリガーで25名ずつ。操作は賞与額の承認依頼・承認、保険料の計算・承認依頼・承認）・`bonusFilingCreate`・`bonusFilingUpdate`・`bonusFilingGet`・`sampleBonusCreate`。承認依頼した人は run の `bonusReview`・`premiumReview` に残し、承認者には「あなたの番」で出す。
 - 届出は算定基礎届と同じ作り（`bonusRuns/.../filings`、1件に1000名まで、状態は 下書き→承認待ち→承認済み→提出済み、届出一覧・承認一覧には出ない）。PDF（画面）`official-filing-pdf.ts` の `createBonusFilingPdf`：1枚10人（行の間隔 77.87＝原票160%の値）、共通の支払日を各ページに書き、各行の支払日は共通と違うときだけ書く。個人番号（70歳以上被用者）の欄は書かず警告を出す。
 - 不支給：事業所の `bonusMonths`（設定の事業所一覧で登録。`officeList` が返すようにした）。予定月が終わって賞与が1件もなく、不支給報告書の提出日の記録もなければ、賞与の画面とホームに「賞与不支給報告書の提出が必要です」。報告書そのものの作成は段階7。
 - ホーム：`home/service.ts` の `bonusTodos`。始めた支給月（半年以内）で終わっていないものと、過去3か月の予定月の不支給。期限は賞与支払届の期限。
@@ -110,7 +110,7 @@
 
 - 個人型。1つの手続きは `procedureType: 'monthly_change'` に `gradeRevision` の状態（種類 `occasional`／`maternityEnd`／`childcareEnd`・起点の月・決めた判定 `decision`・届出・対象外で終えた理由）。ステップは `REVISION_WIZARD_STEPS`：変動を確かめる（終了時改定は休業の終わりと申出）→判定する→届出を作る→承認→提出→完了。
 - 入口：ライフイベントのカード「給料が大きく変わった」（`procedure-start.ts` で従業員と「見直しのきっかけ」を選ぶ）、従業員詳細の「随時改定」ボタン、産休・育休の完了画面の「終了時改定の手続きを始める」（休業を終えた日・子を引き継ぐ。`sourceProcedureId`）、毎月の処理の詳細の「随時改定の対象か確かめる」（変動月を引き継ぐ）、ホームのやること。いずれも `/revisions/new?employeeId=&kind=&startMonth=&sourceProcedureId=` を開き、画面が `gradeRevisionStart` を呼んで手続きの画面へ移る（同じ人の進行中の同じ改定があればそれを開く）。旧 `/employees/:id/revision` はここへ転送し、旧画面と旧 `gradeRevisionCheck`・`gradeRevisionSubmit` はコードから外した（本番には残る）。
-- サーバー `functions/src/grade-revision/`（us-central1）：`gradeRevisionStart`・`gradeRevisionGet`・`gradeRevisionPreview`（入れかけの内容で判定。保存しない）・`gradeRevisionUpdate`（step: change／decide（revise・close）／filing／complete）・`sampleRevisionCreate`。判定は毎回 `evaluate`（給与・改定前の等級・料率の等級表を読む）を通し、届出を作る直前にも判定し直して、決めた内容と違えば作らない。新しい等級を使う月に別の決定の等級があれば止める。
+- サーバー `functions/src/grade-revision/`：`gradeRevisionStart`・`gradeRevisionGet`・`gradeRevisionPreview`（入れかけの内容で判定。保存しない）・`gradeRevisionUpdate`（step: change／decide（revise・close）／filing／complete）・`sampleRevisionCreate`。判定は毎回 `evaluate`（給与・改定前の等級・料率の等級表を読む）を通し、届出を作る直前にも判定し直して、決めた内容と違えば作らない。新しい等級を使う月に別の決定の等級があれば止める。
 - 判定 `grade-revision/rules.ts`（純粋関数・テストあり）：随時改定は変動月と前月の固定的賃金（前月の給与がなければ `previousTotalFixedWage`、なければ担当者が向きを選ぶ）、3か月とも承認済み・支払基礎日数（一般17日・短時間11日）、遡及差額を除いた平均、健保・厚年別に2等級差（上限・下限の特例。従前の報酬月額は担当者の入力か等級の `basisRemuneration`）と向きの一致。終了時改定は休業を終えた日の翌日が属する月から3か月、基準に満たない月を除く（パート15日の特例）、1等級差、本人の申出・子が3歳未満・翌日から次の休業に入らない。どちらも4か月目から適用。
 - 承認は届出の1回（入社と同じく承認申請の `metadata.grade`）。承認で届出が承認済みになり、等級（`grades/{適用月}`、`determinationType: occasional／leaveEnd`、`basisMonths`、`filingId`）が確定する。`approvalRequestApprove` を直した。改定前の等級で計算済みの月があれば、完了画面で計算し直しを案内する（自動では計算し直さない）。
 - 毎月の処理：`monthlyRunOverview` が支給月を3か月目とする人（変動月＝支給月の2か月前）について固定的賃金の変動を見て判定し、行に `revision`（知らせ・手続き）を返す。手続きを始めるまでは注意（`warnings`）に出す（「結果の確認」のステップで「確認が必要」）。対象の人には「給与と等級の開き」の注意は出さない。
@@ -122,7 +122,7 @@
 - 40・65歳は届出がないため手続きを作らない。介護保険料は毎月の計算が年齢から自動で変える（前月差額の理由に「介護保険の開始・終了」が出る）。70・75歳は個人型のウィザード（`procedureType: 'age_event'` に `ageEvent` の状態。1人に1回なので、同じ種類の手続きがあれば終えたものも開く）。ステップは `AGE_WIZARD_STEPS`：到達日と届出の要否を確かめる→届出→承認→提出→完了。
 - 判定 `age-event/rules.ts`（純粋関数・テストあり）：到達日＝誕生日の前日。70歳は到達日に厚生年金を喪失し、到達日の月の前月分まで。75歳は誕生日当日に健康保険を喪失し、誕生日の月の前月分まで。届出の期限は起きた日から5日。70歳は「標準報酬月額相当額」（到達日の報酬月額を厚年の等級表に当てはめる）が到達前の厚年の標準報酬月額と同じなら届出不要（様式にも「従前額と異なる場合に提出」とある）。報酬月額の目安は直近の固定的賃金＋3か月の非固定的賃金の平均で、担当者が直せる。健康保険の等級は変えない。
 - 保険料の月ごとの年齢の扱いは `calculator/age.ts` の `ageFlagsForMonth`（日付で判定）に一本化し、`utils/age.ts` の `isHealthExcluded` などはその包み。以前は75歳の誕生日が月の1日の人の前月分の健保を外していた。
-- サーバー `functions/src/age-event/`（us-central1）：`ageEventStart`・`ageEventGet`・`ageEventPreview`（70歳の届出の要否。保存しない）・`ageEventUpdate`（step: check／filing／complete）・`sampleAgeCreate`。届出が要らない70歳は届出のステップを `skipped` にし、完了は手続き側で閉じる。75歳は被扶養者（`dependents`）も外れることを案内し、保険証などの回収枚数を入れる。台帳（雇用条件の加入）は書き換えない（計算は年齢から判定するため）。
+- サーバー `functions/src/age-event/`：`ageEventStart`・`ageEventGet`・`ageEventPreview`（70歳の届出の要否。保存しない）・`ageEventUpdate`（step: check／filing／complete）・`sampleAgeCreate`。届出が要らない70歳は届出のステップを `skipped` にし、完了は手続き側で閉じる。75歳は被扶養者（`dependents`）も外れることを案内し、保険証などの回収枚数を入れる。台帳（雇用条件の加入）は書き換えない（計算は年齢から判定するため）。
 - 届出：75歳は `lossNotification`（喪失原因「75歳到達」→ 様式の「7.」に丸）。70歳は新しい種類 `pensionLoss70`（公式様式 `src/public/filing-forms/pension-loss-70.pdf`、出所は `sources.json`。喪失原因「6. 70歳到達」は様式に印刷済み。記入は `official-filing-pdf.ts` の `pensionLoss70`）。
 - 入口：ライフイベントのカード「70歳・75歳になる」（`procedure-start.ts` で従業員と年齢を選ぶ）、ホームのやること（`/age-events/new?employeeId=&kind=` を開くと手続きを作る）。ホーム：`home/service.ts` の `ageNoticeTodos`（まだ始めていない到達）と `ageTodo`（手続き）。従業員を全員読む（`select` で生年月日などだけ）。
 
@@ -139,7 +139,7 @@
 
 - 方針と順番は `docs/stage7-plan.md`（ユーザー承認済み）。7-1〜7-5 済み、次は 7-6（添付書類）。
 - 届出の索引 `companies/{c}/filingIndex/{source}_{親ID}_{届出ID}`：従業員の下・`santeiRuns`・`bonusRuns` の届出の書き込みを、トリガー `filingIndexEmployee`・`filingIndexSantei`・`filingIndexBonus`（asia-northeast1）が受けて更新する。中身は `filings/index/rules.ts`（純粋関数・テストあり）：カタログの状態名（draft・rejected・pending・approved・sent・received・processing・completed・mockFailed・returned・cancelled）と紙の提出 `paperStatus`、未提出 `open`、期限 `deadline`（種類ごとに計算。「速やかに」は `deadlineNote`）、受付番号、作成日・提出日。**7-2 で状態の持ち方を変えるときは `employeeFilingStatus`・`runFilingStatus` も直す。**
-- 検索 `filingSearch`（us-central1、admin・operator・approver）：等価条件を1つだけ Firestore に渡し（複合索引なし）、残りは関数内で絞る。上限5000件を読む。未提出・期限超過・7日以内・承認待ちの件数を返す。旧 `filingList` は画面から使わなくなった（関数は残る）。
+- 検索 `filingSearch`（admin・operator・approver）：等価条件を1つだけ Firestore に渡し（複合索引なし）、残りは関数内で絞る。上限5000件を読む。未提出・期限超過・7日以内・承認待ちの件数を返す。旧 `filingList` は画面から使わなくなった（関数は残る）。
 - 移行 `filingIndexRebuild`（管理者）：全届出を索引に入れ直し、元のない索引を消す。2026-10-30 に実行（34件）。順に読んでいたため約4分かかったので並行読み込みに直した（7-2 でデプロイ済み）。
 - 期限の休日延長 `insurance/calculator/holidays.ts`：祝日・振替休日・国民の休日・12月29日〜1月3日。`fiveDayDeadline`（5日の期限）を入社・退職・扶養・年齢到達・賞与・雇用条件の変更・異動で使う。7-2 のデプロイで、使う関数をすべて再デプロイした。
 - 届出一覧 `/filings`：最初は「まだ提出していない」を期限の近い順。カード4つ（未提出・期限超過・今週が期限・承認待ち）、種類・状態・紙の提出・氏名や社員番号・受付番号・期間で絞り込み。算定基礎届・賞与支払届の行は一括型の画面へ。旧「自動生成」ボタンは外した（`filingAutoGenerate` は残る）。表示名は `features/filings/filing-labels.ts`。
@@ -151,7 +151,7 @@
 - 模擬電子申請：送信済み→受付済み→処理中→完了。待ち時間は `settings/mockSubmission`（既定は各10秒、自動で進めない設定も可。設定画面の「模擬電子申請」タブ、変更は管理者）。受付済みになるときに `MOCK-YYYYMMDD-0001`（`counters/mock-YYYYMMDD` の日ごとの連番）。受付前だけ送信取消（承認済みに戻る）。エラーのシミュレーション4種（timeout・serverError・validationError・outOfHours）と必須項目の不足は送信エラーで、送り直せる。管理者は「次の状態へ進める」（以後は自動で進まない）と「返戻にする」（理由が要る）。返戻（模擬・紙）の後は「下書きに戻して直す」（`reopen`。従業員の届出は workflowStatus を draft、run の届出は status を draft）で承認からやり直す。完了・返戻はダッシュボードに通知。
 - 紙の提出：提出日・提出先・方法（窓口／郵送）→ 受理（決定通知の内容）／返戻（理由）。模擬電子申請の完了後も記録できる。送信中は記録できない。
 - 自動で進める仕組み：送信中の届出をルートの `mockSubmissionQueue`（`dueAt`）に置き、定期の関数 `filingMockAdvance`（asia-northeast1、1分ごと）が進める。画面が `filingSubmissionGet` で読むときも予定を過ぎていれば進める。自動で進めたときは届出の version を上げない。
-- 関数：`filingSubmissionGet`・`filingSubmissionAction`（mockSend／mockCancel／mockAdvance／mockReturn／paperSubmit／paperResult／reopen）・`filingMockSettings`（us-central1）。旧 `filingMockSubmit`・`filingSubmit`・`filingRecordResult` は画面から使わなくなった（関数は残る）。
+- 関数：`filingSubmissionGet`・`filingSubmissionAction`（mockSend／mockCancel／mockAdvance／mockReturn／paperSubmit／paperResult／reopen）・`filingMockSettings`。旧 `filingMockSubmit`・`filingSubmit`・`filingRecordResult` は画面から使わなくなった（関数は残る）。
 - 画面：共通の部品 `features/filings/submission/filing-submission.ts`（`<app-filing-submission [target]="{source, parentId, filingId}" (changed)="...">`）。7つのウィザードの提出ステップ・届出の画面・算定基礎届・賞与の届出で使う。確認は画面内（`window.confirm` を使わない）。送信中は3秒ごとに読み直す。
 - 手続きの判定：`procedures/refresh.ts` の模擬申請のステップは送信中が進行中、返戻が差し戻し。算定・賞与の進み具合（`santeiProgress`・`bonusProgress`、画面の `filingTone`）は送信中を待ち、返戻・送信エラーを要対応にする。
 - 画面で確認（2026-10-30、本番の関数）：高橋 三郎の資格取得届でタイムアウトのシミュレーション→送り直し→10秒ごとに完了（`MOCK-20261030-0001`）、取消ボタンが受付後に消える。兼業 六子（CHG-0006）の育休申出書を送信→完了（`-0002`）し、育休の手続きが「復帰を記録する」へ進んだ。自動の進行を止めて前田 翔太（TEST-111）の資格喪失届を送信→取消→紙で提出（品川年金事務所・窓口）→受理（決定通知の内容）。設定は自動・10秒に戻した。届出一覧・ホームへの反映も確認。
@@ -203,13 +203,14 @@
 - 随時改定・終了時改定（2026-10-30）：`gradeRevisionStart`・`gradeRevisionGet`・`gradeRevisionPreview`・`gradeRevisionUpdate`・`sampleRevisionCreate` を新規デプロイ。`monthlyRunOverview`・`homeTodos`・`approvalRequestApprove`・`filingMockSubmit`・`filingPdfData`・`filingCreate` を再デプロイ。`homeTodos` の期間の表示の直しも、この再デプロイより前に反映済み（別セッションで確認）。
 - 年齢到達（2026-10-30）：`ageEventStart`・`ageEventGet`・`ageEventPreview`・`ageEventUpdate`・`sampleAgeCreate` を新規デプロイ。75歳の直しで `monthlyInsuranceCalculate`・`monthlyJobChunk`・`bonusInsuranceCalculate`・`bonusJobChunk`・`resignationGet`・`resignationPreview`・`resignationUpdate`・`employeeResign` を、ほかに `homeTodos`・`filingMockSubmit`・`filingPdfData`・`filingCreate` を再デプロイ。
 - 雇用条件の変更など（2026-10-30）：`employmentChangeStart`・`employmentChangeGet`・`employmentChangePreview`・`employmentChangeUpdate`・`sampleChangeCreate`・`transferStart`・`transferGet`・`transferPreview`・`transferUpdate`・`employeeOtherEmployerSet` を新規デプロイ。`homeTodos`・`employeeGet`・`employmentCreate`・`onboardingUpdate`・`monthlyRunOverview`・`resignationGet`・`gradeRevisionGet`・`ageEventGet` を再デプロイ。
+- 東京への移転（2026-10-30）：公開済みの関数178個（呼び出し型169個＋トリガー・定期9個）を asia-northeast1 にデプロイし、us-central1 の173個（移した169個と、コードにない旧 `santeiPreview`・`santeiSubmit`・`gradeRevisionCheck`・`gradeRevisionSubmit`）を削除した。未公開の7個（`ageEventCheck`・`employeeSecretsGet`・`employeeSecretsUpdate`・`procedureCreate`・`salaryCsvImport`・`userDisableLogin`・`userSuspend`）は今もデプロイしていない。
 - 端数処理の移行（`migrateOfficeRoundingRule`）は未実行。会社設定の「特定適用事業所」は未登録（3/4未満の人の加入判定が「担当者の判断が必要」になる）。
 - 賞与のテスト（2026-10-30）：`sampleBonusCreate` で「サンプル賞与テスト事業所」（`sample-bonus-office`、300名、`BONUS-0001`〜、支給予定月 7・9・12月、2026年4・7・8月の賞与つき。50人ごとに同月2回・上限に近い・上限超え・4回目・育休免除・70歳以上・喪失月・喪失日以後・支給なし・現物・7月未承認・適用外の人）を作成。12月支給を表の貼り付けで294名取り込み（1人分の入力で BONUS-0011 に2回目 100,500円を追加）、賞与額を承認、282名の保険料を計算（7月未承認の6名は失敗→保留）、276名の保険料を承認、届出（276名）を承認→模擬電子申請→完了。9月は不支給のアラートが出たまま（記録の操作は未確認）。7月の未承認6名のため、ホームに「賞与（2026年7月支給）：賞与額の承認を依頼する」が出る。この事業所はホームの「毎月の処理（2026年10月支給）」にも出る（給与なし300名）。
 - 改定のテスト（2026-10-30）：`sampleRevisionCreate` で「サンプル改定テスト事業所」（`sample-revision-office`、11名 `REV-0001`〜。2025年9月の定時決定の等級、2026年6〜9月支給の給与。昇給・降給・1等級差・向き違い・日数不足・遡及・上限・下限・短時間・9月未承認・育休明け）を作成。2026年9月支給の保険料を計算（未承認）。REV-0001 の随時改定（健保22→25・厚年19→22、10月から）と REV-0011 の育休終了時改定（健保22→21・厚年19→18、10月から）は承認→模擬電子申請→完了。REV-0003 は「改定しない」で終えた。ホームに「毎月の処理（2026年9月・10月支給）」が増えている。
 - 年齢到達のテスト（2026-10-30）：`sampleAgeCreate` で「サンプル年齢到達テスト事業所」（`sample-age-office`、7名 `AGE-0001`〜。40・65歳、70歳（報酬が同じ／再雇用で下がった・12月1日生まれ／10月に到達済み）、75歳（配偶者が被扶養者／11月1日生まれ）。2026年9月の等級と8〜10月支給の承認済みの給与）を作成。AGE-0003（70歳・届出なし）は完了、AGE-0004（70歳・届出あり）と AGE-0006（75歳）は承認→模擬電子申請→完了。AGE-0005（10月到達・期限切れ）と AGE-0007（75歳・11月1日生まれ）はホームのやることに残っている。この事業所はホームの「毎月の処理（2026年10月支給）」にも出る。
 - 変更のテスト（2026-10-30）：`sampleChangeCreate` で「サンプル変更テスト事業所」（`sample-change-office`、東京）と「サンプル変更テスト大阪事業所」（`sample-change-office-osaka`）、6名 `CHG-0001`〜 を作成。CHG-0001 は契約を2027-11-30まで更新（完了）、CHG-0002 は11月15日満了の知らせが出たまま、CHG-0003 は12月からパート（資格喪失届を提出・完了）、CHG-0004 は12月から正社員（資格取得届を提出・完了、12月の資格取得時決定の等級）、CHG-0005 は12月1日に大阪へ異動（届出2件を提出・完了、所属は大阪）、CHG-0006 は二以上事業所（株式会社サンプル物流）を登録。CHG-0001 には、最初の保存のエラーの前に作られた余分な雇用条件の承認依頼（effectiveDate のない下書き）が1件ある（ユーザーに差し戻しを依頼）。
 - 確認のテスト（2026-10-30）：REV-0011 に産休終了時の改定（⑪、9月から健保21・厚年18）を完了。CHG-0006 に育休（2026-11-01〜2027-08-19、申出書は承認済み・提出前）、サンプル変更テスト事業所の2026年11月分の保険料を計算（未承認、CHG-0006 は免除で0円）。LOAD-0298 の扶養の手続き（子を外す・配偶者の氏名を「はな子」に変更）を紙の受理まで完了。CHG-0002 は退職日（2026-11-15）を登録し、最後の保険料のステップで止まっている（8月の等級がない）。
-- テスト：593件中584件成功。失敗9件は改修前から（各テスト独自のモックが手続き機能に追随していない。段階10で対応）。
+- テスト：639件中630件成功（2026-10-30）。失敗9件は改修前から（各テスト独自のモックが手続き機能に追随していない。段階10で対応）。
 
 ## 6. 次にやるべきタスク
 
@@ -218,15 +219,15 @@
    - 外国人の退職案内：表示の処理はある。外国人情報（ローマ字氏名・在留資格など）を入れる画面がないため未確認。台帳の項目の画面か、段階9の本人入力と合わせる。
    - 退職後の閲覧期間の延長・短縮、ログイン停止（閲覧専用→停止）：アカウントを持ち、等級がそろった従業員と、そのアカウントでのログイン（ユーザー操作）が要る。段階8のログインまわりと合わせる。
 3. **段階6の任意の確認**（必要なら）：紙の提出・差し戻しの表示（各ウィザード）、承認者だけのアカウントでのホーム表示、退職の画面で70歳・75歳の人を通す、毎月の処理で75歳の月初生まれの保険料（10月分まで健保）を計算、産休・育休の完了画面から終了時改定を始める流れ、下限の特例で従前の報酬月額を入れる操作、改定した月の保険料の計算し直しの案内、賞与の不支給報告書の記録と取り消し、7月の未承認6名を承認して12月を計算し直す流れ、9月分の保険料に定時決定の等級が使われること、産休の終了届、育休の延長の提出、二以上事業所の警告（退職・随時改定・年齢到達・雇用条件の変更・異動の各画面）、2か月以内の有期契約の適用外（入社の画面）、異動日より前の月の毎月の処理が異動先に出てしまう点。
-4. **速さの判断（ユーザーに確認）**：ホーム約5秒、毎月の処理の状況5〜6.5秒、承認一覧約8秒、ウィザードの初回読み込み10〜15秒（関数が us-central1・Firestore が東京のため）。読み込みの多い関数を asia-northeast1 に移す案（画面の呼び出し先の変更も必要）。
-5. 以前からの残り：認証の変更を全関数に反映する再デプロイ（承認要）、端数処理の移行の実行（承認要）、入社の差し戻し・返戻の画面確認、特定適用事業所の登録（ユーザーに確認。未登録のため3/4未満の人の加入判定が「担当者の判断」になる）、Hosting の公開（承認要）、旧 `santeiPreview`・`santeiSubmit`・`gradeRevisionCheck`・`gradeRevisionSubmit` などの本番からの削除（要確認）。
+4. **速さ**（2026-10-30 に東京へ移転・読み込みの遅延を済ませた）：関数を画面を通さずに呼んだ時間（移転前→後、2回目以降）は、承認一覧 `approvalSearch` 1.2〜1.5秒→0.13〜0.17秒、ウィザード `onboardingGet` 1.9〜2.1秒→0.2秒（起動直後は9.0秒→1.2秒）、賞与 `bonusRunOverview` 8.4秒→3.1〜3.4秒。起動（ログの「Starting new instance」から起動確認まで、デプロイ直後の起動の比較）は中央値4.0秒→1.6秒。**残る課題：ホーム `homeTodos` が東京でも17〜20秒**（移転前24〜35秒）。開くたびに事業所ごと・月ごとに毎月の処理・算定基礎届・賞与の状況（`monthlyOverview` など）をまるごと計算し直しているため。件数だけを索引や run の集計から読む形に直す（ユーザーに方針を確認）。
+5. 以前からの残り：認証の変更を全関数に反映する再デプロイ（承認要）、端数処理の移行の実行（承認要）、入社の差し戻し・返戻の画面確認、特定適用事業所の登録（ユーザーに確認。未登録のため3/4未満の人の加入判定が「担当者の判断」になる）、Hosting の公開（承認要。公開中の web.app は古く、米国の関数を呼ぶため、2026-10-30 の米国の関数の削除以降は動かない。公開すれば東京を呼ぶ）。
 6. **段階7のあと・段階8の前にUI統一（段階7.5）**（2026-10-30 ユーザー決定）：設計は決定済み：`docs/ui-unification-design.md`（見本は `ui-proposals/`）。段階7の残りはそのまま進めてよいが、7-3以降で新しく作る承認・届出の画面と確認の表示は、この設計に寄せる（`window.confirm` は画面内の確認ダイアログにする）。
 7. 以降は `docs/roadmap.md` の段階8〜10。後続課題は `docs/catalog-checklist.md` の末尾。
 
 ### 次のセッションの作業メモ
 
 - 開発サーバーは `.claude/launch.json` の `angular-dev`。空いているポートで起動し、ポートが変わるとログインし直し（ユーザーに頼む）。
-- 本番の関数を画面を通さずに呼ぶとき：ブラウザーペインで IndexedDB の `firebaseLocalStorageDb` からトークンを取り、`https://us-central1-kensyu10171.cloudfunctions.net/<関数名>` に `{ data: {...} }` を POST する（companyId は `company-001`）。画面を移るとページの変数は消える。
+- 本番の関数を画面を通さずに呼ぶとき：ブラウザーペインで IndexedDB の `firebaseLocalStorageDb` からトークンを取り、`https://asia-northeast1-kensyu10171.cloudfunctions.net/<関数名>` に `{ data: {...} }` を POST する（companyId は `company-001`）。画面を移るとページの変数は消える。
 - 画面確認のコツ：日本語・日付は `form_input`、数値は三回クリックしてから `type`、`mat-select` はクリックして選択肢を `find`。表示幅はターンごとに戻るので `resize_window` を毎回指定する。PDFのプレビューは iframe を `position:fixed` にして `#page=1&zoom=110,0,500` を付けて読み込み直す。
 - 承認は別アカウントが要る（ユーザーに頼む）。本番への書き込み・デプロイ・テストデータの作成は事前にユーザーに確認する。
 
@@ -243,7 +244,7 @@
 - **本番への書き込み・デプロイ・Hosting の公開は事前にユーザーに確認する。** 本番の認証にパスワードを入力しない。承認の確認には別アカウントが要る（ユーザーが操作）。
 - **デプロイ**は PowerShell から関数名を明示して行う（Bash からは firebase CLI が動かない）：
   `firebase deploy --only functions:default:<名前>,functions:default:<名前> --project kensyu10171 --non-interactive`
-  全体デプロイはしない（未公開の関数が13個あり、個人番号が平文のものを含む）。別 codebase `socialinsurance` に触れない。
+  全体デプロイはしない（未公開の関数が7個あり、個人番号が平文のものを含む）。コマンドは2000文字を超えると端末に渡せないので、60個ほどずつに分ける。関数のリージョンを変えるとき、CLI は旧リージョンの同名の関数を削除するか聞く（`--non-interactive` では止まる）。先に新しいリージョンを作るなら、ターミナルのタブで `--interactive` を付けて実行し、ユーザーに N と答えてもらい、確認後に `firebase functions:delete <名前…> --region <旧> --project kensyu10171 --force` で消す。別 codebase `socialinsurance` に触れない。
 - **Firestore の索引**：`firestore.indexes.json` は本番より古い。索引のデプロイは本番の定義と合わせ、明示の承認を得る。新しい処理は複合索引に頼らない形にしている。
 - Firestore のトランザクションでは書き込みの前にすべて読み取る。監査ログなどに `undefined` を書かない（書き込みが失敗する）。
 - ビルドとテスト：`functions` で `npx tsc --noEmit -p .` と `npx jest --config jest.config.js`、`src` で `npx ng build --configuration development`（以前からの警告 NG8011 が出る）。
