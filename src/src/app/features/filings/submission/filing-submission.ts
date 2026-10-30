@@ -133,7 +133,7 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
           @if (method === 'electronic' && v.canSend) {
             <p class="sub">このシステムの電子申請は模擬です。実際の提出は、e-Govや紙で別に行ってください。</p>
             <div class="fields">
-              <mat-form-field appearance="outline">
+              <mat-form-field appearance="outline" class="wide">
                 <mat-label>申請の種類</mat-label>
                 <mat-select [(ngModel)]="scenario" name="scenario">
                   <mat-option value="normal">通常申請</mat-option>
