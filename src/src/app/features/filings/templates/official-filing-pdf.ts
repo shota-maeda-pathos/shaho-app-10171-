@@ -623,11 +623,11 @@ export async function createBonusNonPaymentPdf(fields: Data, meta: FilingPrintMe
   if (Array.isArray(after)) {
     const afterCells: Box[] = [[184.2,862,33.2,33],[218.7,862,32.7,33],[252.7,862,30.9,33],[285,862,32.6,33]];
     const beforeCells: Box[] = [[409,862,33.3,33],[443.6,862,32.6,33],[477.6,862,32.7,33],[511.6,862,38.6,33]];
-    const values = fields['今後は支給しない'] ? ['00','00','00','00'] : (after as number[]).map(m => String(m));
+    const values = fields['今後は支給しない'] ? ['00','00','00','00'] : (after as number[]).map(m => String(m).padStart(2,'0'));
     values.slice(0,4).forEach((v,i)=>w.text(v,afterCells[i],'変更後の賞与支払予定月',{ size:10, center:true }));
     const before = Array.isArray(fields['変更前の支払予定月']) ? fields['変更前の支払予定月'] as number[] : [];
     if (!before.length) warnings.add('変更前の賞与支払予定月が未登録です。');
-    before.slice(0,4).forEach((m,i)=>w.text(String(m),beforeCells[i],'変更前の賞与支払予定月',{ size:10, center:true }));
+    before.slice(0,4).forEach((m,i)=>w.text(String(m).padStart(2,'0'),beforeCells[i],'変更前の賞与支払予定月',{ size:10, center:true }));
   }
   const [instructions]=await pdf.copyPages(source,[1]);pdf.addPage(instructions);
   pdf.setTitle(form.title);pdf.setCreator('社会保険管理システム');
