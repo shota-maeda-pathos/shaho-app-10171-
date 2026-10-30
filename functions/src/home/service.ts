@@ -12,6 +12,8 @@ import { FILING_LABEL } from '../leave-procedure/rules';
 import { mapConcurrent } from '../utils/parallel';
 import { HomeTodo, TodoTone, payDateOf, sortTodos } from './rules';
 import { monthlyProgress } from './monthly-progress';
+import { santeiOverview, santeiRunId } from '../santei/service';
+import { santeiProgress } from '../santei/progress';
 
 const iso = (v: unknown) => (v as Timestamp | undefined)?.toDate?.().toISOString() ?? null;
 const date = (v: unknown) => iso(v)?.slice(0, 10) ?? null;
@@ -235,6 +237,42 @@ async function monthlyTodos(auth: AuthContext, offices: { id: string; data: Offi
   return todos.filter((t): t is HomeTodo => t !== null);
 }
 
+// ── 算定基礎届 ───────────────────────────────────────
+
+/**
+ * 事業所ごとの今年の算定基礎届。準備期間（6月1日〜7月10日）は始めていなくても出し、それ以外は始めていて終わっていないものだけ出す。
+ * 次にやることは、算定基礎届の画面と同じ判定（santei/progress.ts）で全員分の状況から決める
+ */
+async function santeiTodos(auth: AuthContext, offices: { id: string; data: OfficeDoc }[]) {
+  if (!offices.length) return [];
+  const base = `companies/${auth.companyId}`;
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+  const year = Number(today.slice(0, 4));
+  const inPeriod = today >= `${year}-06-01` && today <= `${year}-07-10`;
+  const runs = await db.getAll(...offices.map(o => db.doc(`${base}/santeiRuns/${santeiRunId(o.id, year)}`)));
+  const targets = offices.filter((_, i) => inPeriod || runs[i].exists);
+  const todos = await mapConcurrent(targets, 4, async (office): Promise<HomeTodo | null> => {
+    const todo = {
+      id: `santei-${office.id}-${year}`, kind: 'santei' as const, title: `算定基礎届（${year}年）`,
+      officeName: office.data.name, deadline: `${year}-07-10`, route: '/santei', queryParams: { officeId: office.id, year: String(year) },
+    };
+    let overview: Awaited<ReturnType<typeof santeiOverview>>;
+    try {
+      overview = await santeiOverview({ companyId: auth.companyId, officeId: office.id, year }, auth);
+    } catch (e) {
+      return { ...todo, next: '状況を読み込めませんでした', detail: (e as Error).message || null, tone: 'action', updatedAt: null };
+    }
+    const job = overview.job;
+    if (job?.status === 'stalled') return { ...todo, updatedAt: job.createdAt, next: `${job.label}が途中で止まりました`, detail: '算定基礎届の画面で、もう一度実行してください', tone: 'action' };
+    if (job?.status === 'running') return { ...todo, updatedAt: job.createdAt, next: `${job.label}を処理しています（${job.processed}/${job.total}名）`, detail: null, tone: 'waiting' };
+    const progress = santeiProgress({ rows: overview.rows, filings: overview.filings, canApprove: overview.me.canApprove, uid: auth.uid });
+    if (!progress) return null;
+    const failed = job && job.failed > 0 ? `直前の${job.label}で${job.failed}名が失敗しました` : null;
+    return { ...todo, updatedAt: job?.createdAt ?? null, ...progress, detail: [failed, progress.detail].filter(Boolean).join('／') || null };
+  });
+  return todos.filter((t): t is HomeTodo => t !== null);
+}
+
 // ── まとめ ───────────────────────────────────────────
 
 /**
@@ -250,11 +288,12 @@ export async function listHomeTodos(auth: AuthContext, officeId?: string) {
   const names = new Map(offices.map(o => [o.id, o.data.name]));
   const inScope = (id: string) => names.has(id);
 
-  const [procedures, monthly] = await Promise.all([
+  const [procedures, monthly, santei] = await Promise.all([
     procedureTodos(auth, inScope, id => names.get(id) ?? ''),
     monthlyTodos(auth, offices),
+    santeiTodos(auth, offices),
   ]);
-  let items = [...procedures, ...monthly];
+  let items = [...procedures, ...monthly, ...santei];
   if (!isOperator(auth)) items = items.filter(t => t.tone === 'yours');
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
   return { today, items: sortTodos(items) };

@@ -71,7 +71,7 @@ const nameOf = (e: FirebaseFirestore.DocumentData) => `${e.lastName ?? ''} ${e.f
 const iso = (v: unknown) => (v as Timestamp | undefined)?.toDate?.().toISOString() ?? null;
 
 /** Firestore の getAll を300件ずつに分けて呼ぶ */
-async function getAllChunked(refs: FirebaseFirestore.DocumentReference[]) {
+export async function getAllChunked(refs: FirebaseFirestore.DocumentReference[]) {
   const out: FirebaseFirestore.DocumentSnapshot[] = [];
   for (let i = 0; i < refs.length; i += 300) {
     const part = refs.slice(i, i + 300);
@@ -463,7 +463,7 @@ export async function getMonthlyJob(input: JobGetInput, auth: AuthContext) {
 }
 
 /** トリガーでは呼び出し元がいないため、ジョブを登録した人の権限をその時点の利用者情報から作り直す */
-async function authOf(companyId: string, uid: string): Promise<AuthContext> {
+export async function authOf(companyId: string, uid: string): Promise<AuthContext> {
   const user = await db.doc(`companies/${companyId}/users/${uid}`).get();
   const d = user.data();
   if (!d || d.isSuspended || d.isLoginDisabled) throw invalidArg('処理を登録した利用者の権限を確認できません');

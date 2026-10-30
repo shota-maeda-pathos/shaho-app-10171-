@@ -238,28 +238,8 @@ export const routes: Routes = [
             (m) => m.ApprovalListComponent,
           ),
       },
-      {
-        path: 'santei',
-        canActivate: [roleGuard('admin', 'operator')],
-        data: { title: '算定' },
-        children: [
-          {
-            path: '',
-            loadComponent: () =>
-              import('./features/santei/santei-list/santei-list').then(
-                (m) => m.SanteiListComponent,
-              ),
-          },
-          {
-            path: ':employeeId',
-            data: { title: '算定詳細' },
-            loadComponent: () =>
-              import('./features/santei/santei-detail/santei-detail').then(
-                (m) => m.SanteiDetailComponent,
-              ),
-          },
-        ],
-      },
+      // 算定基礎届（一括型）。承認者も等級と届出の承認のために開く
+      {path:'santei',canActivate:[roleGuard('admin','operator','approver')],data:{title:'算定基礎届'},loadComponent:()=>import('./features/santei/santei').then(m=>m.SanteiComponent)},
       {
         path: 'simulation',
         canActivate: [roleGuard('admin', 'operator', 'viewer')],

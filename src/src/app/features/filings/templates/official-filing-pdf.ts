@@ -242,8 +242,9 @@ function loss(w: Writer, fd: Data) {
   else w.warnings.add('喪失原因の選択を確認してください。');
 }
 
-function remuneration(w: Writer, fd: Data, regular: boolean) {
-  const top = regular ? 467 : 427;
+/** lenient：算定基礎届（複数人）では、途中入社の月や従前で決めた人の平均額が空欄になるのは正しいため、未登録の警告を出さない */
+function remuneration(w: Writer, fd: Data, regular: boolean, offset = 0, lenient = false) {
+  const top = (regular ? 467 : 427) + offset;
   insuredNumber(w,fd['被保険者整理番号'],[regular?68:93,top+10,regular?98:106,23]);
   w.text(fd['被保険者氏名'],[regular?175:208,top+7,regular?255:211,23],'被保険者氏名',{required:true,center:true});
   w.text(eraText(fd['生年月日']),[regular?438:427,top+7,regular?119:175,22],'生年月日',{size:9,required:true,center:true});
@@ -252,22 +253,22 @@ function remuneration(w: Writer, fd: Data, regular: boolean) {
   if (year >= 2019) w.text(String(year-2018),[regular?579:620,top+15,regular?60:30,21],'適用年',{center:true});
   else w.warnings.add('適用年を確認してください。');
   if (!regular) w.text(String(Number(String(fd['改定年月'] ?? '').slice(5,7))),[668,top+15,22,21],'改定月',{center:true});
-  const middle = regular?507:459;
+  const middle = (regular?507:459)+offset;
   w.money(fd['従前の標準報酬月額_健康保険'],[regular?79:105,middle+14,regular?67:77,18],'従前標準報酬（健康保険）',true);
   w.money(fd['従前の標準報酬月額_厚生年金'],[regular?186:220,middle+14,regular?69:75,18],'従前標準報酬（厚生年金）',true);
   for (let i=0;i<3;i++) {
     const prefix=regular?`${i+4}月`:`${i+1}月目`;
-    const y=(regular?551:500)+i*(regular?25.6:30.6);
+    const y=(regular?551:500)+offset+i*(regular?25.6:30.6);
     if (!regular) w.text(/^\d{4}-\d{2}$/.test(String(fd[`${prefix}_年月`]??'')) ? Number(String(fd[`${prefix}_年月`]).slice(5,7)) : '',[94,y,29,18],`${prefix}の支払月`,{size:9,center:true,required:true});
-    w.text(fd[`${prefix}_支払基礎日数`],[regular?104:133,y,regular?70:63,18],`${prefix}の支払基礎日数`,{size:9,center:true,required:true});
-    w.money(fd[`${prefix}_通貨`],[regular?184:211,y,regular?91:89,18],`${prefix}の通貨報酬`,false,true);
+    w.text(fd[`${prefix}_支払基礎日数`],[regular?104:133,y,regular?70:63,18],`${prefix}の支払基礎日数`,{size:9,center:true,required:!lenient});
+    w.money(fd[`${prefix}_通貨`],[regular?184:211,y,regular?91:89,18],`${prefix}の通貨報酬`,false,!lenient);
     w.money(fd[`${prefix}_現物`],[regular?287:322,y,regular?108:91,18],`${prefix}の現物報酬`);
     const cash=fd[`${prefix}_通貨`],kind=fd[`${prefix}_現物`];
     if(typeof cash==='number'&&typeof kind==='number') w.money(cash+kind,[regular?415:434,y,regular?95:97,18],`${prefix}の合計`);
   }
-  w.money(fd['合計'],[regular?553:554,regular?552:502,regular?114:131,18],'総計',false,true);
-  w.money(fd['平均額'],[regular?553:554,regular?579:534,regular?114:131,18],'平均額',false,true);
-  w.warnings.add('現物報酬・支払月・修正平均額・備考など、登録されていない欄は原票で確認してください。');
+  w.money(fd['合計'],[regular?553:554,(regular?552:502)+offset,regular?114:131,18],'総計',false,!lenient);
+  w.money(fd['平均額'],[regular?553:554,(regular?579:534)+offset,regular?114:131,18],'平均額',false,!lenient);
+  if (!lenient) w.warnings.add('現物報酬・支払月・修正平均額・備考など、登録されていない欄は原票で確認してください。');
 }
 
 function bonus(w: Writer, fd: Data) {
@@ -336,6 +337,82 @@ function dependent(w: Writer, fd: Data, dep: Data | undefined) {
     else w.warnings.add('被扶養者の続柄を原票で確認してください。');
   }
   w.warnings.add('被扶養者の異動区分・理由・該当日・住所等を確認してください。複数人は原票を分けて出力しています。');
+}
+
+/** 算定基礎届の1人分（サーバーの santeiFilingPerson と同じ形） */
+export interface SanteiPrintPerson {
+  被保険者整理番号: string; 被保険者氏名: string; 生年月日: string; 適用年月: string;
+  従前の標準報酬月額_健康保険: number | null; 従前の標準報酬月額_厚生年金: number | null;
+  months: { 月: number; 支払基礎日数: number; 通貨: number; 現物: number; 合計: number }[];
+  総計: number; 平均額: number | null; 修正平均額: number | null; 備考: string;
+  備考区分?: number[]; 備考その他?: string;
+}
+
+/** 備考欄の番号の位置（1人目。原票を160%で測った値） */
+const SANTEI_NOTE_MARKS: Record<number, [number, number]> = { 1: [697, 524], 4: [777, 554], 6: [697, 572], 7: [882, 572], 9: [767, 589] };
+
+/** 1枚に記入する人数と、1人分の欄の高さ（原票を160%で測った値） */
+const SANTEI_ROWS = 5;
+const SANTEI_ROW_HEIGHT = 155;
+
+/** 1人分を、1人用の記入（remuneration）が読む形に直す */
+function santeiPersonData(p: SanteiPrintPerson): Data {
+  const fd: Data = {
+    '被保険者整理番号': p.被保険者整理番号, '被保険者氏名': p.被保険者氏名, '生年月日': p.生年月日, '対象年': p.適用年月.slice(0, 4),
+    '従前の標準報酬月額_健康保険': p.従前の標準報酬月額_健康保険, '従前の標準報酬月額_厚生年金': p.従前の標準報酬月額_厚生年金,
+    '合計': p.平均額 === null ? null : p.総計, '平均額': p.平均額,
+  };
+  for (const m of p.months) {
+    fd[`${m.月}月_支払基礎日数`] = m.支払基礎日数;
+    fd[`${m.月}月_通貨`] = m.通貨;
+    fd[`${m.月}月_現物`] = m.現物;
+  }
+  return fd;
+}
+
+/**
+ * 算定基礎届（複数人）。1枚に SANTEI_ROWS 人ずつ記入し、多ければ2枚目以降に続ける。
+ * 事業所の欄は各ページに記入する。
+ */
+export async function createSanteiFilingPdf(fields: Data, persons: SanteiPrintPerson[], meta: FilingPrintMeta,
+  loadAsset: (path: string) => Promise<Uint8Array> = async path => {
+    const response=await fetch(path);
+    if(!response.ok) throw new Error('公式PDFまたは日本語フォントを読み込めませんでした。再読み込みしてください。');
+    return new Uint8Array(await response.arrayBuffer());
+  }): Promise<OfficialPdfResult> {
+  if (!persons.length) throw new Error('届出に載っている人がいません。');
+  if (persons.length > 3000) throw new Error('人数が多すぎます。');
+  const form = OFFICIAL_FORMS['remunerationMonthlyAlgorithm'];
+  const [template,fontBytes]=await Promise.all([loadAsset(`/filing-forms/${form.file}.pdf`),loadAsset('/filing-forms/fonts/NotoSansJP-Regular.ttf')]);
+  const source=await PDFDocument.load(template);
+  if(source.getPageCount()!==2) throw new Error('公式様式のページ構成が変更されています。テンプレートを確認してください。');
+  const pdf=await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
+  const font=await pdf.embedFont(fontBytes,{subset:false});
+  const fontMetrics = fontkit.create(fontBytes);
+  const warnings=new Set<string>();
+  const placements: PrintPlacement[]=[];
+  warnings.add('被保険者整理番号・事業所整理記号など、登録されていない欄は原票で確かめてください。');
+  for (let start = 0, pageIndex = 0; start < persons.length; start += SANTEI_ROWS, pageIndex++) {
+    const [page]=await pdf.copyPages(source,[0]);pdf.addPage(page);
+    const w=new Writer(page,font,warnings,placements,pageIndex,fontMetrics);
+    header(w,form.file,fields,meta);
+    persons.slice(start, start + SANTEI_ROWS).forEach((p, i) => {
+      const offset = i * SANTEI_ROW_HEIGHT;
+      remuneration(w, santeiPersonData(p), true, offset, true);
+      if (p.修正平均額 !== null) w.money(p.修正平均額,[553,605+offset,114,18],'修正平均額');
+      for (const code of p.備考区分 ?? []) {
+        const mark = SANTEI_NOTE_MARKS[code];
+        if (mark) w.circle(mark[0], mark[1] + offset, 12, 11);
+      }
+      if (p.備考その他) w.text(p.備考その他,[816,581+offset,102,15],'備考（その他）',{size:7});
+      if (p.修正平均額 !== null) warnings.add('遡及支払額の欄は記入していません。修正平均額のある人は、遡及支払の月と額を原票に記入してください。');
+    });
+  }
+  const [instructions]=await pdf.copyPages(source,[1]);pdf.addPage(instructions);
+  pdf.setTitle(form.title);pdf.setCreator('社会保険管理システム');
+  pdf.setSubject('日本年金機構の公式様式（2026-10-28取得）への記入');
+  return {bytes:await pdf.save(),warnings:[...warnings],placements};
 }
 
 /** Fills the bundled, unmodified Japan Pension Service PDF. No external data transmission. */

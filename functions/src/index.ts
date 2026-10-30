@@ -36,7 +36,10 @@ export { employmentCreate } from './employments/employment-create/functions';
 export { gradeCreate } from './grades/grade-create/functions';
 export { gradeUpdate } from './grades/grade-update/functions';
 export { gradeRevisionCheck, gradeRevisionSubmit } from './grades/grade-revision-check/functions';
-export { santeiPreview, santeiSubmit } from './santei/functions';
+export {
+  santeiRunOverview, santeiRunHold, santeiDecision, santeiJobStart, santeiJobGet, santeiJobChunk, santeiFilingCreate, santeiFilingUpdate,
+  santeiFilingGet, sampleSanteiCreate,
+} from './santei/functions';
 
 // 給与API
 export { salaryCreate } from './salaries/salary-create/functions';
