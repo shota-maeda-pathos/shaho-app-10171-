@@ -126,6 +126,8 @@ export interface SanteiFilingSummary {
   mine: boolean;
   rejection: string | null;
   submission: { method: 'mock' | 'paper'; date: string; acceptanceNumber: string | null } | null;
+  /** 模擬電子申請の状態（送信中・送信エラー・返戻など。届出の画面の提出の部品が詳しく出す） */
+  mockStatus: string | null;
   version: number;
   createdAt: string | null;
 }
@@ -137,6 +139,7 @@ function filingSummary(d: FirebaseFirestore.DocumentSnapshot, auth: AuthContext)
     requestedBy: f.requestedBy ?? null, requestedAt: iso(f.requestedAt), mine: f.requestedBy === auth.uid,
     rejection: f.rejection?.comment ?? null,
     submission: f.submission ? { method: f.submission.method, date: f.submission.date, acceptanceNumber: f.submission.acceptanceNumber ?? null } : null,
+    mockStatus: f.mock?.status ?? null,
     version: f.version, createdAt: iso(f.createdAt),
   };
 }
@@ -449,7 +452,7 @@ export async function createSanteiFiling(input: SanteiRunInput, auth: AuthContex
 }
 
 /** 模擬電子申請で確かめる項目。足りなければ受け付けない */
-function mockErrors(f: FirebaseFirestore.DocumentData): string[] {
+export function mockErrors(f: FirebaseFirestore.DocumentData): string[] {
   const errors: string[] = [];
   if (!f.header?.['事業所名称']) errors.push('事業所名称が未登録です');
   for (const p of (f.persons ?? []) as SanteiFilingPerson[]) {

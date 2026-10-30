@@ -5,6 +5,7 @@ import { CompanySettingsComponent } from './company-settings/company-settings';
 import { OfficeManagementComponent } from './office-management/office-management';
 import { AuditLogComponent } from './audit-log/audit-log';
 import { NotificationManagementComponent } from './notification-management/notification-management';
+import { MockSubmissionSettingsComponent } from './mock-submission/mock-submission-settings';
 
 @Component({
   selector: 'app-settings',
@@ -16,6 +17,7 @@ import { NotificationManagementComponent } from './notification-management/notif
     OfficeManagementComponent,
     AuditLogComponent,
     NotificationManagementComponent,
+    MockSubmissionSettingsComponent,
   ],
   template: `
     <div class="settings-container">
@@ -32,6 +34,9 @@ import { NotificationManagementComponent } from './notification-management/notif
         </mat-tab>
         <mat-tab label="お知らせ管理">
           <ng-template matTabContent><app-notification-management /></ng-template>
+        </mat-tab>
+        <mat-tab label="模擬電子申請">
+          <ng-template matTabContent><app-mock-submission-settings /></ng-template>
         </mat-tab>
         <mat-tab label="監査ログ">
           <ng-template matTabContent><app-audit-log /></ng-template>

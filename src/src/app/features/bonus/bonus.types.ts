@@ -52,6 +52,8 @@ export interface FilingSummary {
   mine: boolean;
   rejection: string | null;
   submission: { method: 'mock' | 'paper'; date: string; acceptanceNumber: string | null } | null;
+  /** 模擬電子申請の状態（送信中・送信エラー・返戻など） */
+  mockStatus: string | null;
   version: number;
   createdAt: string | null;
 }

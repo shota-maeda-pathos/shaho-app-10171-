@@ -5,7 +5,7 @@ import { EmployeeDoc, FilingDoc } from '../../types/firestore';
 import { notFound, invalidArg } from '../../utils/errors';
 import { FilingMockSubmitInput } from './schema';
 
-const REQUIRED_FIELDS: Record<string, string[]> = {
+export const REQUIRED_FIELDS: Record<string, string[]> = {
   acquisitionNotification: ['被保険者氏名', '生年月日', '性別', '資格取得年月日', '報酬月額_合計'],
   lossNotification: ['被保険者氏名', '生年月日', '資格喪失年月日', '喪失原因'],
   remunerationMonthlyChange: ['被保険者氏名', '改定年月', '1月目_通貨'],
@@ -21,7 +21,7 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
   pensionLoss70: ['被保険者氏名', '生年月日', '資格喪失年月日', '報酬月額_合計'],
 };
 
-function validateFormData(filingType: string, formData: Record<string, unknown>): string[] {
+export function validateFormData(filingType: string, formData: Record<string, unknown>): string[] {
   const required = REQUIRED_FIELDS[filingType] ?? [];
   const missing: string[] = [];
   for (const field of required) {

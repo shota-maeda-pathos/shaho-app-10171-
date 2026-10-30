@@ -1,4 +1,5 @@
 import { correspondingDayNextMonth, extendToOpenDay, fiveDayDeadline } from '../../insurance/calculator';
+import { stateOf } from '../submission/rules';
 
 // 届出の索引（横断一覧・検索用）の中身を決める純粋関数。
 // 届出は3か所（従業員の下・算定基礎届の run・賞与の run）にあり、状態の持ち方も違うため、ここで1つの形にそろえる。
@@ -65,20 +66,23 @@ export function filingDeadline(filingType: string, data: Data): { deadline: stri
   }
 }
 
+const MOCK_TO_STATUS: Record<string, FilingStatus | null> = {
+  sent: 'sent', received: 'received', processing: 'processing', completed: 'completed', failed: 'mockFailed', returned: 'returned', cancelled: null,
+};
+
+/** 提出（模擬電子申請・紙）の状態を画面の状態にする。承認済みでなければ null */
+function submissionStatusOf(source: FilingSource, data: Data): { status: FilingStatus | null; paperStatus: PaperStatus } {
+  const { mock, paper } = stateOf(source, data);
+  return { status: mock ? MOCK_TO_STATUS[mock.status] : null, paperStatus: paper?.status ?? 'none' };
+}
+
 /** 従業員の下の届出（社内承認・模擬申請・紙提出の3軸）を画面の状態にする */
 export function employeeFilingStatus(data: Data): { status: FilingStatus; paperStatus: PaperStatus } {
   const workflow = data.workflowStatus as string;
-  const mock = data.mockStatus as string;
-  const submission = data.submissionStatus as string;
-  const paperStatus: PaperStatus =
-    submission === 'submitted' ? 'submitted' : submission === 'accepted' ? 'accepted' : submission === 'returned' ? 'returned' : 'none';
+  const sub = submissionStatusOf('employee', data);
+  const paperStatus = sub.paperStatus;
   if (data.cancelledAt || workflow === 'cancelled') return { status: 'cancelled', paperStatus };
-  if (data.mockReturnedAt || mock === 'returned') return { status: 'returned', paperStatus };
-  const mockStatus: Record<string, FilingStatus> = {
-    sent: 'sent', received: 'received', processing: 'processing', completed: 'completed', failed: 'mockFailed',
-  };
-  if (workflow === 'approved' && mockStatus[mock]) return { status: mockStatus[mock], paperStatus };
-  if (workflow === 'approved') return { status: 'approved', paperStatus };
+  if (workflow === 'approved') return { status: sub.status ?? 'approved', paperStatus };
   if (workflow === 'pending') return { status: 'pending', paperStatus };
   if (workflow === 'rejected') return { status: 'rejected', paperStatus };
   return { status: 'draft', paperStatus };
@@ -87,15 +91,11 @@ export function employeeFilingStatus(data: Data): { status: FilingStatus; paperS
 /** 算定基礎届・賞与支払届（run の下。status 1本と submission）を画面の状態にする */
 export function runFilingStatus(data: Data): { status: FilingStatus; paperStatus: PaperStatus } {
   const s = data.status as string;
-  const submission = (data.submission ?? null) as { method?: string; mockStatus?: string } | null;
   if (s === 'cancelled') return { status: 'cancelled', paperStatus: 'none' };
-  if (submission?.method === 'paper') return { status: 'approved', paperStatus: (data.paperStatus as PaperStatus) ?? 'submitted' };
-  if (s === 'submitted' && submission?.method === 'mock') {
-    const m = submission.mockStatus;
-    const status: FilingStatus = m === 'sent' || m === 'received' || m === 'processing' || m === 'returned' ? m : 'completed';
-    return { status, paperStatus: 'none' };
+  if (s === 'approved' || s === 'submitted') {
+    const sub = submissionStatusOf('santei', data);
+    return { status: sub.status ?? 'approved', paperStatus: sub.paperStatus };
   }
-  if (s === 'approved') return { status: 'approved', paperStatus: 'none' };
   if (s === 'pending') return { status: 'pending', paperStatus: 'none' };
   return { status: data.rejection ? 'rejected' : 'draft', paperStatus: 'none' };
 }
@@ -166,6 +166,9 @@ export function buildIndexEntry(data: Data, ctx: IndexContext): FilingIndexEntry
   const submission = (data.submission ?? null) as { date?: string; acceptanceNumber?: string | null } | null;
   const rejection = data.rejection as { comment?: string } | string | null | undefined;
   const e = ctx.employee ?? null;
+  const { mock: mockState, paper: paperState } = stateOf(ctx.source, data);
+  // 送信取消・送信エラーの受付番号・送信日は出さない
+  const liveMock = mockState && mockState.status !== 'cancelled' && mockState.status !== 'failed' ? mockState : null;
   return {
     source: ctx.source,
     path: ctx.path,
@@ -187,9 +190,9 @@ export function buildIndexEntry(data: Data, ctx: IndexContext): FilingIndexEntry
     deadline,
     deadlineNote: note,
     effectiveDate: dateOf(data.effectiveDate),
-    acceptanceNumber: (data.mockAcceptanceNumber as string) ?? submission?.acceptanceNumber ?? null,
+    acceptanceNumber: liveMock?.acceptanceNumber ?? (data.mockAcceptanceNumber as string) ?? submission?.acceptanceNumber ?? null,
     createdDate: dateOf(data.createdAt),
-    submittedDate: dateOf(data.mockSubmittedAt) ?? dateOf(data.submittedAt) ?? str(submission?.date) ?? null,
+    submittedDate: liveMock?.sentDate || paperState?.submittedDate || dateOf(data.mockSubmittedAt) || dateOf(data.submittedAt) || str(submission?.date) || null,
     rejection: typeof rejection === 'string' ? rejection : rejection?.comment ?? null,
     version: typeof data.version === 'number' ? data.version : 0,
   };

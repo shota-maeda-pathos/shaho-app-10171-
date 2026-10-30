@@ -13,6 +13,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import type { FilingPrintMeta } from '../templates/official-filing-pdf';
+import { FilingSubmissionComponent } from '../submission/filing-submission';
 
 const FILING_TYPE_LABELS: Record<string, string> = {
   acquisitionNotification: '被保険者資格取得届',
@@ -33,20 +34,13 @@ const FILING_TYPE_LABELS: Record<string, string> = {
 const WORKFLOW_STATUS_LABELS: Record<string, string> = {
   draft: '下書き', pending: '承認待ち', approved: '承認済', rejected: '差戻し',
 };
-const MOCK_STATUS_LABELS: Record<string, string> = {
-  notStarted: '未実施', processing: '処理中', completed: '完了', failed: 'エラー',
-};
-const SUBMISSION_STATUS_LABELS: Record<string, string> = {
-  notSubmitted: '未提出', submitted: '提出済', accepted: '受理', returned: '返戻',
-};
-
 @Component({
   selector: 'app-filing-detail',
   standalone: true,
   imports: [
     CommonModule,
     MatButtonModule, MatIconModule, MatCardModule, MatChipsModule,
-    MatDividerModule, MatProgressSpinnerModule, MatSnackBarModule, MatStepperModule,
+    MatDividerModule, MatProgressSpinnerModule, MatSnackBarModule, MatStepperModule, FilingSubmissionComponent,
   ],
   template: `
     <div class="page-container">
@@ -80,64 +74,12 @@ const SUBMISSION_STATUS_LABELS: Record<string, string> = {
         </mat-card>
 
         <mat-card class="status-card">
-          <h2>処理状況</h2>
-          <div class="status-steps">
-            <div class="status-step" [class.active]="true">
-              <div class="step-icon" [class]="'ws-' + filing()!.workflowStatus">
-                <mat-icon>{{ filing()!.workflowStatus === 'approved' ? 'check_circle' : 'pending' }}</mat-icon>
-              </div>
-              <div class="step-content">
-                <span class="step-label">社内承認</span>
-                <span class="step-value">{{ workflowLabel(filing()!.workflowStatus) }}</span>
-              </div>
-            </div>
-            <div class="step-connector"></div>
-            <div class="status-step">
-              <div class="step-icon" [class]="'ms-' + filing()!.mockStatus">
-                <mat-icon>{{ filing()!.mockStatus === 'completed' ? 'check_circle' : 'science' }}</mat-icon>
-              </div>
-              <div class="step-content">
-                <span class="step-label">模擬申請</span>
-                <span class="step-value">{{ mockLabel(filing()!.mockStatus) }}</span>
-              </div>
-            </div>
-            <div class="step-connector"></div>
-            <div class="status-step">
-              <div class="step-icon" [class]="'ss-' + filing()!.submissionStatus">
-                <mat-icon>{{ filing()!.submissionStatus === 'accepted' ? 'check_circle' : 'send' }}</mat-icon>
-              </div>
-              <div class="step-content">
-                <span class="step-label">提出</span>
-                <span class="step-value">{{ submissionLabel(filing()!.submissionStatus) }}</span>
-              </div>
-            </div>
-          </div>
-        </mat-card>
-
-        <mat-card class="actions-card">
-          <h2>操作</h2>
+          <h2>社内承認</h2>
+          <p>{{ workflowLabel(filing()!.workflowStatus) }}</p>
           <div class="action-buttons">
             @if (filing()!.workflowStatus === 'draft') {
               <button mat-flat-button color="primary" (click)="requestApproval()" [disabled]="processing()">
                 <mat-icon>send</mat-icon> 承認申請
-              </button>
-            }
-            @if (filing()!.workflowStatus === 'approved' && filing()!.mockStatus === 'notStarted') {
-              <button mat-flat-button color="accent" (click)="mockSubmit()" [disabled]="processing()">
-                <mat-icon>science</mat-icon> 模擬申請
-              </button>
-            }
-            @if (filing()!.workflowStatus === 'approved' && filing()!.submissionStatus === 'notSubmitted') {
-              <button mat-flat-button color="primary" (click)="submitFiling()" [disabled]="processing()">
-                <mat-icon>upload_file</mat-icon> 提出記録
-              </button>
-            }
-            @if (filing()!.submissionStatus === 'submitted') {
-              <button mat-flat-button color="accent" (click)="recordResult(true)" [disabled]="processing()">
-                <mat-icon>check</mat-icon> 受理記録
-              </button>
-              <button mat-stroked-button color="warn" (click)="recordResult(false)" [disabled]="processing()">
-                <mat-icon>reply</mat-icon> 返戻記録
               </button>
             }
             <button mat-stroked-button (click)="printPdf()" [disabled]="processing()">
@@ -146,16 +88,10 @@ const SUBMISSION_STATUS_LABELS: Record<string, string> = {
           </div>
         </mat-card>
 
-        @if (filing()!.mockStatus === 'failed' && filing()!.mockValidationErrors?.length) {
-          <mat-card class="error-card">
-            <h2>模擬申請エラー</h2>
-            <ul class="error-list">
-              @for (err of filing()!.mockValidationErrors; track err) {
-                <li>{{ err }}</li>
-              }
-            </ul>
-          </mat-card>
-        }
+        <mat-card class="actions-card">
+          <h2>提出</h2>
+          <app-filing-submission [target]="{ source: 'employee', parentId: employeeId, filingId: filingId }" (changed)="loadFiling(true)" />
+        </mat-card>
 
         @if (filing()!.formData && objectKeys(filing()!.formData).length > 0) {
           <mat-card class="data-card">
@@ -173,12 +109,6 @@ const SUBMISSION_STATUS_LABELS: Record<string, string> = {
           </mat-card>
         }
 
-        @if (filing()!.resultNote) {
-          <mat-card class="result-card">
-            <h2>結果メモ</h2>
-            <p>{{ filing()!.resultNote }}</p>
-          </mat-card>
-        }
       }
     </div>
   `,
@@ -236,8 +166,8 @@ export class FilingDetailComponent implements OnInit {
   loading = signal(false);
   processing = signal(false);
 
-  private employeeId = '';
-  private filingId = '';
+  employeeId = '';
+  filingId = '';
 
   objectKeys = Object.keys;
 
@@ -259,8 +189,6 @@ export class FilingDetailComponent implements OnInit {
 
   filingTypeLabel(type: string): string { return FILING_TYPE_LABELS[type] ?? type; }
   workflowLabel(s: string): string { return WORKFLOW_STATUS_LABELS[s] ?? s; }
-  mockLabel(s: string): string { return MOCK_STATUS_LABELS[s] ?? s; }
-  submissionLabel(s: string): string { return SUBMISSION_STATUS_LABELS[s] ?? s; }
 
   async requestApproval() {
     this.processing.set(true);
@@ -275,49 +203,6 @@ export class FilingDetailComponent implements OnInit {
         comment: '',
       });
       this.snackBar.open('承認申請しました', '閉じる', { duration: 3000 });
-      this.loadFiling();
-    } catch (e: any) {
-      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
-    } finally {
-      this.processing.set(false);
-    }
-  }
-
-  async submitFiling() {
-    this.processing.set(true);
-    try {
-      const fn = httpsCallable(this.functions, 'filingSubmit');
-      await fn({
-        companyId: this.auth.companyId,
-        employeeId: this.employeeId,
-        filingId: this.filingId,
-        expectedVersion: this.filing()?.version ?? 1,
-      });
-      this.snackBar.open('提出を記録しました', '閉じる', { duration: 3000 });
-      this.loadFiling();
-    } catch (e: any) {
-      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
-    } finally {
-      this.processing.set(false);
-    }
-  }
-
-  async mockSubmit() {
-    this.processing.set(true);
-    try {
-      const fn = httpsCallable<any, any>(this.functions, 'filingMockSubmit');
-      const result = await fn({
-        companyId: this.auth.companyId,
-        employeeId: this.employeeId,
-        filingId: this.filingId,
-        expectedVersion: this.filing()?.version ?? 1,
-      });
-      const status = result.data.mockStatus;
-      if (status === 'completed') {
-        this.snackBar.open('模擬申請が完了しました', '閉じる', { duration: 3000 });
-      } else {
-        this.snackBar.open('模擬申請でエラーが検出されました', '閉じる', { duration: 5000 });
-      }
       this.loadFiling();
     } catch (e: any) {
       this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
@@ -374,33 +259,12 @@ export class FilingDetailComponent implements OnInit {
     }
   }
 
-  async recordResult(accepted: boolean) {
-    this.processing.set(true);
-    try {
-      const fn = httpsCallable(this.functions, 'filingRecordResult');
-      await fn({
-        companyId: this.auth.companyId,
-        employeeId: this.employeeId,
-        filingId: this.filingId,
-        expectedVersion: this.filing()?.version ?? 1,
-        result: accepted ? 'accepted' : 'returned',
-        note: '',
-      });
-      this.snackBar.open(accepted ? '受理を記録しました' : '返戻を記録しました', '閉じる', { duration: 3000 });
-      this.loadFiling();
-    } catch (e: any) {
-      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
-    } finally {
-      this.processing.set(false);
-    }
-  }
-
   goBack() {
     this.router.navigate(['/filings']);
   }
 
-  private async loadFiling() {
-    this.loading.set(true);
+  async loadFiling(silent = false) {
+    if (!silent) this.loading.set(true);
     try {
       const fn = httpsCallable<any, any>(this.functions, 'filingGet');
       const result = await fn({

@@ -1,3 +1,4 @@
+import { FilingSubmissionComponent } from '../filings/submission/filing-submission';
 import { Component, computed, DestroyRef, effect, inject, OnInit, signal, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -38,7 +39,7 @@ const STEPS: StepDef[] = [
   standalone: true,
   imports: [
     DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule,
-    TargetListComponent, TargetCellDirective, ErrorStateComponent, LoadingStateComponent, TermComponent,
+    TargetListComponent, TargetCellDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent,
   ],
   templateUrl: './santei.html',
   styleUrl: './santei.scss',
@@ -89,6 +90,7 @@ export class SanteiComponent implements OnInit {
 
   filingTone(f: FilingSummary): StatusTone {
     if (f.status === 'submitted') return 'done';
+    if (f.status === 'approved' && ['sent', 'received', 'processing'].includes(f.mockStatus ?? '')) return 'waiting';
     if (f.status === 'pending') return this.canApprove() && !f.mine ? 'yours' : 'waiting';
     return 'action';
   }
@@ -214,6 +216,9 @@ export class SanteiComponent implements OnInit {
   private call<T>(name: string, data: object, timeout = 70_000) {
     return httpsCallable<object, T>(this.functions, name, { timeout })({ companyId: this.auth.companyId, officeId: this.office.selected(), year: this.year, ...data });
   }
+
+  /** 届出の提出の部品に渡す run のID（サーバーの santeiRunId と同じ形） */
+  runId = () => `${this.office.selected()}_${this.year}`;
 
   async load() {
     if (!this.office.selected()) return;

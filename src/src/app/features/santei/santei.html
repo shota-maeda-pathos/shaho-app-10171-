@@ -125,9 +125,6 @@
                   <span class="filing-status">{{ statusLabels[f.status] }}</span>
                 </div>
                 @if (f.rejection && f.status === 'draft') { <p class="bad">差し戻されました。理由：{{ f.rejection }}（取り消して作り直すか、そのまま承認を依頼し直します）</p> }
-                @if (f.submission; as s) {
-                  <p>{{ s.method === 'mock' ? '模擬電子申請' : '紙で提出' }}：{{ s.date }}{{ s.acceptanceNumber ? '（受付番号 ' + s.acceptanceNumber + '）' : '' }}</p>
-                }
                 @if (f.status === 'pending') {
                   <p class="hint">{{ canApprove() && !f.mine ? '承認を頼まれています。内容とPDFを確かめてください。' : '別の担当者（管理者・承認者）の承認を待っています。' }}</p>
                 }
@@ -144,12 +141,11 @@
                         <button mat-button type="button" (click)="updateFiling(f, 'reject')" [disabled]="busy()">差し戻す</button>
                       }
                     }
-                    @case ('approved') {
-                      <button mat-flat-button type="button" (click)="updateFiling(f, 'mockSubmit')" [disabled]="busy()">模擬電子申請する</button>
-                      <button mat-stroked-button type="button" (click)="updateFiling(f, 'paperSubmit')" [disabled]="busy()">紙で提出したことを記録</button>
-                    }
                   }
                 </div>
+                @if (f.status === 'approved' || f.status === 'submitted') {
+                  <app-filing-submission [target]="{ source: 'santei', parentId: runId(), filingId: f.id }" (changed)="load()" />
+                }
               </li>
             }
           </ul>

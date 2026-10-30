@@ -46,8 +46,10 @@ export function santeiProgress(input: {
   const active = input.filings.filter(f => f.status !== 'cancelled');
   const draft = active.find(f => f.status === 'draft');
   if (draft) return { next: draft.rejection ? '差し戻された届出を直す' : '届出の承認を依頼する', tone: 'action', detail: draft.rejection ? `差し戻しの理由：${draft.rejection}` : null };
-  const approved = active.find(f => f.status === 'approved');
-  if (approved) return { next: '算定基礎届を提出する', tone: 'action', detail: `${approved.personCount}名` };
+  const sending = active.find(f => f.status === 'approved' && ['sent', 'received', 'processing'].includes(f.mockStatus ?? ''));
+  const approved = active.find(f => f.status === 'approved' && f !== sending);
+  if (approved) return { next: approved.mockStatus === 'returned' ? '返戻された算定基礎届を直す' : approved.mockStatus === 'failed' ? '算定基礎届を送り直す' : '算定基礎届を提出する', tone: 'action', detail: `${approved.personCount}名` };
+  if (sending) return { next: '模擬電子申請の処理を待っています', tone: 'waiting', detail: `${sending.personCount}名の算定基礎届` };
   const pending = active.find(f => f.status === 'pending');
   if (pending && input.canApprove && !pending.mine) return { next: '届出を承認する', tone: 'yours', detail: `${pending.personCount}名の算定基礎届` };
   if (pending) return { next: '届出の承認を待っています', tone: 'waiting', detail: null };

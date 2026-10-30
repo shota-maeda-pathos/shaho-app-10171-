@@ -123,6 +123,7 @@ export { filingAutoGenerate } from './filings/filing-auto-generate/functions';
 export { filingMockSubmit } from './filings/filing-mock-submit/functions';
 export { filingPdfData } from './filings/filing-pdf-data/functions';
 export { filingIndexEmployee, filingIndexSantei, filingIndexBonus, filingSearch, filingIndexRebuild } from './filings/index/functions';
+export { filingSubmissionGet, filingSubmissionAction, filingMockSettings, filingMockAdvance } from './filings/submission/functions';
 
 // 通知API
 export { notificationCreate } from './notifications/notification-create/functions';

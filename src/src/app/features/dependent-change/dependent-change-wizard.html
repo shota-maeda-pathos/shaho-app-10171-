@@ -147,34 +147,8 @@
         <!-- ④ 提出する -->
         @case ('submit') {
           @if (v.filing; as fl) {
-            @if (submitDone()) {
-              <p><app-status-badge tone="done" label="提出済み" />
-                {{ fl.mockStatus === 'completed' ? '模擬電子申請が完了しました。' : '紙の届出が受理されました。' }}</p>
-            } @else {
-              <mat-radio-group [(ngModel)]="method" class="radios" aria-label="提出方法">
-                <mat-radio-button value="electronic">電子申請（模擬）で提出する</mat-radio-button>
-                <mat-radio-button value="paper">紙で提出する</mat-radio-button>
-              </mat-radio-group>
-              @if (method === 'electronic') {
-                <p class="sub">このシステムの電子申請は模擬です。実際の提出は、e-Govや紙で別に行ってください。</p>
-                <button mat-flat-button type="button" (click)="mockSubmit()" [disabled]="busy()">模擬電子申請する</button>
-              } @else {
-                <p class="sub">届出の画面でPDFを印刷し、添える書類と一緒に年金事務所（または健康保険組合）へ提出します。
-                  <a [routerLink]="['/filings', fl.id]" [queryParams]="{ employeeId: v.employee.id }">届出の画面を開く</a></p>
-                @if (fl.submissionStatus === 'notSubmitted') {
-                  <button mat-flat-button type="button" (click)="paper('submit')" [disabled]="busy()">提出したことを記録する</button>
-                } @else if (fl.submissionStatus === 'submitted') {
-                  <p>提出済み（結果待ち）です。結果が届いたら記録してください。</p>
-                  <div class="row-actions">
-                    <button mat-flat-button type="button" (click)="paper('accepted')" [disabled]="busy()">受理された</button>
-                    <button mat-stroked-button type="button" (click)="paper('returned')" [disabled]="busy()">返戻された</button>
-                  </div>
-                } @else if (fl.submissionStatus === 'returned') {
-                  <div class="alert" role="alert">返戻されました。{{ fl.resultNote }} 内容を直して出し直す方法は、届出の画面で確認してください。</div>
-                }
-              }
-              @if (mockResult()) { <p class="note">{{ mockResult() }}</p> }
-            }
+            <p class="sub">提出の前に <a [routerLink]="['/filings', fl.id]" [queryParams]="{ employeeId: v.employee.id }">届出の画面</a> でPDFを確かめられます。紙で出すときは、そこで印刷します。</p>
+            <app-filing-submission [target]="{ source: 'employee', parentId: v.employee.id, filingId: fl.id }" (changed)="load(true)" />
           }
         }
 

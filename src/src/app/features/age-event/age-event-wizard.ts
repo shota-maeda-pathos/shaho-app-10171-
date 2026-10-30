@@ -1,3 +1,4 @@
+import { FilingSubmissionComponent } from '../filings/submission/filing-submission';
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -26,7 +27,7 @@ const KEYS: AgeKey[] = ['check', 'filing', 'approval', 'submit', 'confirm'];
   selector: 'app-age-event-wizard',
   standalone: true,
   imports: [
-    DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatRadioModule,
+    FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatRadioModule,
     WizardComponent, TermComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],
   templateUrl: './age-event-wizard.html',
@@ -247,42 +248,6 @@ export class AgeEventWizardComponent implements OnInit, OnDestroy {
   }
 
   // ── 提出 ──
-
-  async mockSubmit() {
-    const v = this.view();
-    if (!v?.filing) return;
-    this.busy.set(true);
-    try {
-      const { data } = await httpsCallable<object, { mockStatus: string; eGovResponse: { responseMessage: string; acceptanceNumber: string | null } }>(this.functions, 'filingMockSubmit')({
-        companyId: this.auth.companyId, employeeId: v.employee.id, filingId: v.filing.id, expectedVersion: v.filing.version,
-      });
-      this.mockResult.set(data.mockStatus === 'completed'
-        ? `${data.eGovResponse.responseMessage}（受付番号 ${data.eGovResponse.acceptanceNumber}）`
-        : data.eGovResponse.responseMessage);
-      await this.load(true);
-    } catch (e) {
-      this.snackBar.open(errorMessage(e, '模擬電子申請できませんでした'), '閉じる', { duration: 8000 });
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  async paper(action: 'submit' | 'accepted' | 'returned') {
-    const v = this.view();
-    if (!v?.filing) return;
-    this.busy.set(true);
-    const common = { companyId: this.auth.companyId, employeeId: v.employee.id, filingId: v.filing.id, expectedVersion: v.filing.version };
-    try {
-      if (action === 'submit') await httpsCallable(this.functions, 'filingSubmit')(common);
-      else await httpsCallable(this.functions, 'filingRecordResult')({ ...common, result: action });
-      this.snackBar.open(action === 'submit' ? '提出したことを記録しました。結果が届いたら記録してください' : '結果を記録しました', '閉じる', { duration: 4000 });
-      await this.load(true);
-    } catch (e) {
-      this.snackBar.open(errorMessage(e, '記録できませんでした'), '閉じる', { duration: 8000 });
-    } finally {
-      this.busy.set(false);
-    }
-  }
 
   submitDone() {
     const f = this.view()?.filing;

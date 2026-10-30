@@ -274,8 +274,12 @@ function mapFilingStatus(
         return { status: 'completed', stepStatus: 'completed', detail: '模擬電子申請完了', actionLabel: null, actionRoute: null };
       case 'failed':
         return { status: 'failed', stepStatus: 'returned', detail: '模擬電子申請失敗', actionLabel: '再申請', actionRoute: null };
+      case 'sent':
+      case 'received':
       case 'processing':
-        return { status: 'processing', stepStatus: 'in_progress', detail: '処理中', actionLabel: null, actionRoute: null };
+        return { status: data.mockStatus, stepStatus: 'in_progress', detail: { sent: '送信済み', received: '受付済み', processing: '処理中' }[data.mockStatus as 'sent'], actionLabel: null, actionRoute: null };
+      case 'returned':
+        return { status: 'returned', stepStatus: 'returned', detail: '返戻（模擬）', actionLabel: '直して出し直す', actionRoute: null };
       default:
         return { status: 'notStarted', stepStatus: 'in_progress', detail: '申請可能', actionLabel: '模擬電子申請', actionRoute: null };
     }
