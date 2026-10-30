@@ -75,15 +75,19 @@ export class BonusComponent implements OnInit {
 
   canApprove = computed(() => this.data()?.me.canApprove ?? false);
   rowsById = computed(() => new Map((this.data()?.rows ?? []).map(r => [r.employeeId, r])));
-  activeFilings = computed(() => (this.data()?.filings ?? []).filter(f => f.status !== 'cancelled'));
-  cancelledFilings = computed(() => (this.data()?.filings ?? []).filter(f => f.status === 'cancelled'));
+  /** 賞与支払届（不支給報告書は別に扱う） */
+  activeFilings = computed(() => (this.data()?.filings ?? []).filter(f => f.status !== 'cancelled' && (f.filingType ?? 'bonusPayment') === 'bonusPayment'));
+  cancelledFilings = computed(() => (this.data()?.filings ?? []).filter(f => f.status === 'cancelled' && (f.filingType ?? 'bonusPayment') === 'bonusPayment'));
+  /** この月の賞与不支給報告書（取り消したものは除く） */
+  nonPaymentReport = computed(() => (this.data()?.filings ?? []).find(f => f.filingType === 'bonusNonPayment' && f.status !== 'cancelled') ?? null);
   /** 届出に載せられる人（保険料が承認され、まだ届出に載っていない人） */
   toFile = computed(() => (this.data()?.rows ?? []).filter(r => !r.hold && stepState('filing', r)?.label === '届出 未作成'));
   paidCount = computed(() => (this.data()?.rows ?? []).filter(r => r.bonus).length);
   /** 支給予定月なのに賞与がない（終わった月は不支給報告書が必要） */
   nonPayment = computed(() => {
     const d = this.data();
-    if (!d || !d.scheduled || this.paidCount() > 0) return null;
+    // 報告書で支給予定月を変えた後も、作った報告書は表示する
+    if (!d || this.paidCount() > 0 || (!d.scheduled && !this.nonPaymentReport())) return null;
     return { ended: d.monthEnded, reported: d.nonPayment };
   });
 
@@ -479,6 +483,61 @@ export class BonusComponent implements OnInit {
       this.busy.set(false);
     }
     await this.load();
+  }
+
+  // ---- 賞与不支給報告書 ----
+
+  npDate = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+  npChange: 'keep' | 'change' | 'remove' = 'keep';
+  npMonths = signal(new Set<number>());
+  readonly allMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  toggleNpMonth(m: number, on: boolean) {
+    const next = new Set(this.npMonths());
+    if (on) next.add(m); else next.delete(m);
+    this.npMonths.set(next);
+  }
+
+  monthsText(months: number[]) { return months.length ? months.map(m => `${m}月`).join('・') : 'なし'; }
+
+  async createNonPayment() {
+    const change = this.npChange === 'change' ? { kind: 'change', months: [...this.npMonths()].sort((a, b) => a - b) } : { kind: this.npChange };
+    this.busy.set(true);
+    try {
+      await this.call('bonusNonPaymentFilingCreate', { change, reportDate: this.npDate });
+      this.snackBar.open('賞与不支給報告書を作りました。内容とPDFを確かめて承認を依頼してください', '閉じる', { duration: 6000 });
+    } catch (e) {
+      this.snackBar.open(message(e, '報告書を作れませんでした'), '閉じる', { duration: 8000 });
+    } finally {
+      this.busy.set(false);
+    }
+    await this.load();
+  }
+
+  async nonPaymentPdf(f: FilingSummary) {
+    this.busy.set(true);
+    try {
+      const { data } = await this.call<FilingDetail>('bonusFilingGet', { filingId: f.id });
+      const [{ createBonusNonPaymentPdf, OFFICIAL_FORMS }, { OfficialPdfPreviewComponent }] = await Promise.all([
+        import('../filings/templates/official-filing-pdf'), import('../filings/templates/official-pdf-preview'),
+      ]);
+      const h = data.header;
+      const output = await createBonusNonPaymentPdf(h, {
+        companyName: String(h['会社名'] ?? ''), officeName: String(h['事業所名称'] ?? ''), officeNumber: String(h['事業所整理記号'] ?? ''),
+        officeAddress: String(h['事業所所在地'] ?? ''), officePhone: String(h['電話番号'] ?? ''), representativeName: String(h['事業主氏名'] ?? ''),
+        effectiveDate: String(h['届出年月日'] ?? ''),
+      });
+      const form = OFFICIAL_FORMS['bonusNonPayment'];
+      this.dialog.open(OfficialPdfPreviewComponent, {
+        width: '1100px', height: '94vh', maxWidth: '96vw',
+        data: { ...output, title: form.title, filename: `${form.title}_${this.payMonth}.pdf`,
+          sourceUrl: `https://www.nenkin.go.jp/shinsei/kounen/tekiyo/${form.source}`, originalUrl: `/filing-forms/${form.file}.pdf` },
+      });
+    } catch (e) {
+      this.snackBar.open(message(e, 'PDFを作れませんでした'), '閉じる', { duration: 6000 });
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   async openFiling(f: FilingSummary) {

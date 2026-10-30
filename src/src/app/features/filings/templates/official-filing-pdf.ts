@@ -19,6 +19,7 @@ export const OFFICIAL_FORMS: Record<string, { file: string; title: string; sourc
   remunerationMonthlyAlgorithm: { file: 'santei', title: '被保険者報酬月額算定基礎届', source: 'hoshu/20141225.html' },
   remunerationMonthlyChange: { file: 'change', title: '被保険者報酬月額変更届', source: 'hoshu/20141224.html' },
   bonusPayment: { file: 'bonus', title: '被保険者賞与支払届', source: 'shoyo/20140821.html' },
+  bonusNonPayment: { file: 'bonus-non-payment', title: '賞与不支給報告書', source: 'shoyo/20140821.html' },
   dependentChange: { file: 'dependent', title: '被扶養者（異動）届', source: 'hihokensha/20141224.html' },
   maternityLeaveStart: { file: 'maternity', title: '産前産後休業取得者申出書', source: 'menjo/20140326-01.html' },
   childcareLeaveStart: { file: 'childcare', title: '育児休業等取得者申出書', source: 'menjo/20140403-01.html' },
@@ -176,6 +177,8 @@ const HEADERS: Record<string, HeaderLayout> = {
   'pension-loss-70': { date:[[108,145,55,14],[175,145,32,14],[218,145,30,14]], symbol:[[167,164,88,30],[277,164,85,30]], number:[408,164,109,30], address:[168,215,348,45], name:[168,285,348,35], representative:[168,345,348,30], phone:[[170,392,70,16],[252,392,80,16],[340,392,70,16]] },
   'maternity-end-change': { date:[[130,151,37,13],[181,151,28,13],[224,151,26,13]], symbol:[[175,172,83,26],[280,172,82,26]], address:[176,232,305,30], name:[176,288,305,28], representative:[176,340,305,28], phone:[[180,380,55,19],[262,380,65,19],[345,380,60,19]] },
   'childcare-end-change': { date:[[120,151,37,13],[172,151,28,13],[214,151,26,13]], symbol:[[165,172,83,26],[270,172,82,26]], address:[166,232,305,30], name:[166,288,305,28], representative:[166,340,305,28], phone:[[170,380,55,19],[252,380,65,19],[335,380,60,19]] },
+  // 賞与不支給報告書：日付の欄は罫線がないため「令和」「年」「月」「日」の文字の間に書く。整理記号は4マス×2、事業所番号は5マス
+  'bonus-non-payment': { date:[[80,127,38,15],[138,127,36,15],[194,127,36,15]], symbol:[[150.5,147.3,90.1,36.7],[261.7,147.3,90.5,36.7]], number:[420.6,147.3,117,36.7], address:[152,215,380,48], name:[152,276,380,40], representative:[152,323,380,24], phone:[[158,381,70,16],[240,381,68,16],[318,381,80,16]] },
   childcare: { date:[[86,145,37,13],[143,145,31,13],[190,145,30,13]], symbol:[[133.42,163.4,94.47,36.1],[251.5,163.4,94.47,36.1]], address:[140,238,345,41], name:[140,300,345,28], representative:[140,348,345,26], phone:[[157,386,52,19],[237,386,63,19],[322,386,69,19]] },
 };
 
@@ -581,6 +584,54 @@ export async function createBonusFilingPdf(fields: Data, persons: BonusPrintPers
   const [instructions]=await pdf.copyPages(source,[1]);pdf.addPage(instructions);
   pdf.setTitle(form.title);pdf.setCreator('社会保険管理システム');
   pdf.setSubject('日本年金機構の公式様式（2026-10-28取得）への記入');
+  return {bytes:await pdf.save(),warnings:[...warnings],placements};
+}
+
+/**
+ * 賞与不支給報告書（事業所ごとに1枚）。① 賞与支払年月（令和の年2桁＋月2桁）、② 支給の状況（「1. 不支給」は印刷済み）、
+ * ③ 支給予定月の変更（変更後・変更前とも4か月まで。今後は支給しない場合は変更後をすべて「00」）
+ */
+export async function createBonusNonPaymentPdf(fields: Data, meta: FilingPrintMeta,
+  loadAsset: (path: string) => Promise<Uint8Array> = async path => {
+    const response=await fetch(path);
+    if(!response.ok) throw new Error('公式PDFまたは日本語フォントを読み込めませんでした。再読み込みしてください。');
+    return new Uint8Array(await response.arrayBuffer());
+  }): Promise<OfficialPdfResult> {
+  const form = OFFICIAL_FORMS['bonusNonPayment'];
+  const [template,fontBytes]=await Promise.all([loadAsset(`/filing-forms/${form.file}.pdf`),loadAsset('/filing-forms/fonts/NotoSansJP-Regular.ttf')]);
+  const source=await PDFDocument.load(template);
+  if(source.getPageCount()!==2) throw new Error('公式様式のページ構成が変更されています。テンプレートを確認してください。');
+  const pdf=await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
+  const font=await pdf.embedFont(fontBytes,{subset:false});
+  const fontMetrics = fontkit.create(fontBytes);
+  const warnings=new Set<string>();
+  const placements: PrintPlacement[]=[];
+  const [page]=await pdf.copyPages(source,[0]);pdf.addPage(page);
+  const w=new Writer(page,font,warnings,placements,0,fontMetrics);
+  header(w,form.file,fields,meta);
+  const postal = String(fields['郵便番号'] ?? '').trim();
+  if (postal) w.text(postal,[172,199,140,16],'郵便番号',{ size:9 });
+  else warnings.add('郵便番号が未登録です（設定の事業所一覧で登録できます）。');
+  // ① 賞与支払年月：令和の年と月を2桁ずつ
+  const ym = String(fields['賞与支払年月'] ?? '');
+  const paid = parseDate(/^\d{4}-\d{2}$/.test(ym) ? `${ym}-01` : '');
+  if (paid?.era === 9) w.digits(`${String(paid.eraYear).padStart(2,'0')}${String(paid.month).padStart(2,'0')}`,[229.4,551,89,38],4,'賞与支払年月',true);
+  else warnings.add('賞与支払年月が未登録、または令和の年月ではありません。');
+  // ③ 支給予定月の変更（変更するときだけ）
+  const after = fields['変更後の支払予定月'];
+  if (Array.isArray(after)) {
+    const afterCells: Box[] = [[184.2,862,33.2,33],[218.7,862,32.7,33],[252.7,862,30.9,33],[285,862,32.6,33]];
+    const beforeCells: Box[] = [[409,862,33.3,33],[443.6,862,32.6,33],[477.6,862,32.7,33],[511.6,862,38.6,33]];
+    const values = fields['今後は支給しない'] ? ['00','00','00','00'] : (after as number[]).map(m => String(m));
+    values.slice(0,4).forEach((v,i)=>w.text(v,afterCells[i],'変更後の賞与支払予定月',{ size:10, center:true }));
+    const before = Array.isArray(fields['変更前の支払予定月']) ? fields['変更前の支払予定月'] as number[] : [];
+    if (!before.length) warnings.add('変更前の賞与支払予定月が未登録です。');
+    before.slice(0,4).forEach((m,i)=>w.text(String(m),beforeCells[i],'変更前の賞与支払予定月',{ size:10, center:true }));
+  }
+  const [instructions]=await pdf.copyPages(source,[1]);pdf.addPage(instructions);
+  pdf.setTitle(form.title);pdf.setCreator('社会保険管理システム');
+  pdf.setSubject('日本年金機構の公式様式（2026-10-30取得）への記入');
   return {bytes:await pdf.save(),warnings:[...warnings],placements};
 }
 

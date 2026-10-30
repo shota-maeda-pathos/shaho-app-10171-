@@ -46,8 +46,10 @@ export function bonusProgress(input: {
 }): { next: string; tone: 'action' | 'yours' | 'waiting'; detail: string | null } | null {
   const paid = input.rows.filter(r => r.bonus);
   if (!paid.length) {
+    const report = input.filings.find(f => f.filingType === 'bonusNonPayment' && f.status !== 'cancelled');
+    if (report) return reportProgress(report, input.canApprove);
     if (input.scheduled && input.monthEnded && !input.nonPayment) {
-      return { next: '賞与不支給報告書の提出が必要です', tone: 'action', detail: '支給予定月に賞与が登録されていません。支給した場合は賞与を登録してください' };
+      return { next: '賞与不支給報告書の提出が必要です', tone: 'action', detail: '支給予定月に賞与が登録されていません。支給した場合は賞与を登録し、支給しなかった場合は報告書を作ります' };
     }
     return null;
   }
@@ -65,7 +67,7 @@ export function bonusProgress(input: {
   if (premiumWaiting && input.canApprove && !input.reviews.premium?.mine) return { next: '保険料を承認する', tone: 'yours', detail: `${premiumWaiting}名の承認を頼まれています` };
   const toFile = count('filing', 'action');
   if (toFile) return { next: '賞与支払届を作る', tone: 'action', detail: `${toFile}名がまだ届出に載っていません` };
-  const active = input.filings.filter(f => f.status !== 'cancelled');
+  const active = input.filings.filter(f => f.status !== 'cancelled' && (f.filingType ?? 'bonusPayment') === 'bonusPayment');
   const draft = active.find(f => f.status === 'draft');
   if (draft) return { next: draft.rejection ? '差し戻された届出を直す' : '届出の承認を依頼する', tone: 'action', detail: draft.rejection ? `差し戻しの理由：${draft.rejection}` : null };
   const sending = active.find(f => f.status === 'approved' && ['sent', 'received', 'processing'].includes(f.mockStatus ?? ''));
@@ -78,4 +80,15 @@ export function bonusProgress(input: {
   if (bonusWaiting) return { next: '賞与額の承認を待っています', tone: 'waiting', detail: `${bonusWaiting}名` };
   if (premiumWaiting) return { next: '保険料の承認を待っています', tone: 'waiting', detail: `${premiumWaiting}名` };
   return null;
+}
+
+/** 賞与不支給報告書の次にやること。提出し終えていれば null */
+function reportProgress(f: BonusFilingSummary, canApprove: boolean): { next: string; tone: 'action' | 'yours' | 'waiting'; detail: string | null } | null {
+  if (f.status === 'submitted') return null;
+  if (f.status === 'draft') return { next: f.rejection ? '差し戻された賞与不支給報告書を直す' : '賞与不支給報告書の承認を依頼する', tone: 'action', detail: f.rejection ? `差し戻しの理由：${f.rejection}` : null };
+  if (f.status === 'pending') return canApprove && !f.mine
+    ? { next: '賞与不支給報告書を承認する', tone: 'yours', detail: null }
+    : { next: '賞与不支給報告書の承認を待っています', tone: 'waiting', detail: null };
+  if (['sent', 'received', 'processing'].includes(f.mockStatus ?? '')) return { next: '模擬電子申請の処理を待っています', tone: 'waiting', detail: '賞与不支給報告書' };
+  return { next: '賞与不支給報告書を提出する', tone: 'action', detail: null };
 }

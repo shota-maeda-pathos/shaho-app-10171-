@@ -4,10 +4,10 @@ import { getAuthContext, requireRole } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import {
   BonusEntrySchema, BonusFilingGetSchema, BonusFilingUpdateSchema, BonusHoldSchema, BonusImportSchema, BonusJobGetSchema, BonusJobStartSchema,
-  BonusNonPaymentSchema, BonusRunSchema, BonusSampleSchema,
+  BonusNonPaymentSchema, BonusNonPaymentFilingSchema, BonusRunSchema, BonusSampleSchema,
 } from './schema';
 import {
-  bonusOverview, createBonusFiling, getBonusFiling, getBonusJob, importBonus, processBonusChunk, saveBonusEntry, setBonusHold, setBonusNonPayment,
+  bonusOverview, createBonusFiling, getBonusFiling, getBonusJob, importBonus, processBonusChunk, saveBonusEntry, setBonusHold, setBonusNonPayment, createBonusNonPaymentFiling,
   startBonusJob, updateBonusFiling,
 } from './service';
 import { seedBonusSample } from './sample';
@@ -63,6 +63,12 @@ export const bonusJobChunk = onDocumentCreated(
     await processBonusChunk(event.params.companyId, event.params.jobId, event.params.chunkId);
   },
 );
+
+/** 賞与不支給報告書を作る（支給予定月に賞与を払わなかったとき） */
+export const bonusNonPaymentFilingCreate = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
+  const input = validate(BonusNonPaymentFilingSchema, request.data);
+  return createBonusNonPaymentFiling(input, await staff(request, input.companyId));
+});
 
 export const bonusFilingCreate = onCall({ timeoutSeconds: 300, memory: '512MiB' }, async (request) => {
   const input = validate(BonusRunSchema, request.data);

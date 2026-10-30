@@ -17,11 +17,11 @@ import { authOf, getAllChunked } from '../monthly/service';
 import { splitCsvLine } from '../monthly/rules';
 import {
   BonusCaps, BonusFilingPerson, BonusPayment, BonusTarget, bonusCaps, bonusFilingDeadline, bonusFilingPerson, bonusTarget, capWarnings,
-  commonPaymentDate, earlierMonthsInFiscalYear, isScheduledMonth, parseBonusCsv, paymentCountWarning, paymentErrors, summarizePayments,
+  commonPaymentDate, earlierMonthsInFiscalYear, isScheduledMonth, nonPaymentChangeOf, parseBonusCsv, paymentCountWarning, paymentErrors, summarizePayments,
 } from './bonus-calc';
 import {
   BonusAction, BonusEntryInput, BonusFilingGetInput, BonusFilingUpdateInput, BonusHoldInput, BonusImportInput, BonusJobGetInput,
-  BonusJobStartInput, BonusNonPaymentInput, BonusRunInput,
+  BonusJobStartInput, BonusNonPaymentFilingInput, BonusNonPaymentInput, BonusRunInput,
 } from './schema';
 
 /** 1つの事業所で扱える人数の上限（毎月の処理と同じ） */
@@ -112,6 +112,10 @@ export interface BonusFilingSummary {
   submission: { method: 'mock' | 'paper'; date: string; acceptanceNumber: string | null } | null;
   /** 模擬電子申請の状態（送信中・送信エラー・返戻など。届出の画面の提出の部品が詳しく出す） */
   mockStatus: string | null;
+  /** bonusPayment（賞与支払届）／bonusNonPayment（賞与不支給報告書） */
+  filingType: string;
+  /** 賞与不支給報告書の③ 支給予定月の変更（変更しないときは null） */
+  change: { before: number[]; after: number[]; noMoreBonus: boolean } | null;
   version: number;
   createdAt: string | null;
 }
@@ -124,6 +128,9 @@ function filingSummary(d: FirebaseFirestore.DocumentSnapshot, auth: AuthContext)
     rejection: f.rejection?.comment ?? null,
     submission: f.submission ? { method: f.submission.method, date: f.submission.date, acceptanceNumber: f.submission.acceptanceNumber ?? null } : null,
     mockStatus: f.mock?.status ?? null,
+    filingType: f.filingType ?? 'bonusPayment',
+    change: f.filingType === 'bonusNonPayment' && Array.isArray(f.header?.['変更後の支払予定月'])
+      ? { before: f.header['変更前の支払予定月'] ?? [], after: f.header['変更後の支払予定月'], noMoreBonus: !!f.header['今後は支給しない'] } : null,
     version: f.version, createdAt: iso(f.createdAt),
   };
 }
@@ -224,7 +231,7 @@ export async function bonusOverview(input: BonusRunInput, auth: AuthContext) {
     /** 事業所の賞与支給予定月か */
     scheduled: isScheduledMonth(office.bonusMonths, input.payMonth),
     monthEnded: todayInTokyo() > lastDayOfMonth(input.payMonth),
-    nonPayment: runData.nonPayment ? { reportedOn: runData.nonPayment.reportedOn as string, by: runData.nonPayment.by as string } : null,
+    nonPayment: runData.nonPayment ? { reportedOn: runData.nonPayment.reportedOn as string, by: runData.nonPayment.by as string, filingId: (runData.nonPayment.filingId as string | undefined) ?? null } : null,
     /** 届出の期限（いちばん早い支給日から5日） */
     deadline: firstDates.length ? bonusFilingDeadline(firstDates[0]) : null,
     totals: {
@@ -276,6 +283,80 @@ export async function setBonusNonPayment(input: BonusNonPaymentInput, auth: Auth
     entity: 'bonusRun', entityId: runRef.id, action: 'update', changes: { nonPayment: { from: null, to: input.reportedOn } }, performedBy: auth.uid, performedAt: now,
   });
   return { success: true };
+}
+
+/**
+ * 賞与不支給報告書を作る（支給予定月に賞与を払わなかったとき）。承認・提出は賞与支払届と同じ流れ（届出の承認→提出）。
+ * 提出を終えると、不支給の記録と、③で変えた支給予定月を事業所に反映する
+ */
+export async function createBonusNonPaymentFiling(input: BonusNonPaymentFilingInput, auth: AuthContext) {
+  const { office, runRef } = await loadRun(input, auth);
+  if (!isScheduledMonth(office.bonusMonths, input.payMonth)) throw invalidArg('この月は事業所の賞与支給予定月ではありません（設定の事業所一覧で支給予定月を確かめてください）');
+  const { errors, before, after, noMoreBonus } = nonPaymentChangeOf(input.change, office.bonusMonths);
+  if (errors.length) throw invalidArg(errors.join('。'));
+  const overview = await bonusOverview({ companyId: input.companyId, officeId: input.officeId, payMonth: input.payMonth }, auth);
+  if (overview.rows.some(r => r.bonus)) throw invalidArg('この月は賞与が登録されています。賞与を払った月は賞与支払届を出します');
+  const companyBase = base(auth.companyId);
+  const company = await db.doc(companyBase).get();
+  const header = {
+    '事業所整理記号': office.officeNumber ?? '', '事業所番号': office.officeCode ?? '', '郵便番号': office.postalCode ?? '',
+    '事業所所在地': office.address ?? '', '事業所名称': office.name ?? '', '電話番号': office.phone ?? '',
+    '事業主氏名': company.data()?.representativeName ?? '', '会社名': company.data()?.name ?? '',
+    '届出年月日': input.reportDate, '賞与支払年月': input.payMonth, '支給の状況': '不支給',
+    '変更前の支払予定月': after === null ? null : before, '変更後の支払予定月': after, '今後は支給しない': noMoreBonus,
+  };
+  const id = await db.runTransaction(async tx => {
+    const run = await tx.get(runRef);
+    const active = await tx.get(runRef.collection('filings').where('status', 'in', ['draft', 'pending', 'approved', 'submitted']));
+    if (active.docs.some(d => d.data().filingType === 'bonusNonPayment')) throw invalidArg('この月の賞与不支給報告書はもう作ってあります（作り直すときは取り消してから作ります）');
+    if (active.docs.some(d => (d.data().filingType ?? 'bonusPayment') === 'bonusPayment')) throw invalidArg('この月は賞与支払届があります');
+    const number = ((run.data()?.filingCount ?? 0) as number) + 1;
+    const now = Timestamp.now();
+    const ref = runRef.collection('filings').doc();
+    tx.set(ref, {
+      number, officeId: input.officeId, payMonth: input.payMonth, filingType: 'bonusNonPayment', status: 'draft', deadline: null,
+      employeeIds: [], header, persons: [],
+      requestedBy: null, requestedAt: null, approvedBy: null, approvedAt: null, rejection: null, submission: null,
+      createdBy: auth.uid, createdAt: now, updatedAt: now, version: 1,
+    });
+    tx.set(runRef, { officeId: input.officeId, payMonth: input.payMonth, filingCount: number, updatedAt: now }, { merge: true });
+    tx.set(db.collection(`${companyBase}/auditLogs`).doc(), {
+      entity: 'bonusFiling', entityId: ref.id, action: 'create', changes: { filingType: { from: null, to: 'bonusNonPayment' } },
+      performedBy: auth.uid, performedAt: now, version: 1,
+    });
+    return ref.id;
+  });
+  return { filingId: id };
+}
+
+/**
+ * 提出の処理（模擬電子申請の完了・紙の提出）のあとに呼ぶ。賞与不支給報告書を提出し終えたら、
+ * run に不支給の記録を書き、③で変えた支給予定月を事業所に反映する（一度だけ）
+ */
+export async function afterBonusFilingSubmitted(path: string) {
+  const ref = db.doc(path);
+  const runRef = ref.parent.parent!;
+  const companyId = path.split('/')[1];
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const f = snap.data();
+    if (!f || f.filingType !== 'bonusNonPayment' || f.status !== 'submitted' || f.nonPaymentApplied) return;
+    const officeRef = db.doc(`companies/${companyId}/offices/${f.officeId}`);
+    const office = await tx.get(officeRef);
+    const now = Timestamp.now();
+    const reportedOn = (f.submission?.date as string | undefined) ?? toDateString(now)!;
+    tx.set(runRef, { nonPayment: { reportedOn, by: f.requestedBy ?? 'system', at: now, filingId: snap.id }, updatedAt: now }, { merge: true });
+    const after = f.header?.['変更後の支払予定月'] as number[] | null | undefined;
+    if (Array.isArray(after) && office.exists) {
+      const version = ((office.data()!.version as number | undefined) ?? 0) + 1;
+      tx.update(officeRef, { bonusMonths: after, updatedAt: now, version });
+      tx.set(db.collection(`companies/${companyId}/auditLogs`).doc(), {
+        entity: 'office', entityId: f.officeId, action: 'update', changes: { bonusMonths: { from: office.data()!.bonusMonths ?? [], to: after } },
+        note: '賞与不支給報告書の提出で支給予定月を変更', performedBy: 'system', performedAt: now, version,
+      });
+    }
+    tx.update(ref, { nonPaymentApplied: true });
+  });
 }
 
 // ---- 賞与の登録 ----
@@ -629,6 +710,11 @@ export async function createBonusFiling(input: BonusRunInput, auth: AuthContext)
 export function mockErrors(f: FirebaseFirestore.DocumentData): string[] {
   const errors: string[] = [];
   if (!f.header?.['事業所名称']) errors.push('事業所名称が未登録です');
+  if (f.filingType === 'bonusNonPayment') {
+    if (!f.header?.['事業所整理記号']) errors.push('事業所整理記号が未登録です');
+    if (!f.header?.['賞与支払年月']) errors.push('賞与支払年月がありません');
+    return errors;
+  }
   for (const p of (f.persons ?? []) as BonusFilingPerson[]) {
     if (!p.被保険者氏名) errors.push(`${p.employeeId}：被保険者氏名がありません`);
     if (!p.生年月日) errors.push(`${p.被保険者氏名}：生年月日がありません`);

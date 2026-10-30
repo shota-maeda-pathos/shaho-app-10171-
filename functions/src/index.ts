@@ -41,7 +41,7 @@ export {
 } from './santei/functions';
 export {
   bonusRunOverview, bonusRunHold, bonusRunImport, bonusRunEntry, bonusRunNonPayment, bonusJobStart, bonusJobGet, bonusJobChunk,
-  bonusFilingCreate, bonusFilingUpdate, bonusFilingGet, sampleBonusCreate,
+  bonusFilingCreate, bonusFilingUpdate, bonusFilingGet, sampleBonusCreate, bonusNonPaymentFilingCreate,
 } from './bonus/functions';
 
 // 給与API

@@ -150,6 +150,28 @@ export function isScheduledMonth(bonusMonths: number[] | undefined, yearMonth: s
   return (bonusMonths ?? []).includes(Number(yearMonth.slice(5, 7)));
 }
 
+/**
+ * 賞与不支給報告書の③「賞与支払予定月の変更」。様式の欄は変更後・変更前とも4か月まで。
+ * keep：変更しない（③は書かない）、change：変更後の月、remove：今後の支給予定がなくなった（変更後をすべて「00」）
+ */
+export type NonPaymentChange = { kind: 'keep' } | { kind: 'change'; months: number[] } | { kind: 'remove' };
+
+export function nonPaymentChangeOf(change: NonPaymentChange, currentMonths: number[] | undefined): {
+  errors: string[]; before: number[]; after: number[] | null; noMoreBonus: boolean;
+} {
+  const before = [...new Set(currentMonths ?? [])].sort((a, b) => a - b);
+  const errors: string[] = [];
+  if (before.length > 4) errors.push('登録されている支給予定月が4か月を超えています。様式の欄は4か月までです');
+  if (change.kind === 'keep') return { errors, before, after: null, noMoreBonus: false };
+  if (change.kind === 'remove') return { errors, before, after: [], noMoreBonus: true };
+  const after = [...new Set(change.months)].sort((a, b) => a - b);
+  if (!after.length) errors.push('変更後の支給予定月を選んでください（支給がなくなる場合は「今後は支給しない」を選びます）');
+  if (after.length > 4) errors.push('変更後の支給予定月は4か月までです');
+  if (after.some(m => !Number.isInteger(m) || m < 1 || m > 12)) errors.push('支給予定月は1〜12月で選んでください');
+  if (after.length && after.join(',') === before.join(',')) errors.push('変更後の支給予定月が今と同じです（変更しない場合は「変更しない」を選びます）');
+  return { errors, before, after, noMoreBonus: false };
+}
+
 /** 届出の1人分 */
 export interface BonusFilingPerson {
   employeeId: string;

@@ -58,5 +58,10 @@
     "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/hihokensha/20140218.files/0000014752oyCXKgetP9.pdf",
     "checkedOn": "2026-10-30",
     "sha256": "ecbddd474865d81b7fb22cc61d157491648eef3076fcbc98f83e3642c2c17883"
+  },
+  "bonus-non-payment": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/shoyo/20140821.files/0000021444dL0Veo13cP.pdf",
+    "checkedOn": "2026-10-30",
+    "sha256": "3558d592ea5d33444388994e00cc657190cd5da215d1b56a1a8132d7d6dc0f32"
   }
 }

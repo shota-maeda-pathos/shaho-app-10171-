@@ -181,6 +181,7 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
                   <td><a class="link">{{ typeLabel(r.filingType) }}</a>@if (r.number) { <span class="muted">（{{ r.number }}件目）</span> }</td>
                   <td>
                     @if (r.source === 'employee') { {{ r.employeeName }} <span class="muted">{{ r.employeeNumber }}</span> }
+                    @else if (r.filingType === 'bonusNonPayment') { 事業所の報告 <span class="muted">{{ r.payMonth }}分</span> }
                     @else { {{ r.personCount }}名 <span class="muted">{{ r.year ? r.year + '年' : r.payMonth + '支給' }}</span> }
                   </td>
                   <td>{{ r.officeName }}</td>

@@ -41,23 +41,72 @@
       <app-loading-state message="賞与の状況を読み込んでいます…" />
     } @else if (data(); as d) {
       @if (nonPayment(); as np) {
-        @if (np.reported) {
+        @if (nonPaymentReport(); as r) {
+          <section class="report" aria-label="賞与不支給報告書">
+            <h2>賞与不支給報告書<app-term key="bonusNonPayment" [showLabel]="false" /></h2>
+            <p>{{ monthLabel(d.payMonth) }}は事業所の賞与支給予定月でしたが、賞与を支給しなかったことを年金事務所に報告します（期限：速やかに）。</p>
+            <p>状態：<strong>{{ statusLabels[r.status] }}</strong>
+              @if (r.change) { ・支給予定月を {{ monthsText(r.change.before) }} から {{ r.change.noMoreBonus ? '「今後は支給しない」' : monthsText(r.change.after) }} に変更します（提出を終えると事業所の設定に反映します）。 }
+            </p>
+            @if (r.rejection && r.status === 'draft') { <p class="bad">差し戻されました。理由：{{ r.rejection }}（取り消して作り直すか、そのまま承認を依頼し直します）</p> }
+            @if (r.status === 'pending') {
+              <p class="hint">{{ canApprove() && !r.mine ? '承認を頼まれています。内容とPDFを確かめてください。' : '別の担当者（管理者・承認者）の承認を待っています。' }}</p>
+            }
+            <div class="filing-actions">
+              <button mat-stroked-button type="button" (click)="nonPaymentPdf(r)" [disabled]="busy()"><mat-icon>picture_as_pdf</mat-icon>公式様式のPDFを作る</button>
+              @switch (r.status) {
+                @case ('draft') {
+                  <button mat-flat-button type="button" (click)="updateFiling(r, 'requestApproval')" [disabled]="busy()">承認を依頼</button>
+                  <button mat-button type="button" (click)="updateFiling(r, 'cancel')" [disabled]="busy()">取り消す</button>
+                }
+                @case ('pending') {
+                  @if (canApprove() && !r.mine) {
+                    <button mat-flat-button type="button" (click)="updateFiling(r, 'approve')" [disabled]="busy()">承認する</button>
+                    <button mat-button type="button" (click)="updateFiling(r, 'reject')" [disabled]="busy()">差し戻す</button>
+                  }
+                }
+              }
+            </div>
+            @if (r.status === 'approved' || r.status === 'submitted') {
+              <app-filing-submission [target]="{ source: 'bonus', parentId: runId(), filingId: r.id }" (changed)="load()" />
+            }
+          </section>
+        } @else if (np.reported) {
           <div class="complete" role="status">
             <mat-icon aria-hidden="true">check_circle</mat-icon>
             <div>{{ monthLabel(d.payMonth) }}は支給予定月でしたが賞与を支給せず、賞与不支給報告書<app-term key="bonusNonPayment" [showLabel]="false" />を {{ np.reported.reportedOn }} に提出したことを記録しています。
               <button mat-button type="button" (click)="recordNonPayment(true)" [disabled]="busy()">記録を取り消す</button></div>
           </div>
         } @else if (np.ended) {
-          <div class="alert" role="alert">
-            <mat-icon aria-hidden="true">warning</mat-icon>
-            <div>
-              <strong>賞与不支給報告書の提出が必要です。</strong>{{ monthLabel(d.payMonth) }}は事業所の賞与支給予定月ですが、賞与が登録されていません。
-              支給した場合は賞与を登録してください。支給しなかった場合は、年金事務所に賞与不支給報告書<app-term key="bonusNonPayment" [showLabel]="false" />を提出し、提出した日を記録してください。
-              <div><button mat-flat-button type="button" (click)="recordNonPayment()" [disabled]="busy()">提出した日を記録する</button></div>
+          <section class="report" aria-label="賞与不支給報告書を作る">
+            <div class="alert" role="alert">
+              <mat-icon aria-hidden="true">warning</mat-icon>
+              <div><strong>賞与不支給報告書の提出が必要です。</strong>{{ monthLabel(d.payMonth) }}は事業所の賞与支給予定月ですが、賞与が登録されていません。
+                支給した場合は賞与を登録してください。支給しなかった場合は、ここで報告書<app-term key="bonusNonPayment" [showLabel]="false" />を作り、承認を受けて提出します。</div>
             </div>
-          </div>
+            <div class="np-form">
+              <label class="np-field">届書の提出日 <input type="date" [(ngModel)]="npDate" name="npDate"></label>
+              <fieldset>
+                <legend>今後の賞与の支給予定月（③ 支給予定月の変更）</legend>
+                <label><input type="radio" name="npChange" value="keep" [(ngModel)]="npChange"> 変えない（今の予定月：{{ monthsText(d.office.bonusMonths) }}）</label>
+                <label><input type="radio" name="npChange" value="change" [(ngModel)]="npChange"> 予定月を変える</label>
+                <label><input type="radio" name="npChange" value="remove" [(ngModel)]="npChange"> 今後は賞与を支給しない</label>
+                @if (npChange === 'change') {
+                  <div class="np-months" role="group" aria-label="変更後の支給予定月（4か月まで）">
+                    @for (m of allMonths; track m) {
+                      <label><input type="checkbox" [checked]="npMonths().has(m)" (change)="toggleNpMonth(m, $any($event.target).checked)"
+                        [disabled]="!npMonths().has(m) && npMonths().size >= 4"> {{ m }}月</label>
+                    }
+                  </div>
+                  <p class="hint">様式の欄は4か月までです。</p>
+                }
+              </fieldset>
+              <button mat-flat-button type="button" (click)="createNonPayment()" [disabled]="busy() || !npDate || (npChange === 'change' && !npMonths().size)">賞与不支給報告書を作る</button>
+              <button mat-button type="button" (click)="recordNonPayment()" [disabled]="busy()">別の方法で提出済みなので、提出した日だけ記録する</button>
+            </div>
+          </section>
         } @else {
-          <div class="note" data-mine="true" role="status"><mat-icon aria-hidden="true">event</mat-icon>{{ monthLabel(d.payMonth) }}は事業所の賞与支給予定月です。支給したら賞与を登録してください（支給しなかった場合は、月が終わってから賞与不支給報告書を提出します）。</div>
+          <div class="note" data-mine="true" role="status"><mat-icon aria-hidden="true">event</mat-icon>{{ monthLabel(d.payMonth) }}は事業所の賞与支給予定月です。支給したら賞与を登録してください（支給しなかった場合は、月が終わってから賞与不支給報告書を作ります）。</div>
         }
       }
 

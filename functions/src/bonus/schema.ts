@@ -57,5 +57,17 @@ export type BonusFilingGetInput = z.infer<typeof BonusFilingGetSchema>;
 export const BonusNonPaymentSchema = BonusRunSchema.extend({ reportedOn: date.nullable() }).strict();
 export type BonusNonPaymentInput = z.infer<typeof BonusNonPaymentSchema>;
 
+/** 賞与不支給報告書を作る。③ 支給予定月の変更（変更しない・変更する・今後は支給しない） */
+export const BonusNonPaymentFilingSchema = BonusRunSchema.extend({
+  change: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('keep') }),
+    z.object({ kind: z.literal('change'), months: z.array(z.number().int().min(1).max(12)).min(1).max(4) }),
+    z.object({ kind: z.literal('remove') }),
+  ]),
+  /** 届書の提出日（記入する日付） */
+  reportDate: date,
+}).strict();
+export type BonusNonPaymentFilingInput = z.infer<typeof BonusNonPaymentFilingSchema>;
+
 /** 賞与のテスト用の架空の事業所（管理者だけ） */
 export const BonusSampleSchema = z.object({ companyId: id, count: z.number().int().min(10).max(1000) }).strict();

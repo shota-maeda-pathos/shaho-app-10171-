@@ -79,6 +79,8 @@ async function afterChange(path: string, before: MockState | null, after: MockSt
     const { refreshEmployeeProcedures } = await import('../../procedures/hooks');
     await refreshEmployeeProcedures(src.companyId, src.parentId);
   }
+  // 賞与不支給報告書は、提出を終えたら不支給の記録と支給予定月の変更を反映する
+  if (src.source === 'bonus') await (await import('../../bonus/service')).afterBonusFilingSubmitted(path);
   // 模擬電子申請の結果（完了・返戻）はダッシュボードに通知する
   if (after && before?.status !== after.status && (after.status === 'completed' || after.status === 'returned')) {
     const { notify } = await import('../../utils/notify');

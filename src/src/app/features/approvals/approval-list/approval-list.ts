@@ -341,7 +341,7 @@ export class ApprovalListComponent {
     return TYPE_LABELS[i.requestType] ?? i.requestType;
   }
   targetLabel(i: ApprovalItem) {
-    if (i.kind === 'runFiling') return `${i.personCount}名分`;
+    if (i.kind === 'runFiling') return i.filingType === 'bonusNonPayment' ? `事業所の報告（${i.payMonth}分）` : `${i.personCount}名分`;
     return `${i.employeeName}${i.employeeNumber ? `（${i.employeeNumber}）` : ''}`;
   }
   statusOf = (i: ApprovalItem) => STATUS[i.status] ?? { label: i.status, tone: 'waiting' as StatusTone };

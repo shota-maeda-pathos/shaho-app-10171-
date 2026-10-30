@@ -54,6 +54,10 @@ export interface FilingSummary {
   submission: { method: 'mock' | 'paper'; date: string; acceptanceNumber: string | null } | null;
   /** 模擬電子申請の状態（送信中・送信エラー・返戻など） */
   mockStatus: string | null;
+  /** bonusPayment（賞与支払届）／bonusNonPayment（賞与不支給報告書） */
+  filingType: string;
+  /** 賞与不支給報告書の③ 支給予定月の変更（変更しないときは null） */
+  change: { before: number[]; after: number[]; noMoreBonus: boolean } | null;
   version: number;
   createdAt: string | null;
 }

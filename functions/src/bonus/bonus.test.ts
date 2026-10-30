@@ -1,7 +1,7 @@
 import { splitCsvLine } from '../monthly/rules';
 import {
   bonusCaps, bonusFilingDeadline, bonusFilingPerson, bonusTarget, capWarnings, commonPaymentDate, earlierMonthsInFiscalYear, fiscalYearOf,
-  parseBonusCsv, paymentCountWarning, paymentErrors, summarizePayments,
+  nonPaymentChangeOf, parseBonusCsv, paymentCountWarning, paymentErrors, summarizePayments,
 } from './bonus-calc';
 
 describe('年度', () => {
@@ -153,5 +153,29 @@ describe('進み具合', () => {
     expect(bonusProgress({ ...base, rows: empty, scheduled: true, nonPayment: { reportedOn: '2026-10-01' } })).toBeNull();
     expect(bonusProgress({ ...base, rows: empty, scheduled: true, monthEnded: false })).toBeNull();
     expect(bonusProgress({ ...base, rows: empty })).toBeNull();
+  });
+});
+
+describe('賞与不支給報告書', () => {
+  it('③ 支給予定月の変更', () => {
+    expect(nonPaymentChangeOf({ kind: 'keep' }, [12, 6])).toEqual({ errors: [], before: [6, 12], after: null, noMoreBonus: false });
+    expect(nonPaymentChangeOf({ kind: 'change', months: [12, 3, 6] }, [6, 12])).toEqual({ errors: [], before: [6, 12], after: [3, 6, 12], noMoreBonus: false });
+    expect(nonPaymentChangeOf({ kind: 'remove' }, [7, 12])).toEqual({ errors: [], before: [7, 12], after: [], noMoreBonus: true });
+    expect(nonPaymentChangeOf({ kind: 'change', months: [6, 12] }, [12, 6]).errors[0]).toContain('今と同じ');
+    expect(nonPaymentChangeOf({ kind: 'change', months: [1, 2, 3, 4, 5] }, [6]).errors[0]).toContain('4か月まで');
+  });
+
+  it('報告書を作ったあとの次にやること', () => {
+    const empty = [{ employeeId: 'e', bonus: null } as never];
+    const report = (o: object) => ({ id: 'r', number: 1, status: 'draft', personCount: 0, deadline: null, requestedBy: null, requestedAt: null, mine: false,
+      rejection: null, submission: null, mockStatus: null, filingType: 'bonusNonPayment', change: null, version: 1, createdAt: null, ...o }) as never;
+    const base = { canApprove: true, uid: 'me', reviews: { bonus: null, premium: null }, scheduled: true, monthEnded: true, nonPayment: null, rows: empty };
+    expect(bonusProgress({ ...base, filings: [report({})] })?.next).toBe('賞与不支給報告書の承認を依頼する');
+    expect(bonusProgress({ ...base, filings: [report({ status: 'pending' })] })?.tone).toBe('yours');
+    expect(bonusProgress({ ...base, filings: [report({ status: 'pending', mine: true })] })?.tone).toBe('waiting');
+    expect(bonusProgress({ ...base, filings: [report({ status: 'approved', mockStatus: 'sent' })] })?.tone).toBe('waiting');
+    expect(bonusProgress({ ...base, filings: [report({ status: 'approved' })] })?.next).toBe('賞与不支給報告書を提出する');
+    expect(bonusProgress({ ...base, filings: [report({ status: 'submitted' })] })).toBeNull();
+    expect(bonusProgress({ ...base, filings: [report({ status: 'cancelled' })] })?.next).toBe('賞与不支給報告書の提出が必要です');
   });
 });

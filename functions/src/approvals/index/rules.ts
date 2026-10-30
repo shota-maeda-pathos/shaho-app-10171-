@@ -145,7 +145,7 @@ export function buildRunFilingEntry(input: {
   if (!status) return null;
   const { deadline, note } = filingDeadline(String(f.filingType ?? ''), f);
   const persons = Array.isArray(f.employeeIds) ? f.employeeIds.length : 0;
-  const label = input.source === 'santei' ? `${f.year}年の算定基礎届` : `${f.payMonth}支給の賞与支払届`;
+  const label = input.source === 'santei' ? `${f.year}年の算定基礎届` : f.filingType === 'bonusNonPayment' ? `${f.payMonth}の賞与不支給報告書` : `${f.payMonth}支給の賞与支払届`;
   return {
     kind: 'runFiling',
     requestId: input.filingId,
@@ -173,7 +173,7 @@ export function buildRunFilingEntry(input: {
     targetVersion: f.version ?? 0,
     deadline,
     deadlineNote: note,
-    summary: `${label}（${f.number}件目・${persons}名）`,
+    summary: f.filingType === 'bonusNonPayment' ? label : `${label}（${f.number}件目・${persons}名）`,
     origin: input.source,
   };
 }

@@ -111,3 +111,10 @@ th { background: var(--app-color-surface-sub); position: sticky; top: 0; }
   span, small { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
   strong { font-size: var(--app-font-xl); font-weight: 500; }
 }
+
+.report { margin-bottom: var(--app-space-4); padding: var(--app-space-3) var(--app-space-4); border: 1px solid var(--app-color-border); border-radius: 8px; background: var(--app-color-surface); }
+.report h2 { font-size: 18px; margin: 0 0 var(--app-space-2); }
+.np-form { display: flex; flex-direction: column; align-items: flex-start; gap: var(--app-space-3); margin-top: var(--app-space-3); }
+.np-form fieldset { border: 1px solid var(--app-color-border); border-radius: 8px; padding: var(--app-space-2) var(--app-space-3); display: flex; flex-direction: column; gap: var(--app-space-1); }
+.np-months { display: flex; flex-wrap: wrap; gap: var(--app-space-1) var(--app-space-3); margin-top: var(--app-space-2); }
+.np-field input { margin-left: var(--app-space-2); }
