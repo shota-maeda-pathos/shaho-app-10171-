@@ -14,6 +14,7 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
   bonusPayment: ['被保険者氏名', '賞与支払年月日', '賞与額_合計'],
   maternityLeaveStart: ['被保険者氏名'],
   childcareLeaveStart: ['被保険者氏名'],
+  maternityLeaveChange: ['被保険者氏名', '出産予定年月日'],
   childcareLeaveEnd: ['被保険者氏名'],
 };
 

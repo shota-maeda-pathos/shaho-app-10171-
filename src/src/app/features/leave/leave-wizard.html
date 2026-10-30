@@ -1,0 +1,247 @@
+<div class="app-page">
+  <a routerLink="/procedures" class="back"><mat-icon>arrow_back</mat-icon>進行中の手続き</a>
+
+  @if (loading()) {
+    <app-loading-state />
+  } @else if (loadError()) {
+    <app-error-state [message]="loadError()" (retry)="load(true)" />
+  } @else if (view(); as v) {
+    <app-wizard [heading]="v.procedure.title"
+                [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.period ? '・' + (v.period.startDate | date:'M月d日') + '〜' + ((v.period.actualEndDate ?? v.period.plannedEnd) | date:'M月d日') : '')"
+                [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                (advance)="advance()">
+
+      @switch (key()) {
+
+        <!-- ① 休業の期間を決める -->
+        @case ('plan') {
+          @let fixed = v.history.length > 0 || v.filingKind !== 'start' || v.locked;
+          @if (fixed) {
+            <p class="note">申出書の承認を依頼したあとの変更は、「休業中のことと復帰を記録する」で入れてください。届出が要るかはシステムが判定します。</p>
+          } @else if (v.procedure.fromMaternity && !dirty() && v.steps[0].status !== 'completed') {
+            <p class="note">産休の手続きから、生まれた子と、産休の翌日からの期間を入れてあります。子の名前と終える予定の日を確かめてください。</p>
+          }
+          <fieldset class="form-grid" [disabled]="fixed">
+            @if (isMaternity()) {
+              <mat-form-field appearance="outline"><mat-label>出産予定日</mat-label>
+                <input matInput type="date" [(ngModel)]="form.expectedBirthDate" (ngModelChange)="changed()" name="expected"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>出産日（生まれていれば）</mat-label>
+                <input matInput type="date" [(ngModel)]="form.actualBirthDate" (ngModelChange)="changed()" name="actual">
+                <mat-hint>生まれる前に申し出るときは空のまま</mat-hint></mat-form-field>
+              <mat-checkbox class="wide" [(ngModel)]="form.multiple" (ngModelChange)="changed()" name="multiple" [disabled]="fixed">双子以上（多胎）の出産</mat-checkbox>
+              <mat-form-field appearance="outline"><mat-label>休み始める日</mat-label>
+                <input matInput type="date" [(ngModel)]="form.startDate" (ngModelChange)="changed()" name="start">
+                <mat-hint>空なら産前休業を取れるいちばん早い日</mat-hint></mat-form-field>
+            } @else {
+              <mat-form-field appearance="outline"><mat-label>養育する子の姓</mat-label>
+                <input matInput [(ngModel)]="form.childLastName" (ngModelChange)="dirty.set(true)" name="childLast" maxlength="50"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>養育する子の名</mat-label>
+                <input matInput [(ngModel)]="form.childFirstName" (ngModelChange)="dirty.set(true)" name="childFirst" maxlength="50"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>子の生年月日</mat-label>
+                <input matInput type="date" [(ngModel)]="form.childBirthDate" (ngModelChange)="changed()" name="childBirth"></mat-form-field>
+              <mat-checkbox [(ngModel)]="form.bornByEmployee" (ngModelChange)="changed()" name="born" [disabled]="fixed">本人が出産した子（産後休業のあとに育休）</mat-checkbox>
+              <mat-form-field appearance="outline"><mat-label>育休を始める日</mat-label>
+                <input matInput type="date" [(ngModel)]="form.startDate" (ngModelChange)="changed()" name="start"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>育休を終える予定の日</mat-label>
+                <input matInput type="date" [(ngModel)]="form.endDate" (ngModelChange)="changed()" name="end">
+                <mat-hint>空なら子が1歳に達する日（誕生日の前日）</mat-hint></mat-form-field>
+            }
+          </fieldset>
+
+          @if (plan(); as p) {
+            <section class="result" aria-live="polite">
+              <h3>休業の期間と保険料の免除</h3>
+              @if (p.errors.length) {
+                @for (e of p.errors; track e) { <p><app-status-badge tone="action" label="確かめてください" /> {{ e }}</p> }
+              } @else {
+                <table class="summary">
+                  <tbody>
+                    <tr><th>休業の期間</th><td>{{ p.start | date:'yyyy年M月d日' }} 〜 {{ p.end | date:'yyyy年M月d日' }}{{ p.stage ? '（' + p.stage + '）' : '' }}</td></tr>
+                    @if (p.legalStart) { <tr><th>産前休業を取れる日</th><td>{{ p.legalStart | date:'yyyy年M月d日' }}から</td></tr> }
+                    <tr><th><app-term key="exemption" />の月</th><td>{{ monthsText(p.exemptMonths) }}</td></tr>
+                    <tr><th>賞与の保険料</th><td>{{ p.bonusExempt ? '期間中に払う賞与は免除' : '免除されません' }}</td></tr>
+                    <tr><th>届出の期限</th><td>{{ p.deadline ? (p.deadline | date:'yyyy年M月d日') + 'まで' : '速やかに' }}</td></tr>
+                  </tbody>
+                </table>
+                @for (n of p.notes; track n) { <p class="sub">{{ n }}</p> }
+                <p class="sub">免除は、届出が承認された時点で毎月の保険料の計算に反映します。</p>
+              }
+            </section>
+          }
+          @if (!fixed && planMissing(); as m) { <p class="sub">{{ m }}</p> }
+        }
+
+        <!-- ② 届出を作る -->
+        @case ('filing') {
+          @if (v.approval?.status === 'rejected') {
+            <div class="alert" role="alert">
+              <strong>承認者から差し戻されました。</strong>
+              @if (v.approval?.comment) { 理由：{{ v.approval!.comment }} }
+              {{ v.filingKind === 'start' ? '期間を直す場合は「戻る」で最初のステップへ戻ってください。' : '記録を直す場合は「休業中のことと復帰を記録する」でやり直してください。' }}
+              直したら、もう一度届出を作って依頼します。
+            </div>
+          }
+          @if (v.filingKind !== 'start' && v.pending) {
+            <p class="note">{{ eventLabel[v.pending.type] }}（{{ v.pending.date | date:'yyyy年M月d日' }}）ことを記録したため、{{ v.filingLabel }}を出します。</p>
+            @if (!v.locked) {
+              <button mat-stroked-button type="button" (click)="index.set(4)"><mat-icon>edit</mat-icon>記録を直す</button>
+            }
+          }
+          @if (v.period) {
+            <table class="summary">
+              <tbody>
+                <tr><th>届出</th><td>{{ v.filingLabel }}</td></tr>
+                @if (isMaternity()) {
+                  <tr><th>出産予定日</th><td>{{ v.expectedBirthDate | date:'yyyy年M月d日' }}{{ v.multiple ? '（多胎）' : '' }}</td></tr>
+                  @if (v.period.actualBirthDate) { <tr><th>出産日</th><td>{{ v.period.actualBirthDate | date:'yyyy年M月d日' }}</td></tr> }
+                } @else if (v.child) {
+                  <tr><th>養育する子</th><td>{{ v.child.lastName }} {{ v.child.firstName }}（{{ v.child.birthDate | date:'yyyy年M月d日' }}生まれ）</td></tr>
+                }
+                <tr><th>休業を始める日</th><td>{{ v.period.startDate | date:'yyyy年M月d日' }}</td></tr>
+                <tr><th>終える予定の日</th><td>{{ v.period.plannedEnd | date:'yyyy年M月d日' }}</td></tr>
+                @if (v.period.actualEndDate) { <tr><th>休業を終えた日</th><td>{{ v.period.actualEndDate | date:'yyyy年M月d日' }}</td></tr> }
+                <tr><th><app-term key="exemption" />の月</th><td>{{ monthsText(v.exemptMonths) }}</td></tr>
+              </tbody>
+            </table>
+          }
+          <p class="sub">本人の個人番号（または基礎年金番号）は、届出の画面で確かめてください。</p>
+        }
+
+        <!-- ③ 承認者が確認する -->
+        @case ('approval') {
+          @if (v.approval?.status === 'pending') {
+            <p>承認者に確認を依頼しました。承認者は「承認」の画面から確認します。</p>
+            <button mat-stroked-button type="button" (click)="load(true)" [disabled]="busy()"><mat-icon>refresh</mat-icon>最新の状態にする</button>
+          } @else if (v.approval?.status === 'approved' || v.filing?.workflowStatus === 'approved') {
+            <p><app-status-badge tone="done" label="承認済み" /> {{ v.filingLabel }}が承認されました。</p>
+          }
+        }
+
+        <!-- ④ 提出する -->
+        @case ('submit') {
+          @if (v.exemption?.status === 'active' && v.filingKind === 'start') {
+            <p class="note">申出書が承認されたため、{{ monthsText(v.exemptMonths) }}の保険料の免除を毎月の計算に反映しました。</p>
+          }
+          @if (v.filing; as fl) {
+            @if (submitDone()) {
+              <p><app-status-badge tone="done" label="提出済み" />
+                {{ fl.mockStatus === 'completed' ? '模擬電子申請が完了しました。' : '紙の届出が受理されました。' }}</p>
+            } @else {
+              <mat-radio-group [(ngModel)]="method" class="radios" aria-label="提出方法">
+                <mat-radio-button value="electronic">電子申請（模擬）で提出する</mat-radio-button>
+                <mat-radio-button value="paper">紙で提出する</mat-radio-button>
+              </mat-radio-group>
+              @if (method === 'electronic') {
+                <p class="sub">このシステムの電子申請は模擬です。実際の提出は、e-Govや紙で別に行ってください。</p>
+                <button mat-flat-button type="button" (click)="mockSubmit()" [disabled]="busy()">模擬電子申請する</button>
+              } @else {
+                <p class="sub">届出の画面でPDFを印刷し、年金事務所（または健康保険組合）へ提出します。
+                  <a [routerLink]="['/filings', fl.id]" [queryParams]="{ employeeId: v.employee.id }">届出の画面を開く</a></p>
+                @if (fl.submissionStatus === 'notSubmitted') {
+                  <button mat-flat-button type="button" (click)="paper('submit')" [disabled]="busy()">提出したことを記録する</button>
+                } @else if (fl.submissionStatus === 'submitted') {
+                  <p>提出済み（結果待ち）です。結果が届いたら記録してください。</p>
+                  <div class="row-actions">
+                    <button mat-flat-button type="button" (click)="paper('accepted')" [disabled]="busy()">受理された</button>
+                    <button mat-stroked-button type="button" (click)="paper('returned')" [disabled]="busy()">返戻された</button>
+                  </div>
+                } @else if (fl.submissionStatus === 'returned') {
+                  <div class="alert" role="alert">返戻されました。{{ fl.resultNote }} 内容を直して出し直す方法は、届出の画面で確認してください。</div>
+                }
+              }
+              @if (mockResult()) { <p class="note">{{ mockResult() }}</p> }
+            }
+          }
+        }
+
+        <!-- ⑤ 休業中のことと復帰を記録する -->
+        @case ('during') {
+          @if (v.period) {
+            <table class="summary">
+              <tbody>
+                <tr><th>休業の期間</th><td>{{ v.period.startDate | date:'yyyy年M月d日' }} 〜 {{ (v.period.actualEndDate ?? v.period.plannedEnd) | date:'yyyy年M月d日' }}
+                  {{ v.period.actualEndDate ? '（終えた）' : '（予定）' }}</td></tr>
+                @if (isMaternity()) {
+                  <tr><th>出産日</th><td>{{ v.period.actualBirthDate ? (v.period.actualBirthDate | date:'yyyy年M月d日') : '未記録（予定日 ' + (v.expectedBirthDate | date:'M月d日') + '）' }}</td></tr>
+                }
+                <tr><th><app-term key="exemption" />の月</th><td>{{ monthsText(v.exemptMonths) }}
+                  <app-status-badge [tone]="v.exemption?.status === 'active' ? 'done' : 'waiting'" [label]="v.exemption?.status === 'active' ? '反映済み' : '承認待ち'" /></td></tr>
+              </tbody>
+            </table>
+          }
+          @if (v.recalcMonths.length) {
+            <div class="alert" role="alert">
+              {{ v.recalcMonths.map(monthLabel).join('・') }}分の保険料は、免除の前に計算されています。毎月の処理で計算し直してください。
+              <a routerLink="/monthly">毎月の処理を開く</a>
+            </div>
+          }
+
+          @if (canRecord()) {
+            @if (v.pending && v.current !== 'during') {
+              <p class="note">{{ eventLabel[v.pending.type] }}（{{ v.pending.date | date:'yyyy年M月d日' }}）ことを記録し、{{ v.filingLabel }}をまだ出していません。記録を直す場合は、もう一度記録してください。</p>
+            }
+            <h3>起きたことを記録する</h3>
+            <mat-radio-group [(ngModel)]="eventType" (ngModelChange)="eventChanged()" class="radios" aria-label="記録すること">
+              @for (t of eventChoices(); track t) { <mat-radio-button [value]="t">{{ eventLabel[t] }}</mat-radio-button> }
+            </mat-radio-group>
+            <mat-form-field appearance="outline">
+              <mat-label>{{ eventType === 'birth' ? '出産日' : eventType === 'extend' ? '延長後の終了予定日' : '休業の最後の日（復帰の前日）' }}</mat-label>
+              <input matInput type="date" [(ngModel)]="eventDate" (ngModelChange)="eventChanged()" name="eventDate">
+            </mat-form-field>
+            @if (eventResult(); as r) {
+              <section class="result" aria-live="polite">
+                @if (r.errors.length) {
+                  @for (e of r.errors; track e) { <p><app-status-badge tone="action" label="確かめてください" /> {{ e }}</p> }
+                } @else {
+                  <p>
+                    @if (r.filing) { <app-status-badge tone="yours" label="届出が要ります" /> } @else { <app-status-badge tone="done" label="届出は要りません" /> }
+                    @for (n of r.notes; track n) { {{ n }}。 }
+                  </p>
+                  <p class="sub">休業の期間：{{ r.start | date:'yyyy年M月d日' }}〜{{ r.end | date:'yyyy年M月d日' }}・免除の月：{{ monthsText(r.exemptMonths) }}</p>
+                }
+              </section>
+            }
+          } @else if (v.period?.actualEndDate) {
+            <p><app-status-badge tone="done" label="記録済み" /> {{ v.period!.actualEndDate | date:'yyyy年M月d日' }}に{{ short() }}を終えたことを記録しました。</p>
+          } @else if (v.current !== 'during') {
+            <p class="sub">届出の提出が済むと、ここで記録できるようになります。</p>
+          }
+        }
+
+        <!-- ⑥ 完了を確認する -->
+        @case ('confirm') {
+          @if (isDone()) {
+            <div class="complete" role="status">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+              <div><strong>{{ short() }}の手続きは完了しました。</strong></div>
+            </div>
+          }
+          <table class="summary">
+            <tbody>
+              @if (v.period) {
+                <tr><th>休業の期間</th><td>{{ v.period.startDate | date:'yyyy年M月d日' }} 〜 {{ (v.period.actualEndDate ?? v.period.plannedEnd) | date:'yyyy年M月d日' }}</td></tr>
+              }
+              <tr><th><app-term key="exemption" />の月</th><td>{{ monthsText(v.exemptMonths) }}</td></tr>
+              @for (h of v.history; track h.filingId) { <tr><th>出した届出</th><td>{{ h.label }}</td></tr> }
+              @if (v.filing && submitDone()) { <tr><th>出した届出</th><td>{{ v.filingLabel }}</td></tr> }
+            </tbody>
+          </table>
+
+          @if (v.returnMonth) {
+            <h3>復帰したあとのこと</h3>
+            <p>復帰したあとの給与が休業の前より下がった場合は、本人の申出があれば<app-term key="revision" />と同じように標準報酬月額を見直せます（産休・育休終了時の改定。1等級の差でも改定できます）。
+              {{ monthLabel(revisionMonths()[0]) }}〜{{ monthLabel(revisionMonths()[2]) }}の給与がそろったら判定できます。</p>
+            @if (isMaternity()) { <p class="sub">産休のあと続けて育休に入る場合は、産休の終了時の改定はしません（育休を終えたときに判定します）。</p> }
+            <a mat-stroked-button [routerLink]="['/employees', v.employee.id, 'revision']">等級の見直しを開く</a>
+          }
+          @if (isDone() && isMaternity()) {
+            <h3>続けて育休に入る</h3>
+            <p>生まれた子と、産休の翌日からの期間を引き継いで、育休の手続きを始めます。</p>
+            <button mat-flat-button type="button" (click)="startChildcare()" [disabled]="busy()">育休の手続きを始める</button>
+          }
+        }
+      }
+    </app-wizard>
+  }
+</div>

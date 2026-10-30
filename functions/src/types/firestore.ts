@@ -438,6 +438,50 @@ export interface ProcedureDoc {
   resignation?: ResignationState;
   /** 扶養の手続き（ウィザード）の状態。旧方式の扶養異動にはない */
   dependentChange?: DependentChangeState;
+  /** 産休・育休の手続き（ウィザード）の状態。旧方式の休業手続きにはない */
+  leaveProcedure?: LeaveProcedureState;
+}
+
+/** 休業の期間（届け出た内容）。日付は YYYY-MM-DD */
+export interface LeavePeriodState {
+  startDate: string;
+  /** 終了予定日（延長・出産日の変更で変わる） */
+  plannedEnd: string;
+  actualBirthDate: string | null;
+  /** 休業を終えた日。終えるまでは null */
+  actualEndDate: string | null;
+}
+
+/** 産休・育休の手続き（ウィザード）の状態。1つの休業につき1つの手続きで、休業中の変更届・終了届まで扱う */
+export interface LeaveProcedureState {
+  kind: 'maternity' | 'childcare';
+  /** 産休：出産予定日と多胎か */
+  expectedBirthDate: string | null;
+  multiple: boolean;
+  /** 育休：養育する子。本人が出産した子なら産後56日は育休を取れない */
+  child: { lastName: string; firstName: string; birthDate: string; bornByEmployee: boolean } | null;
+  /** 期間。入れるまでは null */
+  period: LeavePeriodState | null;
+  /** 今作っている（最後に作った）届出の種類と届出 */
+  filingKind: 'start' | 'change' | 'extend' | 'end';
+  filingId: string | null;
+  /** 申出書（最初の届出）。免除はこの届出の承認で効く */
+  startFilingId: string | null;
+  /** 申出書を出したときに出産日が分かっていたか（出産後の申出なら出産日の変更届は要らない） */
+  filedWithBirth: boolean;
+  /** 休業中に記録したことで、まだ提出していない届出がある場合の、記録する前の期間（記録をやり直すときに戻す） */
+  pending: {
+    type: 'birth' | 'extend' | 'end'; date: string; before: LeavePeriodState;
+    /** 記録する前の届出のステップと参照（記録をやり直すときに戻す） */
+    steps: ProcedureStep[]; references: ProcedureReference[];
+  } | null;
+  /** 提出が済んだ届出の履歴 */
+  history: { kind: 'start' | 'change' | 'extend' | 'end'; filingId: string; label: string; eventDate: string | null }[];
+  /** 休業（leaves）と免除（premiumExemptions）。申出書を作ったときに作る */
+  leaveId: string | null;
+  exemptionId: string | null;
+  /** 産休の手続きから続けて始めた育休の場合の、産休の手続き */
+  sourceProcedureId: string | null;
 }
 
 /** 扶養の手続きで届け出る1人分の異動 */

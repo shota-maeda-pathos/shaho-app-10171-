@@ -1,5 +1,6 @@
 import { Component, Input, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -17,23 +18,22 @@ interface Leave {
   actualEndDate: string | null;
   version: number;
   status: string;
+  procedureId: string | null;
 }
 @Component({
   selector: 'app-employee-leaves',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   template: `
     <h2>休業管理</h2>
+    <p>産休・育休は、申出書・保険料の免除・休業中の変更届や終了届までを手続きの画面で進めます。</p>
+    <div class="actions">
+      <button mat-flat-button type="button" (click)="startProcedure('maternity')" [disabled]="saving()">産休の手続きを始める</button>
+      <button mat-flat-button type="button" (click)="startProcedure('childcare')" [disabled]="saving()">育休の手続きを始める</button>
+    </div>
+    <h3>介護休業の予定を登録する</h3>
     <form #form="ngForm" (ngSubmit)="register()">
       <div class="fields">
-        <mat-form-field appearance="outline">
-          <mat-label>休業種別</mat-label>
-          <mat-select name="type" [(ngModel)]="leaveType" required>
-            <mat-option value="maternity">産前産後休業</mat-option>
-            <mat-option value="childcare">育児休業</mat-option>
-            <mat-option value="nursing">介護休業</mat-option>
-          </mat-select>
-        </mat-form-field>
         <mat-form-field appearance="outline"><mat-label>開始予定日</mat-label>
           <input matInput type="date" name="start" [(ngModel)]="start" required>
         </mat-form-field>
@@ -41,13 +41,13 @@ interface Leave {
           <input matInput type="date" name="end" [(ngModel)]="end" [min]="start" required>
         </mat-form-field>
       </div>
-      <p>休業予定を登録します。保険料免除の登録は別途必要です。</p>
+      <p>介護休業は保険料の免除がありません。休業の予定と実績だけを記録します。</p>
       <button mat-flat-button type="submit" [disabled]="form.invalid || saving() || loading() || updating() || !start || end < start">
         {{ saving() ? '登録中...' : '休業予定を登録' }}
       </button>
     </form>
     <h3>休業履歴</h3>
-    <p>休業の終了だけでは免除期間は変更されません。「保険料免除」タブで別途確認してください。</p>
+    <p>産休・育休の開始・終了は、それぞれの手続きで記録します（免除の期間も合わせて変わります）。</p>
     @if (error()) {
       <p role="alert">{{ error() }}</p>
       <button mat-stroked-button (click)="load()">再読み込み</button>
@@ -60,10 +60,12 @@ interface Leave {
           <span>{{ leave.expectedStartDate }} 〜 {{ leave.expectedEndDate }}</span>
           <span>{{ statusLabel(leave.status) }}</span>
           @if (leave.actualStartDate) { <span>実績：{{ leave.actualStartDate }} 〜 {{ leave.actualEndDate ?? '休業中' }}</span> }
-          @if (leave.status === 'planned' || leave.status === 'scheduled') {
+          @if (leave.procedureId) {
+            <a mat-stroked-button [routerLink]="['/leaves', leave.procedureId]">手続きを開く</a>
+          } @else if (leave.status === 'planned' || leave.status === 'scheduled') {
             <button mat-stroked-button (click)="editLeave(leave, 'start')" [disabled]="updating() || saving()">開始を記録</button>
           }
-          @if (leave.status === 'active') {
+          @if (!leave.procedureId && leave.status === 'active') {
             <button mat-stroked-button (click)="editLeave(leave, 'end')" [disabled]="updating() || saving()">終了を記録</button>
           }
           @if (editing(); as edit) {
@@ -90,6 +92,7 @@ interface Leave {
   styles: [`
     :host { display: block; }
     .fields { display: flex; flex-wrap: wrap; gap: 16px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .record { display: flex; flex-wrap: wrap; gap: 20px; padding: 16px 0; border-bottom: 1px solid #ddd; }
     h3 { margin-top: 32px; }
   `],
@@ -99,6 +102,7 @@ export class EmployeeLeavesComponent implements OnInit {
   private functions = inject(Functions);
   private auth = inject(AuthService);
   private snackBar = inject(MatSnackBar);
+  private router = inject(Router);
   leaves = signal<Leave[]>([]);
   updating = signal(false);
   editing = signal<{ id: string; version: number; action: 'start' | 'end'; date: string; requestId: string } | null>(null);
@@ -124,7 +128,7 @@ export class EmployeeLeavesComponent implements OnInit {
   saving = signal(false);
   error = signal('');
   hasMore = signal(false);
-  leaveType = 'maternity';
+  leaveType = 'nursing';
   start = '';
   end = '';
   ngOnInit() { void this.load(); }
@@ -145,6 +149,16 @@ export class EmployeeLeavesComponent implements OnInit {
     } catch {
       this.error.set('休業情報を取得できませんでした。接続状況・アクセス権・APIの公開状況を確認してください。');
     } finally { this.loading.set(false); }
+  }
+  /** 産休・育休の手続きを始める。同じ種類の進行中の手続きがあれば、それを開く */
+  async startProcedure(kind: 'maternity' | 'childcare') {
+    this.saving.set(true);
+    try {
+      const { data } = await httpsCallable<object, { procedureId: string }>(this.functions, 'leaveProcedureStart')({ companyId: this.auth.companyId, employeeId: this.employeeId, kind });
+      await this.router.navigate(['/leaves', data.procedureId]);
+    } catch (e: any) {
+      this.snackBar.open(e.message ?? '手続きを始められませんでした', '閉じる', { duration: 6000 });
+    } finally { this.saving.set(false); }
   }
   async register() {
     if (this.saving() || this.updating() || this.loading() || !this.start || !this.end || this.end < this.start) return;

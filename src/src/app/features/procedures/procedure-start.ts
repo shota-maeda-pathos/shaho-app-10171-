@@ -5,6 +5,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatRadioModule } from '@angular/material/radio';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
@@ -15,7 +16,7 @@ interface Employee { id: string; lastName: string; firstName: string; employeeNu
 /** 手続きを始める。何が起きたかをカードで選び、従業員を選ぶ業務ならその人を選んで進む */
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, LifeEventCardsComponent],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatRadioModule, LifeEventCardsComponent],
   template: `<section class="start">
     <h1>手続きを始める</h1>
     <p class="lead">何が起きたかを選んでください。必要な入力画面へ案内します。</p>
@@ -34,6 +35,14 @@ interface Employee { id: string; lastName: string; firstName: string; employeeNu
         @if (!loading() && keyword && !matches().length) { <p>見つかりません。{{hasMore() ? '続きを読み込んでから探してください。' : ''}}</p> }
         @if (hasMore()) { <button mat-stroked-button (click)="loadEmployees()" [disabled]="loading()">従業員をさらに読み込む</button> }
         @if (error()) { <p role="alert">{{error()}}</p><button mat-stroked-button (click)="loadEmployees()">再読み込み</button> }
+        @if (type() === 'leave') {
+          <h3>休業の種類</h3>
+          <mat-radio-group [(ngModel)]="leaveKind" class="kinds" aria-label="休業の種類">
+            <mat-radio-button value="maternity">産休（産前産後休業。出産する本人）</mat-radio-button>
+            <mat-radio-button value="childcare">育休（育児休業。父母どちらでも）</mat-radio-button>
+          </mat-radio-group>
+          <p class="note">休業中の出産・延長・復帰も、始めた手続きの中で記録します。進行中の手続きがあれば、それを開きます。</p>
+        }
         <p class="note">この画面では従業員の情報を変更しません。次の画面で入力・確認してから登録します。</p>
         <button mat-flat-button (click)="start()" [disabled]="!canStart() || starting()">入力画面へ進む</button>
       </section>
@@ -53,6 +62,8 @@ interface Employee { id: string; lastName: string; firstName: string; employeeNu
     .matches button:hover { background: var(--app-color-surface-sub); }
     .matches button.selected { background: var(--app-status-yours-bg); color: var(--app-status-yours-fg); font-weight: 600; }
     .note { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
+    .employee h3 { margin: var(--app-space-4) 0 var(--app-space-2); font-size: var(--app-font-md, 1rem); font-weight: 500; }
+    .kinds { display: flex; flex-direction: column; gap: var(--app-space-1); }
   `],
 })
 export class ProcedureStartComponent implements OnInit {
@@ -60,7 +71,7 @@ export class ProcedureStartComponent implements OnInit {
   private functions = inject(Functions); private auth = inject(AuthService); private router = inject(Router); private route = inject(ActivatedRoute);
   type = signal('');
   event = computed(() => LIFE_EVENTS.find(e => e.type === this.type() && !e.route) ?? null);
-  employeeId = ''; keyword = '';
+  employeeId = ''; keyword = ''; leaveKind: 'maternity' | 'childcare' = 'maternity';
   employees = signal<Employee[]>([]); loading = signal(false); error = signal(''); hasMore = signal(true); private cursor = '';
   starting = signal(false);
 
@@ -100,12 +111,13 @@ export class ProcedureStartComponent implements OnInit {
     const wizard: Record<string, { fn: string; route: string }> = {
       loss: { fn: 'resignationStart', route: '/resignation' },
       dependent_change: { fn: 'dependentChangeStart', route: '/dependents' },
+      leave: { fn: 'leaveProcedureStart', route: '/leaves' },
     };
     const w = wizard[this.type()];
     if (w) {
       this.starting.set(true); this.error.set('');
       try {
-        const {data} = await httpsCallable<object,{procedureId:string}>(this.functions,w.fn)({companyId:this.auth.companyId,employeeId:this.employeeId});
+        const {data} = await httpsCallable<object,{procedureId:string}>(this.functions,w.fn)({companyId:this.auth.companyId,employeeId:this.employeeId,...(this.type() === 'leave' ? {kind:this.leaveKind} : {})});
         void this.router.navigate([w.route, data.procedureId]);
       } catch(e:any) { this.error.set(e.message ?? '手続きを始められませんでした'); } finally { this.starting.set(false); }
       return;

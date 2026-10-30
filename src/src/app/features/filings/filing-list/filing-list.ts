@@ -43,6 +43,7 @@ const FILING_TYPE_LABELS: Record<string, string> = {
   dependentChange: '被扶養者異動届',
   maternityLeaveStart: '産前産後休業申出書',
   childcareLeaveStart: '育児休業等申出書',
+  maternityLeaveChange: '産前産後休業変更（終了）届',
   childcareLeaveEnd: '育児休業等終了届',
   bonusPayment: '賞与支払届',
 };

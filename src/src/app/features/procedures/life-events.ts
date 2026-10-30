@@ -28,7 +28,7 @@ export const LIFE_EVENT_GROUPS: { label: string; events: LifeEvent[] }[] = [
     label: '在籍中の変化',
     events: [
       { type: 'dependent_change', icon: 'family_restroom', label: '家族が増えた・減った', hint: '被扶養者（異動）届' },
-      { type: 'leave', icon: 'child_friendly', label: '産休・育休に入る／戻る', hint: '休業の登録と保険料の免除' },
+      { type: 'leave', icon: 'child_friendly', label: '産休・育休に入る／戻る', hint: '申出書・保険料の免除・変更届・終了届' },
       { type: 'monthly_change', icon: 'swap_vert', label: '給料が大きく変わった', hint: '随時改定（月額変更届）' },
       { type: 'transfer', icon: 'apartment', label: '別の事業所へ異動する', hint: '事業所間の異動' },
     ],

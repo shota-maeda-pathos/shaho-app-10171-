@@ -11,6 +11,7 @@ export const FilingCreateSchema = z.object({
     'dependentChange',
     'maternityLeaveStart',
     'childcareLeaveStart',
+    'maternityLeaveChange',
     'childcareLeaveEnd',
     'bonusPayment',
   ]),

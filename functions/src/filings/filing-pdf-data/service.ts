@@ -12,6 +12,7 @@ const FILING_TYPE_TITLES: Record<string, string> = {
   bonusPayment: '健康保険・厚生年金保険 被保険者賞与支払届',
   maternityLeaveStart: '産前産後休業取得者申出書',
   childcareLeaveStart: '育児休業等取得者申出書',
+  maternityLeaveChange: '産前産後休業取得者変更（終了）届',
   childcareLeaveEnd: '育児休業等取得者終了届',
 };
 

@@ -7,6 +7,8 @@ import { acquisitionFilingDeadline, currentWizardStep } from '../onboarding/serv
 import { monthlyOverview, runId } from '../monthly/service';
 import { currentResignationStep } from '../resignation/service';
 import { currentDependentStep } from '../dependent-change/service';
+import { currentLeaveStep } from '../leave-procedure/service';
+import { FILING_LABEL } from '../leave-procedure/rules';
 import { mapConcurrent } from '../utils/parallel';
 import { HomeTodo, TodoTone, payDateOf, sortTodos } from './rules';
 import { monthlyProgress } from './monthly-progress';
@@ -138,6 +140,32 @@ function dependentTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, offi
   });
 }
 
+const LEAVE_NEXT: Record<string, string> = {
+  plan: '休業の期間を決める',
+  filing: '届出を作って承認を依頼する',
+  submit: '届出を提出する',
+  confirm: '完了を確認する',
+};
+
+/** 産休・育休。休業中は「待ち」にして、終了予定日を期限として出す（出産・延長・復帰を記録する） */
+async function leaveTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string) {
+  const lp = p.leaveProcedure!;
+  const step = currentLeaveStep(p);
+  const short = lp.kind === 'maternity' ? '産休' : '育休';
+  const base = {
+    id: `procedure-${p.id}`, kind: 'leave' as const, title: `${p.employeeName}さんの${short}`, officeName,
+    route: `/leaves/${p.id}`, queryParams: { officeId: p.officeId }, updatedAt: iso(p.updatedAt),
+  };
+  const md = (d: string) => `${Number(d.slice(5, 7))}月${Number(d.slice(8))}日`;
+  const period = lp.period ? `${md(lp.period.startDate)}〜${md(lp.period.actualEndDate ?? lp.period.plannedEnd)}` : null;
+  if (step === 'during') {
+    const end = lp.period!.plannedEnd;
+    const next = lp.kind === 'maternity' && !lp.period!.actualBirthDate ? '出産したら出産日を記録する' : `${short}を終えたら復帰を記録する`;
+    return { ...base, next, detail: period, tone: 'waiting' as const, deadline: end };
+  }
+  return wizardTodo(p, auth, { base, step, next: LEAVE_NEXT, filingName: FILING_LABEL[lp.kind][lp.filingKind], detail: period });
+}
+
 /** 入社・退職・扶養以外の手続き（段階6でウィザードに置き換える）。次のステップを出す */
 function procedureTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string): HomeTodo | null {
   const order: ProcedureStep['status'][] = ['returned', 'in_progress', 'available'];
@@ -161,6 +189,7 @@ async function procedureTodos(auth: AuthContext, inScope: (officeId: string) => 
   const todos = await mapConcurrent(procs, 10, p => p.onboarding ? onboardingTodo(p, auth, officeName(p.officeId))
     : p.resignation ? resignationTodo(p, auth, officeName(p.officeId))
     : p.dependentChange ? dependentTodo(p, auth, officeName(p.officeId))
+    : p.leaveProcedure ? leaveTodo(p, auth, officeName(p.officeId))
     : Promise.resolve(procedureTodo(p, auth, officeName(p.officeId))));
   return todos.filter((t): t is HomeTodo => t !== null);
 }

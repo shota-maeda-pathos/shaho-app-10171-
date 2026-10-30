@@ -22,6 +22,7 @@ export const OFFICIAL_FORMS: Record<string, { file: string; title: string; sourc
   dependentChange: { file: 'dependent', title: '被扶養者（異動）届', source: 'hihokensha/20141224.html' },
   maternityLeaveStart: { file: 'maternity', title: '産前産後休業取得者申出書', source: 'menjo/20140326-01.html' },
   childcareLeaveStart: { file: 'childcare', title: '育児休業等取得者申出書', source: 'menjo/20140403-01.html' },
+  maternityLeaveChange: { file: 'maternity', title: '産前産後休業取得者変更（終了）届', source: 'menjo/20140326-01.html' },
   childcareLeaveEnd: { file: 'childcare-end', title: '育児休業等取得者終了届', source: 'menjo/20140403-02.html' },
 };
 

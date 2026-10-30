@@ -8,10 +8,16 @@ export interface ExemptionDecision {
   exemptionIds: string[];
 }
 
-/** 承認済みの免除登録（届出承認後に反映される免除）か */
-function isApprovedActive(data: FirebaseFirestore.DocumentData): boolean {
-  return data.status === 'active' && data.deletedAt == null && data.approvedAt != null
-    && ['maternity', 'childcare'].includes(data.exemptionType);
+/**
+ * 承認済みの免除登録（届出承認後に反映される免除）か。
+ * 産休・育休の手続きで作った免除は、申出書（filingId）が承認されていれば、免除の記録を書き換える前でも効かせる
+ */
+async function isApprovedActive(tx: Tx, base: string, data: FirebaseFirestore.DocumentData): Promise<boolean> {
+  if (data.deletedAt != null || !['maternity', 'childcare'].includes(data.exemptionType)) return false;
+  if (data.status === 'active' && data.approvedAt != null) return true;
+  if (data.status !== 'pending' || !data.filingId) return false;
+  const filing = await tx.get(db.doc(`${base}/filings/${data.filingId}`));
+  return filing.exists && filing.data()!.workflowStatus === 'approved';
 }
 
 function leavePeriod(kind: 'maternity' | 'childcare', leave: FirebaseFirestore.DocumentData | undefined): LeavePeriod | null {
@@ -37,8 +43,8 @@ export async function decideExemption(
   const exemptionIds: string[] = [];
   for (const doc of snap.docs) {
     const data = doc.data();
-    if (!isApprovedActive(data)) continue;
     if (target === 'monthly' && data.isMonthlyExempted !== true) continue;
+    if (!(await isApprovedActive(tx, base, data))) continue;
     let exempt: boolean;
     const leaveSnap = data.leaveId ? await tx.get(db.doc(`${base}/leaves/${data.leaveId}`)) : null;
     const period = leaveSnap?.exists ? leavePeriod(data.exemptionType, leaveSnap.data()) : null;

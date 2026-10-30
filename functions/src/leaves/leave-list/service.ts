@@ -21,6 +21,8 @@ interface LeaveListItem {
   actualEndDate: string | null;
   status: string;
   version: number;
+  /** 産休・育休の手続き（ウィザード）で作った休業は、その手続き。開始・終了は手続きで記録する */
+  procedureId: string | null;
 }
 
 export interface LeaveListResponse {
@@ -72,6 +74,7 @@ export async function listLeaves(
         actualEndDate: d.actualEndDate ?? null,
         status: d.status,
         version: d.version ?? 1,
+        procedureId: d.procedureId ?? null,
       });
     }
   }
@@ -123,7 +126,8 @@ async function listForEmployee(
       actualStartDate: d.actualStartDate ?? null,
       actualEndDate: d.actualEndDate ?? null,
       status: d.status,
-        version: d.version ?? 1,
+      version: d.version ?? 1,
+      procedureId: d.procedureId ?? null,
     };
   });
 

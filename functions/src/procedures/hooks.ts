@@ -9,7 +9,7 @@ import { refreshProcedure } from './refresh';
 export function filingMatchesProcedure(type: ProcedureType, filingType: string): boolean {
   const allowed: Partial<Record<ProcedureType, string[]>> = {
     acquisition: ['acquisitionNotification'], loss: ['lossNotification'],
-    dependent_change: ['dependentChange'], maternity_leave: ['maternityLeaveStart'],
+    dependent_change: ['dependentChange'], maternity_leave: ['maternityLeaveStart', 'maternityLeaveChange'],
     childcare_leave: ['childcareLeaveStart', 'childcareLeaveEnd'],
     monthly_change: ['remunerationMonthlyChange'], annual_review: ['remunerationMonthlyAlgorithm'],
     bonus_payment: ['bonusPayment'], age_event: ['lossNotification'],

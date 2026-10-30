@@ -23,6 +23,7 @@ const FILING_TYPE_LABELS: Record<string, string> = {
   bonusPayment: '賞与支払届',
   maternityLeaveStart: '産前産後休業取得者申出書',
   childcareLeaveStart: '育児休業等取得者申出書',
+  maternityLeaveChange: '産前産後休業取得者変更（終了）届',
   childcareLeaveEnd: '育児休業等取得者終了届',
 };
 
