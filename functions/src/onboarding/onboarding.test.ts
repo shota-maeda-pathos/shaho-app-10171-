@@ -57,7 +57,8 @@ describe('入社：加入の判定と資格取得時決定', () => {
 
   it('資格取得届の期限は資格取得日の翌日から数えて5日目', () => {
     expect(acquisitionFilingDeadline('2026-04-01')).toBe('2026-04-06');
-    expect(acquisitionFilingDeadline('2026-10-29')).toBe('2026-11-03');
+    // 5日目の11月3日は文化の日のため、翌日の4日まで延びる
+    expect(acquisitionFilingDeadline('2026-10-29')).toBe('2026-11-04');
   });
 });
 

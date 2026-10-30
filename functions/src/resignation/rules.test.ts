@@ -10,7 +10,8 @@ describe('resignationFacts', () => {
     const f = resignationFacts({ ...base, resignationDate: '2026-11-15' });
     expect(f.lossDate).toBe('2026-11-16');
     expect(f.lastChargedMonth).toBe('2026-10');
-    expect(f.filingDeadline).toBe('2026-11-21');
+    // 5日目の11月21日は土曜、23日は勤労感謝の日のため、翌開庁日の24日まで延びる
+    expect(f.filingDeadline).toBe('2026-11-24');
     expect(f.lossCause).toBe('退職等');
   });
 

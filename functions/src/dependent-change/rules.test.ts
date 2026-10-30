@@ -48,7 +48,8 @@ describe('judgeDependent', () => {
 
 describe('dependentFilingDeadline', () => {
   it('いちばん早い異動日から5日', () => {
-    expect(dependentFilingDeadline(['2026-11-10', '2026-11-03'])).toBe('2026-11-08');
+    // 5日目の11月8日は日曜のため、翌日の9日まで延びる
+    expect(dependentFilingDeadline(['2026-11-10', '2026-11-03'])).toBe('2026-11-09');
     expect(dependentFilingDeadline([])).toBeNull();
   });
 });

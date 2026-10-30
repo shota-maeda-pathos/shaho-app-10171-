@@ -9,7 +9,7 @@ import {
 import { invalidArg, notFound } from '../utils/errors';
 import { toDateString, toTimestamp } from '../utils/firestore';
 import {
-  acquisitionRemuneration, addDays, eligibilityByAge, judgeApplicability, lookupGrade, monthlyHoursFromWeekly,
+  acquisitionRemuneration, fiveDayDeadline, eligibilityByAge, judgeApplicability, lookupGrade, monthlyHoursFromWeekly,
   resolveGradeTable, ApplicabilityJudgement,
 } from '../insurance/calculator';
 import { buildOnboardingSteps } from '../procedures/templates';
@@ -30,10 +30,10 @@ export const hashToken = (token: string) => createHash('sha256').update(token).d
 
 /**
  * 資格取得届の提出期限。事実発生（資格取得日）から5日以内で、初日は数えない（民法140条）。
- * 期限が土日祝日にあたる場合の延長は、届出の期限計算（段階7）でまとめて扱う。
+ * 期限が行政機関の休日（土日・祝日・年末年始）にあたるときは翌開庁日まで延びる。
  */
 export function acquisitionFilingDeadline(hireDate: string): string {
-  return addDays(hireDate, 5);
+  return fiveDayDeadline(hireDate);
 }
 
 /** 手続きIDから決まる requestId（従業員登録をやり直しても二重に登録しない） */

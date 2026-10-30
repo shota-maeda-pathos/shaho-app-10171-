@@ -9,3 +9,4 @@ export * from './remuneration';
 export * from './applicability';
 export * from './dates';
 export * from './age';
+export * from './holidays';

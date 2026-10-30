@@ -1,5 +1,5 @@
 import { GradeTableEntry } from '../types/firestore';
-import { addDays, addMonths, ageReachDate, lookupGrade, monthOf, nthBirthday } from '../insurance/calculator';
+import { fiveDayDeadline, addMonths, ageReachDate, lookupGrade, monthOf, nthBirthday } from '../insurance/calculator';
 
 /**
  * 年齢到達（純粋関数）。年齢は誕生日の前日に加わる（年齢計算ニ関スル法律）。
@@ -70,7 +70,7 @@ export function milestonesBetween(birthDate: string, from: string, to: string): 
 
 /** 届出の期限（起きた日から5日。初日は数えない） */
 export function deadlineOf(eventDate: string): string {
-  return addDays(eventDate, 5);
+  return fiveDayDeadline(eventDate);
 }
 
 // ── 70歳：届出が要るか ───────────────────────────────

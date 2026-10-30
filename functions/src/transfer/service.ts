@@ -4,7 +4,7 @@ import { AuthContext, requireOffice } from '../middleware/auth';
 import { EmployeeDoc, FilingDoc, GradeDoc, OfficeDoc, ProcedureDoc, TransferState } from '../types/firestore';
 import { invalidArg, notFound } from '../utils/errors';
 import { toDateString } from '../utils/firestore';
-import { addDays } from '../insurance/calculator';
+import { addDays, fiveDayDeadline } from '../insurance/calculator';
 import { buildTransferWizardSteps } from '../procedures/templates';
 import { requireProcedureAccess } from '../procedures/access';
 import { completed, requireVersion, setStep, statusReasonOf, stepOf } from '../procedures/wizard';
@@ -151,7 +151,7 @@ export async function saveTransferEntry(input: { companyId: string; procedureId:
       'transfer.toOfficeId': input.toOfficeId, 'transfer.transferDate': input.transferDate, 'transfer.reason': input.reason,
       'transfer.filingRequired': facts.filingRequired, targetOfficeId: input.toOfficeId,
       effectiveDate: Timestamp.fromDate(new Date(`${input.transferDate}T00:00:00Z`)),
-      deadline: facts.filingRequired ? Timestamp.fromDate(new Date(`${addDays(input.transferDate, 5)}T00:00:00Z`)) : null,
+      deadline: facts.filingRequired ? Timestamp.fromDate(new Date(`${fiveDayDeadline(input.transferDate)}T00:00:00Z`)) : null,
       steps, statusReason: statusReasonOf(steps), version: latest.version + 1, updatedAt: Timestamp.now(),
     });
   });

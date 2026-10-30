@@ -1,5 +1,5 @@
 // 賞与の判定（純粋関数）。標準賞与額・年度累計（健保573万円）・月の上限（厚年150万円）・同月合算・年4回以上・届出の要否
-import { addDays, coverageForMonth } from '../insurance/calculator';
+import { fiveDayDeadline, coverageForMonth } from '../insurance/calculator';
 
 /** 健康保険の標準賞与額の年度（4月〜翌3月）累計の上限 */
 export const HEALTH_BONUS_CAP = 5_730_000;
@@ -142,7 +142,7 @@ export function capWarnings(caps: BonusCaps): string[] {
 
 /** 賞与支払届の期限：支給日から5日以内（初回の支給日で数える） */
 export function bonusFilingDeadline(firstPaymentDate: string): string {
-  return addDays(firstPaymentDate, 5);
+  return fiveDayDeadline(firstPaymentDate);
 }
 
 /** 事業所の賞与支給予定月か（予定月に賞与がなければ不支給報告書が必要） */

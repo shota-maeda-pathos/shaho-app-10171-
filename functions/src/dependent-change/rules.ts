@@ -1,4 +1,4 @@
-import { addDays, nthBirthday } from '../insurance/calculator';
+import { addDays, fiveDayDeadline, nthBirthday } from '../insurance/calculator';
 
 /** 続柄。同居が要件になるかは続柄で決まる（担当者が最終判断する） */
 export const RELATIONSHIPS = ['spouse', 'child', 'parent', 'grandparent', 'grandchild', 'sibling', 'other'] as const;
@@ -68,7 +68,7 @@ export type DependentJudgement = ReturnType<typeof judgeDependent>;
 /** 届出の期限：事実の発生から5日以内（初日は数えない。いちばん早い異動日から数える） */
 export function dependentFilingDeadline(eventDates: string[]): string | null {
   if (!eventDates.length) return null;
-  return addDays([...eventDates].sort()[0], 5);
+  return fiveDayDeadline([...eventDates].sort()[0]);
 }
 
 /** 添えて出す書類の目安（個人番号で確認できる場合は省略できるものがある） */

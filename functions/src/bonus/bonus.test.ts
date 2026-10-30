@@ -84,7 +84,8 @@ describe('年4回以上', () => {
 
 describe('届出', () => {
   it('期限は支給日から5日', () => {
-    expect(bonusFilingDeadline('2026-12-28')).toBe('2027-01-02');
+    // 5日目の1月2日は年末年始の休日のため、翌開庁日の1月4日まで延びる
+    expect(bonusFilingDeadline('2026-12-28')).toBe('2027-01-04');
   });
   it('同月合算と70歳以上の備考', () => {
     const p = bonusFilingPerson({

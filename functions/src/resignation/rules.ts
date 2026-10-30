@@ -1,4 +1,4 @@
-import { addDays, addMonths, correspondingDayAfterMonths, eligibilityByAge, lossDateFromResignation, monthOf } from '../insurance/calculator';
+import { addDays, fiveDayDeadline, addMonths, correspondingDayAfterMonths, eligibilityByAge, lossDateFromResignation, monthOf } from '../insurance/calculator';
 
 /** 退職の手続きで扱う喪失の原因（年齢到達による喪失は年齢到達の手続きで扱う） */
 export type LossReason = 'resignation' | 'death';
@@ -61,7 +61,7 @@ export function resignationFacts(input: ResignationFactsInput) {
     insured,
     sameMonth,
     lastChargedMonth,
-    filingDeadline: needsFiling ? addDays(lossDate, 5) : null,
+    filingDeadline: needsFiling ? fiveDayDeadline(lossDate) : null,
     account: { viewOnlyFrom: lossDate, accessUntil, loginStopsFrom: addDays(accessUntil, 1) },
     /** 外国人の退職時の案内（脱退一時金の請求手続きはこのシステムの対象外） */
     foreignNotice: input.isForeign && lost.pension

@@ -5,7 +5,7 @@ import { EmployeeDoc, EmploymentChangeState, EmploymentDoc, FilingDoc, OfficeDoc
 import { invalidArg, notFound } from '../utils/errors';
 import { toDateString } from '../utils/firestore';
 import { normalizeEmployment } from '../utils/employment';
-import { addDays } from '../insurance/calculator';
+import { fiveDayDeadline } from '../insurance/calculator';
 import { evaluateContract } from '../onboarding/service';
 import { buildEmploymentChangeSteps } from '../procedures/templates';
 import { requireProcedureAccess } from '../procedures/access';
@@ -310,7 +310,7 @@ export async function saveEmploymentEntry(input: ChangeEntryInput, auth: AuthCon
       'employmentChange.approvalId': approvalId,
       steps, statusReason: statusReasonOf(steps),
       effectiveDate: Timestamp.fromDate(new Date(`${input.effectiveDate}T00:00:00Z`)),
-      deadline: j.qualificationDate ? Timestamp.fromDate(new Date(`${addDays(j.qualificationDate, 5)}T00:00:00Z`)) : null,
+      deadline: j.qualificationDate ? Timestamp.fromDate(new Date(`${fiveDayDeadline(j.qualificationDate)}T00:00:00Z`)) : null,
       version: latest.version + 1, updatedAt: now,
     });
   });
