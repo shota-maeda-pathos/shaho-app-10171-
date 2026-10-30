@@ -1,6 +1,6 @@
 # 引継ぎ（最新）
 
-更新：2026-10-30（段階7を終えた：7-1 届出の横断一覧、7-2 模擬電子申請と紙の提出、7-3 承認の横断機能、7-4 賞与不支給報告書、7-5 訂正届・取消届、7-6 添付書類、7-7 保存原本とZIP。方針は `docs/stage7-plan.md`。**次は段階7.5（UI統一）**：着手の前に「6. 次にやるべきタスク」の「段階7.5 の着手メモ」を読む）。新しいセッションは最初にこのファイルを読む。応答は日本語で行う。
+更新：2026-10-30（段階7.5 着手：共通部品・賞与・入社を作り直した。段階7を終えた：7-1 届出の横断一覧、7-2 模擬電子申請と紙の提出、7-3 承認の横断機能、7-4 賞与不支給報告書、7-5 訂正届・取消届、7-6 添付書類、7-7 保存原本とZIP。方針は `docs/stage7-plan.md`。**次は段階7.5（UI統一）**：着手の前に「6. 次にやるべきタスク」の「段階7.5 の着手メモ」を読む）。新しいセッションは最初にこのファイルを読む。応答は日本語で行う。
 
 ## 1. 目的と前提
 
@@ -204,6 +204,16 @@
 - あわせて直したこと：承認の一覧で、処理した案件を索引が追いつくまで外し3秒後に読み直す（「読み込み直す」を押さないと消えなかった）。上で事業所を選んでいると一覧はその事業所だけだがバッジは全事業所の件数だったため、ほかの事業所の承認待ちの件数を出し、その場で「すべての事業所を表示」できるようにした（`approvalSearch` の `summary.elsewhere`）。送信エラーのまま紙で提出した届出は、索引の状態に送信エラーを出さない。
 - 確認できたこと：一括承認（2件以上、金本）、紙の提出→受理（森下の月額変更届・西宮年金事務所）、取消届を紙で提出→元の届出が「取消」（坂本 誠志郎の資格取得届。古い形式の届出で被保険者氏名がないため模擬電子申請は送信エラーになる）。差戻しは確認待ち（斎藤 修の訂正届に「【差し戻してください】」で依頼中）。
 
+## 4-18. 重要な仕様（段階7.5 UI統一。途中）
+
+- 設計は `docs/ui-unification-design.md`、進み具合はチェックリストの末尾「段階7.5」。
+- 共通部品 `shared/ui/procedure-frame.ts`：`app-page-head`（種類のタグ・件名・[meta]・[actions]・戻るリンク）、`app-stepper`（`StepperItem` の state は done／attention／waiting／todo、note は数字1つ）、`app-step-lead`（見出し＋やることの1行）、`app-action-bar`（sticky で下に固定。info・注意の1行・主ボタン）、`app-side-panel`（右から重なるパネル、前後・Esc・矢印キー）。`app-wizard` は API をそのままにこれらで描く（`WizardStep` に caution・attention・note を足し、why・next は画面に出さない）。`app-target-list` はチップ（要対応・保留・問題なし・すべて）と検索、`appTargetDetail` を渡すと名前で右のパネル、渡さなければ open。一括操作 `BulkAction` に caution（操作バーの注意）と confirm（確認ダイアログ）。ページ独自のボタンは `[barActions]`。`defaultFilter` で最初の絞り込み。
+- 状態色：`StatusTone` は yours・attention・waiting・done・error と旧 action（要確認の見た目。作り直すときに置き換える）。`needsMe(tone)` は自分が手を動かす状態。
+- 確認：`shared/confirm-dialog` の `ConfirmService.ask({ title, message, count, items, notice })`。
+- 賞与：`features/bonus/`。1人分は `BonusPersonComponent`（右のパネル、`linkedSignal` で人を切り替えると入力が戻る）。状態色は画面だけ変えた（サーバーの `bonusStepState` の判定は同じ）。
+- 入社のまとめ：データでは持たず、`onboarding.types.ts` の `groupOnboarding`（事業所×入社日）。`onboardingList` は `hireDate` で絞れ、1000件ずつ最後まで読む（旧方式の資格取得の手続きが上限を埋めていた。2026-10-30 デプロイ）。古い `?batchId=` のリンクはまとめの画面へ移す。
+- ブラウザーペインは背景にあるとアニメーションが止まるため、パネルにアニメーションを付けない。
+
 ## 5. 現在の状態（本番）
 
 - 段階4の関数と `homeTodos` はデプロイ済み。段階6の `resignationStart`・`resignationGet`・`resignationPreview`・`resignationUpdate`・`userUnsuspend`（今回が初公開）、扶養の `dependentChangeStart`・`dependentChangeGet`・`dependentChangePreview`・`dependentChangeUpdate`、直した `dependentList` もデプロイ済み。産休・育休の `leaveProcedureStart`・`leaveProcedureGet`・`leaveProcedurePreview`・`leaveProcedureUpdate` と、変更した `leaveList`・`homeTodos`・`filingMockSubmit`・`filingPdfData`・`monthlyJobChunk`・`monthlyInsuranceCalculate`・`bonusInsuranceCalculate` も 2026-10-29 にデプロイ済み（ただし `homeTodos` の期間の表示（「6月30日〜10月10日」の形）の直しは未デプロイ）。旧画面の `operationsMonthlyAction` は免除の変更を反映していない。認証（`middleware/auth.ts`）の変更は、これらの関数にだけ反映されている。**Hosting（画面）は未公開**（ローカルの開発サーバーで確認している）。
@@ -232,7 +242,7 @@
 
 ## 6. 次にやるべきタスク
 
-0. **段階7.5（UI統一）に着手する**（2026-10-30 ユーザー決定。設計は決定済み）。下の「段階7.5 の着手メモ」を読んでから始める。
+0. **段階7.5（UI統一）の続き**：①共通部品・②賞与と入社は済み（2026-10-30、4-18）。次は③残りの手続き（毎月の処理・算定は賞与と同じ多人数の型、退職・年齢到達は入社と同じまとめ（退職日・到達月で束ねる。退職日が未入力の人は「退職日 未入力」のまとめ）、扶養・休業・雇用条件の変更・異動・随時改定はウィザードのステップ名を短くし主ボタンの文言と注意をそろえる）→ ④ホーム・手続き一覧・承認・届出（`homeTodos` の速さも）。1人の画面の自動下書き保存は未着手（サーバーに下書きの関数が要る。ユーザーと相談）。
 1. **段階7の残り（ユーザー判断・小さな直し）**：
    - ZIPの大きさ（約150MB）：PDFごとに日本語フォントを丸ごと埋め込んでいる。フォントを使う文字に絞るか（以前、絞り込みで文字が抜けたため丸ごとにした経緯あり）を決める。
    - 算定基礎届・賞与支払届（run の届出）の訂正届・取消届：1人分を取り出す作り方を決める。
