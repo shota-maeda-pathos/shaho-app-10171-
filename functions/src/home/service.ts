@@ -8,6 +8,8 @@ import { monthlyOverview, runId } from '../monthly/service';
 import { currentResignationStep } from '../resignation/service';
 import { currentDependentStep } from '../dependent-change/service';
 import { currentLeaveStep } from '../leave-procedure/service';
+import { currentRevisionStep } from '../grade-revision/service';
+import { FILING_LABEL as REVISION_FILING_LABEL, KIND_LABEL as REVISION_KIND_LABEL } from '../grade-revision/rules';
 import { FILING_LABEL } from '../leave-procedure/rules';
 import { mapConcurrent } from '../utils/parallel';
 import { HomeTodo, TodoTone, payDateOf, sortTodos } from './rules';
@@ -171,6 +173,31 @@ async function leaveTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, of
   return wizardTodo(p, auth, { base, step, next: LEAVE_NEXT, filingName: FILING_LABEL[lp.kind][lp.filingKind], detail: period });
 }
 
+const REVISION_NEXT: Record<string, string> = {
+  change: '変動を確かめる',
+  judge: '判定して改定するか決める',
+  filing: '届出を作って承認を依頼する',
+  submit: '届出を提出する',
+  confirm: '完了を確認する',
+};
+
+/** 随時改定・終了時改定。判定に要る給与がそろうまでは「待ち」にする */
+function revisionTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string) {
+  const gr = p.gradeRevision!;
+  const step = currentRevisionStep(p);
+  const base = {
+    id: `procedure-${p.id}`, kind: 'revision' as const, title: `${p.employeeName}さんの${REVISION_KIND_LABEL[gr.kind]}`, officeName,
+    route: `/revisions/${p.id}`, queryParams: { officeId: p.officeId }, updatedAt: iso(p.updatedAt),
+  };
+  const ymText = (m: string) => `${Number(m.slice(0, 4))}年${Number(m.slice(5, 7))}月`;
+  const detail = gr.startMonth ? `${ymText(gr.startMonth)}〜${ymText(addMonths(gr.startMonth, 2))}の給与で判定` : null;
+  // 3か月目の給与がまだ来ていなければ、判定は待ち
+  if (step === 'judge' && gr.startMonth && addMonths(gr.startMonth, 2) > currentMonthJst()) {
+    return Promise.resolve<HomeTodo>({ ...base, next: `${ymText(addMonths(gr.startMonth, 2))}支給の給与がそろったら判定する`, detail, tone: 'waiting', deadline: null });
+  }
+  return wizardTodo(p, auth, { base, step, next: REVISION_NEXT, filingName: REVISION_FILING_LABEL[gr.kind], detail });
+}
+
 /** 入社・退職・扶養以外の手続き（段階6でウィザードに置き換える）。次のステップを出す */
 function procedureTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string): HomeTodo | null {
   const order: ProcedureStep['status'][] = ['returned', 'in_progress', 'available'];
@@ -195,6 +222,7 @@ async function procedureTodos(auth: AuthContext, inScope: (officeId: string) => 
     : p.resignation ? resignationTodo(p, auth, officeName(p.officeId))
     : p.dependentChange ? dependentTodo(p, auth, officeName(p.officeId))
     : p.leaveProcedure ? leaveTodo(p, auth, officeName(p.officeId))
+    : p.gradeRevision ? revisionTodo(p, auth, officeName(p.officeId))
     : Promise.resolve(procedureTodo(p, auth, officeName(p.officeId))));
   return todos.filter((t): t is HomeTodo => t !== null);
 }

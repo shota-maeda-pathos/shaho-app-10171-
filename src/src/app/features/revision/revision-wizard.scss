@@ -1,0 +1,9 @@
+fieldset.form-grid { margin-bottom: var(--app-space-3); }
+.advanced { margin-top: var(--app-space-3); }
+.advanced summary { cursor: pointer; color: var(--app-color-link); margin-bottom: var(--app-space-2); }
+.table-wrap { overflow-x: auto; margin-bottom: var(--app-space-2); }
+.months { border-collapse: collapse; min-width: 560px; }
+.months th, .months td { padding: var(--app-space-2) var(--app-space-3); border-bottom: 1px solid var(--app-color-border); text-align: left; white-space: nowrap; }
+.months th { font-weight: 500; color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
+.months .num { text-align: right; font-variant-numeric: tabular-nums; }
+.summary thead th { width: auto; }

@@ -16,6 +16,8 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
   childcareLeaveStart: ['被保険者氏名'],
   maternityLeaveChange: ['被保険者氏名', '出産予定年月日'],
   childcareLeaveEnd: ['被保険者氏名'],
+  maternityLeaveEndChange: ['被保険者氏名', '改定年月', '休業終了年月日', '平均額'],
+  childcareLeaveEndChange: ['被保険者氏名', '改定年月', '休業終了年月日', '平均額'],
 };
 
 function validateFormData(filingType: string, formData: Record<string, unknown>): string[] {

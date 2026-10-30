@@ -13,6 +13,8 @@ export const FilingCreateSchema = z.object({
     'childcareLeaveStart',
     'maternityLeaveChange',
     'childcareLeaveEnd',
+    'maternityLeaveEndChange',
+    'childcareLeaveEndChange',
     'bonusPayment',
   ]),
   effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

@@ -1,0 +1,286 @@
+<div class="app-page">
+  <a routerLink="/procedures" class="back"><mat-icon>arrow_back</mat-icon>進行中の手続き</a>
+
+  @if (loading()) {
+    <app-loading-state />
+  } @else if (loadError()) {
+    <app-error-state [message]="loadError()" (retry)="load(true)" />
+  } @else if (view(); as v) {
+    <app-wizard [heading]="v.procedure.title"
+                [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.form.startMonth ? '・' + monthLabel(v.form.startMonth) + '〜' + monthLabel(addMonth(v.form.startMonth, 2)) + 'の給与で判定' : '')"
+                [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                (advance)="advance()">
+
+      @switch (key()) {
+
+        <!-- ① 変動を確かめる -->
+        @case ('change') {
+          @if (v.locked) {
+            <p class="note">届出の承認を依頼したあとは直せません。直す場合は承認者に差し戻してもらってください。</p>
+          }
+          <fieldset class="form-grid" [disabled]="v.locked || isDone()">
+            @if (!isLeave()) {
+              <mat-form-field appearance="outline"><mat-label>変動月（固定的賃金が変わった給与の支給月）</mat-label>
+                <input matInput type="month" [(ngModel)]="form.startMonth" (ngModelChange)="changed()" name="startMonth">
+                <mat-hint>遡って昇給した場合は、差額を払った月</mat-hint></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>変動の理由（任意）</mat-label>
+                <input matInput [(ngModel)]="form.note" (ngModelChange)="dirty.set(true)" name="note" maxlength="200" placeholder="例：昇給、住宅手当の新設"></mat-form-field>
+            } @else {
+              <mat-form-field appearance="outline"><mat-label>休業を終えた日（復帰の前日）</mat-label>
+                <input matInput type="date" [(ngModel)]="form.endDate" (ngModelChange)="changed()" name="endDate"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>養育する子の生年月日</mat-label>
+                <input matInput type="date" [(ngModel)]="form.childBirthDate" (ngModelChange)="changed()" name="childBirth"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>養育する子の氏名</mat-label>
+                <input matInput [(ngModel)]="form.childName" (ngModelChange)="dirty.set(true)" name="childName" maxlength="100"></mat-form-field>
+              <div></div>
+              <mat-checkbox class="wide" [(ngModel)]="form.nextLeaveFromNextDay" (ngModelChange)="changed()" name="nextLeave" [disabled]="v.locked">
+                休業を終えた翌日から、続けて産休・育休に入る</mat-checkbox>
+              <mat-checkbox [(ngModel)]="form.applied" (ngModelChange)="changed()" name="applied" [disabled]="v.locked">本人の申出あり</mat-checkbox>
+              @if (form.applied) {
+                <mat-form-field appearance="outline"><mat-label>申出を受けた日</mat-label>
+                  <input matInput type="date" [(ngModel)]="form.appliedDate" (ngModelChange)="dirty.set(true)" name="appliedDate"></mat-form-field>
+              }
+            }
+          </fieldset>
+
+          @if (preview(); as p) {
+            <section class="result" aria-live="polite">
+              @if (!isLeave()) {
+                <h3><app-term key="fixedWage" />の変動</h3>
+                @if (p.fixedWage; as fw) {
+                  <p>
+                    @if (fw.changed === true) { <app-status-badge tone="done" [label]="fw.direction === 'up' ? '上がった' : '下がった'" /> }
+                    @else if (fw.changed === false) { <app-status-badge tone="action" label="変わっていない" /> }
+                    @else { <app-status-badge tone="yours" label="確かめてください" /> }
+                    {{ fw.message }}
+                  </p>
+                  @if (fw.after !== null && (fw.needsInput || form.manualDirection)) {
+                    <mat-radio-group [(ngModel)]="form.manualDirection" (ngModelChange)="changed()" class="radios" aria-label="固定的賃金の変動の向き" [disabled]="v.locked">
+                      <mat-radio-button value="up">上がった（昇給・手当の新設など）</mat-radio-button>
+                      <mat-radio-button value="down">下がった（降給・手当の廃止など）</mat-radio-button>
+                    </mat-radio-group>
+                  }
+                }
+              } @else if (leaveStartMonth(); as s) {
+                <h3>判定に使う給与</h3>
+                <table class="summary">
+                  <tbody>
+                    <tr><th>判定する3か月</th><td>{{ monthLabel(s) }}〜{{ monthLabel(addMonth(s, 2)) }}に支払う給与</td></tr>
+                    <tr><th>新しい等級を使う月</th><td>{{ monthLabel(addMonth(s, 3)) }}分の保険料から</td></tr>
+                  </tbody>
+                </table>
+                @for (m of p.leaveCheck?.blocking ?? []; track m) { <p><app-status-badge tone="action" label="改定できません" /> {{ m }}</p> }
+                @for (m of p.leaveCheck?.missing ?? []; track m) { <p><app-status-badge tone="yours" label="確かめてください" /> {{ m }}</p> }
+              }
+              @if (p.judgement; as j) {
+                <p class="sub">
+                  @switch (j.status) {
+                    @case ('waiting') { 給与がそろうのを待っています（{{ j.messages.join('・') }}）。保存しておけば、そろったときに判定できます。 }
+                    @case ('eligible') { 今の給与で判定すると、改定の対象です。 }
+                    @case ('ineligible') { 今の給与で判定すると、改定の対象ではありません。 }
+                    @default { 判定には確認が要ります。次のステップで確かめてください。 }
+                  }
+                </p>
+              }
+            </section>
+          }
+
+          <details class="advanced">
+            <summary>上限・下限の等級の人（任意）</summary>
+            <p class="sub">標準報酬月額が等級表のいちばん上や下に近い人は、従前の報酬月額で改定できるかが変わります（上限・下限の特例）。判定で求められたら入れてください。</p>
+            <mat-form-field appearance="outline"><mat-label>従前の報酬月額（円）</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="form.previousRemuneration" (ngModelChange)="changed()" name="previous" [disabled]="v.locked"></mat-form-field>
+          </details>
+          @if (!v.locked && changeMissing(); as m) { <p class="sub">{{ m }}</p> }
+        }
+
+        <!-- ② 判定する -->
+        @case ('judge') {
+          @let j = judgement();
+          @if (v.closedReason) {
+            <p><app-status-badge tone="done" label="改定しない" /> {{ v.closedReason }}</p>
+          } @else if (!j) {
+            <p class="sub">先に変動を確かめてください。</p>
+          } @else {
+            @if (v.evaluation?.conflict; as c) { <div class="alert" role="alert">{{ c }}</div> }
+            <h3>3か月の報酬（{{ monthLabel(j.startMonth) }}〜{{ monthLabel(addMonth(j.startMonth, 2)) }}支給）</h3>
+            <div class="table-wrap">
+              <table class="months">
+                <thead><tr><th>支給月</th><th>通貨</th><th>現物</th><th>遡及差額</th><th>判定に使う額</th><th><app-term key="paymentBasisDays" /></th><th>平均に</th></tr></thead>
+                <tbody>
+                  @for (m of j.months; track m.yearMonth) {
+                    <tr>
+                      <td>{{ monthLabel(m.yearMonth) }}</td>
+                      @if (m.status === 'ok') {
+                        <td class="num">{{ m.totalSalary | number }}</td>
+                        <td class="num">{{ m.inKind ? (m.inKind | number) : '—' }}</td>
+                        <td class="num">{{ m.retroactive ? ('−' + (m.retroactive | number)) : '—' }}</td>
+                        <td class="num">{{ m.remuneration | number }}</td>
+                        <td class="num" [class.error]="m.short">{{ m.paymentBasisDays }}日</td>
+                        <td>{{ j.status === 'waiting' ? '' : m.used ? '入れる' : '入れない' }}</td>
+                      } @else {
+                        <td colspan="6"><app-status-badge tone="waiting" [label]="m.status === 'missing' ? '給与がまだありません' : '給与の承認待ち'" /></td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (j.average !== null) {
+              <p>平均：<strong>{{ j.average | number }}円</strong>（基準の日数 {{ j.minDays }}日{{ isLeave() ? '。基準に満たない月は除く' : '。3か月とも必要' }}）</p>
+            }
+
+            @if (j.status !== 'waiting' && j.health.currentGrade !== null) {
+              <h3>等級の判定</h3>
+              <table class="summary">
+                <thead><tr><th></th><th>今の等級</th><th>判定の等級</th><th>結果</th></tr></thead>
+                <tbody>
+                  @for (r of [{ label: '健康保険', x: j.health }, { label: '厚生年金', x: j.pension }]; track r.label) {
+                    <tr>
+                      <th>{{ r.label }}</th>
+                      @if (r.x.enrolled) {
+                        <td>{{ gradeText(r.x) }}</td>
+                        <td>{{ newGradeText(r.x) }}{{ r.x.diff ? '（' + (r.x.diff > 0 ? '+' : '') + r.x.diff + '）' : '' }}</td>
+                        <td>@if (r.x.eligible) { <app-status-badge tone="done" label="改定する" /> } @else { 今のまま }</td>
+                      } @else {
+                        <td colspan="3">加入していません</td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              @if (j.status === 'eligible') {
+                <p>新しい等級は <strong>{{ monthLabel(j.effectiveMonth) }}分</strong>の保険料から使います（起点の月から4か月目）。</p>
+              }
+            }
+
+            <section class="result" aria-live="polite">
+              <p>
+                @switch (j.status) {
+                  @case ('eligible') { <app-status-badge tone="yours" label="改定の対象です" /> }
+                  @case ('ineligible') { <app-status-badge tone="done" label="改定の対象ではありません" /> }
+                  @case ('waiting') { <app-status-badge tone="waiting" label="給与を待っています" /> }
+                  @default { <app-status-badge tone="action" label="確かめてください" /> }
+                }
+              </p>
+              @if (j.messages.length) { <ul class="plain">@for (m of j.messages; track m) { <li>{{ m }}</li> }</ul> }
+              @if (j.status === 'waiting') {
+                <p class="sub">給与が承認されたら、ここで判定できます。ホームの「やること」にも出ます。</p>
+                <button mat-stroked-button type="button" (click)="load(false)" [disabled]="busy()"><mat-icon>refresh</mat-icon>最新の状態にする</button>
+              } @else if (j.status === 'review') {
+                <p class="sub">「戻る」で前のステップに戻り、足りないことを入れてください。</p>
+              }
+            </section>
+
+            @if (j.status === 'ineligible' || j.status === 'review') {
+              <h3>改定しないで終える</h3>
+              <p class="sub">改定の対象でない場合（本人の申出がない場合を含む）は、ここで手続きを終えます。終えた手続きは元に戻せません。</p>
+              <mat-checkbox [(ngModel)]="closeChecked" name="closeChecked">改定しないことを確かめました</mat-checkbox>
+              <div class="row-actions">
+                <button mat-flat-button type="button" (click)="closeWithoutRevision()" [disabled]="busy() || !closeChecked">改定しないで手続きを終える</button>
+              </div>
+            }
+          }
+        }
+
+        <!-- ③ 届出を作る -->
+        @case ('filing') {
+          @if (v.approval?.status === 'rejected') {
+            <div class="alert" role="alert">
+              <strong>承認者から差し戻されました。</strong>
+              @if (v.approval?.comment) { 理由：{{ v.approval!.comment }} }
+              直す場合は「戻る」で前のステップへ戻り、判定し直してから、もう一度届出を作って依頼します。
+            </div>
+          }
+          @if (shown(); as s) {
+            <table class="summary">
+              <tbody>
+                <tr><th>届出</th><td>{{ v.filingLabel }}</td></tr>
+                <tr><th>平均</th><td>{{ s.average | number }}円{{ s.averageWithRetro !== s.average ? '（遡及差額を含めると ' + (s.averageWithRetro | number) + '円）' : '' }}</td></tr>
+                <tr><th>健康保険</th><td>{{ gradeText(s.health) }} → {{ s.health.eligible ? newGradeText(s.health) : '今のまま' }}</td></tr>
+                <tr><th>厚生年金</th><td>{{ gradeText(s.pension) }} → {{ s.pension.eligible ? newGradeText(s.pension) : '今のまま' }}</td></tr>
+                <tr><th>改定年月</th><td>{{ monthLabel(s.effectiveMonth) }}</td></tr>
+                <tr><th>提出の期限</th><td>改定月から速やかに</td></tr>
+              </tbody>
+            </table>
+          }
+          <p class="sub">届出を作ったあとに給与が直されると、届出は作れません。その場合は判定し直してください。本人の個人番号（または基礎年金番号）は、届出の画面で確かめてください。</p>
+        }
+
+        <!-- ④ 承認者が確認する -->
+        @case ('approval') {
+          @if (v.approval?.status === 'pending') {
+            <p>承認者に確認を依頼しました。承認者は「承認」の画面から確認します。承認されると新しい等級が確定します。</p>
+            <button mat-stroked-button type="button" (click)="load(true)" [disabled]="busy()"><mat-icon>refresh</mat-icon>最新の状態にする</button>
+          } @else if (v.approval?.status === 'approved' || v.filing?.workflowStatus === 'approved') {
+            <p><app-status-badge tone="done" label="承認済み" /> {{ v.filingLabel }}が承認され、新しい等級が確定しました。</p>
+          }
+        }
+
+        <!-- ⑤ 提出する -->
+        @case ('submit') {
+          @if (v.filing; as fl) {
+            @if (submitDone()) {
+              <p><app-status-badge tone="done" label="提出済み" />
+                {{ fl.mockStatus === 'completed' ? '模擬電子申請が完了しました。' : '紙の届出が受理されました。' }}</p>
+            } @else {
+              <mat-radio-group [(ngModel)]="method" class="radios" aria-label="提出方法">
+                <mat-radio-button value="electronic">電子申請（模擬）で提出する</mat-radio-button>
+                <mat-radio-button value="paper">紙で提出する</mat-radio-button>
+              </mat-radio-group>
+              @if (method === 'electronic') {
+                <p class="sub">このシステムの電子申請は模擬です。実際の提出は、e-Govや紙で別に行ってください。</p>
+                <button mat-flat-button type="button" (click)="mockSubmit()" [disabled]="busy()">模擬電子申請する</button>
+              } @else {
+                <p class="sub">届出の画面でPDFを印刷し、年金事務所（または健康保険組合）へ提出します。
+                  <a [routerLink]="['/filings', fl.id]" [queryParams]="{ employeeId: v.employee.id }">届出の画面を開く</a></p>
+                @if (fl.submissionStatus === 'notSubmitted') {
+                  <button mat-flat-button type="button" (click)="paper('submit')" [disabled]="busy()">提出したことを記録する</button>
+                } @else if (fl.submissionStatus === 'submitted') {
+                  <p>提出済み（結果待ち）です。結果が届いたら記録してください。</p>
+                  <div class="row-actions">
+                    <button mat-flat-button type="button" (click)="paper('accepted')" [disabled]="busy()">受理された</button>
+                    <button mat-stroked-button type="button" (click)="paper('returned')" [disabled]="busy()">返戻された</button>
+                  </div>
+                } @else if (fl.submissionStatus === 'returned') {
+                  <div class="alert" role="alert">返戻されました。{{ fl.resultNote }} 内容を直して出し直す方法は、届出の画面で確認してください。</div>
+                }
+              }
+              @if (mockResult()) { <p class="note">{{ mockResult() }}</p> }
+            }
+          }
+        }
+
+        <!-- ⑥ 完了を確認する -->
+        @case ('confirm') {
+          @if (isDone()) {
+            <div class="complete" role="status">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+              <div><strong>{{ v.closedReason ? '改定しないで手続きを終えました。' : v.procedure.kindLabel + 'の手続きは完了しました。' }}</strong></div>
+            </div>
+          }
+          @if (v.closedReason) {
+            <p>理由：{{ v.closedReason }}</p>
+          } @else if (shown(); as s) {
+            <table class="summary">
+              <tbody>
+                <tr><th>健康保険</th><td>{{ gradeText(s.health) }} → {{ s.health.eligible ? newGradeText(s.health) : '今のまま' }}</td></tr>
+                <tr><th>厚生年金</th><td>{{ gradeText(s.pension) }} → {{ s.pension.eligible ? newGradeText(s.pension) : '今のまま' }}</td></tr>
+                <tr><th>新しい等級を使う月</th><td>{{ monthLabel(s.effectiveMonth) }}分の保険料から</td></tr>
+                @if (v.filing && submitDone()) { <tr><th>出した届出</th><td>{{ v.filingLabel }}</td></tr> }
+              </tbody>
+            </table>
+            @if (v.recalcMonths.length) {
+              <div class="alert" role="alert">
+                {{ v.recalcMonths.map(monthLabel).join('・') }}分の保険料は、改定の前の等級で計算されています。毎月の処理で計算し直してください。
+                <a routerLink="/monthly">毎月の処理を開く</a>
+              </div>
+            }
+          }
+          <a mat-stroked-button [routerLink]="['/employees', v.employee.id]">従業員の画面を開く</a>
+        }
+      }
+    </app-wizard>
+  }
+</div>

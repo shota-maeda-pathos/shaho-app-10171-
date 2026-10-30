@@ -127,7 +127,9 @@ export async function approveApprovalRequest(
           pensionStandardRemuneration: filingGrade.pensionStandardRemuneration,
           reason: filingGrade.reason ?? '',
           basisRemuneration: filingGrade.basisRemuneration ?? null,
-          basisMonths: null,
+          basisMonths: Array.isArray(filingGrade.basisMonths) ? filingGrade.basisMonths : null,
+          // 等級の履歴から、決めたときの届出をたどれるようにする
+          filingId: targetRef.id,
           approvalRequestId: reqRef.id,
           isConfirmed: true,
           confirmedAt: now,

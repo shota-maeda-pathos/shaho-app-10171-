@@ -27,6 +27,8 @@ export interface MonthlyRow {
   stale?: boolean;
   // 古いサーバーは返さないため省略可
   rejected?: { salary: string | null; premium: string | null };
+  /** 随時改定の可能性（この支給月が変動月から3か月目）。古いサーバーは返さない */
+  revision?: { startMonth: string; text: string; procedureId: string | null; procedureDone: boolean } | null;
 }
 
 export interface JobSummary {

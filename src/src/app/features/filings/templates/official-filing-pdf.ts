@@ -24,6 +24,8 @@ export const OFFICIAL_FORMS: Record<string, { file: string; title: string; sourc
   childcareLeaveStart: { file: 'childcare', title: '育児休業等取得者申出書', source: 'menjo/20140403-01.html' },
   maternityLeaveChange: { file: 'maternity', title: '産前産後休業取得者変更（終了）届', source: 'menjo/20140326-01.html' },
   childcareLeaveEnd: { file: 'childcare-end', title: '育児休業等取得者終了届', source: 'menjo/20140403-02.html' },
+  maternityLeaveEndChange: { file: 'maternity-end-change', title: '産前産後休業終了時報酬月額変更届', source: 'menjo/20140327-01.html' },
+  childcareLeaveEndChange: { file: 'childcare-end-change', title: '育児休業等終了時報酬月額変更届', source: 'menjo/20140626-01.html' },
 };
 
 type Data = Record<string, unknown>;
@@ -170,6 +172,8 @@ const HEADERS: Record<string, HeaderLayout> = {
   bonus: { date:[[59,83,26,13],[109,83,27,13],[161,83,34,13]], symbol:[[107.5,97.16,93.7,39.55],[226.54,97.16,90.82,39.55]], address:[113,180,367,65], name:[113,270,367,29], representative:[113,312,367,26], phone:[[125,342,67,19],[213,342,76,19],[317,342,80,19]] },
   dependent: { date:[[85,83,34,13],[141,83,33,13],[194,83,30,13]], symbol:[[155.6,97.74,101.57,32.26],[281.36,97.74,94.46,32.26]], address:[160,181,346,35], name:[160,229,346,29], representative:[160,277,346,24], phone:[[163,307,59,19],[246,307,69,19],[336,307,74,19]] },
   maternity: { date:[[122,146,28,13],[167,146,28,13],[210,146,28,13]], symbol:[[156.46,163.4,87.56,32.26],[265.9,163.4,87.56,32.26]], address:[161,235,321,40], name:[161,289,321,28], representative:[161,339,321,28], phone:[[178,374,53,19],[250,374,66,19],[345,374,63,19]] },
+  'maternity-end-change': { date:[[130,151,37,13],[181,151,28,13],[224,151,26,13]], symbol:[[175,172,83,26],[280,172,82,26]], address:[176,232,305,30], name:[176,288,305,28], representative:[176,340,305,28], phone:[[180,380,55,19],[262,380,65,19],[345,380,60,19]] },
+  'childcare-end-change': { date:[[120,151,37,13],[172,151,28,13],[214,151,26,13]], symbol:[[165,172,83,26],[270,172,82,26]], address:[166,232,305,30], name:[166,288,305,28], representative:[166,340,305,28], phone:[[170,380,55,19],[252,380,65,19],[335,380,60,19]] },
   childcare: { date:[[86,145,37,13],[143,145,31,13],[190,145,30,13]], symbol:[[133.42,163.4,94.47,36.1],[251.5,163.4,94.47,36.1]], address:[140,238,345,41], name:[140,300,345,28], representative:[140,348,345,26], phone:[[157,386,52,19],[237,386,63,19],[322,386,69,19]] },
 };
 
@@ -269,6 +273,74 @@ function remuneration(w: Writer, fd: Data, regular: boolean, offset = 0, lenient
   w.money(fd['合計'],[regular?553:554,(regular?552:502)+offset,regular?114:131,18],'総計',false,!lenient);
   w.money(fd['平均額'],[regular?553:554,(regular?579:534)+offset,regular?114:131,18],'平均額',false,!lenient);
   if (!lenient) w.warnings.add('現物報酬・支払月・修正平均額・備考など、登録されていない欄は原票で確認してください。');
+}
+
+/**
+ * 産前産後休業終了時・育児休業等終了時報酬月額変更届（1人1枚）。2つの様式は同じ並びで、育休の様式は約10px左にある。
+ * 申出者欄は被保険者本人の申出を兼ねる（申出のチェックと日付・氏名を書く。住所は台帳にないため空欄）
+ */
+function leaveEndRemuneration(w: Writer, fd: Data, childcare: boolean) {
+  const dx = childcare ? -10 : 0;
+  const b = (x: number, top: number, width: number, height: number): Box => [x + dx, top, width, height];
+  // 申出：本人の申出の日と氏名
+  if (fd['申出年月日']) {
+    w.text('レ', b(126, 411, 12, 12), '申出のチェック', { size: 9, center: true });
+    const d = parseDate(fd['申出年月日']);
+    if (d?.era === 9) [d.eraYear, d.month, d.day].forEach((v, i) => w.text(v, [b(690, 428, 33, 15), b(737, 428, 29, 15), b(780, 428, 29, 15)][i], '申出年月日', { size: 9, center: true }));
+  } else w.warnings.add('本人の申出年月日が未登録です。');
+  w.text(fd['被保険者氏名'], b(165, 521, 300, 18), '申出者氏名');
+  w.warnings.add('申出者の住所・電話番号は台帳にないため空欄です。原票に記入してください。');
+
+  insuredNumber(w, fd['被保険者整理番号'], b(166, 570, 92, 40));
+  identifier(w, fd, b(322, 567, 298, 45));
+  names(w, fd, [b(167, 630, 90, 25), b(259, 630, 92, 25)], [b(167, 609, 90, 11), b(259, 609, 92, 11)]);
+  dateParts(w, fd['生年月日'], [b(473, 622, 40, 32), b(522, 622, 40, 32), b(571, 622, 40, 32)], '生年月日',
+    { x: 444 + dx, showa: childcare ? 627 : 626, heisei: childcare ? 638 : 637, reiwa: childcare ? 649 : 648 });
+  const child = String(fd['養育する子の氏名'] ?? '').trim().split(/[\s　]+/);
+  if (child[0]) {
+    w.text(child[0], b(167, 683, 90, 24), '子の氏名', { center: true });
+    w.text(child.slice(1).join(' '), b(259, 683, 92, 24), '子の氏名', { center: true });
+  } else w.warnings.add('養育する子の氏名が未登録です。');
+  dateParts(w, fd['養育する子の生年月日'], [b(473, 673, 40, 32), b(522, 673, 40, 32), b(571, 673, 40, 32)], '子の生年月日',
+    childcare ? { x: 444 + dx, showa: 0, heisei: 683, reiwa: 696 } : undefined);
+  dateParts(w, fd['休業終了年月日'], [b(694, 673, 40, 32), b(743, 673, 40, 32), b(792, 673, 40, 32)], '休業終了年月日');
+
+  for (let i = 0; i < 3; i++) {
+    const p = `${i + 1}月目`;
+    const top = 747 + 47 * i;
+    const ymText = String(fd[`${p}_年月`] ?? '');
+    w.text(/^\d{4}-\d{2}$/.test(ymText) ? Number(ymText.slice(5, 7)) : '', b(170, top, 34, 20), `${p}の支給月`, { size: 9, center: true, required: true });
+    w.text(fd[`${p}_支払基礎日数`], b(218, top, 29, 20), `${p}の支払基礎日数`, { size: 9, center: true, required: true });
+    w.money(fd[`${p}_通貨`], b(264, top, 88, 20), `${p}の通貨`, false, true);
+    w.money(fd[`${p}_現物`], b(366, top, 109, 20), `${p}の現物`);
+    const cash = fd[`${p}_通貨`], kind = fd[`${p}_現物`];
+    if (typeof cash === 'number' && typeof kind === 'number') w.money(cash + kind, b(490, top, 120, 20), `${p}の合計`);
+  }
+  // 総計・平均額・修正平均額は1桁ずつの枠（9桁）
+  const digits = (value: unknown, top: number, label: string, required: boolean) => {
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) w.cells(value, b(660, top, 170, 20), 9, label, true);
+    else if (required) w.warnings.add(`${label}が未登録です。`);
+  };
+  digits(fd['合計'], 747, '総計', true);
+  digits(fd['平均額'], 794, '平均額', true);
+  digits(fd['修正平均額'], 841, '修正平均額', false);
+  w.money(fd['従前の標準報酬月額_健康保険'], b(167, 893, 30, 15), '従前標準報酬（健康保険）', true);
+  w.money(fd['従前の標準報酬月額_厚生年金'], b(212, 893, 27, 15), '従前標準報酬（厚生年金）', true);
+  if (fd['昇降給区分'] === '昇給') w.circle(352 + dx, 891, 12, 11);
+  else if (fd['昇降給区分'] === '降給') w.circle(397 + dx, 891, 12, 11);
+  if (fd['遡及支払額'] != null) {
+    const months = String(fd['遡及支払月'] ?? '').split('、')[0];
+    if (/^\d{4}-\d{2}$/.test(months)) w.text(Number(months.slice(5, 7)), b(490, 893, 34, 15), '遡及支払月', { size: 9, center: true });
+    w.money(fd['遡及支払額'], b(538, 893, 72, 15), '遡及支払額');
+  }
+  const effective = String(fd['改定年月'] ?? '');
+  if (/^\d{4}-\d{2}$/.test(effective) && Number(effective.slice(0, 4)) >= 2019) {
+    w.text(Number(effective.slice(0, 4)) - 2018, b(700, 892, 36, 16), '改定年', { size: 9, center: true });
+    w.text(Number(effective.slice(5, 7)), b(760, 892, 44, 16), '改定月', { size: 9, center: true });
+  } else w.warnings.add('改定年月を確認してください。');
+  // 翌日から続けて産休・育休に入る人は、この届出を作れない（サーバーで止めている）
+  w.text('レ', childcare ? [382, 1001, 12, 12] : [392, 1007, 12, 12], '月変該当の確認', { size: 9, center: true });
+  w.warnings.add('給与の締切日・支払日と備考は、原票で確認してください。');
 }
 
 /** 賞与支払届の1人分（サーバーの bonusFilingPerson と同じ形） */
@@ -520,6 +592,8 @@ export async function createOfficialFilingPdf(filingType: string, formData: Data
       case 'remunerationMonthlyChange':remuneration(w,formData,false);break;
       case 'bonusPayment':bonus(w,formData);break;
       case 'dependentChange':dependent(w,formData,deps[i]);break;
+      case 'maternityLeaveEndChange':leaveEndRemuneration(w,formData,false);break;
+      case 'childcareLeaveEndChange':leaveEndRemuneration(w,formData,true);break;
       default:leave(w,formData,form.file);
     }
   }

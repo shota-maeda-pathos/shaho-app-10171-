@@ -5,7 +5,7 @@ const row = (patch: Partial<MonthlyRow> = {}): MonthlyRow => ({
   employeeId: 'e', employeeNumber: '1', name: 'テスト', salaryRequired: true, premiumDue: true, premiumNote: '',
   salary: null, premium: null, previous: null, diff: null, diffReasons: [], issues: [], warnings: [],
   collection: { plan: 'payroll', due: 0, collected: null, status: 'none' as never, version: 0, entries: [] },
-  hold: null, stale: false, rejected: { salary: null, premium: null }, ...patch,
+  hold: null, stale: false, rejected: { salary: null, premium: null }, revision: null, ...patch,
 });
 const salary = (patch = {}) => ({ total: 300000, inKind: 0, basisDays: 30, noPay: false, noPayReason: '', confirmed: false, pending: false, published: false, version: 1, ...patch });
 const premium = (patch = {}) => ({ employee: 15000, employer: 15000, healthGrade: 22, pensionGrade: 19, exempted: false, confirmed: false, pending: false, version: 1, ...patch });

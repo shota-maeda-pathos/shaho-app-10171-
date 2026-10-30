@@ -233,7 +233,10 @@
             <p>復帰したあとの給与が休業の前より下がった場合は、本人の申出があれば<app-term key="revision" />と同じように標準報酬月額を見直せます（産休・育休終了時の改定。1等級の差でも改定できます）。
               {{ monthLabel(revisionMonths()[0]) }}〜{{ monthLabel(revisionMonths()[2]) }}の給与がそろったら判定できます。</p>
             @if (isMaternity()) { <p class="sub">産休のあと続けて育休に入る場合は、産休の終了時の改定はしません（育休を終えたときに判定します）。</p> }
-            <a mat-stroked-button [routerLink]="['/employees', v.employee.id, 'revision']">等級の見直しを開く</a>
+            @if (isDone() && v.period?.actualEndDate) {
+              <a mat-stroked-button [routerLink]="['/revisions', 'new']" [queryParams]="{ employeeId: v.employee.id, sourceProcedureId: v.procedure.id }">終了時改定の手続きを始める</a>
+              <p class="sub">本人の申出があるかは、手続きの中で確かめます。給与がそろう前に始めておくと、そろったときにホームに出ます。</p>
+            }
           }
           @if (isDone() && isMaternity()) {
             <h3>続けて育休に入る</h3>

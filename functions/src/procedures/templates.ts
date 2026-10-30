@@ -63,6 +63,16 @@ const LEAVE_WIZARD_STEPS: StepTemplate[] = [
   { id: 'confirm', label: '完了を確認する', type: 'confirmation', dependsOn: ['mock_filing', 'paper_submit', 'during'], isConditional: false, condition: null },
 ];
 
+const REVISION_WIZARD_STEPS: StepTemplate[] = [
+  { id: 'change', label: '変動を確かめる', type: 'data_entry', dependsOn: [], isConditional: false, condition: null },
+  { id: 'judge', label: '判定する', type: 'calculation', dependsOn: ['change'], isConditional: false, condition: null },
+  { id: 'filing_create', label: '届出を作る', type: 'document_create', dependsOn: ['judge'], isConditional: false, condition: null },
+  { id: 'approval', label: '承認者が確認する', type: 'approval', dependsOn: ['filing_create'], isConditional: false, condition: null },
+  { id: 'mock_filing', label: '電子申請する（模擬）', type: 'mock_filing', dependsOn: ['approval'], isConditional: false, condition: null },
+  { id: 'paper_submit', label: '紙で提出して記録する', type: 'paper_submit', dependsOn: ['approval'], isConditional: false, condition: null },
+  { id: 'confirm', label: '完了を確認する', type: 'confirmation', dependsOn: ['mock_filing', 'paper_submit'], isConditional: false, condition: null },
+];
+
 const LOSS_STEPS: StepTemplate[] = [
   { id: 'resign_entry', label: '退職情報入力', type: 'data_entry', dependsOn: [], isConditional: false, condition: null },
   { id: 'final_salary', label: '最終給与精算', type: 'calculation', dependsOn: [], isConditional: false, condition: null },
@@ -188,6 +198,11 @@ export function buildDependentWizardSteps(): ProcedureStep[] {
 /** 産休・育休の手続き（ウィザード）のステップ */
 export function buildLeaveWizardSteps(): ProcedureStep[] {
   return toSteps(LEAVE_WIZARD_STEPS);
+}
+
+/** 随時改定・終了時改定（ウィザード）のステップ */
+export function buildRevisionWizardSteps(): ProcedureStep[] {
+  return toSteps(REVISION_WIZARD_STEPS);
 }
 
 /** 退職手続き（ウィザード）のステップ */

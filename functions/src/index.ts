@@ -35,7 +35,6 @@ export { employmentCreate } from './employments/employment-create/functions';
 // 等級API
 export { gradeCreate } from './grades/grade-create/functions';
 export { gradeUpdate } from './grades/grade-update/functions';
-export { gradeRevisionCheck, gradeRevisionSubmit } from './grades/grade-revision-check/functions';
 export {
   santeiRunOverview, santeiRunHold, santeiDecision, santeiJobStart, santeiJobGet, santeiJobChunk, santeiFilingCreate, santeiFilingUpdate,
   santeiFilingGet, sampleSanteiCreate,
@@ -157,3 +156,4 @@ export { homeTodos } from './home/functions';
 export { resignationStart, resignationGet, resignationPreview, resignationUpdate } from './resignation/functions';
 export { dependentChangeStart, dependentChangeGet, dependentChangePreview, dependentChangeUpdate } from './dependent-change/functions';
 export { leaveProcedureStart, leaveProcedureGet, leaveProcedurePreview, leaveProcedureUpdate } from './leave-procedure/functions';
+export { gradeRevisionStart, gradeRevisionGet, gradeRevisionPreview, gradeRevisionUpdate, sampleRevisionCreate } from './grade-revision/functions';

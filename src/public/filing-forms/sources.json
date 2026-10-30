@@ -43,5 +43,15 @@
     "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/menjo/20140403-02.files/A.pdf",
     "checkedOn": "2026-10-28",
     "sha256": "8e30d157b2fdfacd00623950637a44201d4af3109e8c630adb839170d65def1f"
+  },
+  "maternity-end-change": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/menjo/20140327-01.files/0000018145ipLhlm2cOX.pdf",
+    "checkedOn": "2026-10-30",
+    "sha256": "05b75168a8d66637420e2536048c12b0687557b43ed6d3d22af7db67ca80e19a"
+  },
+  "childcare-end-change": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/menjo/20140626-01.files/0000018500e8THA3msW5.pdf",
+    "checkedOn": "2026-10-30",
+    "sha256": "fed40a5b0be16a5f6abe7f7dcb46765696834b67f02f62d20d31e11216a1e690"
   }
 }

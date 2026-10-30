@@ -14,6 +14,8 @@ const FILING_TYPE_TITLES: Record<string, string> = {
   childcareLeaveStart: '育児休業等取得者申出書',
   maternityLeaveChange: '産前産後休業取得者変更（終了）届',
   childcareLeaveEnd: '育児休業等取得者終了届',
+  maternityLeaveEndChange: '健康保険・厚生年金保険 産前産後休業終了時報酬月額変更届',
+  childcareLeaveEndChange: '健康保険・厚生年金保険 育児休業等終了時報酬月額変更届',
 };
 
 export interface FilingPdfDataResponse {
@@ -144,7 +146,17 @@ function buildSections(
     });
   }
 
-  if (filingType === 'remunerationMonthlyChange') {
+  if (filingType === 'remunerationMonthlyChange' || filingType === 'maternityLeaveEndChange' || filingType === 'childcareLeaveEndChange') {
+    if (filingType !== 'remunerationMonthlyChange') {
+      sections.push({
+        label: '休業と申出',
+        rows: [
+          { label: '休業終了年月日', value: fmt(fd['休業終了年月日']) },
+          { label: '養育する子', value: `${fmt(fd['養育する子の氏名'])}（${fmt(fd['養育する子の生年月日'])}生まれ）` },
+          { label: '本人の申出年月日', value: fmt(fd['申出年月日']) },
+        ],
+      });
+    }
     sections.push({
       label: '従前の標準報酬',
       rows: [
@@ -154,18 +166,32 @@ function buildSections(
         { label: '厚生年金 標準報酬月額', value: yen(fd['従前の標準報酬月額_厚生年金']) },
       ],
     });
+    const month = (i: number) => {
+      const p = `${i}月目`;
+      const used = fd[`${p}_算入`] === false ? '（平均に入れない）' : '';
+      return { label: `${i}月目（${fmt(fd[`${p}_年月`])}）`, value: `通貨 ${yen(fd[`${p}_通貨`])}・現物 ${yen(fd[`${p}_現物`])} / ${fmt(fd[`${p}_支払基礎日数`])}日${used}` };
+    };
     sections.push({
       label: '報酬月額（3か月）',
       rows: [
         { label: '改定年月', value: fmt(fd['改定年月']) },
-        { label: '昇（降）給月', value: fmt(fd['昇降給月']) },
-        { label: `1月目（${fmt(fd['1月目_年月'])}）`, value: `${yen(fd['1月目_通貨'])} / ${fmt(fd['1月目_支払基礎日数'])}日` },
-        { label: `2月目（${fmt(fd['2月目_年月'])}）`, value: `${yen(fd['2月目_通貨'])} / ${fmt(fd['2月目_支払基礎日数'])}日` },
-        { label: `3月目（${fmt(fd['3月目_年月'])}）`, value: `${yen(fd['3月目_通貨'])} / ${fmt(fd['3月目_支払基礎日数'])}日` },
-        { label: '合計', value: yen(fd['合計']) },
+        ...(fd['昇降給月'] ? [{ label: '昇（降）給月', value: `${fmt(fd['昇降給月'])}（${fmt(fd['昇降給区分'])}）` }] : []),
+        month(1), month(2), month(3),
+        { label: '総計', value: yen(fd['合計']) },
         { label: '平均額', value: yen(fd['平均額']) },
+        ...(fd['修正平均額'] != null ? [{ label: '修正平均額', value: yen(fd['修正平均額']) }, { label: '遡及支払額', value: `${yen(fd['遡及支払額'])}（${fmt(fd['遡及支払月'])}）` }] : []),
       ],
     });
+    if (fd['改定後の等級_健康保険'] != null) {
+      sections.push({
+        label: '改定後の標準報酬',
+        rows: [
+          { label: '健康保険', value: `${fmt(fd['改定後の等級_健康保険'])}等級 ${yen(fd['改定後の標準報酬月額_健康保険'])}` },
+          { label: '厚生年金', value: `${fmt(fd['改定後の等級_厚生年金'])}等級 ${yen(fd['改定後の標準報酬月額_厚生年金'])}` },
+          { label: '改定する保険', value: fmt(fd['改定する保険']) },
+        ],
+      });
+    }
   }
 
   if (filingType === 'remunerationMonthlyAlgorithm') {

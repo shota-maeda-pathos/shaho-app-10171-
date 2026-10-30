@@ -144,7 +144,7 @@ interface OnboardResult {
         @if (employeeStatus() === 'resigned') {
           <mat-chip-set><mat-chip color="warn" highlighted>退職済</mat-chip></mat-chip-set>
         } @else {
-          <button mat-stroked-button [routerLink]="['/employees', employeeId, 'revision']">
+          <button mat-stroked-button [routerLink]="['/revisions', 'new']" [queryParams]="{ employeeId }">
             <mat-icon>trending_up</mat-icon> 随時改定
           </button>
           <button mat-stroked-button color="primary" (click)="showTransferPanel = !showTransferPanel">

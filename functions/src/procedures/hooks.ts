@@ -11,7 +11,7 @@ export function filingMatchesProcedure(type: ProcedureType, filingType: string):
     acquisition: ['acquisitionNotification'], loss: ['lossNotification'],
     dependent_change: ['dependentChange'], maternity_leave: ['maternityLeaveStart', 'maternityLeaveChange'],
     childcare_leave: ['childcareLeaveStart', 'childcareLeaveEnd'],
-    monthly_change: ['remunerationMonthlyChange'], annual_review: ['remunerationMonthlyAlgorithm'],
+    monthly_change: ['remunerationMonthlyChange', 'maternityLeaveEndChange', 'childcareLeaveEndChange'], annual_review: ['remunerationMonthlyAlgorithm'],
     bonus_payment: ['bonusPayment'], age_event: ['lossNotification'],
   };
   return allowed[type]?.includes(filingType) ?? false;

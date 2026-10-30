@@ -24,6 +24,8 @@ const FILING_TYPE_LABELS: Record<string, string> = {
   maternityLeaveStart: '産前産後休業取得者申出書',
   childcareLeaveStart: '育児休業等取得者申出書',
   maternityLeaveChange: '産前産後休業取得者変更（終了）届',
+  maternityLeaveEndChange: '産前産後休業終了時報酬月額変更届',
+  childcareLeaveEndChange: '育児休業等終了時報酬月額変更届',
   childcareLeaveEnd: '育児休業等取得者終了届',
 };
 

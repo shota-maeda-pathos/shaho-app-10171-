@@ -12,6 +12,7 @@ import { createApprovalRequest } from '../approvals/approval-request-create/serv
 import { approveApprovalRequest } from '../approvals/approval-request-approve/service';
 import { periodTarget } from '../operations/service';
 import { findAllRates, rateFingerprint } from '../utils/insurance-rate';
+import { RevisionAlert, revisionAlerts } from '../grade-revision/alerts';
 import {
   CollectionPlan, CollectionStatus, DEFAULT_SALARY_ITEMS, DeductionMethod, PremiumFacts, SalaryItem, collectionPlan, collectionStatus, diffReasons,
   parseSalaryCsv, premiumMonthFor, remunerationWarning,
@@ -112,6 +113,8 @@ export interface MonthlyRow {
   stale: boolean;
   /** 差し戻しの理由（直して出し直すまで出す） */
   rejected: { salary: string | null; premium: string | null };
+  /** 随時改定の可能性（この支給月が変動月から3か月目） */
+  revision: RevisionAlert | null;
 }
 
 /** 事業所と支給月の状況（全員分）。数百〜数千人でも1回で返す */
@@ -132,7 +135,9 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
       db.doc(`${e}/collectionReceipts/${premiumMonth}`), db.doc(`${runRef.path}/holds/${d.id}`),
     ];
   });
-  const [snaps, run, salaryItems] = await Promise.all([getAllChunked(refs), runRef.get(), salaryItemsOf(auth.companyId)]);
+  const [snaps, run, salaryItems, alerts] = await Promise.all([
+    getAllChunked(refs), runRef.get(), salaryItemsOf(auth.companyId), revisionAlerts(auth.companyId, input.officeId, payMonth, employees.map(d => d.id)),
+  ]);
 
   // 未計算の人だけ、等級と雇用条件（適用・適用外）を調べる
   const facts = await mapConcurrent(employees, 20, async (doc, i) => {
@@ -209,7 +214,10 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
       d?.lastRejection && !d.isConfirmed && !d.approvalPending ? String(d.lastRejection.comment || '理由の記入なし') : null;
     const reasons = p ? diffReasons(premiumFacts(p), prev ? premiumFacts(prev) : null) : [];
     const standard = p ? (p.healthStandardRemuneration ?? 0) : facts[i].standard;
-    if (salary && !salary.noPay) {
+    const revision = alerts.get(doc.id) ?? null;
+    // 手続きを始めるまでは確認を促す
+    if (revision && !revision.procedureId) warnings.push(revision.text);
+    else if (salary && !salary.noPay && !revision) {
       const w = remunerationWarning(salary.total + salary.inKind, standard);
       if (w) warnings.push(w);
     }
@@ -232,6 +240,7 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
       hold: h?.reason ? { reason: h.reason } : null,
       stale,
       rejected: { salary: rejectionOf(s), premium: rejectionOf(p) },
+      revision,
     };
   });
 

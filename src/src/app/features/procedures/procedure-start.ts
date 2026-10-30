@@ -43,6 +43,15 @@ interface Employee { id: string; lastName: string; firstName: string; employeeNu
           </mat-radio-group>
           <p class="note">休業中の出産・延長・復帰も、始めた手続きの中で記録します。進行中の手続きがあれば、それを開きます。</p>
         }
+        @if (type() === 'monthly_change') {
+          <h3>見直しのきっかけ</h3>
+          <mat-radio-group [(ngModel)]="revisionKind" class="kinds" aria-label="見直しのきっかけ">
+            <mat-radio-button value="occasional">昇給・降給などで固定的賃金が変わった（随時改定）</mat-radio-button>
+            <mat-radio-button value="childcareEnd">育休から復帰して給与が変わった（育休終了時の改定）</mat-radio-button>
+            <mat-radio-button value="maternityEnd">産休から復帰して給与が変わった（産休終了時の改定）</mat-radio-button>
+          </mat-radio-group>
+          <p class="note">産休・育休の手続きをこのシステムで行った場合は、その手続きの完了画面から始めると、休業を終えた日を引き継げます。</p>
+        }
         <p class="note">この画面では従業員の情報を変更しません。次の画面で入力・確認してから登録します。</p>
         <button mat-flat-button (click)="start()" [disabled]="!canStart() || starting()">入力画面へ進む</button>
       </section>
@@ -71,7 +80,7 @@ export class ProcedureStartComponent implements OnInit {
   private functions = inject(Functions); private auth = inject(AuthService); private router = inject(Router); private route = inject(ActivatedRoute);
   type = signal('');
   event = computed(() => LIFE_EVENTS.find(e => e.type === this.type() && !e.route) ?? null);
-  employeeId = ''; keyword = ''; leaveKind: 'maternity' | 'childcare' = 'maternity';
+  employeeId = ''; keyword = ''; leaveKind: 'maternity' | 'childcare' = 'maternity'; revisionKind: 'occasional' | 'maternityEnd' | 'childcareEnd' = 'occasional';
   employees = signal<Employee[]>([]); loading = signal(false); error = signal(''); hasMore = signal(true); private cursor = '';
   starting = signal(false);
 
@@ -106,18 +115,18 @@ export class ProcedureStartComponent implements OnInit {
 
   async start() {
     if (!this.canStart()) return;
-    if (this.type() === 'monthly_change') { void this.router.navigate(['/employees', this.employeeId, 'revision']); return; }
     // ウィザードで進める業務。同じ人の進行中の手続きがあれば、それを開く
     const wizard: Record<string, { fn: string; route: string }> = {
       loss: { fn: 'resignationStart', route: '/resignation' },
       dependent_change: { fn: 'dependentChangeStart', route: '/dependents' },
       leave: { fn: 'leaveProcedureStart', route: '/leaves' },
+      monthly_change: { fn: 'gradeRevisionStart', route: '/revisions' },
     };
     const w = wizard[this.type()];
     if (w) {
       this.starting.set(true); this.error.set('');
       try {
-        const {data} = await httpsCallable<object,{procedureId:string}>(this.functions,w.fn)({companyId:this.auth.companyId,employeeId:this.employeeId,...(this.type() === 'leave' ? {kind:this.leaveKind} : {})});
+        const {data} = await httpsCallable<object,{procedureId:string}>(this.functions,w.fn)({companyId:this.auth.companyId,employeeId:this.employeeId,...(this.type() === 'leave' ? {kind:this.leaveKind} : this.type() === 'monthly_change' ? {kind:this.revisionKind} : {})});
         void this.router.navigate([w.route, data.procedureId]);
       } catch(e:any) { this.error.set(e.message ?? '手続きを始められませんでした'); } finally { this.starting.set(false); }
       return;

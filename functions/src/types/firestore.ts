@@ -182,6 +182,8 @@ export interface GradeDoc {
   /** 決定の根拠となった報酬月額 */
   basisRemuneration?: number | null;
   basisMonths?: string[] | null;
+  /** 決めたときの届出（資格取得届・月額変更届など） */
+  filingId?: string | null;
   approvalRequestId?: string;
   reason: string;
   version: number;
@@ -440,6 +442,45 @@ export interface ProcedureDoc {
   dependentChange?: DependentChangeState;
   /** 産休・育休の手続き（ウィザード）の状態。旧方式の休業手続きにはない */
   leaveProcedure?: LeaveProcedureState;
+  /** 随時改定・産休育休終了時改定の手続き（ウィザード）の状態。旧方式の随時改定にはない */
+  gradeRevision?: GradeRevisionState;
+}
+
+/** 随時改定・終了時改定で、等級を改定すると決めたときの判定（届出と承認はこの値で作る） */
+export interface GradeRevisionDecision {
+  startMonth: string;
+  effectiveMonth: string;
+  months: { yearMonth: string; totalSalary: number; inKind: number; retroactive: number; remuneration: number; paymentBasisDays: number; used: boolean }[];
+  total: number;
+  average: number;
+  averageWithRetro: number;
+  direction: 'up' | 'down' | null;
+  health: { eligible: boolean; currentGrade: number | null; currentStandard: number | null; newGrade: number | null; newStandard: number | null };
+  pension: { eligible: boolean; currentGrade: number | null; currentStandard: number | null; newGrade: number | null; newStandard: number | null };
+  decidedAt: Timestamp;
+  decidedBy: string;
+}
+
+/** 随時改定・産休育休終了時改定の手続き（ウィザード）の状態 */
+export interface GradeRevisionState {
+  kind: 'occasional' | 'maternityEnd' | 'childcareEnd';
+  /** 起点の月（随時改定は固定的賃金が変わった給与の支給月、終了時改定は休業を終えた日の翌日が属する月） */
+  startMonth: string | null;
+  /** 随時改定：前月の給与がなく比べられないときに担当者が選んだ固定的賃金の変動の向き */
+  manualDirection: 'up' | 'down' | null;
+  /** 上限・下限の特例で使う従前の報酬月額（担当者が入れた値） */
+  previousRemuneration: number | null;
+  /** 変動の理由（昇給・手当の新設など。届出の備考の参考） */
+  note: string;
+  /** 終了時改定：休業と本人の申出 */
+  leave: {
+    procedureId: string | null; endDate: string | null; childName: string; childBirthDate: string | null;
+    nextLeaveFromNextDay: boolean; applied: boolean; appliedDate: string | null;
+  } | null;
+  decision: GradeRevisionDecision | null;
+  filingId: string | null;
+  /** 対象外として終えたときの理由 */
+  closedReason: string | null;
 }
 
 /** 休業の期間（届け出た内容）。日付は YYYY-MM-DD */

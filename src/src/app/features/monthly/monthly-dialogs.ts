@@ -56,6 +56,15 @@ export class NoPayDialogComponent {
       @if (r.rejected?.salary) { <p class="bad">給与が差し戻されました。理由：{{ r.rejected?.salary }}</p> }
       @if (r.rejected?.premium) { <p class="bad">保険料が差し戻されました。理由：{{ r.rejected?.premium }}</p> }
       @for (w of r.warnings; track w) { <p class="warn">{{ w }}</p> }
+      @if (r.revision; as rv) {
+        <div class="row-actions">
+          @if (rv.procedureId) {
+            <a mat-stroked-button [routerLink]="['/revisions', rv.procedureId]" mat-dialog-close>{{ rv.procedureDone ? '随時改定の手続きを見る' : '随時改定の手続きを開く' }}</a>
+          } @else {
+            <a mat-flat-button [routerLink]="['/revisions', 'new']" [queryParams]="{ employeeId: r.employeeId, startMonth: rv.startMonth }" mat-dialog-close>随時改定の対象か確かめる</a>
+          }
+        </div>
+      }
 
       <h3>{{ month(data.payMonth) }}支給の給与</h3>
       @if (r.salary; as s) {

@@ -1,4 +1,5 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes } from '@angular/router';
 import { authGuard, roleGuard, portalGuard, homeGuard } from './core/guards/auth.guard';
 import { PortalLayoutComponent } from './features/portal/portal-layout';
 import { LayoutComponent } from './shared/layout/layout';
@@ -74,12 +75,9 @@ export const routes: Routes = [
               ),
           },
           {
+            // 旧い随時改定の画面。ウィザードへ移す
             path: ':id/revision',
-            data: { title: '随時改定' },
-            loadComponent: () =>
-              import('./features/employees/grade-revision/grade-revision').then(
-                (m) => m.GradeRevisionComponent,
-              ),
+            redirectTo: ({ params }) => inject(Router).createUrlTree(['/revisions', 'new'], { queryParams: { employeeId: params['id'] } }),
           },
         ],
       },
@@ -193,6 +191,13 @@ export const routes: Routes = [
         data: { title: '産休・育休の手続き' },
         loadComponent: () =>
           import('./features/leave/leave-wizard').then((m) => m.LeaveWizardComponent),
+      },
+      {
+        path: 'revisions/:id',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '等級の見直し' },
+        loadComponent: () =>
+          import('./features/revision/revision-wizard').then((m) => m.RevisionWizardComponent),
       },
       {
         path: 'resignation/:id',
