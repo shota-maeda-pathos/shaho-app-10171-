@@ -53,8 +53,9 @@
       <span class="spacer"></span>
       <label style="font-size:14px;margin-right:24px">事業所
         <select aria-label="表示する事業所" [value]="office.selected()" (change)="changeOffice($event)" [disabled]="!office.ready() || office.busy()" style="margin-left:8px;padding:8px;max-width:220px">
-          <option value="">{{auth.hasRole('admin') ? '全事業所' : '担当事業所すべて'}}</option>
-          @for (item of office.offices(); track item.id) { <option [value]="item.id">{{item.name}}</option> }
+          <!-- 選択肢は事業所を読み込んでから作られるので、選んでいる事業所は選択肢の側で示す（select の value だけだと先頭のままになる） -->
+          <option value="" [selected]="!office.selected()">{{auth.hasRole('admin') ? '全事業所' : '担当事業所すべて'}}</option>
+          @for (item of office.offices(); track item.id) { <option [value]="item.id" [selected]="item.id === office.selected()">{{item.name}}</option> }
         </select>
       </label>
       <button mat-icon-button [matMenuTriggerFor]="userMenu">
