@@ -1,12 +1,12 @@
 <div class="app-page">
-  <a routerLink="/procedures" class="back"><mat-icon>arrow_back</mat-icon>進行中の手続き</a>
 
   @if (loading()) {
     <app-loading-state />
   } @else if (loadError()) {
     <app-error-state [message]="loadError()" (retry)="load(true)" />
   } @else if (view(); as v) {
-    <app-wizard [heading]="v.procedure.title"
+    <app-wizard kicker="等級の見直し" backLink="/procedures" backLabel="進行中の手続き"
+                [heading]="v.procedure.title"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.form.startMonth ? '・' + monthLabel(v.form.startMonth) + '〜' + monthLabel(addMonth(v.form.startMonth, 2)) + 'の給与で判定' : '')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
                 [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"

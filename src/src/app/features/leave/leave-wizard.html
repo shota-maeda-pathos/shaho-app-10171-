@@ -1,12 +1,12 @@
 <div class="app-page">
-  <a routerLink="/procedures" class="back"><mat-icon>arrow_back</mat-icon>進行中の手続き</a>
 
   @if (loading()) {
     <app-loading-state />
   } @else if (loadError()) {
     <app-error-state [message]="loadError()" (retry)="load(true)" />
   } @else if (view(); as v) {
-    <app-wizard [heading]="v.procedure.title"
+    <app-wizard kicker="産休・育休" backLink="/procedures" backLabel="進行中の手続き"
+                [heading]="v.procedure.title"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.period ? '・' + (v.period.startDate | date:'M月d日') + '〜' + ((v.period.actualEndDate ?? v.period.plannedEnd) | date:'M月d日') : '')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
                 [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"

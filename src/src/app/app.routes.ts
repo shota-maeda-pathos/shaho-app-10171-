@@ -213,6 +213,13 @@ export const routes: Routes = [
           import('./features/employment-change/employment-change-wizard').then((m) => m.EmploymentChangeWizardComponent),
       },
       {
+        path: 'age-events',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '年齢到達', groupType: 'age_event' },
+        loadComponent: () =>
+          import('./features/procedures/procedure-groups').then((m) => m.ProcedureGroupsComponent),
+      },
+      {
         path: 'age-events/:id',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '年齢到達の手続き' },
@@ -225,6 +232,13 @@ export const routes: Routes = [
         data: { title: '等級の見直し' },
         loadComponent: () =>
           import('./features/revision/revision-wizard').then((m) => m.RevisionWizardComponent),
+      },
+      {
+        path: 'resignation',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '退職', groupType: 'loss' },
+        loadComponent: () =>
+          import('./features/procedures/procedure-groups').then((m) => m.ProcedureGroupsComponent),
       },
       {
         path: 'resignation/:id',

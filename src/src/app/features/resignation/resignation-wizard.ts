@@ -11,6 +11,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { GroupNavComponent } from '../procedures/procedure-groups';
 import {
   ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
 } from '../../shared/ui';
@@ -24,7 +25,7 @@ const KEYS: ResignationKey[] = ['entry', 'settlement', 'account', 'filing', 'app
   selector: 'app-resignation-wizard',
   standalone: true,
   imports: [
-    FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule,
+    GroupNavComponent, FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule,
     MatRadioModule, WizardComponent, TermComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],
   templateUrl: './resignation-wizard.html',
@@ -89,32 +90,32 @@ export class ResignationWizardComponent implements OnInit, OnDestroy {
     const noFiling = '社会保険に加入していないため、このステップはありません。';
     const waitingApproval = v.current === 'approval' && v.approval?.status === 'pending';
     return [
-      { key: 'entry', label: '退職日と理由を入れる', done: done || cur > 0,
+      { key: 'entry', label: '退職日と理由', done: done || cur > 0,
         what: '退職日を入れて、従業員台帳に退職を登録します。資格喪失日や保険料がかかる月はシステムが決めます。',
         why: '資格喪失日（退職日の翌日）から、届出の期限と最後の保険料が決まるためです。',
         next: '最後の保険料をどう集めるかを決めます。' },
-      { key: 'settlement', label: '最後の保険料の集め方を決める', done: done || cur > 1,
+      { key: 'settlement', label: '最後の保険料', done: done || cur > 1,
         what: this.settlementSkipped() ? '保険料がかかる月がないため、このステップはありません。' : '最後の月までの保険料のうち、まだ集めていない分を、どの給与から引くか（引けなければ別途入金）を決めます。',
         why: '退職後は給与がなくなることがあり、引き忘れると本人から回収できなくなるためです。',
         next: '退職後のポータルのアカウントを確かめます。' },
-      { key: 'account', label: '退職後のアカウントを確かめる', done: done || cur > 2,
+      { key: 'account', label: '退職後のアカウント', done: done || cur > 2,
         what: '退職後に本人がポータルで明細を見られる期間を確かめます。必要なら延ばしたり縮めたりします。',
         why: '退職日の翌日から申請はできなくなり、閲覧だけになります。期間が過ぎるとログインできなくなります。',
         next: f?.needsFiling === false ? '届出は不要です。完了を確認します。' : '資格喪失届を作ります。' },
-      { key: 'filing', label: '資格喪失届を作る', done: done || cur > 3,
+      { key: 'filing', caution: '承認を依頼すると、差し戻されるまで内容を直せません。', label: '届出の作成', done: done || cur > 3,
         what: this.filingSkipped() ? noFiling : '被保険者証の回収状況を入れて資格喪失届を作り、承認者に確認を依頼します。',
         why: `資格喪失届は喪失日から5日以内${f?.filingDeadline ? `（${this.monthDay(f.filingDeadline)}まで）` : ''}に出す決まりがあるためです。`,
         next: '承認者が届出を確認します。' },
-      { key: 'approval', label: '承認者が確認する', done: done || cur > 4,
+      { key: 'approval', label: '承認', done: done || cur > 4,
         what: this.filingSkipped() ? noFiling : '作った人とは別の担当者が、資格喪失届を確認します。',
         why: '1人で作った届出の誤りを防ぐためです。',
         next: '承認されると、届出を提出できるようになります。',
         ...(waitingApproval ? { waitingFor: '承認者' } : {}) },
-      { key: 'submit', label: '提出する', done: done || cur > 5,
+      { key: 'submit', label: '提出', done: done || cur > 5,
         what: this.filingSkipped() ? noFiling : '電子申請か紙のどちらかで提出し、結果を記録します。',
         why: '期限内に提出したことを記録に残すためです。',
         next: '提出が済んだら、完了を確認します。' },
-      { key: 'confirm', label: '完了を確認する', done,
+      { key: 'confirm', label: '完了の確認', done,
         what: '登録した内容・保険料の集め方・届出の結果を見直して、手続きを完了にします。',
         why: '漏れがないことを確かめてから、やることリストから外すためです。',
         next: 'これで退職の手続きは完了です。別途入金がある場合は、入金されたら毎月の処理で記録します。' },

@@ -81,16 +81,16 @@ export class TransferWizardComponent implements OnInit {
     const cur = this.currentIndex();
     const filing = v.facts?.filingRequired ?? true;
     return [
-      { key: 'entry', label: '異動先と異動日を入れて影響を確かめる', done: done || cur > 0,
+      { key: 'entry', label: '異動先と異動日', done: done || cur > 0,
         what: '異動先の事業所と異動日を入れます。保険料率・届出・新しい料率を使う月をシステムが判定します。',
         why: '都道府県が変わると健康保険の料率が変わり、別の適用事業所なら届出が要るためです。', next: '台帳の所属事業所を変えます。' },
-      { key: 'apply', label: '台帳の所属事業所を変える', done: done || cur > 1,
+      { key: 'apply', label: '所属の変更', done: done || cur > 1,
         what: '台帳の所属事業所を異動先に変え、異動の履歴を残します。届出が要る場合は、資格喪失届と資格取得届を作って承認を依頼します。',
         why: 'その月の保険料から異動先の事業所で計算するためです。', next: filing ? '2件の届出を承認・提出します。' : '完了を確認します。' },
-      { key: 'filings', label: filing ? '資格喪失届・資格取得届を出す' : '届出を出す（不要）', done: done || cur > 2,
+      { key: 'filings', label: filing ? '届出の提出' : '届出（不要）', done: done || cur > 2,
         what: '届出の画面で、2件の届出の承認と提出（模擬電子申請または紙）を行います。',
         why: '異動日から5日以内に届け出る決まりがあるためです。', next: '2件とも提出すると完了を確認できます。' },
-      { key: 'confirm', label: '完了を確認する', done,
+      { key: 'confirm', label: '完了の確認', done,
         what: '異動の内容と、異動先の事業所で計算を始める月を確かめて、手続きを完了にします。',
         why: '毎月の処理で、異動した月から異動先の事業所に出るためです。', next: 'これで手続きは完了です。' },
     ];

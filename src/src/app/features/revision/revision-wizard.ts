@@ -81,7 +81,7 @@ export class RevisionWizardComponent implements OnInit, OnDestroy {
     const leave = this.isLeave();
     const closed = !!v.closedReason;
     return [
-      { key: 'change', label: leave ? '休業の終わりと申出を確かめる' : '変動を確かめる', done: done || cur > 0,
+      { key: 'change', label: leave ? '休業の終わりと申出' : '変動の確認', done: done || cur > 0,
         what: leave
           ? '休業を終えた日と養育する子、本人から申出があったかを入れます。'
           : '固定的賃金（基本給や手当）が変わった給与の支給月（変動月）を入れます。前の月と比べて上がったか下がったかはシステムが見ます。',
@@ -89,26 +89,26 @@ export class RevisionWizardComponent implements OnInit, OnDestroy {
           ? '復帰した月から3か月の給与で判定し、本人の申出があるときだけ改定するためです。'
           : '随時改定は、固定的賃金が変わったときだけ、変わった月から3か月の給与で判定するためです。',
         next: '3か月の給与で判定します。' },
-      { key: 'judge', label: '判定する', done: done || cur > 1,
+      { key: 'judge', label: '判定', done: done || cur > 1,
         what: leave
           ? '3か月の報酬と支払基礎日数から平均を出し、今の等級と比べます。基準の日数に満たない月は平均に入れません。'
           : '3か月の報酬と支払基礎日数から平均を出し、今の等級と比べます。健康保険と厚生年金は別々に判定します。',
         why: leave ? '1等級でも差があれば改定できるためです。' : '2等級以上の差（上限・下限の等級は特例あり）があるときに改定する決まりのためです。',
         next: closed ? '改定しないため、ここで手続きを終えます。' : '改定する場合は届出を作ります。' },
-      { key: 'filing', label: `${v.filingLabel}を作る`, done: done || cur > 2,
+      { key: 'filing', caution: '承認を依頼すると、差し戻されるまで内容を直せません。', label: '届出の作成', done: done || cur > 2,
         what: '判定の内容から届出を作り、承認者に確認を依頼します。',
         why: '届出が承認されると、新しい等級が確定して毎月の保険料の計算に使われるためです。',
         next: '承認者が届出を確認します。' },
-      { key: 'approval', label: '承認者が確認する', done: done || cur > 3,
+      { key: 'approval', label: '承認', done: done || cur > 3,
         what: '作った人とは別の担当者が、届出と新しい等級を確認します。',
         why: '1人で決めた等級の誤りを防ぐためです。',
         next: '承認されると、届出を提出できるようになります。',
         ...(v.current === 'approval' && v.approval?.status === 'pending' ? { waitingFor: '承認者' } : {}) },
-      { key: 'submit', label: '提出する', done: done || cur > 4,
+      { key: 'submit', label: '提出', done: done || cur > 4,
         what: '電子申請か紙のどちらかで提出し、結果を記録します。',
         why: '改定月から速やかに提出する決まりがあるためです。',
         next: '提出したら、手続きを完了にします。' },
-      { key: 'confirm', label: '完了を確認する', done,
+      { key: 'confirm', label: '完了の確認', done,
         what: '新しい等級と、それを使い始める月を見直して、手続きを完了にします。',
         why: 'その月の保険料をすでに計算していれば、計算し直す必要があるためです。',
         next: 'これで手続きは完了です。' },

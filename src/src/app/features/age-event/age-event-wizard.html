@@ -1,16 +1,17 @@
 <div class="app-page">
-  <a routerLink="/procedures" class="back"><mat-icon>arrow_back</mat-icon>進行中の手続き</a>
 
   @if (loading()) {
     <app-loading-state />
   } @else if (loadError()) {
     <app-error-state [message]="loadError()" (retry)="load(true)" />
   } @else if (view(); as v) {
-    <app-wizard [heading]="v.procedure.title"
+    <app-wizard kicker="年齢到達" backLink="/age-events" [backQuery]="{ officeId: v.procedure.officeId, key: v.facts.reachDate.slice(0, 7) }" [backLabel]="'年齢到達のまとめ'"
+                [heading]="v.procedure.title"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + '・資格喪失日 ' + (v.facts.lossDate | date:'yyyy年M月d日')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
                 [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
                 (advance)="advance()">
+      <app-group-nav headActions type="age_event" [officeId]="v.procedure.officeId" [groupKey]="v.facts.reachDate.slice(0, 7)" [currentId]="v.procedure.id" />
       @if (v.employee.otherEmployer) {
         <div class="alert" role="alert">二以上事業所勤務（ほかに「{{ v.employee.otherEmployer }}」）として登録されています。本システムは二以上事業所勤務に対応していないため、届出と保険料は別途確かめてください。</div>
       }

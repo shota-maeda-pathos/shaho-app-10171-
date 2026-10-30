@@ -1,16 +1,17 @@
 <div class="app-page">
-  <a routerLink="/procedures" class="back"><mat-icon>arrow_back</mat-icon>進行中の手続き</a>
 
   @if (loading()) {
     <app-loading-state />
   } @else if (loadError()) {
     <app-error-state [message]="loadError()" (retry)="load(true)" />
   } @else if (view(); as v) {
-    <app-wizard [heading]="v.procedure.title"
+    <app-wizard kicker="退職" backLink="/resignation" [backQuery]="{ officeId: v.procedure.officeId, key: (v.entry?.resignationDate ?? 'none') }" [backLabel]="'退職のまとめ'"
+                [heading]="v.procedure.title"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.entry ? '・退職日 ' + (v.entry.resignationDate | date:'yyyy年M月d日') : '') + (v.facts?.filingDeadline ? '・資格喪失届の期限 ' + (v.facts!.filingDeadline | date:'M月d日') : '')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
                 [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
                 (advance)="advance()">
+      <app-group-nav headActions type="loss" [officeId]="v.procedure.officeId" [groupKey]="(v.entry?.resignationDate ?? 'none')" [currentId]="v.procedure.id" />
       @if (v.employee.otherEmployer) {
         <div class="alert" role="alert">二以上事業所勤務（ほかに「{{ v.employee.otherEmployer }}」）として登録されています。本システムは二以上事業所勤務に対応していないため、届出と保険料は別途確かめてください。</div>
       }

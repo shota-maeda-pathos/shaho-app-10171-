@@ -82,34 +82,34 @@ export class LeaveWizardComponent implements OnInit, OnDestroy {
     const maternity = this.isMaternity();
     const deadline = this.plan()?.deadline ?? v.deadline;
     return [
-      { key: 'plan', label: '休業の期間を決める', done: done || cur > 0,
+      { key: 'plan', label: '休業の期間', done: done || cur > 0,
         what: maternity
           ? '出産予定日を入れます。産前（42日、双子以上は98日）と産後（56日）の期間はシステムが数えます。'
           : '養育する子と、育休を始める日・終える予定の日を入れます。',
         why: '休業の期間から、保険料が免除される月が決まるためです。',
         next: `${filing}を作ります。` },
-      { key: 'filing', label: `${filing}を作る`, done: done || cur > 1,
+      { key: 'filing', caution: '承認を依頼すると、差し戻されるまで内容を直せません。', label: '届出の作成', done: done || cur > 1,
         what: '入れた期間から届出を作り、承認者に確認を依頼します。',
         why: maternity
           ? `産休の届出は、産休中か産休を終えてから1か月以内${deadline ? `（${this.monthDay(deadline)}まで）` : ''}に出す決まりがあるためです。`
           : '育休の届出は、速やかに出す決まりがあるためです。',
         next: '承認者が届出を確認します。' },
-      { key: 'approval', label: '承認者が確認する', done: done || cur > 2,
+      { key: 'approval', label: '承認', done: done || cur > 2,
         what: '作った人とは別の担当者が、届出を確認します。',
         why: v.filingKind === 'start' ? '承認されると、保険料の免除が毎月の計算に反映されるためです。' : '1人で作った届出の誤りを防ぐためです。',
         next: '承認されると、届出を提出できるようになります。',
         ...(v.current === 'approval' && v.approval?.status === 'pending' ? { waitingFor: '承認者' } : {}) },
-      { key: 'submit', label: '提出する', done: done || cur > 3,
+      { key: 'submit', label: '提出', done: done || cur > 3,
         what: '電子申請か紙のどちらかで提出し、結果を記録します。',
         why: '期限内に提出したことを記録に残すためです。',
         next: `${this.short()}が終わるまで、休業中のことを記録します。` },
-      { key: 'during', label: '休業中のことと復帰を記録する', done: done || cur > 4,
+      { key: 'during', label: '休業中と復帰', done: done || cur > 4,
         what: maternity
           ? '出産したら出産日を、産休を終えたら終えた日を記録します。届出が要るかはシステムが判定します。'
           : '育休を延長するときと、育休を終えて復帰したときに記録します。届出が要るかはシステムが判定します。',
         why: '出産日が予定と違ったときや、予定より早く復帰したときは、変更届・終了届が要るためです。',
         next: '休業を終えたら、手続きを完了にします。' },
-      { key: 'confirm', label: '完了を確認する', done,
+      { key: 'confirm', label: '完了の確認', done,
         what: '出した届出と免除された月を見直して、手続きを完了にします。',
         why: '復帰後に給与が下がった場合の終了時改定など、次にやることを確かめるためです。',
         next: maternity ? '続けて育休に入る場合は、育休の手続きを始めます。' : 'これで育休の手続きは完了です。' },

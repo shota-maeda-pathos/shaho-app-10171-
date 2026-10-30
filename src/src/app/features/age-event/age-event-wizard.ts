@@ -11,6 +11,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { GroupNavComponent } from '../procedures/procedure-groups';
 import {
   ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
 } from '../../shared/ui';
@@ -27,7 +28,7 @@ const KEYS: AgeKey[] = ['check', 'filing', 'approval', 'submit', 'confirm'];
   selector: 'app-age-event-wizard',
   standalone: true,
   imports: [
-    FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatRadioModule,
+    GroupNavComponent, FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatRadioModule,
     WizardComponent, TermComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],
   templateUrl: './age-event-wizard.html',
@@ -79,7 +80,7 @@ export class AgeEventWizardComponent implements OnInit, OnDestroy {
     const p70 = this.is70();
     const skipped = this.noFiling();
     return [
-      { key: 'check', label: '到達日と届出の要否を確かめる', done: done || cur > 0,
+      { key: 'check', label: '到達日と届出の要否', done: done || cur > 0,
         what: p70
           ? '70歳に達する日と、その日の報酬月額を確かめます。報酬月額から標準報酬月額相当額を出し、届出が要るかをシステムが判定します。'
           : '75歳の誕生日に健康保険の資格を失います。被扶養者と、回収する保険証などの枚数を確かめます。',
@@ -87,20 +88,20 @@ export class AgeEventWizardComponent implements OnInit, OnDestroy {
           ? '厚生年金は70歳に達する日に資格を失い、70歳以上被用者になります。報酬が変わらなければ届出は原則いりません。'
           : '健康保険の資格喪失届を5日以内に出す決まりがあるためです。',
         next: p70 ? '届出が要る場合は届出を作ります。要らなければ完了を確認します。' : '資格喪失届を作ります。' },
-      { key: 'filing', label: skipped ? '届出を作る（不要）' : `${v.filingLabel}を作る`, done: done || cur > 1,
+      { key: 'filing', caution: '承認を依頼すると、差し戻されるまで内容を直せません。', label: skipped ? '届出（不要）' : '届出の作成', done: done || cur > 1,
         what: '確かめた内容から届出を作り、承認者に確認を依頼します。',
         why: `${Number(v.facts.deadline.slice(5, 7))}月${Number(v.facts.deadline.slice(8))}日までに出す決まりがあるためです。`,
         next: '承認者が届出を確認します。' },
-      { key: 'approval', label: skipped ? '承認者が確認する（不要）' : '承認者が確認する', done: done || cur > 2,
+      { key: 'approval', label: skipped ? '承認（不要）' : '承認', done: done || cur > 2,
         what: '作った人とは別の担当者が、届出を確認します。',
         why: '1人で作った届出の誤りを防ぐためです。',
         next: '承認されると、届出を提出できるようになります。',
         ...(v.current === 'approval' && v.approval?.status === 'pending' ? { waitingFor: '承認者' } : {}) },
-      { key: 'submit', label: skipped ? '提出する（不要）' : '提出する', done: done || cur > 3,
+      { key: 'submit', label: skipped ? '提出（不要）' : '提出', done: done || cur > 3,
         what: '電子申請か紙のどちらかで提出し、結果を記録します。',
         why: '期限内に提出したことを記録に残すためです。',
         next: '提出したら、手続きを完了にします。' },
-      { key: 'confirm', label: '完了を確認する', done,
+      { key: 'confirm', label: '完了の確認', done,
         what: '保険料が何月分まで（から）変わるかを見直して、手続きを完了にします。',
         why: '毎月の保険料の計算は年齢から自動で変わるため、その月の計算結果を確かめるためです。',
         next: 'これで手続きは完了です。' },
