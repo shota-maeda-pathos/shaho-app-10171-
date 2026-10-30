@@ -2,6 +2,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { db } from '../../config';
 import { AuthContext } from '../../middleware/auth';
 import { FilingGetInput } from './schema';
+import { isSubmittedFiling } from '../correction/rules';
 
 export interface FilingGetResponse {
   id: string;
@@ -19,6 +20,17 @@ export interface FilingGetResponse {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /** 訂正届・取消届：元の届出・訂正箇所・理由 */
+  originalFilingId: string | null;
+  originalFilingType: string | null;
+  corrections: { field: string; before: string; after: string }[];
+  reason: string | null;
+  /** 元の届出：あとから出した訂正届・取消届 */
+  correctedByFilingIds: string[];
+  cancelledByFilingId: string | null;
+  cancelledAt: string | null;
+  /** 提出を終えているか（訂正届・取消届を作れるか） */
+  submitted: boolean;
 }
 
 export async function getFiling(
@@ -61,5 +73,13 @@ export async function getFiling(
     version: data.version,
     createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? '',
     updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? '',
+    originalFilingId: data.originalFilingId ?? null,
+    originalFilingType: data.originalFilingType ?? null,
+    corrections: data.corrections ?? [],
+    reason: data.reason ?? null,
+    correctedByFilingIds: data.correctedByFilingIds ?? [],
+    cancelledByFilingId: data.cancelledByFilingId ?? null,
+    cancelledAt: data.cancelledAt?.toDate?.()?.toISOString?.() ?? null,
+    submitted: isSubmittedFiling(data),
   };
 }

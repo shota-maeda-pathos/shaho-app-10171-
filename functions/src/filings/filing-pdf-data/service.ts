@@ -33,6 +33,10 @@ export interface FilingPdfDataResponse {
   formData: Record<string, unknown>;
   createdAt: string;
   sections: { label: string; rows: { label: string; value: string }[] }[];
+  /** 訂正届・取消届：元の届出の種類（様式はこれを使う）・訂正箇所・理由 */
+  originalFilingType: string | null;
+  corrections: { field: string; before: string; after: string }[];
+  reason: string | null;
 }
 
 export async function getFilingPdfData(
@@ -76,6 +80,9 @@ export async function getFilingPdfData(
     formData: fd,
     createdAt: filing.createdAt?.toDate?.()?.toISOString?.() ?? '',
     sections,
+    originalFilingType: filing.originalFilingType ?? null,
+    corrections: filing.corrections ?? [],
+    reason: filing.reason ?? null,
   };
 }
 

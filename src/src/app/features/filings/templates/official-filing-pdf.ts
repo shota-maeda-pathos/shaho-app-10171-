@@ -683,3 +683,82 @@ export async function createOfficialFilingPdf(filingType: string, formData: Data
   pdf.setSubject('日本年金機構の公式様式（2026-10-28取得）への記入');
   return {bytes:await pdf.save(),warnings:[...warnings],placements};
 }
+
+export interface CorrectionRow { field: string; before: string; after: string }
+
+/**
+ * 訂正届・取消届（カタログ 届出⑩）。元の届出の公式様式に記入し（訂正届は訂正後の値、取消届は元の値）、
+ * 1枚目の上の余白に赤で「訂正」「取消」と示し、最後に訂正箇所の一覧（項目・訂正前・訂正後）と理由のページを付ける
+ */
+export async function createCorrectionPdf(kind: 'correction' | 'cancellation', originalType: string, formData: Data,
+  corrections: CorrectionRow[], reason: string, meta: FilingPrintMeta,
+  loadAsset: (path: string) => Promise<Uint8Array> = async path => {
+    const response=await fetch(path);
+    if(!response.ok) throw new Error('公式PDFまたは日本語フォントを読み込めませんでした。再読み込みしてください。');
+    return new Uint8Array(await response.arrayBuffer());
+  }): Promise<OfficialPdfResult> {
+  const base = await createOfficialFilingPdf(originalType, formData, meta, loadAsset);
+  const label = kind === 'correction' ? '訂正' : '取消';
+  const title = OFFICIAL_FORMS[originalType]?.title ?? '届出';
+  const pdf = await PDFDocument.load(base.bytes);
+  pdf.registerFontkit(fontkit);
+  const font = await pdf.embedFont(await loadAsset('/filing-forms/fonts/NotoSansJP-Regular.ttf'), { subset: false });
+  const red = rgb(0.8, 0.1, 0.1);
+
+  // 1枚目の上の余白に「訂正」「取消」の表示（様式の記入欄にかからない位置）
+  const first = pdf.getPage(0);
+  const media = first.getMediaBox();
+  const stamp = `${label}届`;
+  const stampSize = 12;
+  const stampWidth = font.widthOfTextAtSize(stamp, stampSize) + 16;
+  const sx = media.x + media.width / 2 - stampWidth / 2;
+  const sy = media.y + media.height - 22;
+  first.drawRectangle({ x: sx, y: sy - 4, width: stampWidth, height: stampSize + 8, borderColor: red, borderWidth: 1.2 });
+  first.drawText(stamp, { x: sx + 8, y: sy, size: stampSize, font, color: red });
+
+  // 訂正箇所の一覧（A4縦）。長い値は折り返し、ページに収まらなければ次のページへ
+  const W = 595.28, H = 841.89, left = 48, right = W - 48;
+  const cols = [left, left + 150, left + 150 + (right - left - 150) / 2, right];
+  const wrap = (text: string, width: number, size: number) => {
+    const lines: string[] = [];
+    let line = '';
+    for (const ch of [...(text || '（空欄）')]) {
+      if (font.widthOfTextAtSize(line + ch, size) > width - 8) { lines.push(line); line = ch; } else line += ch;
+    }
+    lines.push(line);
+    return lines;
+  };
+  let page = pdf.addPage([W, H]);
+  let y = H - 56;
+  const text = (t: string, x: number, size = 10, color = rgb(0, 0, 0)) => page.drawText(t, { x, y, size, font, color });
+  text(`${label}届（${title}）`, left, 16, red);
+  y -= 24;
+  text(`事業所：${meta.officeName}　被保険者：${String(formData['被保険者氏名'] ?? '')}`, left);
+  y -= 18;
+  for (const line of wrap(`${label}の理由：${reason}`, right - left, 10)) { text(line, left); y -= 15; }
+  y -= 8;
+  if (kind === 'cancellation') {
+    text('この届出（上の様式に記入した内容）を取り消します。', left);
+  } else {
+    const header = () => {
+      page.drawRectangle({ x: left, y: y - 6, width: right - left, height: 20, color: rgb(0.93, 0.93, 0.93) });
+      ['項目', '訂正前', '訂正後'].forEach((h, i) => page.drawText(h, { x: cols[i] + 4, y, size: 10, font }));
+      y -= 22;
+    };
+    header();
+    for (const c of corrections) {
+      const cells = [wrap(c.field, cols[1] - cols[0], 9), wrap(c.before, cols[2] - cols[1], 9), wrap(c.after, cols[3] - cols[2], 9)];
+      const rows = Math.max(...cells.map(l => l.length));
+      if (y - rows * 13 < 56) { page = pdf.addPage([W, H]); y = H - 56; header(); }
+      cells.forEach((lines, i) => lines.forEach((l, n) => page.drawText(l, { x: cols[i] + 4, y: y - n * 13, size: 9, font, color: i === 2 ? red : rgb(0, 0, 0) })));
+      y -= rows * 13 + 4;
+      page.drawLine({ start: { x: left, y: y + 6 }, end: { x: right, y: y + 6 }, thickness: 0.4, color: rgb(0.7, 0.7, 0.7) });
+      y -= 6;
+    }
+    if (!corrections.length) text('訂正箇所がありません。', left);
+  }
+  pdf.setTitle(`${label}届（${title}）`);
+  const warnings = [...base.warnings];
+  if (kind === 'correction' && !corrections.length) warnings.push('訂正箇所がありません。元の届出から直した項目を確かめてください。');
+  return { bytes: await pdf.save(), warnings, placements: base.placements };
+}

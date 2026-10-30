@@ -38,6 +38,9 @@ const isApproved = (source: FilingSource, data: FirebaseFirestore.DocumentData) 
 async function missingFields(source: FilingSource, data: FirebaseFirestore.DocumentData): Promise<string[]> {
   if (source === 'santei') return (await import('../../santei/service')).mockErrors(data);
   if (source === 'bonus') return (await import('../../bonus/service')).mockErrors(data);
+  if (data.filingType === 'correction' || data.filingType === 'cancellation') {
+    return (await import('../correction/rules')).correctionErrors(data);
+  }
   const { validateFormData } = await import('../filing-mock-submit/service');
   return validateFormData(data.filingType, data.formData ?? {});
 }
@@ -78,6 +81,8 @@ async function afterChange(path: string, before: MockState | null, after: MockSt
   if (src.source === 'employee') {
     const { refreshEmployeeProcedures } = await import('../../procedures/hooks');
     await refreshEmployeeProcedures(src.companyId, src.parentId);
+    // 訂正届・取消届は、提出を終えたら元の届出に印を付ける
+    await (await import('../correction/service')).afterCorrectionSubmitted(path);
   }
   // 賞与不支給報告書は、提出を終えたら不支給の記録と支給予定月の変更を反映する
   if (src.source === 'bonus') await (await import('../../bonus/service')).afterBonusFilingSubmitted(path);

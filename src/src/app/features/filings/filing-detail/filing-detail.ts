@@ -1,6 +1,10 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, DestroyRef, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { combineLatest } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
@@ -29,6 +33,8 @@ const FILING_TYPE_LABELS: Record<string, string> = {
   childcareLeaveEndChange: '育児休業等終了時報酬月額変更届',
   pensionLoss70: '資格喪失届・70歳以上被用者該当届',
   childcareLeaveEnd: '育児休業等取得者終了届',
+  correction: '訂正届',
+  cancellation: '取消届',
 };
 
 const WORKFLOW_STATUS_LABELS: Record<string, string> = {
@@ -41,6 +47,7 @@ const WORKFLOW_STATUS_LABELS: Record<string, string> = {
     CommonModule,
     MatButtonModule, MatIconModule, MatCardModule, MatChipsModule,
     MatDividerModule, MatProgressSpinnerModule, MatSnackBarModule, MatStepperModule, FilingSubmissionComponent,
+    RouterLink, FormsModule, MatFormFieldModule, MatInputModule,
   ],
   template: `
     <div class="page-container">
@@ -72,6 +79,68 @@ const WORKFLOW_STATUS_LABELS: Record<string, string> = {
             </div>
           </div>
         </mat-card>
+
+        @if (isCorrection()) {
+          <mat-card class="correction-card">
+            <h2>{{ filing()!.filingType === 'correction' ? '訂正届' : '取消届' }}</h2>
+            <p>元の届出：<a [routerLink]="['/filings', filing()!.originalFilingId]" [queryParams]="{ employeeId: employeeId }">{{ filingTypeLabel(filing()!.originalFilingType) }}</a></p>
+            <p>理由：{{ filing()!.reason }}</p>
+            @if (filing()!.filingType === 'correction') {
+              <h3>訂正箇所（元の届出との違い）</h3>
+              @if (!filing()!.corrections.length) { <p class="muted">まだ直した項目はありません。下の記入内容を直して保存してください。</p> }
+              @else {
+                <table class="diff">
+                  <thead><tr><th>項目</th><th>訂正前</th><th>訂正後</th></tr></thead>
+                  <tbody>@for (c of filing()!.corrections; track c.field) { <tr><th>{{ c.field }}</th><td class="before">{{ c.before || '（空欄）' }}</td><td class="after">{{ c.after || '（空欄）' }}</td></tr> }</tbody>
+                </table>
+              }
+            }
+            <p class="note">台帳・等級・被扶養者などの登録は自動では直りません。必要なら<a [routerLink]="['/employees', employeeId]">従業員の画面</a>で直してください。</p>
+            @if (editable()) {
+              @if (filing()!.filingType === 'correction') {
+                <h3>記入内容を直す</h3>
+                <div class="edit-grid">
+                  @for (key of editableKeys(); track key) {
+                    <mat-form-field appearance="outline"><mat-label>{{ key }}</mat-label>
+                      <input matInput [(ngModel)]="edits[key]" [name]="key"></mat-form-field>
+                  }
+                </div>
+              }
+              <mat-form-field appearance="outline" class="wide"><mat-label>理由</mat-label><input matInput [(ngModel)]="editReason" name="editReason"></mat-form-field>
+              <div class="action-buttons">
+                <button mat-flat-button color="primary" (click)="saveCorrection()" [disabled]="processing()">保存する</button>
+                <button mat-button (click)="discardCorrection()" [disabled]="processing()">取り下げる</button>
+              </div>
+            }
+          </mat-card>
+        }
+
+        @if (filing()!.cancelledByFilingId || filing()!.correctedByFilingIds.length) {
+          <mat-card class="correction-card">
+            @if (filing()!.cancelledByFilingId) { <p>この届出は<a [routerLink]="['/filings', filing()!.cancelledByFilingId]" [queryParams]="{ employeeId: employeeId }">取消届</a>で取り消しました。</p> }
+            @for (id of filing()!.correctedByFilingIds; track id) { <p>この届出には<a [routerLink]="['/filings', id]" [queryParams]="{ employeeId: employeeId }">訂正届</a>を出しています。</p> }
+          </mat-card>
+        }
+
+        @if (canCorrect()) {
+          <mat-card class="correction-card">
+            <h2>提出したあとに誤りが見つかったら</h2>
+            <p class="muted">提出した届出は、訂正届で直すか、取消届で取り消します（承認を受けてから提出します）。</p>
+            @if (correctionKind()) {
+              <mat-form-field appearance="outline" class="wide"><mat-label>{{ correctionKind() === 'correction' ? '訂正の理由' : '取消の理由' }}（必須）</mat-label>
+                <input matInput [(ngModel)]="newReason" name="newReason"></mat-form-field>
+              <div class="action-buttons">
+                <button mat-flat-button color="primary" (click)="createCorrection()" [disabled]="processing() || !newReason.trim()">{{ correctionKind() === 'correction' ? '訂正届を作る' : '取消届を作る' }}</button>
+                <button mat-button (click)="correctionKind.set(null)">やめる</button>
+              </div>
+            } @else {
+              <div class="action-buttons">
+                <button mat-stroked-button (click)="correctionKind.set('correction')">訂正届を作る</button>
+                <button mat-stroked-button (click)="correctionKind.set('cancellation')">取消届を作る</button>
+              </div>
+            }
+          </mat-card>
+        }
 
         <mat-card class="status-card">
           <h2>社内承認</h2>
@@ -152,6 +221,15 @@ const WORKFLOW_STATUS_LABELS: Record<string, string> = {
     .error-card { border-left: 4px solid #f44336; }
     .error-list { margin: 0; padding-left: 20px; color: #c62828; }
     .error-list li { margin-bottom: 4px; }
+    .correction-card h3 { font-size: 14px; margin: 12px 0 6px; }
+    .diff { border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
+    .diff th, .diff td { padding: 4px 10px; border-bottom: 1px solid var(--app-color-border); text-align: left; }
+    .diff td.before { color: var(--app-color-text-sub); text-decoration: line-through; }
+    .diff td.after { background: #fff59d; font-weight: 500; }
+    .edit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 12px; }
+    .wide { width: min(100%, 480px); }
+    .muted { color: var(--app-color-text-sub); }
+    .note { padding: 8px 12px; border-radius: 8px; background: var(--app-status-yours-bg); }
   `],
 })
 export class FilingDetailComponent implements OnInit {
@@ -181,10 +259,87 @@ export class FilingDetailComponent implements OnInit {
     return Array.isArray(v);
   }
 
+  private destroyRef = inject(DestroyRef);
+  correctionKind = signal<'correction' | 'cancellation' | null>(null);
+  newReason = '';
+  edits: Record<string, string> = {};
+  editReason = '';
+
   ngOnInit() {
-    this.filingId = this.route.snapshot.paramMap.get('filingId') ?? '';
-    this.employeeId = this.route.snapshot.queryParamMap.get('employeeId') ?? '';
-    this.loadFiling();
+    // 訂正届から元の届出へ移るときも同じ画面を使うので、URL が変わるたびに読み直す
+    const sub = combineLatest([this.route.paramMap, this.route.queryParamMap]).subscribe(([params, query]) => {
+      this.filingId = params.get('filingId') ?? '';
+      this.employeeId = query.get('employeeId') ?? '';
+      this.correctionKind.set(null);
+      this.newReason = '';
+      this.loadFiling();
+    });
+    this.destroyRef.onDestroy(() => sub.unsubscribe());
+  }
+
+  isCorrection() { const t = this.filing()?.filingType; return t === 'correction' || t === 'cancellation'; }
+  editable() { return this.isCorrection() && ['draft', 'rejected'].includes(this.filing()?.workflowStatus) && !this.filing()?.cancelledAt; }
+  canCorrect() { const f = this.filing(); return !!f && !this.isCorrection() && f.submitted && !f.cancelledAt; }
+  editableKeys() {
+    const fd = this.filing()?.formData ?? {};
+    return Object.keys(fd).filter(k => fd[k] === null || typeof fd[k] !== 'object');
+  }
+
+  async createCorrection() {
+    const kind = this.correctionKind();
+    if (!kind) return;
+    this.processing.set(true);
+    try {
+      const { data } = await httpsCallable<object, { filingId: string }>(this.functions, 'filingCorrectionCreate')({
+        companyId: this.auth.companyId, employeeId: this.employeeId, filingId: this.filingId, kind, reason: this.newReason.trim(),
+      });
+      this.snackBar.open(kind === 'correction' ? '訂正届を作りました。直す項目を入れて保存してください' : '取消届を作りました。内容を確かめて承認を申請してください', '閉じる', { duration: 6000 });
+      await this.router.navigate(['/filings', data.filingId], { queryParams: { employeeId: this.employeeId } });
+    } catch (e: any) {
+      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 8000 });
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  async saveCorrection() {
+    const f = this.filing();
+    if (!f) return;
+    const patch: Record<string, string> = {};
+    for (const key of this.editableKeys()) {
+      const current = f.formData[key] == null ? '' : String(f.formData[key]);
+      if ((this.edits[key] ?? '') !== current) patch[key] = this.edits[key] ?? '';
+    }
+    this.processing.set(true);
+    try {
+      await httpsCallable(this.functions, 'filingCorrectionUpdate')({
+        companyId: this.auth.companyId, employeeId: this.employeeId, filingId: this.filingId, expectedVersion: f.version,
+        action: 'save', ...(f.filingType === 'correction' ? { formData: patch } : {}), reason: this.editReason,
+      });
+      this.snackBar.open('保存しました', '閉じる', { duration: 3000 });
+      await this.loadFiling(true);
+    } catch (e: any) {
+      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 8000 });
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
+  async discardCorrection() {
+    const f = this.filing();
+    if (!f) return;
+    this.processing.set(true);
+    try {
+      await httpsCallable(this.functions, 'filingCorrectionUpdate')({
+        companyId: this.auth.companyId, employeeId: this.employeeId, filingId: this.filingId, expectedVersion: f.version, action: 'discard',
+      });
+      this.snackBar.open('取り下げました', '閉じる', { duration: 3000 });
+      await this.router.navigate(['/filings', f.originalFilingId], { queryParams: { employeeId: this.employeeId } });
+    } catch (e: any) {
+      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 8000 });
+    } finally {
+      this.processing.set(false);
+    }
   }
 
   filingTypeLabel(type: string): string { return FILING_TYPE_LABELS[type] ?? type; }
@@ -242,8 +397,11 @@ export class FilingDetailComponent implements OnInit {
       const [{ createOfficialFilingPdf, OFFICIAL_FORMS }, { OfficialPdfPreviewComponent }] = await Promise.all([
         import('../templates/official-filing-pdf'), import('../templates/official-pdf-preview'),
       ]);
-      const output = await createOfficialFilingPdf(d.filingType, d.formData ?? {}, meta);
-      const form = OFFICIAL_FORMS[d.filingType];
+      const correction = d.filingType === 'correction' || d.filingType === 'cancellation';
+      const output = correction
+        ? await (await import('../templates/official-filing-pdf')).createCorrectionPdf(d.filingType, d.originalFilingType, d.formData ?? {}, d.corrections ?? [], d.reason ?? '', meta)
+        : await createOfficialFilingPdf(d.filingType, d.formData ?? {}, meta);
+      const form = OFFICIAL_FORMS[correction ? d.originalFilingType : d.filingType];
       this.dialog.open(OfficialPdfPreviewComponent, {
         width: '1100px', height: '94vh', maxWidth: '96vw',
         data: { ...output, title: form.title,
@@ -273,6 +431,8 @@ export class FilingDetailComponent implements OnInit {
         filingId: this.filingId,
       });
       this.filing.set(result.data);
+      this.edits = Object.fromEntries(this.editableKeys().map(k => [k, result.data.formData[k] == null ? '' : String(result.data.formData[k])]));
+      this.editReason = result.data.reason ?? '';
     } catch {
       this.filing.set(null);
     } finally {

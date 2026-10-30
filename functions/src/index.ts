@@ -124,6 +124,7 @@ export { filingMockSubmit } from './filings/filing-mock-submit/functions';
 export { filingPdfData } from './filings/filing-pdf-data/functions';
 export { filingIndexEmployee, filingIndexSantei, filingIndexBonus, filingSearch, filingIndexRebuild } from './filings/index/functions';
 export { filingSubmissionGet, filingSubmissionAction, filingMockSettings, filingMockAdvance } from './filings/submission/functions';
+export { filingCorrectionCreate, filingCorrectionUpdate } from './filings/correction/functions';
 export {
   approvalIndexRequest, approvalSearch, approvalBadgeGet, approvalDetailGet, approvalBulkApprove, approvalCancel, approvalSettingsGet, approvalIndexRebuild,
   approvalReminder,
