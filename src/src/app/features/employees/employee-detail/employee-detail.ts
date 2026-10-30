@@ -560,6 +560,10 @@ interface OnboardResult {
                     <th mat-header-cell *matHeaderCellDef>認定日</th>
                     <td mat-cell *matCellDef="let d">{{ d.qualificationDate }}</td>
                   </ng-container>
+                  <ng-container matColumnDef="disqualificationDate">
+                    <th mat-header-cell *matHeaderCellDef>扶養から外れた日</th>
+                    <td mat-cell *matCellDef="let d">{{ d.disqualificationDate ?? '' }}</td>
+                  </ng-container>
                   <tr mat-header-row *matHeaderRowDef="dependentColumns"></tr>
                   <tr mat-row *matRowDef="let row; columns: dependentColumns"></tr>
                 </table>
@@ -653,6 +657,13 @@ interface OnboardResult {
                   <ng-container matColumnDef="pensionGrade">
                     <th mat-header-cell *matHeaderCellDef>厚年等級</th>
                     <td mat-cell *matCellDef="let g">{{ g.pensionGradeNumber }}等級 ({{ g.pensionStandardRemuneration | number }}円)</td>
+                  </ng-container>
+                  <ng-container matColumnDef="basis">
+                    <th mat-header-cell *matHeaderCellDef>根拠・届出</th>
+                    <td mat-cell *matCellDef="let g">
+                      @if (g.basisRemuneration) { 報酬月額 {{ g.basisRemuneration | number }}円 }
+                      @if (g.filingId) { <a [routerLink]="['/filings', g.filingId]" [queryParams]="{ employeeId }">届出を開く</a> }
+                    </td>
                   </ng-container>
                   <tr mat-header-row *matHeaderRowDef="gradeColumns"></tr>
                   <tr mat-row *matRowDef="let row; columns: gradeColumns"></tr>
@@ -856,7 +867,7 @@ export class EmployeeDetailComponent implements OnInit {
   private version = 0;
 
   dependents = signal<Dependent[]>([]);
-  dependentColumns = ['name', 'relationship', 'birthDate', 'qualificationDate'];
+  dependentColumns = ['name', 'relationship', 'birthDate', 'qualificationDate', 'disqualificationDate'];
   /** 扶養の手続きで登録した続柄は英字の値で持つ。旧データの日本語はそのまま出す */
   readonly relationshipLabel = relationshipLabel;
 
@@ -864,7 +875,7 @@ export class EmployeeDetailComponent implements OnInit {
   employmentColumns = ['effectiveDate', 'employmentType', 'baseSalary', 'weeklyHours', 'socialInsurance'];
 
   grades = signal<Grade[]>([]);
-  gradeColumns = ['effectiveMonth', 'determinationType', 'healthGrade', 'pensionGrade'];
+  gradeColumns = ['effectiveMonth', 'determinationType', 'healthGrade', 'pensionGrade', 'basis'];
 
   salaries = signal<Salary[]>([]);
   salaryColumns = ['yearMonth', 'baseSalary', 'totalSalary', 'isConfirmed'];
@@ -1120,7 +1131,8 @@ export class EmployeeDetailComponent implements OnInit {
       regular: '定時決定',
       occasional: '随時改定',
       initial: '資格取得時決定',
-      specific: '特定適用',
+      leaveEnd: '産休・育休終了時改定',
+      specific: 'その他',
     };
     return labels[type] ?? type;
   }
