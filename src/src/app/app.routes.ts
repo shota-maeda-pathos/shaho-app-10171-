@@ -193,6 +193,13 @@ export const routes: Routes = [
           import('./features/leave/leave-wizard').then((m) => m.LeaveWizardComponent),
       },
       {
+        path: 'age-events/:id',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '年齢到達の手続き' },
+        loadComponent: () =>
+          import('./features/age-event/age-event-wizard').then((m) => m.AgeEventWizardComponent),
+      },
+      {
         path: 'revisions/:id',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '等級の見直し' },

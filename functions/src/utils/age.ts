@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase-admin/firestore';
+import { ageFlagsForMonth } from '../insurance/calculator';
 
 /**
  * 社会保険の年齢判定: 「誕生日の前日」に年齢が加算される。
@@ -23,18 +24,19 @@ export function ageAtEndOfMonth(birthDate: Timestamp, yearMonth: string): number
   return Math.max(0, age);
 }
 
-/** 40歳以上65歳未満: 介護保険第2号被保険者 */
+const flags = (birthDate: Timestamp, yearMonth: string) => ageFlagsForMonth(birthDate.toDate().toISOString().slice(0, 10), yearMonth);
+
+/** その月の保険料に介護保険料を含める（40歳到達日の月から65歳到達日の月の前月まで） */
 export function isLongTermCareAge(birthDate: Timestamp, yearMonth: string): boolean {
-  const age = ageAtEndOfMonth(birthDate, yearMonth);
-  return age >= 40 && age < 65;
+  return flags(birthDate, yearMonth).longTermCare;
 }
 
-/** 70歳以上: 厚生年金の被保険者資格なし（原則） */
+/** その月は厚生年金保険料がない（70歳到達日の月から） */
 export function isPensionExcluded(birthDate: Timestamp, yearMonth: string): boolean {
-  return ageAtEndOfMonth(birthDate, yearMonth) >= 70;
+  return flags(birthDate, yearMonth).pensionExcluded;
 }
 
-/** 75歳以上: 後期高齢者医療制度に移行 */
+/** その月は健康保険料がない（75歳の誕生日の月から。後期高齢者医療制度） */
 export function isHealthExcluded(birthDate: Timestamp, yearMonth: string): boolean {
-  return ageAtEndOfMonth(birthDate, yearMonth) >= 75;
+  return flags(birthDate, yearMonth).healthExcluded;
 }

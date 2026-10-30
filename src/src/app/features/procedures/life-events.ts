@@ -31,6 +31,7 @@ export const LIFE_EVENT_GROUPS: { label: string; events: LifeEvent[] }[] = [
       { type: 'leave', icon: 'child_friendly', label: '産休・育休に入る／戻る', hint: '申出書・保険料の免除・変更届・終了届' },
       { type: 'monthly_change', icon: 'swap_vert', label: '給料が大きく変わった', hint: '随時改定（月額変更届）' },
       { type: 'transfer', icon: 'apartment', label: '別の事業所へ異動する', hint: '事業所間の異動' },
+      { type: 'age_event', icon: 'elderly', label: '70歳・75歳になる', hint: '厚生年金・健康保険の資格喪失' },
     ],
   },
   {

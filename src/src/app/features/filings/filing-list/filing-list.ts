@@ -46,6 +46,7 @@ const FILING_TYPE_LABELS: Record<string, string> = {
   maternityLeaveChange: '産前産後休業変更（終了）届',
   maternityLeaveEndChange: '産前産後休業終了時報酬月額変更届',
   childcareLeaveEndChange: '育児休業等終了時報酬月額変更届',
+  pensionLoss70: '資格喪失届・70歳以上被用者該当届',
   childcareLeaveEnd: '育児休業等終了届',
   bonusPayment: '賞与支払届',
 };

@@ -26,6 +26,7 @@ export const OFFICIAL_FORMS: Record<string, { file: string; title: string; sourc
   childcareLeaveEnd: { file: 'childcare-end', title: '育児休業等取得者終了届', source: 'menjo/20140403-02.html' },
   maternityLeaveEndChange: { file: 'maternity-end-change', title: '産前産後休業終了時報酬月額変更届', source: 'menjo/20140327-01.html' },
   childcareLeaveEndChange: { file: 'childcare-end-change', title: '育児休業等終了時報酬月額変更届', source: 'menjo/20140626-01.html' },
+  pensionLoss70: { file: 'pension-loss-70', title: '厚生年金保険 被保険者資格喪失届・70歳以上被用者該当届', source: 'hihokensha/20140218.html' },
 };
 
 type Data = Record<string, unknown>;
@@ -172,6 +173,7 @@ const HEADERS: Record<string, HeaderLayout> = {
   bonus: { date:[[59,83,26,13],[109,83,27,13],[161,83,34,13]], symbol:[[107.5,97.16,93.7,39.55],[226.54,97.16,90.82,39.55]], address:[113,180,367,65], name:[113,270,367,29], representative:[113,312,367,26], phone:[[125,342,67,19],[213,342,76,19],[317,342,80,19]] },
   dependent: { date:[[85,83,34,13],[141,83,33,13],[194,83,30,13]], symbol:[[155.6,97.74,101.57,32.26],[281.36,97.74,94.46,32.26]], address:[160,181,346,35], name:[160,229,346,29], representative:[160,277,346,24], phone:[[163,307,59,19],[246,307,69,19],[336,307,74,19]] },
   maternity: { date:[[122,146,28,13],[167,146,28,13],[210,146,28,13]], symbol:[[156.46,163.4,87.56,32.26],[265.9,163.4,87.56,32.26]], address:[161,235,321,40], name:[161,289,321,28], representative:[161,339,321,28], phone:[[178,374,53,19],[250,374,66,19],[345,374,63,19]] },
+  'pension-loss-70': { date:[[108,145,55,14],[175,145,32,14],[218,145,30,14]], symbol:[[167,164,88,30],[277,164,85,30]], number:[408,164,109,30], address:[168,215,348,45], name:[168,285,348,35], representative:[168,345,348,30], phone:[[170,392,70,16],[252,392,80,16],[340,392,70,16]] },
   'maternity-end-change': { date:[[130,151,37,13],[181,151,28,13],[224,151,26,13]], symbol:[[175,172,83,26],[280,172,82,26]], address:[176,232,305,30], name:[176,288,305,28], representative:[176,340,305,28], phone:[[180,380,55,19],[262,380,65,19],[345,380,60,19]] },
   'childcare-end-change': { date:[[120,151,37,13],[172,151,28,13],[214,151,26,13]], symbol:[[165,172,83,26],[270,172,82,26]], address:[166,232,305,30], name:[166,288,305,28], representative:[166,340,305,28], phone:[[170,380,55,19],[252,380,65,19],[335,380,60,19]] },
   childcare: { date:[[86,145,37,13],[143,145,31,13],[190,145,30,13]], symbol:[[133.42,163.4,94.47,36.1],[251.5,163.4,94.47,36.1]], address:[140,238,345,41], name:[140,300,345,28], representative:[140,348,345,26], phone:[[157,386,52,19],[237,386,63,19],[322,386,69,19]] },
@@ -234,6 +236,9 @@ function acquisition(w: Writer, fd: Data) {
   w.text(fd['被保険者住所'] ?? fd['住所'],[132,527,395,14],'被保険者住所');
 }
 
+/** 喪失原因「7. 75歳到達（健康保険のみ喪失）」の丸の位置 */
+const LOSS_75_MARK: [number, number] = [705, 441];
+
 function loss(w: Writer, fd: Data) {
   insuredNumber(w,fd['被保険者整理番号'],[135,377,100,25]);
   names(w,fd,[[308,375,166,28],[483,375,160,28]],[[308,358,166,13],[483,358,160,13]]);
@@ -243,6 +248,7 @@ function loss(w: Writer, fd: Data) {
   const reason = String(fd['喪失原因'] ?? '');
   if (reason === '退職等' || reason === '4') w.circle(705,420,12,11);
   else if (reason === '死亡' || reason === '5') w.circle(705,431,12,11);
+  else if (reason === '75歳到達' || reason === '7') w.circle(LOSS_75_MARK[0],LOSS_75_MARK[1],12,11);
   else w.warnings.add('喪失原因の選択を確認してください。');
 }
 
@@ -341,6 +347,29 @@ function leaveEndRemuneration(w: Writer, fd: Data, childcare: boolean) {
   // 翌日から続けて産休・育休に入る人は、この届出を作れない（サーバーで止めている）
   w.text('レ', childcare ? [382, 1001, 12, 12] : [392, 1007, 12, 12], '月変該当の確認', { size: 9, center: true });
   w.warnings.add('給与の締切日・支払日と備考は、原票で確認してください。');
+}
+
+/** 元号の番号（昭和5・平成7・令和9）の枠と、年・月・日の2桁ずつの枠に日付を書く */
+function eraDate(w: Writer, value: unknown, era: Box, parts: [Box, Box, Box], label: string) {
+  const d = parseDate(value);
+  if (!d) { w.warnings.add(`${label}が未登録、または様式に記入できない日付です。`); return; }
+  w.text(d.era, era, label, { center: true });
+  [d.eraYear, d.month, d.day].forEach((v, i) => w.digits(String(v).padStart(2, '0'), parts[i], 2, label));
+}
+
+/** 厚生年金保険 被保険者資格喪失届・70歳以上被用者該当届（喪失原因「6. 70歳到達」は様式に印刷済み） */
+function pensionLoss70(w: Writer, fd: Data) {
+  insuredNumber(w, fd['被保険者整理番号'], [170, 540, 103, 40]);
+  w.text(fd['被保険者氏名'], [320, 540, 280, 40], '被保険者氏名', { required: true, center: true });
+  eraDate(w, fd['生年月日'], [641, 520, 37, 80], [[678, 520, 74, 80], [752, 520, 73, 80], [825, 520, 72, 80]], '生年月日');
+  identifier(w, fd, [168, 612, 437, 105]);
+  eraDate(w, fd['資格喪失年月日'], [168, 735, 37, 90], [[205, 735, 72, 90], [277, 735, 73, 90], [350, 735, 72, 90]], '資格喪失年月日');
+  eraDate(w, fd['該当年月日'], [168, 847, 37, 105], [[205, 847, 72, 105], [277, 847, 73, 105], [350, 847, 72, 105]], '該当年月日');
+  w.money(fd['報酬月額_通貨'], [470, 866, 145, 20], '報酬月額（通貨）', false, true);
+  w.money(fd['報酬月額_現物'], [470, 930, 145, 20], '報酬月額（現物）');
+  const total = fd['報酬月額_合計'];
+  if (typeof total === 'number' && Number.isSafeInteger(total) && total >= 0) w.cells(total, [635, 880, 262, 45], 9, '報酬月額合計', true);
+  else w.warnings.add('報酬月額合計が未登録、または整数の金額ではありません。');
 }
 
 /** 賞与支払届の1人分（サーバーの bonusFilingPerson と同じ形） */
@@ -594,6 +623,7 @@ export async function createOfficialFilingPdf(filingType: string, formData: Data
       case 'dependentChange':dependent(w,formData,deps[i]);break;
       case 'maternityLeaveEndChange':leaveEndRemuneration(w,formData,false);break;
       case 'childcareLeaveEndChange':leaveEndRemuneration(w,formData,true);break;
+      case 'pensionLoss70':pensionLoss70(w,formData);break;
       default:leave(w,formData,form.file);
     }
   }

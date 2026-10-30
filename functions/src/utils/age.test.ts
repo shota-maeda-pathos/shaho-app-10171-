@@ -61,3 +61,21 @@ describe('isHealthExcluded', () => {
     expect(isHealthExcluded(birth, '2030-06')).toBe(true);
   });
 });
+
+describe('月の1日生まれ（70歳と75歳で喪失の日が違う）', () => {
+  const birth = ts('1955-04-01');
+  it('70歳：到達日（3月31日）に喪失し、厚年は2月分まで', () => {
+    expect(isPensionExcluded(birth, '2025-02')).toBe(false);
+    expect(isPensionExcluded(birth, '2025-03')).toBe(true);
+  });
+  it('75歳：誕生日（4月1日）に喪失し、健保は3月分まで', () => {
+    expect(isHealthExcluded(birth, '2030-03')).toBe(false);
+    expect(isHealthExcluded(birth, '2030-04')).toBe(true);
+  });
+  it('40歳：到達日（3月31日）の月から介護、65歳：到達日の月の前月まで', () => {
+    expect(isLongTermCareAge(birth, '1995-02')).toBe(false);
+    expect(isLongTermCareAge(birth, '1995-03')).toBe(true);
+    expect(isLongTermCareAge(birth, '2020-02')).toBe(true);
+    expect(isLongTermCareAge(birth, '2020-03')).toBe(false);
+  });
+});

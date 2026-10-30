@@ -53,5 +53,10 @@
     "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/menjo/20140626-01.files/0000018500e8THA3msW5.pdf",
     "checkedOn": "2026-10-30",
     "sha256": "fed40a5b0be16a5f6abe7f7dcb46765696834b67f02f62d20d31e11216a1e690"
+  },
+  "pension-loss-70": {
+    "sourceUrl": "https://www.nenkin.go.jp/shinsei/kounen/tekiyo/hihokensha/20140218.files/0000014752oyCXKgetP9.pdf",
+    "checkedOn": "2026-10-30",
+    "sha256": "ecbddd474865d81b7fb22cc61d157491648eef3076fcbc98f83e3642c2c17883"
   }
 }

@@ -16,6 +16,7 @@ const FILING_TYPE_TITLES: Record<string, string> = {
   childcareLeaveEnd: '育児休業等取得者終了届',
   maternityLeaveEndChange: '健康保険・厚生年金保険 産前産後休業終了時報酬月額変更届',
   childcareLeaveEndChange: '健康保険・厚生年金保険 育児休業等終了時報酬月額変更届',
+  pensionLoss70: '厚生年金保険 被保険者資格喪失届・70歳以上被用者該当届',
 };
 
 export interface FilingPdfDataResponse {
@@ -142,6 +143,26 @@ function buildSections(
         { label: '退職年月日', value: fmt(fd['退職年月日']) },
         { label: '最終標準報酬月額（健康保険）', value: yen(fd['最終標準報酬月額_健康保険']) },
         { label: '最終標準報酬月額（厚生年金）', value: yen(fd['最終標準報酬月額_厚生年金']) },
+      ],
+    });
+  }
+
+  if (filingType === 'pensionLoss70') {
+    sections.push({
+      label: '厚生年金の資格喪失（70歳到達）',
+      rows: [
+        { label: '資格喪失年月日（70歳到達日）', value: fmt(fd['資格喪失年月日']) },
+        { label: '従前の標準報酬月額（厚生年金）', value: yen(fd['従前の標準報酬月額_厚生年金']) },
+      ],
+    });
+    sections.push({
+      label: '70歳以上被用者該当',
+      rows: [
+        { label: '該当年月日', value: fmt(fd['該当年月日']) },
+        { label: '報酬月額（通貨）', value: yen(fd['報酬月額_通貨']) },
+        { label: '報酬月額（現物）', value: yen(fd['報酬月額_現物']) },
+        { label: '報酬月額（合計）', value: yen(fd['報酬月額_合計']) },
+        { label: '標準報酬月額相当額', value: yen(fd['標準報酬月額相当額']) },
       ],
     });
   }

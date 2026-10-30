@@ -2,7 +2,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
 import { OfficeDoc, ProcedureDoc, ProcedureStep } from '../types/firestore';
-import { addMonths } from '../insurance/calculator';
+import { addMonths, lastDayOfMonth } from '../insurance/calculator';
 import { acquisitionFilingDeadline, currentWizardStep } from '../onboarding/service';
 import { monthlyOverview, runId } from '../monthly/service';
 import { currentResignationStep } from '../resignation/service';
@@ -10,6 +10,8 @@ import { currentDependentStep } from '../dependent-change/service';
 import { currentLeaveStep } from '../leave-procedure/service';
 import { currentRevisionStep } from '../grade-revision/service';
 import { FILING_LABEL as REVISION_FILING_LABEL, KIND_LABEL as REVISION_KIND_LABEL } from '../grade-revision/rules';
+import { currentAgeStep } from '../age-event/service';
+import { deadlineOf, FILING_LABEL as AGE_FILING_LABEL, KIND_LABEL as AGE_KIND_LABEL, milestonesBetween } from '../age-event/rules';
 import { FILING_LABEL } from '../leave-procedure/rules';
 import { mapConcurrent } from '../utils/parallel';
 import { HomeTodo, TodoTone, payDateOf, sortTodos } from './rules';
@@ -198,6 +200,73 @@ function revisionTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, offic
   return wizardTodo(p, auth, { base, step, next: REVISION_NEXT, filingName: REVISION_FILING_LABEL[gr.kind], detail });
 }
 
+const AGE_NEXT: Record<string, string> = {
+  check: '到達日と届出の要否を確かめる',
+  filing: '届出を作って承認を依頼する',
+  submit: '届出を提出する',
+  confirm: '完了を確認する',
+};
+
+/** 年齢到達（70歳・75歳）の手続き */
+function ageTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string) {
+  const ae = p.ageEvent!;
+  return wizardTodo(p, auth, {
+    base: {
+      id: `procedure-${p.id}`, kind: 'age', title: `${p.employeeName}さんの${AGE_KIND_LABEL[ae.kind]}`, officeName,
+      route: `/age-events/${p.id}`, queryParams: { officeId: p.officeId }, updatedAt: iso(p.updatedAt),
+    },
+    step: currentAgeStep(p), next: AGE_NEXT, filingName: AGE_FILING_LABEL[ae.kind], detail: `資格喪失日 ${ae.lossDate}`,
+  });
+}
+
+/**
+ * まだ手続きを始めていない年齢到達（カタログ：翌月の到達者を事前に表示する）。
+ * 40・65歳は届出がないため「待ち」で知らせるだけ。70・75歳は、2か月前から来月末までに起きる人の手続きを促す
+ */
+async function ageNoticeTodos(auth: AuthContext, inScope: (officeId: string) => boolean, officeName: (id: string) => string): Promise<HomeTodo[]> {
+  const base = `companies/${auth.companyId}`;
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+  const thisMonth = today.slice(0, 7);
+  const from = `${addMonths(thisMonth, -2)}-01`;
+  const to = lastDayOfMonth(addMonths(thisMonth, 1));
+  // 等価条件だけにして複合索引に頼らない。生年月日だけを読む
+  const [employees, started] = await Promise.all([
+    db.collection(`${base}/employees`).where('isActive', '==', true).where('deletedAt', '==', null)
+      .select('birthDate', 'lastName', 'firstName', 'officeId').get(),
+    db.collection(`${base}/procedures`).where('procedureType', '==', 'age_event').get(),
+  ]);
+  const done = new Set(started.docs.map(d => d.data() as ProcedureDoc)
+    .filter(p => p.ageEvent && p.status !== 'cancelled' && !p.deletedAt).map(p => `${p.employeeId}:${p.ageEvent!.kind}`));
+  const todos: HomeTodo[] = [];
+  for (const d of employees.docs) {
+    const e = d.data();
+    if (!e.birthDate || !inScope(e.officeId)) continue;
+    const birth = (e.birthDate as Timestamp).toDate().toISOString().slice(0, 10);
+    for (const m of milestonesBetween(birth, from, to)) {
+      const name = `${e.lastName ?? ''} ${e.firstName ?? ''}`.trim();
+      const common = { officeName: officeName(e.officeId), updatedAt: null, detail: m.effect };
+      if (!m.kind) {
+        // 40・65歳は今月以降のものだけ（届出はなく、保険料の計算が自動で変わる）
+        if (m.eventDate < `${thisMonth}-01`) continue;
+        todos.push({
+          ...common, id: `age-${d.id}-${m.age}`, kind: 'age', title: `${name}さんの${m.age}歳到達`,
+          next: '確かめるだけ（届出はありません）', tone: 'waiting', deadline: m.eventDate,
+          route: `/employees/${d.id}`, queryParams: {},
+        });
+        continue;
+      }
+      if (done.has(`${d.id}:${m.kind}`)) continue;
+      const deadline = deadlineOf(m.eventDate);
+      todos.push({
+        ...common, id: `age-${d.id}-${m.age}`, kind: 'age', title: `${name}さんの${AGE_KIND_LABEL[m.kind]}`,
+        next: `${m.age}歳到達の手続きを始める`, tone: deadline < today ? 'action' : 'yours', deadline,
+        route: '/age-events/new', queryParams: { employeeId: d.id, kind: m.kind },
+      });
+    }
+  }
+  return todos;
+}
+
 /** 入社・退職・扶養以外の手続き（段階6でウィザードに置き換える）。次のステップを出す */
 function procedureTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, officeName: string): HomeTodo | null {
   const order: ProcedureStep['status'][] = ['returned', 'in_progress', 'available'];
@@ -223,6 +292,7 @@ async function procedureTodos(auth: AuthContext, inScope: (officeId: string) => 
     : p.dependentChange ? dependentTodo(p, auth, officeName(p.officeId))
     : p.leaveProcedure ? leaveTodo(p, auth, officeName(p.officeId))
     : p.gradeRevision ? revisionTodo(p, auth, officeName(p.officeId))
+    : p.ageEvent ? ageTodo(p, auth, officeName(p.officeId))
     : Promise.resolve(procedureTodo(p, auth, officeName(p.officeId))));
   return todos.filter((t): t is HomeTodo => t !== null);
 }
@@ -364,13 +434,14 @@ export async function listHomeTodos(auth: AuthContext, officeId?: string) {
   const names = new Map(offices.map(o => [o.id, o.data.name]));
   const inScope = (id: string) => names.has(id);
 
-  const [procedures, monthly, santei, bonus] = await Promise.all([
+  const [procedures, monthly, santei, bonus, ages] = await Promise.all([
     procedureTodos(auth, inScope, id => names.get(id) ?? ''),
     monthlyTodos(auth, offices),
     santeiTodos(auth, offices),
     bonusTodos(auth, offices),
+    ageNoticeTodos(auth, inScope, id => names.get(id) ?? ''),
   ]);
-  let items = [...procedures, ...monthly, ...santei, ...bonus];
+  let items = [...procedures, ...monthly, ...santei, ...bonus, ...ages];
   if (!isOperator(auth)) items = items.filter(t => t.tone === 'yours');
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
   return { today, items: sortTodos(items) };

@@ -444,6 +444,29 @@ export interface ProcedureDoc {
   leaveProcedure?: LeaveProcedureState;
   /** 随時改定・産休育休終了時改定の手続き（ウィザード）の状態。旧方式の随時改定にはない */
   gradeRevision?: GradeRevisionState;
+  /** 年齢到達（70歳・75歳）の手続き（ウィザード）の状態。旧方式の年齢到達にはない */
+  ageEvent?: AgeEventState;
+}
+
+/** 年齢到達（70歳の厚生年金の喪失・75歳の健康保険の喪失）の手続き（ウィザード）の状態 */
+export interface AgeEventState {
+  kind: 'pension70' | 'health75';
+  birthDate: string;
+  /** 年齢に達する日（誕生日の前日） */
+  reachDate: string;
+  /** 資格を失う日（70歳は到達日、75歳は誕生日） */
+  lossDate: string;
+  /** 70歳：到達日の報酬月額（担当者が確かめた額）と現物の内訳 */
+  remuneration: number | null;
+  inKind: number;
+  /** 70歳：届出が要るか（標準報酬月額相当額が到達前と違う）。確かめるまでは null */
+  filingRequired: boolean | null;
+  equivalentGrade: number | null;
+  equivalentStandard: number | null;
+  /** 75歳：保険証などの回収枚数 */
+  cardsReturned: number;
+  cardsUnreturnable: number;
+  filingId: string | null;
 }
 
 /** 随時改定・終了時改定で、等級を改定すると決めたときの判定（届出と承認はこの値で作る） */

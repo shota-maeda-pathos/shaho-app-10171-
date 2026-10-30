@@ -52,6 +52,14 @@ interface Employee { id: string; lastName: string; firstName: string; employeeNu
           </mat-radio-group>
           <p class="note">産休・育休の手続きをこのシステムで行った場合は、その手続きの完了画面から始めると、休業を終えた日を引き継げます。</p>
         }
+        @if (type() === 'age_event') {
+          <h3>年齢</h3>
+          <mat-radio-group [(ngModel)]="ageKind" class="kinds" aria-label="到達する年齢">
+            <mat-radio-button value="pension70">70歳（厚生年金の資格を失う）</mat-radio-button>
+            <mat-radio-button value="health75">75歳（健康保険の資格を失う）</mat-radio-button>
+          </mat-radio-group>
+          <p class="note">40歳・65歳は届出がなく、介護保険料は毎月の計算で自動で変わります。ホームの「やること」に事前に出ます。</p>
+        }
         <p class="note">この画面では従業員の情報を変更しません。次の画面で入力・確認してから登録します。</p>
         <button mat-flat-button (click)="start()" [disabled]="!canStart() || starting()">入力画面へ進む</button>
       </section>
@@ -80,7 +88,7 @@ export class ProcedureStartComponent implements OnInit {
   private functions = inject(Functions); private auth = inject(AuthService); private router = inject(Router); private route = inject(ActivatedRoute);
   type = signal('');
   event = computed(() => LIFE_EVENTS.find(e => e.type === this.type() && !e.route) ?? null);
-  employeeId = ''; keyword = ''; leaveKind: 'maternity' | 'childcare' = 'maternity'; revisionKind: 'occasional' | 'maternityEnd' | 'childcareEnd' = 'occasional';
+  employeeId = ''; keyword = ''; leaveKind: 'maternity' | 'childcare' = 'maternity'; revisionKind: 'occasional' | 'maternityEnd' | 'childcareEnd' = 'occasional'; ageKind: 'pension70' | 'health75' = 'pension70';
   employees = signal<Employee[]>([]); loading = signal(false); error = signal(''); hasMore = signal(true); private cursor = '';
   starting = signal(false);
 
@@ -121,12 +129,13 @@ export class ProcedureStartComponent implements OnInit {
       dependent_change: { fn: 'dependentChangeStart', route: '/dependents' },
       leave: { fn: 'leaveProcedureStart', route: '/leaves' },
       monthly_change: { fn: 'gradeRevisionStart', route: '/revisions' },
+      age_event: { fn: 'ageEventStart', route: '/age-events' },
     };
     const w = wizard[this.type()];
     if (w) {
       this.starting.set(true); this.error.set('');
       try {
-        const {data} = await httpsCallable<object,{procedureId:string}>(this.functions,w.fn)({companyId:this.auth.companyId,employeeId:this.employeeId,...(this.type() === 'leave' ? {kind:this.leaveKind} : this.type() === 'monthly_change' ? {kind:this.revisionKind} : {})});
+        const {data} = await httpsCallable<object,{procedureId:string}>(this.functions,w.fn)({companyId:this.auth.companyId,employeeId:this.employeeId,...(this.type() === 'leave' ? {kind:this.leaveKind} : this.type() === 'monthly_change' ? {kind:this.revisionKind} : this.type() === 'age_event' ? {kind:this.ageKind} : {})});
         void this.router.navigate([w.route, data.procedureId]);
       } catch(e:any) { this.error.set(e.message ?? '手続きを始められませんでした'); } finally { this.starting.set(false); }
       return;

@@ -1,0 +1,173 @@
+<div class="app-page">
+  <a routerLink="/procedures" class="back"><mat-icon>arrow_back</mat-icon>進行中の手続き</a>
+
+  @if (loading()) {
+    <app-loading-state />
+  } @else if (loadError()) {
+    <app-error-state [message]="loadError()" (retry)="load(true)" />
+  } @else if (view(); as v) {
+    <app-wizard [heading]="v.procedure.title"
+                [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + '・資格喪失日 ' + (v.facts.lossDate | date:'yyyy年M月d日')"
+                [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                (advance)="advance()">
+
+      @switch (key()) {
+
+        <!-- ① 到達日と届出の要否を確かめる -->
+        @case ('check') {
+          @if (v.locked) {
+            <p class="note">届出の承認を依頼したあとは直せません。直す場合は承認者に差し戻してもらってください。</p>
+          }
+          <table class="summary">
+            <tbody>
+              <tr><th>生年月日</th><td>{{ v.employee.birthDate | date:'yyyy年M月d日' }}</td></tr>
+              <tr><th>{{ is70() ? 70 : 75 }}歳に達する日</th><td>{{ v.facts.reachDate | date:'yyyy年M月d日' }}（誕生日の前日）</td></tr>
+              <tr><th>資格を失う日</th><td><strong>{{ v.facts.lossDate | date:'yyyy年M月d日' }}</strong>（{{ is70() ? '厚生年金。70歳に達する日' : '健康保険。75歳の誕生日' }}）</td></tr>
+              <tr><th>保険料</th><td>{{ is70() ? '厚生年金保険料' : '健康保険料' }}は<strong>{{ monthLabel(v.facts.lastChargedMonth) }}分まで</strong>です。毎月の計算は年齢から自動で変わります。</td></tr>
+              @if (v.grade) {
+                <tr><th>今の等級</th><td>{{ is70() ? '厚生年金 ' + v.grade.pensionGrade + '等級（' + (v.grade.pensionStandard | number) + '円）' : '健康保険 ' + v.grade.healthGrade + '等級（' + (v.grade.healthStandard | number) + '円）' }}</td></tr>
+              }
+            </tbody>
+          </table>
+
+          @if (is70()) {
+            <h3>70歳に達する日の報酬月額</h3>
+            <p class="sub">固定的賃金に、残業手当などの非固定的賃金の平均を足した額です。
+              @if (v.estimate !== null && !v.state.remuneration) { 直近の給与（{{ monthLabel(v.latestSalaryMonth) }}支給まで）からの目安を入れてあります。再雇用などで給与が変わる場合は直してください。 }</p>
+            <fieldset class="form-grid" [disabled]="v.locked || isDone()">
+              <mat-form-field appearance="outline"><mat-label>報酬月額（円、現物を含む）</mat-label>
+                <input matInput type="number" min="0" [(ngModel)]="remuneration" (ngModelChange)="changed()" name="remuneration"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>うち現物給与（円）</mat-label>
+                <input matInput type="number" min="0" [(ngModel)]="inKind" (ngModelChange)="dirty.set(true)" name="inKind"></mat-form-field>
+            </fieldset>
+            @if (judged(); as j) {
+              <section class="result" aria-live="polite">
+                <p>
+                  @if (j.filingRequired === true) { <app-status-badge tone="yours" label="届出が要ります" /> }
+                  @else if (j.filingRequired === false) { <app-status-badge tone="done" label="届出は要りません" /> }
+                  {{ j.message }}
+                </p>
+                @if (j.equivalentStandard !== null) {
+                  <p class="sub">標準報酬月額相当額：{{ j.equivalentGrade }}等級（{{ j.equivalentStandard | number }}円）。健康保険の等級は変わりません。</p>
+                }
+              </section>
+            }
+          } @else {
+            @if (v.dependents.length) {
+              <div class="alert" role="alert">
+                被扶養者（{{ v.dependents.join('・') }}）も、本人と同じ日に健康保険の被扶養者でなくなります。国民健康保険などへの加入が要ることを本人に伝えてください（75歳以上の人は後期高齢者医療制度）。
+              </div>
+            }
+            <h3>保険証などの回収</h3>
+            <fieldset class="form-grid" [disabled]="v.locked || isDone()">
+              <mat-form-field appearance="outline"><mat-label>回収して添付する枚数</mat-label>
+                <input matInput type="number" min="0" max="20" [(ngModel)]="cardsReturned" (ngModelChange)="dirty.set(true)" name="returned"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>回収できない枚数</mat-label>
+                <input matInput type="number" min="0" max="20" [(ngModel)]="cardsUnreturnable" (ngModelChange)="dirty.set(true)" name="unreturnable"></mat-form-field>
+            </fieldset>
+            <p class="sub">本人と被扶養者の分を数えます。資格確認書を発行している場合も同じです。</p>
+          }
+        }
+
+        <!-- ② 届出を作る -->
+        @case ('filing') {
+          @if (noFiling()) {
+            <p><app-status-badge tone="done" label="不要" /> 標準報酬月額相当額が到達前と同じため、届出はいりません。</p>
+          } @else {
+            @if (v.approval?.status === 'rejected') {
+              <div class="alert" role="alert">
+                <strong>承認者から差し戻されました。</strong>
+                @if (v.approval?.comment) { 理由：{{ v.approval!.comment }} }
+                直す場合は「戻る」で最初のステップへ戻り、保存し直してから、もう一度届出を作って依頼します。
+              </div>
+            }
+            <table class="summary">
+              <tbody>
+                <tr><th>届出</th><td>{{ v.filingLabel }}</td></tr>
+                <tr><th>資格喪失日</th><td>{{ v.facts.lossDate | date:'yyyy年M月d日' }}</td></tr>
+                @if (is70()) {
+                  <tr><th>報酬月額</th><td>{{ v.state.remuneration | number }}円（うち現物 {{ v.state.inKind | number }}円）</td></tr>
+                  <tr><th>標準報酬月額相当額</th><td>{{ v.state.equivalentStandard | number }}円</td></tr>
+                } @else {
+                  <tr><th>保険証などの回収</th><td>添付 {{ v.state.cardsReturned }}枚・回収できない {{ v.state.cardsUnreturnable }}枚</td></tr>
+                }
+                <tr><th>提出の期限</th><td>{{ v.facts.deadline | date:'yyyy年M月d日' }}まで</td></tr>
+              </tbody>
+            </table>
+            <p class="sub">本人の個人番号（または基礎年金番号）は、届出の画面で確かめてください。</p>
+          }
+        }
+
+        <!-- ③ 承認者が確認する -->
+        @case ('approval') {
+          @if (noFiling()) {
+            <p class="sub">届出がないため、承認はいりません。</p>
+          } @else if (v.approval?.status === 'pending') {
+            <p>承認者に確認を依頼しました。承認者は「承認」の画面から確認します。</p>
+            <button mat-stroked-button type="button" (click)="load(true)" [disabled]="busy()"><mat-icon>refresh</mat-icon>最新の状態にする</button>
+          } @else if (v.approval?.status === 'approved' || v.filing?.workflowStatus === 'approved') {
+            <p><app-status-badge tone="done" label="承認済み" /> {{ v.filingLabel }}が承認されました。</p>
+          }
+        }
+
+        <!-- ④ 提出する -->
+        @case ('submit') {
+          @if (noFiling()) {
+            <p class="sub">届出がないため、提出はいりません。</p>
+          } @else if (v.filing; as fl) {
+            @if (submitDone()) {
+              <p><app-status-badge tone="done" label="提出済み" />
+                {{ fl.mockStatus === 'completed' ? '模擬電子申請が完了しました。' : '紙の届出が受理されました。' }}</p>
+            } @else {
+              <mat-radio-group [(ngModel)]="method" class="radios" aria-label="提出方法">
+                <mat-radio-button value="electronic">電子申請（模擬）で提出する</mat-radio-button>
+                <mat-radio-button value="paper">紙で提出する</mat-radio-button>
+              </mat-radio-group>
+              @if (method === 'electronic') {
+                <p class="sub">このシステムの電子申請は模擬です。実際の提出は、e-Govや紙で別に行ってください。</p>
+                <button mat-flat-button type="button" (click)="mockSubmit()" [disabled]="busy()">模擬電子申請する</button>
+              } @else {
+                <p class="sub">届出の画面でPDFを印刷し、年金事務所（または健康保険組合）へ提出します。
+                  <a [routerLink]="['/filings', fl.id]" [queryParams]="{ employeeId: v.employee.id }">届出の画面を開く</a></p>
+                @if (fl.submissionStatus === 'notSubmitted') {
+                  <button mat-flat-button type="button" (click)="paper('submit')" [disabled]="busy()">提出したことを記録する</button>
+                } @else if (fl.submissionStatus === 'submitted') {
+                  <p>提出済み（結果待ち）です。結果が届いたら記録してください。</p>
+                  <div class="row-actions">
+                    <button mat-flat-button type="button" (click)="paper('accepted')" [disabled]="busy()">受理された</button>
+                    <button mat-stroked-button type="button" (click)="paper('returned')" [disabled]="busy()">返戻された</button>
+                  </div>
+                } @else if (fl.submissionStatus === 'returned') {
+                  <div class="alert" role="alert">返戻されました。{{ fl.resultNote }} 内容を直して出し直す方法は、届出の画面で確認してください。</div>
+                }
+              }
+              @if (mockResult()) { <p class="note">{{ mockResult() }}</p> }
+            }
+          }
+        }
+
+        <!-- ⑤ 完了を確認する -->
+        @case ('confirm') {
+          @if (isDone()) {
+            <div class="complete" role="status">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+              <div><strong>{{ v.procedure.kindLabel }}の手続きは完了しました。</strong></div>
+            </div>
+          }
+          <table class="summary">
+            <tbody>
+              <tr><th>資格喪失日</th><td>{{ v.facts.lossDate | date:'yyyy年M月d日' }}</td></tr>
+              <tr><th>保険料</th><td>{{ v.facts.effect }}</td></tr>
+              <tr><th>届出</th><td>{{ noFiling() ? 'なし（標準報酬月額相当額が到達前と同じ）' : v.filingLabel + (submitDone() ? '（提出済み）' : '') }}</td></tr>
+            </tbody>
+          </table>
+          @if (is70()) {
+            <p class="sub">70歳以上被用者として、算定基礎届・月額変更届・賞与支払届は引き続き出します（厚生年金の欄は70歳以上被用者として記入）。</p>
+          }
+          <a mat-stroked-button [routerLink]="['/employees', v.employee.id]">従業員の画面を開く</a>
+        }
+      }
+    </app-wizard>
+  }
+</div>
