@@ -19,6 +19,7 @@ function toOfficeResponse(id: string, data: OfficeDoc): OfficeResponse {
     paymentMonth: data.paymentMonth,
     deductionMethod: data.deductionMethod,
     roundingRule: data.roundingRule,
+    bonusMonths: data.bonusMonths ?? [],
     isActive: data.isActive,
     version: data.version ?? 1,
     createdAt: toISOString(data.createdAt),

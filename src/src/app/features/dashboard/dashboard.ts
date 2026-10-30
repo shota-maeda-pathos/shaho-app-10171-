@@ -12,7 +12,7 @@ import { LifeEventCardsComponent } from '../procedures/life-events';
 /** サーバーの homeTodos が返す1件 */
 interface HomeTodo {
   id: string;
-  kind: 'onboarding' | 'resignation' | 'dependent' | 'leave' | 'procedure' | 'monthly' | 'santei';
+  kind: 'onboarding' | 'resignation' | 'dependent' | 'leave' | 'procedure' | 'monthly' | 'santei' | 'bonus';
   title: string;
   next: string;
   detail: string | null;

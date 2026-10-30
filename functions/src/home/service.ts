@@ -14,6 +14,9 @@ import { HomeTodo, TodoTone, payDateOf, sortTodos } from './rules';
 import { monthlyProgress } from './monthly-progress';
 import { santeiOverview, santeiRunId } from '../santei/service';
 import { santeiProgress } from '../santei/progress';
+import { bonusOverview, bonusRunId } from '../bonus/service';
+import { bonusProgress } from '../bonus/progress';
+import { isScheduledMonth } from '../bonus/bonus-calc';
 
 const iso = (v: unknown) => (v as Timestamp | undefined)?.toDate?.().toISOString() ?? null;
 const date = (v: unknown) => iso(v)?.slice(0, 10) ?? null;
@@ -273,6 +276,51 @@ async function santeiTodos(auth: AuthContext, offices: { id: string; data: Offic
   return todos.filter((t): t is HomeTodo => t !== null);
 }
 
+// ── 賞与 ─────────────────────────────────────────────
+
+/**
+ * 事業所ごとの賞与。始めた支給月（半年以内）のうち終わっていないものと、支給予定月が終わったのに賞与が登録されていない月（3か月以内）を出す。
+ * 次にやることは、賞与の画面と同じ判定（bonus/progress.ts）で全員分の状況から決める
+ */
+async function bonusTodos(auth: AuthContext, offices: { id: string; data: OfficeDoc }[]) {
+  if (!offices.length) return [];
+  const base = `companies/${auth.companyId}`;
+  const current = currentMonthJst();
+  const targets = (await mapConcurrent(offices, 4, async office => {
+    const runs = await db.collection(`${base}/bonusRuns`).where('officeId', '==', office.id).get();
+    const months = new Set(runs.docs.map(d => d.data().payMonth as string).filter(m => m && m >= addMonths(current, -6)));
+    for (let i = 1; i <= 3; i++) {
+      const m = addMonths(current, -i);
+      if (isScheduledMonth(office.data.bonusMonths, m) && !months.has(m)) months.add(m);
+    }
+    return [...months].map(payMonth => ({ office, payMonth }));
+  })).flat();
+  const todos = await mapConcurrent(targets, 4, async ({ office, payMonth }): Promise<HomeTodo | null> => {
+    const todo = {
+      id: `bonus-${bonusRunId(office.id, payMonth)}`, kind: 'bonus' as const, title: `賞与（${payMonth.slice(0, 4)}年${Number(payMonth.slice(5, 7))}月支給）`,
+      officeName: office.data.name, route: '/bonus', queryParams: { officeId: office.id, month: payMonth },
+    };
+    let overview: Awaited<ReturnType<typeof bonusOverview>>;
+    try {
+      overview = await bonusOverview({ companyId: auth.companyId, officeId: office.id, payMonth }, auth);
+    } catch (e) {
+      return { ...todo, deadline: null, next: '状況を読み込めませんでした', detail: (e as Error).message || null, tone: 'action', updatedAt: null };
+    }
+    const deadline = overview.deadline;
+    const job = overview.job;
+    if (job?.status === 'stalled') return { ...todo, deadline, updatedAt: job.createdAt, next: `${job.label}が途中で止まりました`, detail: '賞与の画面で、もう一度実行してください', tone: 'action' };
+    if (job?.status === 'running') return { ...todo, deadline, updatedAt: job.createdAt, next: `${job.label}を処理しています（${job.processed}/${job.total}名）`, detail: null, tone: 'waiting' };
+    const progress = bonusProgress({
+      rows: overview.rows, filings: overview.filings, canApprove: overview.me.canApprove, uid: auth.uid, reviews: overview.reviews,
+      scheduled: overview.scheduled, monthEnded: overview.monthEnded, nonPayment: overview.nonPayment,
+    });
+    if (!progress) return null;
+    const failed = job && job.failed > 0 ? `直前の${job.label}で${job.failed}名が失敗しました` : null;
+    return { ...todo, deadline, updatedAt: job?.createdAt ?? null, ...progress, detail: [failed, progress.detail].filter(Boolean).join('／') || null };
+  });
+  return todos.filter((t): t is HomeTodo => t !== null);
+}
+
 // ── まとめ ───────────────────────────────────────────
 
 /**
@@ -288,12 +336,13 @@ export async function listHomeTodos(auth: AuthContext, officeId?: string) {
   const names = new Map(offices.map(o => [o.id, o.data.name]));
   const inScope = (id: string) => names.has(id);
 
-  const [procedures, monthly, santei] = await Promise.all([
+  const [procedures, monthly, santei, bonus] = await Promise.all([
     procedureTodos(auth, inScope, id => names.get(id) ?? ''),
     monthlyTodos(auth, offices),
     santeiTodos(auth, offices),
+    bonusTodos(auth, offices),
   ]);
-  let items = [...procedures, ...monthly, ...santei];
+  let items = [...procedures, ...monthly, ...santei, ...bonus];
   if (!isOperator(auth)) items = items.filter(t => t.tone === 'yours');
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
   return { today, items: sortTodos(items) };

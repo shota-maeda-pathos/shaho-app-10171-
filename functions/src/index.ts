@@ -40,6 +40,10 @@ export {
   santeiRunOverview, santeiRunHold, santeiDecision, santeiJobStart, santeiJobGet, santeiJobChunk, santeiFilingCreate, santeiFilingUpdate,
   santeiFilingGet, sampleSanteiCreate,
 } from './santei/functions';
+export {
+  bonusRunOverview, bonusRunHold, bonusRunImport, bonusRunEntry, bonusRunNonPayment, bonusJobStart, bonusJobGet, bonusJobChunk,
+  bonusFilingCreate, bonusFilingUpdate, bonusFilingGet, sampleBonusCreate,
+} from './bonus/functions';
 
 // 給与API
 export { salaryCreate } from './salaries/salary-create/functions';

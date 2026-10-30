@@ -51,6 +51,8 @@ export interface OfficeResponse {
   paymentMonth: 'current' | 'next';
   deductionMethod: 'current' | 'previous';
   roundingRule: 'statutory' | 'truncate' | 'round' | 'ceil';
+  /** 賞与の支給予定月（不支給報告書の判定に使う） */
+  bonusMonths: number[];
   isActive: boolean;
   /** 更新時の expectedVersion に使う */
   version: number;

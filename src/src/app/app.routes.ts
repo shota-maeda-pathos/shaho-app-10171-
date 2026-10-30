@@ -126,14 +126,8 @@ export const routes: Routes = [
                 (m) => m.PremiumCollectionComponent,
               ),
           },
-          {
-            path: 'bonus',
-            data: { title: '賞与保険料' },
-            loadComponent: () =>
-              import('./features/premium/premium-bonus/premium-bonus').then(
-                (m) => m.PremiumBonusComponent,
-              ),
-          },
+          // 旧い賞与保険料の画面は、賞与（一括型）に移した
+          { path: 'bonus', redirectTo: '/bonus', pathMatch: 'full' },
         ],
       },
       {
@@ -240,6 +234,7 @@ export const routes: Routes = [
       },
       // 算定基礎届（一括型）。承認者も等級と届出の承認のために開く
       {path:'santei',canActivate:[roleGuard('admin','operator','approver')],data:{title:'算定基礎届'},loadComponent:()=>import('./features/santei/santei').then(m=>m.SanteiComponent)},
+      {path:'bonus',canActivate:[roleGuard('admin','operator','approver')],data:{title:'賞与'},loadComponent:()=>import('./features/bonus/bonus').then(m=>m.BonusComponent)},
       {
         path: 'simulation',
         canActivate: [roleGuard('admin', 'operator', 'viewer')],

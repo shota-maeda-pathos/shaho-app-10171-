@@ -271,14 +271,46 @@ function remuneration(w: Writer, fd: Data, regular: boolean, offset = 0, lenient
   if (!lenient) w.warnings.add('現物報酬・支払月・修正平均額・備考など、登録されていない欄は原票で確認してください。');
 }
 
+/** 賞与支払届の1人分（サーバーの bonusFilingPerson と同じ形） */
+export interface BonusPrintPerson {
+  被保険者整理番号: string; 被保険者氏名: string; 生年月日: string; 賞与支払年月日: string;
+  賞与額_通貨: number; 賞与額_現物: number; 賞与額_合計: number;
+  /** 1=70歳以上被用者 3=同一月内の賞与合算 */
+  備考区分?: number[]; 初回支払日?: number | null;
+}
+
+/** 1枚に記入する人数と、1人分の欄の高さ（原票を160%で測った値） */
+const BONUS_ROWS = 10;
+const BONUS_ROW_HEIGHT = 77.87;
+/** 備考の番号に付ける丸（1人目の位置） */
+const BONUS_NOTE_MARKS: Record<number, [number, number]> = { 1: [697, 532], 3: [800, 532] };
+
+/** 賞与支払届の1人分の行。支払日は共通の支払日と違うときだけ書く（様式の注記） */
+function bonusRow(w: Writer, p: BonusPrintPerson, offset: number, commonDate: unknown) {
+  insuredNumber(w,p.被保険者整理番号,[58,482+offset,175,29]);
+  w.text(p.被保険者氏名,[242,479+offset,298,29],'被保険者氏名',{required:true,center:true});
+  w.text(eraText(p.生年月日),[550,481+offset,126,24],'生年月日',{size:9,required:true,center:true});
+  if (p.賞与支払年月日 && p.賞与支払年月日 !== commonDate) {
+    dateParts(w,p.賞与支払年月日,[[92,531+offset,22,19],[125,531+offset,48,19],[185,531+offset,42,19]],'賞与支払年月日');
+  }
+  w.money(p.賞与額_通貨,[243,531+offset,139,19],'賞与額（通貨）',false,true);
+  w.money(p.賞与額_現物 || null,[395,531+offset,134,19],'賞与額（現物）');
+  w.money(p.賞与額_合計,[551,531+offset,85,19],'賞与額合計（千円）',true,true);
+  for (const code of p.備考区分 ?? []) {
+    const mark = BONUS_NOTE_MARKS[code];
+    if (mark) w.circle(mark[0], mark[1] + offset, 12, 11);
+  }
+  if (p.初回支払日) w.text(p.初回支払日,[864,531+offset,23,14],'初回支払日',{size:7,center:true});
+  if (p.備考区分?.includes(1)) w.warnings.add('70歳以上被用者の人は、個人番号（または基礎年金番号）の欄を原票に記入してください。');
+}
+
 function bonus(w: Writer, fd: Data) {
   dateParts(w,fd['賞与支払年月日'],[[331.66,428.34,70.27,37.44],[401.93,428.34,70.27,37.44],[472.2,428.34,70.27,37.44]],'賞与支払年月日');
-  insuredNumber(w,fd['被保険者整理番号'],[58,482,175,29]);
-  w.text(fd['被保険者氏名'],[242,479,298,29],'被保険者氏名',{required:true,center:true});
-  w.text(eraText(fd['生年月日']),[550,481,126,24],'生年月日',{size:9,required:true,center:true});
-  w.money(fd['賞与額_通貨'],[243,531,139,19],'賞与額（通貨）',false,true);
-  w.money(fd['賞与額_現物'],[395,531,134,19],'賞与額（現物）');
-  w.money(fd['賞与額_合計'],[551,531,85,19],'賞与額合計（千円）',true,true);
+  bonusRow(w, {
+    被保険者整理番号: String(fd['被保険者整理番号'] ?? ''), 被保険者氏名: String(fd['被保険者氏名'] ?? ''), 生年月日: String(fd['生年月日'] ?? ''),
+    賞与支払年月日: String(fd['賞与支払年月日'] ?? ''), 賞与額_通貨: fd['賞与額_通貨'] as number, 賞与額_現物: fd['賞与額_現物'] as number,
+    賞与額_合計: fd['賞与額_合計'] as number,
+  }, 0, fd['賞与支払年月日']);
 }
 
 function leave(w: Writer, fd: Data, key: string) {
@@ -408,6 +440,42 @@ export async function createSanteiFilingPdf(fields: Data, persons: SanteiPrintPe
       if (p.備考その他) w.text(p.備考その他,[816,581+offset,102,15],'備考（その他）',{size:7});
       if (p.修正平均額 !== null) warnings.add('遡及支払額の欄は記入していません。修正平均額のある人は、遡及支払の月と額を原票に記入してください。');
     });
+  }
+  const [instructions]=await pdf.copyPages(source,[1]);pdf.addPage(instructions);
+  pdf.setTitle(form.title);pdf.setCreator('社会保険管理システム');
+  pdf.setSubject('日本年金機構の公式様式（2026-10-28取得）への記入');
+  return {bytes:await pdf.save(),warnings:[...warnings],placements};
+}
+
+/**
+ * 賞与支払届（複数人）。1枚に BONUS_ROWS 人ずつ記入し、多ければ2枚目以降に続ける。
+ * 事業所の欄と賞与支払年月日（共通）は各ページに記入する。
+ */
+export async function createBonusFilingPdf(fields: Data, persons: BonusPrintPerson[], meta: FilingPrintMeta,
+  loadAsset: (path: string) => Promise<Uint8Array> = async path => {
+    const response=await fetch(path);
+    if(!response.ok) throw new Error('公式PDFまたは日本語フォントを読み込めませんでした。再読み込みしてください。');
+    return new Uint8Array(await response.arrayBuffer());
+  }): Promise<OfficialPdfResult> {
+  if (!persons.length) throw new Error('届出に載っている人がいません。');
+  if (persons.length > 3000) throw new Error('人数が多すぎます。');
+  const form = OFFICIAL_FORMS['bonusPayment'];
+  const [template,fontBytes]=await Promise.all([loadAsset(`/filing-forms/${form.file}.pdf`),loadAsset('/filing-forms/fonts/NotoSansJP-Regular.ttf')]);
+  const source=await PDFDocument.load(template);
+  if(source.getPageCount()!==2) throw new Error('公式様式のページ構成が変更されています。テンプレートを確認してください。');
+  const pdf=await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
+  const font=await pdf.embedFont(fontBytes,{subset:false});
+  const fontMetrics = fontkit.create(fontBytes);
+  const warnings=new Set<string>();
+  const placements: PrintPlacement[]=[];
+  const common = fields['賞与支払年月日'];
+  for (let start = 0, pageIndex = 0; start < persons.length; start += BONUS_ROWS, pageIndex++) {
+    const [page]=await pdf.copyPages(source,[0]);pdf.addPage(page);
+    const w=new Writer(page,font,warnings,placements,pageIndex,fontMetrics);
+    header(w,form.file,fields,meta);
+    dateParts(w,common,[[331.66,428.34,70.27,37.44],[401.93,428.34,70.27,37.44],[472.2,428.34,70.27,37.44]],'賞与支払年月日（共通）');
+    persons.slice(start, start + BONUS_ROWS).forEach((p, i) => bonusRow(w, p, i * BONUS_ROW_HEIGHT, common));
   }
   const [instructions]=await pdf.copyPages(source,[1]);pdf.addPage(instructions);
   pdf.setTitle(form.title);pdf.setCreator('社会保険管理システム');

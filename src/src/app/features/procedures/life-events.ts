@@ -37,7 +37,7 @@ export const LIFE_EVENT_GROUPS: { label: string; events: LifeEvent[] }[] = [
     label: '毎月・毎年の処理',
     events: [
       { type: 'monthly', icon: 'event_repeat', label: '毎月の保険料処理', hint: '給与の取り込みから明細の公開・徴収まで', route: '/monthly' },
-      { type: 'bonus_payment', icon: 'card_giftcard', label: '賞与を払った', hint: '賞与の保険料と賞与支払届', route: '/premium/bonus' },
+      { type: 'bonus_payment', icon: 'card_giftcard', label: '賞与を払った', hint: '賞与の保険料と賞与支払届', route: '/bonus' },
       { type: 'annual_review', icon: 'assessment', label: '年1回の算定基礎届（7月）', hint: '4〜6月の給与から標準報酬月額を決め直す', route: '/santei' },
     ],
   },

@@ -1,3 +1,4 @@
+import { Timestamp } from 'firebase-admin/firestore';
 import { makeAuth, makeEmployeeDoc, makeOfficeDoc, makeInsuranceRateDoc } from '../../__tests__/helpers';
 
 const mockTxGet = jest.fn();
@@ -8,6 +9,7 @@ let exemptions: any[] = [];
 let confirmed = false;
 let pending = false;
 let sourceBonus: any;
+let priorBonuses: Record<string, any> = {};
 
 const buildQuery = (path = ''): any => {
   const q: any = {
@@ -74,7 +76,7 @@ describe('calculateBonusInsurance', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    exemptions = []; confirmed = false; pending = false;
+    exemptions = []; confirmed = false; pending = false; priorBonuses = {};
     sourceBonus = { totalAmount: 500000, standardBonusAmount: 500000, cumulativeBonusAmount: 500000, version: 2, isConfirmed: true };
 
     mockFindAllRates.mockResolvedValue({
@@ -88,7 +90,8 @@ describe('calculateBonusInsurance', () => {
       if (ref.path.endsWith('/premiumExemptions')) {
         return { docs: exemptions.filter(d => d.startMonth <= '2026-06').map((d, i) => ({ id: `exemption-${i}`, data: () => d })) };
       }
-      if (ref.path.includes('/bonuses/')) return { exists: sourceBonus !== null, data: () => sourceBonus };
+      if (ref.path.endsWith('/bonuses/2026-06')) return { exists: sourceBonus !== null, data: () => sourceBonus, id: '2026-06' };
+      if (ref.path.includes('/bonuses/')) { const prior = priorBonuses[ref.id]; return { exists: !!prior, data: () => prior, id: ref.id }; }
       if (ref.path.includes('/employees/') && !ref.path.includes('/bonusInsurance/')) {
         return { exists: true, data: () => empDoc, id: 'emp-001' };
       }
@@ -228,17 +231,17 @@ describe('calculateBonusInsurance', () => {
     expect(saved()).toMatchObject({ totalBonusAmount, bonusVersion: 2, cumulativeBonusAmount: 500000 });
   });
   it('applies the remaining annual health cap, independently of the monthly pension cap', async () => {
-    sourceBonus.cumulativeBonusAmount = 6000000;
+    priorBonuses = { '2026-04': { isConfirmed: true, standardBonusAmount: 5_500_000 } };
     await calculateBonusInsurance(input, makeAuth());
     expect(saved()).toMatchObject({ healthCappedAmount: 230000, pensionCappedAmount: 500000, healthInsurance: { employeeAmount: 11477 }, pensionInsurance: { employeeAmount: 45750 } });
   });
   it('health premium is zero after the annual cap while pension remains payable', async () => {
-    sourceBonus.cumulativeBonusAmount = 6230000;
+    priorBonuses = { '2026-04': { isConfirmed: true, standardBonusAmount: 3_000_000 }, '2026-05': { isConfirmed: true, standardBonusAmount: 2_730_000 } };
     await calculateBonusInsurance(input, makeAuth());
     expect(saved()).toMatchObject({ healthCappedAmount: 0, pensionCappedAmount: 500000, totalEmployeeAmount: 45750 });
   });
   it('employer childcare contribution uses the pension cap, independently of remaining health cap', async () => {
-    sourceBonus.cumulativeBonusAmount = 6000000;
+    priorBonuses = { '2026-04': { isConfirmed: true, standardBonusAmount: 5_500_000 } };
     mockFindAllRates.mockResolvedValue({
       health: healthRate,
       pension: pensionRate,
@@ -250,9 +253,31 @@ describe('calculateBonusInsurance', () => {
     // 支援金 264.5円：本人は50銭以下切捨てで264円、会社は全額529円−本人264円＝265円
     expect(saved().childSupportPayment).toEqual({ employeeAmount: 264, employerAmount: 265 });
   });
-  it.each([{ cumulativeBonusAmount: 499000 }, { standardBonusAmount: 1 }, { cumulativeBonusAmount: 500001 }])('refuses inconsistent saved amounts %j', async override => {
-    Object.assign(sourceBonus, override);
-    await expect(calculateBonusInsurance(input, makeAuth())).rejects.toThrow('年度累計');
+  it('refuses inconsistent saved amounts', async () => {
+    sourceBonus.standardBonusAmount = 1;
+    await expect(calculateBonusInsurance(input, makeAuth())).rejects.toThrow('標準賞与額');
     expect(mockTxSet).not.toHaveBeenCalled();
+  });
+  it('counts the fiscal-year cumulative from earlier approved bonuses on the server', async () => {
+    priorBonuses = { '2026-04': { isConfirmed: true, standardBonusAmount: 1_000_000 }, '2025-12': { isConfirmed: true, standardBonusAmount: 9_000_000 } };
+    await calculateBonusInsurance(input, makeAuth());
+    expect(saved()).toMatchObject({ priorCumulativeBonusAmount: 1_000_000, cumulativeBonusAmount: 1_500_000, healthCappedAmount: 500_000 });
+  });
+  it('refuses while an earlier month in the fiscal year is unapproved', async () => {
+    priorBonuses = { '2026-05': { isConfirmed: false, standardBonusAmount: 100_000 } };
+    await expect(calculateBonusInsurance(input, makeAuth())).rejects.toThrow('未承認');
+  });
+  it('charges nothing for a bonus paid in the month of losing coverage before the loss date', async () => {
+    const resigned = makeEmployeeDoc({ resignationDate: Timestamp.fromDate(new Date('2026-06-19T00:00:00Z')) });
+    mockTxGet.mockImplementationOnce(async () => ({ exists: true, data: () => resigned, id: 'emp-001' }));
+    sourceBonus.payments = [{ date: '2026-06-10', cash: 500000, inKind: 0 }];
+    await calculateBonusInsurance(input, makeAuth());
+    expect(saved()).toMatchObject({ bonusTarget: 'lossMonth', totalEmployeeAmount: 0, totalEmployerAmount: 0, healthCappedAmount: 500000 });
+  });
+  it('refuses a bonus paid on or after the loss date', async () => {
+    const resigned = makeEmployeeDoc({ resignationDate: Timestamp.fromDate(new Date('2026-06-05T00:00:00Z')) });
+    mockTxGet.mockImplementationOnce(async () => ({ exists: true, data: () => resigned, id: 'emp-001' }));
+    sourceBonus.payments = [{ date: '2026-06-10', cash: 500000, inKind: 0 }];
+    await expect(calculateBonusInsurance(input, makeAuth())).rejects.toThrow('対象ではありません');
   });
 });

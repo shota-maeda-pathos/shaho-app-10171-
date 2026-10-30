@@ -12,16 +12,11 @@ import { isLongTermCareAge, isPensionExcluded, isHealthExcluded } from '../../ut
 import { findAllRates } from '../../utils/insurance-rate';
 import { calculateChildSupportPayment } from '../../utils/child-support-payment';
 import { decideExemption } from '../../utils/exemption-period';
+import { normalizeEmployment, qualificationDates } from '../../utils/employment';
+import { EmploymentDoc } from '../../types/firestore';
 import { employerOnlyPremium, normalizeRoundingRule, splitPremium } from '../calculator';
+import { bonusCaps, bonusTarget, earlierMonthsInFiscalYear, summarizePayments, toThousand } from '../../bonus/bonus-calc';
 import { BonusInsuranceCalculateInput } from './schema';
-
-const HEALTH_BONUS_CAP = 5_730_000;
-const PENSION_BONUS_CAP = 1_500_000;
-
-function capToThousand(amount: number, cap: number): number {
-  const capped = Math.min(amount, cap);
-  return Math.floor(capped / 1000) * 1000;
-}
 
 const ZERO: InsurancePremiumBreakdown = { employeeAmount: 0, employerAmount: 0 };
 
@@ -45,16 +40,25 @@ export async function calculateBonusInsurance(
     if (!auth.roles.includes('admin')) {
       requireOffice(auth, employee.officeId);
     }
-    const bonus = await tx.get(db.doc(`companies/${auth.companyId}/employees/${input.employeeId}/bonuses/${input.yearMonth}`));
+    const empPath = `companies/${auth.companyId}/employees/${input.employeeId}`;
+    const bonus = await tx.get(db.doc(`${empPath}/bonuses/${input.yearMonth}`));
     if (!bonus.exists || bonus.data()!.isConfirmed !== true) throw invalidArg('賞与額を登録・承認してから保険料を計算してください');
     const source = bonus.data()!;
     const totalBonusAmount = source.totalAmount as number;
-    const standardBonusAmount = Math.floor(totalBonusAmount / 1000) * 1000;
-    if (!Number.isSafeInteger(totalBonusAmount) || totalBonusAmount < 0 || source.standardBonusAmount !== standardBonusAmount ||
-        !Number.isSafeInteger(source.cumulativeBonusAmount) || source.cumulativeBonusAmount < standardBonusAmount || source.cumulativeBonusAmount % 1000 !== 0) {
-      throw invalidArg('賞与額または年度累計を確認してください');
+    const standardBonusAmount = toThousand(totalBonusAmount);
+    if (!Number.isSafeInteger(totalBonusAmount) || totalBonusAmount < 0 || source.standardBonusAmount !== standardBonusAmount) {
+      throw invalidArg('賞与額と標準賞与額が一致しません。賞与を登録し直してください');
     }
     if (input.totalBonusAmount !== undefined && input.totalBonusAmount !== totalBonusAmount) throw invalidArg('指定額が承認済みの賞与額と一致しません');
+
+    // 健保の年度累計：同じ年度の前の月の承認済みの標準賞与額（免除・資格喪失月の賞与も数える）
+    const earlier = await Promise.all(earlierMonthsInFiscalYear(input.yearMonth).map(ym => tx.get(db.doc(`${empPath}/bonuses/${ym}`))));
+    const unconfirmed = earlier.filter(d => d.exists && d.data()!.isConfirmed !== true).map(d => d.id);
+    if (unconfirmed.length) throw invalidArg(`同じ年度の前の月（${unconfirmed.join('・')}）に未承認の賞与があります。先に承認してください（年度累計を数えるため）`);
+    const priorCumulative = earlier.reduce((a, d) => a + (d.exists ? Number(d.data()!.standardBonusAmount ?? 0) : 0), 0);
+    const caps = bonusCaps(standardBonusAmount, priorCumulative);
+    const firstPaymentDate = Array.isArray(source.payments) && source.payments.length
+      ? summarizePayments(source.payments).firstPaymentDate : (source.paymentDate ?? null);
 
     const officeSnap = await tx.get(
       db.doc(`companies/${auth.companyId}/offices/${employee.officeId}`),
@@ -62,6 +66,17 @@ export async function calculateBonusInsurance(
     if (!officeSnap.exists) throw notFound('事業所');
     const office = officeSnap.data()! as OfficeDoc;
     const roundingRule = normalizeRoundingRule(office.roundingRule);
+
+    // 資格と適用（支給日で判定。資格喪失月の賞与は保険料なし）
+    const employmentSnap = await db.collection(`${empPath}/employments`).where('effectiveDate', '<=', `${input.yearMonth}-31`).orderBy('effectiveDate', 'desc').limit(1).get();
+    const employment = employmentSnap.empty ? null : normalizeEmployment(employmentSnap.docs[0].data() as EmploymentDoc);
+    const { acquisitionDate, lossDate } = qualificationDates(employee);
+    const target = bonusTarget({
+      yearMonth: input.yearMonth, firstPaymentDate, acquisitionDate, lossDate,
+      enrolled: employment === null || employment.healthInsuranceEnrolled || employment.pensionEnrolled,
+    });
+    if (target.target === 'excluded') throw invalidArg(`保険料の対象ではありません（${target.reason}）`);
+    const notCharged = target.target === 'lossMonth';
 
     // 年齢判定
     const healthExcl = isHealthExcluded(employee.birthDate, input.yearMonth);
@@ -76,8 +91,8 @@ export async function calculateBonusInsurance(
       office.insurerId,
     );
 
-    if (!healthExcl && !rates.health) throw invalidArg('健康保険料率が設定されていません');
-    if (!pensionExcl && !rates.pension) throw invalidArg('厚生年金保険料率が設定されていません');
+    if (!healthExcl && !notCharged && !rates.health) throw invalidArg('健康保険料率が設定されていません');
+    if (!pensionExcl && !notCharged && !rates.pension) throw invalidArg('厚生年金保険料率が設定されていません');
 
     // 免除判定（産休：支給月の末日が休業中。育休：さらに休業期間が1か月超）
     const exemption = await decideExemption(tx, auth.companyId, input.employeeId, input.yearMonth, 'bonus');
@@ -85,36 +100,37 @@ export async function calculateBonusInsurance(
     if (input.isExempted !== undefined && input.isExempted !== isExempted) {
       throw invalidArg('賞与免除の指定が承認済みの免除期間と一致しません。免除登録を確認してください');
     }
-    const priorCumulative = source.cumulativeBonusAmount - standardBonusAmount;
-    const healthCappedAmount = capToThousand(standardBonusAmount, Math.max(0, HEALTH_BONUS_CAP - priorCumulative));
-    const pensionCappedAmount = capToThousand(standardBonusAmount, PENSION_BONUS_CAP);
+    const healthCappedAmount = caps.healthCapped;
+    const pensionCappedAmount = caps.pensionCapped;
+    const healthNone = healthExcl || isExempted || notCharged;
+    const pensionNone = pensionExcl || isExempted || notCharged;
 
     // 健康保険
-    const healthInsurance = (healthExcl || isExempted || !rates.health)
+    const healthInsurance = (healthNone || !rates.health)
       ? ZERO
       : splitPremium(healthCappedAmount, rates.health.employeeRate, rates.health.employerRate, roundingRule, rates.health.totalRate);
 
     // 介護保険: 年齢自動判定
     let longTermCareInsurance: InsurancePremiumBreakdown | null = null;
     if (ltcAge && !healthExcl && rates.longTermCare) {
-      longTermCareInsurance = isExempted
+      longTermCareInsurance = isExempted || notCharged
         ? ZERO
         : splitPremium(healthCappedAmount, rates.longTermCare.employeeRate, rates.longTermCare.employerRate, roundingRule, rates.longTermCare.totalRate);
     }
 
     // 厚生年金
-    const pensionInsurance = (pensionExcl || isExempted || !rates.pension)
+    const pensionInsurance = (pensionNone || !rates.pension)
       ? ZERO
       : splitPremium(pensionCappedAmount, rates.pension.employeeRate, rates.pension.employerRate, roundingRule, rates.pension.totalRate);
 
     const childSupportPayment = calculateChildSupportPayment(
-      healthCappedAmount, input.yearMonth, healthExcl || isExempted,
+      healthCappedAmount, input.yearMonth, healthNone,
       roundingRule, rates.childSupportPayment,
     );
 
     // 子ども・子育て拠出金（事業主のみ）
     let childSupportContribution: InsurancePremiumBreakdown;
-    if (!rates.childSupport || isExempted || pensionExcl) {
+    if (!rates.childSupport || pensionNone) {
       childSupportContribution = ZERO;
     } else {
       childSupportContribution = employerOnlyPremium(pensionCappedAmount, rates.childSupport.employerRate);
@@ -148,7 +164,13 @@ export async function calculateBonusInsurance(
       yearMonth: input.yearMonth,
       bonusVersion: source.version,
       totalBonusAmount,
-      cumulativeBonusAmount: source.cumulativeBonusAmount,
+      standardBonusAmount,
+      priorCumulativeBonusAmount: priorCumulative,
+      cumulativeBonusAmount: caps.healthCumulative,
+      healthOverCap: caps.healthOverCap,
+      pensionOverCap: caps.pensionOverCap,
+      bonusTarget: target.target,
+      bonusTargetReason: target.reason,
       officeId: employee.officeId,
       healthCappedAmount,
       pensionCappedAmount,

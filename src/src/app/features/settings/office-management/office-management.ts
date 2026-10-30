@@ -28,6 +28,8 @@ interface OfficeRow {
   paymentDay: number;
   isActive: boolean;
   roundingRule?: RoundingRule;
+  /** 賞与の支給予定月（古いサーバーは返さない） */
+  bonusMonths?: number[];
   /** 古いサーバーは返さない */
   version?: number;
 }
@@ -171,6 +173,25 @@ const PREFECTURES: Record<string, string> = {
                 @if (row.version === undefined) { <div class="hint">サーバーの更新後に変更できます</div> }
               </td>
             </ng-container>
+            <ng-container matColumnDef="bonusMonths">
+              <th mat-header-cell *matHeaderCellDef>賞与の支給予定月 <app-term key="bonusNonPayment" [showLabel]="false" /></th>
+              <td mat-cell *matCellDef="let row">
+                @if (bonusEditing()?.id === row.id) {
+                  <div class="months" role="group" [attr.aria-label]="row.name + 'の賞与の支給予定月'">
+                    @for (m of monthList; track m) {
+                      <label><input type="checkbox" [checked]="bonusEditing()!.months.includes(m)" (change)="toggleBonusMonth(m)">{{ m }}月</label>
+                    }
+                  </div>
+                  <button mat-flat-button type="button" (click)="saveBonusMonths(row)" [disabled]="savingId() === row.id">保存</button>
+                  <button mat-button type="button" (click)="bonusEditing.set(null)">やめる</button>
+                } @else {
+                  {{ row.bonusMonths?.length ? row.bonusMonths.join('・') + '月' : '未登録' }}
+                  @if (row.version !== undefined && row.bonusMonths) {
+                    <button mat-button type="button" (click)="bonusEditing.set({ id: row.id, months: [...row.bonusMonths] })" [attr.aria-label]="row.name + 'の賞与の支給予定月を変更'">変更</button>
+                  }
+                }
+              </td>
+            </ng-container>
             <ng-container matColumnDef="status">
               <th mat-header-cell *matHeaderCellDef>状態</th>
               <td mat-cell *matCellDef="let row">
@@ -205,6 +226,8 @@ const PREFECTURES: Record<string, string> = {
     .empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; color: #ccc; }
     .status-chip { padding: 4px 12px; border-radius: 16px; font-size: 12px; background: #e8f5e9; color: #2e7d32; }
     .status-chip.inactive { background: #f5f5f5; color: #999; }
+    .months { display: flex; flex-wrap: wrap; gap: 2px 8px; max-width: 260px; margin-bottom: 4px; }
+    .months label { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
     .rounding-select { padding: 6px 8px; max-width: 260px; font: inherit; }
     .hint { font-size: var(--app-font-xs); color: var(--app-color-text-sub); margin-top: 2px; }
     .migration { display: flex; align-items: center; gap: var(--app-space-3); flex-wrap: wrap; margin-bottom: var(--app-space-4);
@@ -230,7 +253,10 @@ export class OfficeManagementComponent implements OnInit {
   /** 移行の対象（サーバーの migrateOfficeRoundingRule と同じ条件：切捨てか未設定） */
   needsMigration = computed(() => this.offices().filter(o => !o.roundingRule || o.roundingRule === 'truncate'));
 
-  columns = ['officeNumber', 'name', 'address', 'phone', 'paymentInfo', 'rounding', 'status'];
+  columns = ['officeNumber', 'name', 'address', 'phone', 'paymentInfo', 'rounding', 'bonusMonths', 'status'];
+  readonly monthList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  /** 賞与の支給予定月を編集中の事業所 */
+  bonusEditing = signal<{ id: string; months: number[] } | null>(null);
 
   prefectureList = Object.entries(PREFECTURES).map(([code, name]) => ({ code, name }));
 
@@ -298,6 +324,29 @@ export class OfficeManagementComponent implements OnInit {
       this.snackBar.open('端数処理を変更しました', '閉じる', { duration: 3000 });
     } catch (e: unknown) {
       this.snackBar.open(`変更できませんでした：${e instanceof Error ? e.message : ''}`, '閉じる', { duration: 6000 });
+    } finally {
+      this.savingId.set('');
+      await this.loadOffices();
+    }
+  }
+
+  toggleBonusMonth(month: number) {
+    this.bonusEditing.update(e => e && { ...e, months: e.months.includes(month) ? e.months.filter(m => m !== month) : [...e.months, month].sort((a, b) => a - b) });
+  }
+
+  /** 賞与の支給予定月。予定月に賞与が登録されないと、賞与の画面とホームで不支給報告書の提出を知らせる */
+  async saveBonusMonths(row: OfficeRow) {
+    const editing = this.bonusEditing();
+    if (!editing || row.version === undefined) return;
+    this.savingId.set(row.id);
+    try {
+      await httpsCallable(this.functions, 'officeUpdate')({
+        companyId: this.auth.companyId, officeId: row.id, bonusMonths: editing.months, expectedVersion: row.version,
+      });
+      this.snackBar.open('賞与の支給予定月を保存しました', '閉じる', { duration: 3000 });
+      this.bonusEditing.set(null);
+    } catch (e: unknown) {
+      this.snackBar.open(`保存できませんでした：${e instanceof Error ? e.message : ''}`, '閉じる', { duration: 6000 });
     } finally {
       this.savingId.set('');
       await this.loadOffices();
