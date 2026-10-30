@@ -31,6 +31,8 @@ export interface FilingGetResponse {
   cancelledAt: string | null;
   /** 提出を終えているか（訂正届・取消届を作れるか） */
   submitted: boolean;
+  /** いちばん新しい承認申請の結果（差し戻しの理由を画面に出す） */
+  lastApproval: { status: string; comment: string | null; reviewedAt: string | null } | null;
 }
 
 export async function getFiling(
@@ -57,6 +59,9 @@ export async function getFiling(
   }
 
   const data = filingSnap.data()!;
+  const requests = await db.collection(`companies/${auth.companyId}/employees/${input.employeeId}/approvalRequests`)
+    .where('targetPath', '==', filingRef.path).get();
+  const last = requests.docs.map(d => d.data()).sort((a, b) => (b.requestedAt?.toMillis?.() ?? 0) - (a.requestedAt?.toMillis?.() ?? 0))[0];
   return {
     id: filingSnap.id,
     employeeId: input.employeeId,
@@ -81,5 +86,6 @@ export async function getFiling(
     cancelledByFilingId: data.cancelledByFilingId ?? null,
     cancelledAt: data.cancelledAt?.toDate?.()?.toISOString?.() ?? null,
     submitted: isSubmittedFiling(data),
+    lastApproval: last ? { status: last.status, comment: last.comment ?? null, reviewedAt: last.reviewedAt?.toDate?.()?.toISOString?.() ?? null } : null,
   };
 }

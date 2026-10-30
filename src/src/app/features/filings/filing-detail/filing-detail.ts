@@ -149,8 +149,11 @@ interface ArchiveRow { id: string; approvedAt: string | null; approvedByName: st
         <mat-card class="status-card">
           <h2>社内承認</h2>
           <p>{{ workflowLabel(filing()!.workflowStatus) }}</p>
+          @if (filing()!.workflowStatus === 'rejected' && filing()!.lastApproval?.status === 'rejected') {
+            <p class="note">差し戻されました。理由：{{ filing()!.lastApproval.comment || '（理由の記入なし）' }}。内容を直してから、もう一度承認を申請してください。</p>
+          }
           <div class="action-buttons">
-            @if (filing()!.workflowStatus === 'draft') {
+            @if (filing()!.workflowStatus === 'draft' || filing()!.workflowStatus === 'rejected') {
               <button mat-flat-button color="primary" (click)="requestApproval()" [disabled]="processing()">
                 <mat-icon>send</mat-icon> 承認申請
               </button>
