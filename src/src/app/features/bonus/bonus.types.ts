@@ -131,7 +131,8 @@ export const FILING_STATUS_LABELS: Record<FilingStatus, string> = {
 };
 
 /**
- * 1人分のステップごとの状態。サーバーの bonus/progress.ts の bonusStepState と同じ判定（変えるときは両方を直す）。
+ * 1人分のステップごとの状態。サーバーの bonus/progress.ts の bonusStepState と同じ判定（変えるときは両方を直す。色は画面だけ：
+ * 自分が進める＝yours、差し戻し・要確認＝attention）。
  * そのステップの対象でなければ null。届出のステップ（filing）は、届出の作成と承認・提出を1つにまとめている
  */
 export function stepState(step: StepKey, r: BonusRow): { tone: StatusTone; label: string } | null {
@@ -139,23 +140,23 @@ export function stepState(step: StepKey, r: BonusRow): { tone: StatusTone; label
   const premiumTarget = r.bonus.confirmed && r.target !== 'excluded';
   switch (step) {
     case 'entry':
-      if (r.rejected.bonus && !r.bonus.pending && !r.bonus.confirmed) return { tone: 'action', label: '差し戻し' };
-      if (r.issues.length && !r.bonus.confirmed) return { tone: 'action', label: '要確認' };
+      if (r.rejected.bonus && !r.bonus.pending && !r.bonus.confirmed) return { tone: 'attention', label: '差し戻し' };
+      if (r.issues.length && !r.bonus.confirmed) return { tone: 'attention', label: '要確認' };
       return { tone: 'done', label: r.target === 'excluded' ? '登録済み（届出不要）' : '登録済み' };
     case 'review':
       if (r.bonus.confirmed) return { tone: 'done', label: '承認済み' };
       if (r.bonus.pending) return { tone: 'waiting', label: '承認待ち' };
-      return { tone: 'action', label: r.rejected.bonus ? '差し戻し' : '依頼前' };
+      return r.rejected.bonus ? { tone: 'attention', label: '差し戻し' } : { tone: 'yours', label: '依頼前' };
     case 'premium':
       if (!premiumTarget) return null;
       if (r.premium?.confirmed) return { tone: 'done', label: r.premium.exempted ? '承認済み（免除）' : '承認済み' };
       if (r.premium?.pending) return { tone: 'waiting', label: '承認待ち' };
-      if (!r.premium) return { tone: 'action', label: '未計算' };
-      if (r.stale) return { tone: 'action', label: '計算し直し' };
-      return { tone: 'action', label: r.rejected.premium ? '差し戻し' : '依頼前' };
+      if (!r.premium) return { tone: 'yours', label: '未計算' };
+      if (r.stale) return { tone: 'attention', label: '計算し直し' };
+      return r.rejected.premium ? { tone: 'attention', label: '差し戻し' } : { tone: 'yours', label: '依頼前' };
     case 'filing':
       if (!premiumTarget || !r.premium?.confirmed) return null;
-      return r.filingId ? { tone: 'done', label: '届出に記載' } : { tone: 'action', label: '届出 未作成' };
+      return r.filingId ? { tone: 'done', label: '届出に記載' } : { tone: 'yours', label: '届出 未作成' };
   }
 }
 

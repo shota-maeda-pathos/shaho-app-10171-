@@ -38,15 +38,20 @@ body {
 }
 // デザイントークン。色・余白・文字サイズは画面ごとに直書きせず、ここの変数を使う。
 :root {
-  // 状態色4種：要対応＝赤／あなたの番＝青／他の人の待ち＝灰／完了＝緑
-  --app-status-action-fg: #c62828;
-  --app-status-action-bg: #ffebee;
+  // 状態色5種（docs/ui-unification-design.md）：あなたの番＝青／要確認＝橙／待ち＝灰／完了＝緑／エラー・期限切れ＝赤
   --app-status-yours-fg: #1565c0;
   --app-status-yours-bg: #e3f2fd;
+  --app-status-attention-fg: #9a5b12;
+  --app-status-attention-bg: #fdf3e3;
   --app-status-waiting-fg: #5f6368;
   --app-status-waiting-bg: #f1f3f4;
   --app-status-done-fg: #2e7d32;
   --app-status-done-bg: #e8f5e9;
+  --app-status-error-fg: #c62828;
+  --app-status-error-bg: #ffebee;
+  // 旧い「要対応」。画面を作り直すまでの間だけ残す（エラーと同じ色）
+  --app-status-action-fg: var(--app-status-error-fg);
+  --app-status-action-bg: var(--app-status-error-bg);
 
   --app-color-text: #1f1f1f;
   --app-color-text-sub: #5f6368;
@@ -83,10 +88,11 @@ body {
   font-size: var(--app-font-xs);
   line-height: 20px;
   white-space: nowrap;
-  &[data-tone='action'] { color: var(--app-status-action-fg); background: var(--app-status-action-bg); }
   &[data-tone='yours'] { color: var(--app-status-yours-fg); background: var(--app-status-yours-bg); }
+  &[data-tone='attention'], &[data-tone='action'] { color: var(--app-status-attention-fg); background: var(--app-status-attention-bg); }
   &[data-tone='waiting'] { color: var(--app-status-waiting-fg); background: var(--app-status-waiting-bg); }
   &[data-tone='done'] { color: var(--app-status-done-fg); background: var(--app-status-done-bg); }
+  &[data-tone='error'] { color: var(--app-status-error-fg); background: var(--app-status-error-bg); }
 }
 
 // 画面の共通の枠

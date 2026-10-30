@@ -14,22 +14,25 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
 import {
-  BulkAction, BulkRun, ErrorStateComponent, LoadingStateComponent, StatusTone, TargetCellDirective, TargetListComponent, TargetRow, TermComponent,
+  BulkAction, BulkRun, ErrorStateComponent, LoadingStateComponent, PageHeadComponent, StatusTone, StepLeadComponent, StepperComponent, StepperItem,
+  TargetCellDirective, TargetDetailDirective, TargetListComponent, TargetRow, TermComponent, needsMe,
 } from '../../shared/ui';
+import { ConfirmService } from '../../shared/confirm-dialog/confirm-dialog';
 import { SanteiInputDialogComponent } from '../santei/santei-dialogs';
 import {
   ACTION_STEP, BonusAction, BonusPayment, BonusRow, FILING_STATUS_LABELS, FilingDetail, FilingSummary, ImportResult, JobSummary, monthLabel, Overview,
   StepKey, stepState,
 } from './bonus.types';
-import { BonusEntryDialogComponent, BonusFilingDialogComponent } from './bonus-dialogs';
+import { BonusFilingDialogComponent, BonusPersonComponent } from './bonus-dialogs';
 
-interface StepDef { key: StepKey; label: string; what: string; why: string; next: string }
+/** ステップ。what は本体の見出しの横に出す1行。注意は操作バーの主ボタンの横に出す（BulkAction の caution） */
+interface StepDef { key: StepKey; label: string; what: string }
 
 const STEPS: StepDef[] = [
-  { key: 'entry', label: '賞与を登録する', what: 'この月に支給した賞与を、CSVで取り込むか1人ずつ入力します。同じ月に2回以上支給した人は、支給ごとに行を分けて入れます（合算して計算します）。', why: '賞与の保険料と賞与支払届は、登録した支給額（通貨と現物）から計算します。年度の累計や年4回以上の支給も、ここで確かめます。', next: '登録した賞与額を、別の担当者に承認してもらいます。' },
-  { key: 'review', label: '賞与額の承認', what: '登録した賞与額を確かめて、別の担当者に承認を依頼します。承認者はこの画面で内容を見て、まとめて承認します。', why: '承認された賞与額だけが保険料と届出に使われます。承認後は上書きできません（直すときは差し戻します）。', next: '承認された賞与から保険料を計算します。' },
-  { key: 'premium', label: '保険料の計算と承認', what: '標準賞与額から保険料を計算し、結果を確かめて承認を依頼します。上限（健保は年度累計573万円、厚年は月150万円）・産休育休の免除・70歳以上はシステムが判定します。', why: '賞与の保険料は賞与から控除します。計算の誤りは過少控除につながるため、別の目で確かめます。', next: '保険料が承認された人で賞与支払届を作ります。' },
-  { key: 'filing', label: '賞与支払届', what: '保険料が承認された人をまとめて、事業所の賞与支払届を1件作ります。内容を確かめて承認を依頼し、承認されたら模擬電子申請するか、紙で提出したことを記録します。', why: '賞与支払届は、支給日から5日以内に事業所の全員分をまとめて提出します。資格喪失月の支給や免除中の人も届け出ます。', next: 'すべて提出すれば、この月の賞与は完了です。' },
+  { key: 'entry', label: '賞与の登録', what: 'この月に支給した賞与を、CSV・表の貼り付け・1人ずつのどれかで登録します。' },
+  { key: 'review', label: '賞与額の承認', what: '登録した賞与額を確かめて、別の担当者に承認してもらいます。' },
+  { key: 'premium', label: '保険料の計算', what: '標準賞与額から保険料を計算し、承認してもらいます。' },
+  { key: 'filing', label: '届出の提出', what: '保険料が承認された人をまとめて賞与支払届を作り、承認を受けて提出します。' },
 ];
 
 /**
@@ -41,7 +44,8 @@ const STEPS: StepDef[] = [
   standalone: true,
   imports: [
     DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule,
-    TargetListComponent, TargetCellDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent, FilingAttachmentsComponent,
+    TargetListComponent, TargetCellDirective, TargetDetailDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent, FilingAttachmentsComponent,
+    PageHeadComponent, StepperComponent, StepLeadComponent, BonusPersonComponent,
   ],
   templateUrl: './bonus.html',
   styleUrl: './bonus.scss',
@@ -54,6 +58,7 @@ export class BonusComponent implements OnInit {
   private router = inject(Router);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
+  private confirm = inject(ConfirmService);
   private destroyRef = inject(DestroyRef);
 
   readonly steps = STEPS;
@@ -108,32 +113,52 @@ export class BonusComponent implements OnInit {
   filingTone(f: FilingSummary): StatusTone {
     if (f.status === 'submitted') return 'done';
     if (f.status === 'approved' && ['sent', 'received', 'processing'].includes(f.mockStatus ?? '')) return 'waiting';
+    if (f.status === 'approved' && ['failed', 'returned'].includes(f.mockStatus ?? '')) return 'error';
     if (f.status === 'pending') return this.canApprove() && !f.mine ? 'yours' : 'waiting';
-    return 'action';
+    return f.rejection && f.status === 'draft' ? 'attention' : 'yours';
   }
 
   summaries = computed(() => STEPS.map(step => {
-    const rows = (this.data()?.rows ?? []).filter(r => !r.hold).map(r => this.stateFor(step.key, r)).filter(s => s !== null);
-    let todo = rows.filter(s => s!.tone === 'action' || s!.tone === 'yours').length;
-    let waiting = rows.filter(s => s!.tone === 'waiting').length;
+    const fails = this.failures()?.step === step.key ? this.failures()!.byId : {};
+    const rows = (this.data()?.rows ?? []).filter(r => !r.hold).flatMap(r => {
+      const s = this.stateFor(step.key, r);
+      return s ? [fails[r.employeeId] ? { ...s, tone: 'error' as StatusTone } : s] : [];
+    });
+    let todo = rows.filter(s => needsMe(s.tone)).length;
+    let attention = rows.filter(s => s.tone === 'attention' || s.tone === 'error').length;
+    let waiting = rows.filter(s => s.tone === 'waiting').length;
     let total = rows.length;
     if (step.key === 'filing') {
       // 届出のステップは、届出に載っていない人と、承認・提出の終わっていない届出を数える
       const tones = this.activeFilings().map(f => this.filingTone(f));
-      todo += tones.filter(t => t === 'action' || t === 'yours').length;
+      todo += tones.filter(t => needsMe(t)).length;
+      attention += tones.filter(t => t === 'attention' || t === 'error').length;
       waiting += tones.filter(t => t === 'waiting').length;
       total += tones.length;
     }
-    return { key: step.key, total, todo, waiting, done: total > 0 && todo === 0 && waiting === 0, empty: total === 0, unit: '名' };
+    return { key: step.key, total, todo, attention, waiting, done: total > 0 && todo === 0 && waiting === 0, empty: total === 0 };
+  }));
+  /** 横並びのステップ。数字は1つだけ（要確認 → 残り → 承認待ち → 完了 → —） */
+  stepItems = computed<StepperItem[]>(() => this.summaries().map((s, i) => {
+    const step = STEPS[i];
+    const unit = s.key === 'filing' && !this.toFile().length ? '件' : '名';
+    const note = s.attention ? `要確認 ${s.attention}${unit}`
+      : s.key === 'entry' && this.paidCount() ? `${this.paidCount()}名 登録済み`
+      : s.key === 'filing' && this.toFile().length ? `${this.toFile().length}名 届出 未作成`
+      : s.todo ? `残り ${s.todo}${unit}`
+      : s.waiting ? `承認待ち ${s.waiting}${unit}`
+      : s.done ? '完了' : '—';
+    const state = s.attention ? 'attention' : s.done || (s.key === 'entry' && this.paidCount() && !s.todo) ? 'done' : !s.todo && s.waiting ? 'waiting' : 'todo';
+    return { key: step.key, label: step.label, state, note };
   }));
   /** 開くステップ。承認を頼まれていればそのステップ、なければ自分がやることのある最初のステップ、それもなければ最初の未完了ステップ */
   firstOpen = computed<StepKey>(() => {
     const sums = this.summaries();
     const rows = (this.data()?.rows ?? []).filter(r => !r.hold);
     for (const step of ['review', 'premium'] as const) {
-      if (rows.some(r => this.stateFor(step, r)?.tone === 'yours')) return step;
+      if (rows.some(r => this.stateFor(step, r)?.label === 'あなたの承認待ち')) return step;
     }
-    if (this.activeFilings().some(f => this.filingTone(f) === 'yours')) return 'filing';
+    if (this.activeFilings().some(f => f.status === 'pending' && this.filingTone(f) === 'yours')) return 'filing';
     if (!this.paidCount()) return 'entry';
     return sums.find(s => s.todo > 0)?.key ?? sums.find(s => !s.done && !s.empty)?.key ?? 'filing';
   });
@@ -146,18 +171,40 @@ export class BonusComponent implements OnInit {
   });
 
   actions = computed<BulkAction[]>(() => {
-    const approve = (key: BonusAction): BulkAction[] => this.canApprove() ? [{ key, label: '承認する', appliesTo: (r: TargetRow) => r.tone === 'yours' }] : [];
+    const month = monthLabel(this.payMonth);
+    const approve = (key: BonusAction, what: string): BulkAction[] => this.canApprove() ? [{
+      key, label: '承認する', appliesTo: (r: TargetRow) => r.statusLabel === 'あなたの承認待ち',
+      caution: `承認した${what}は、差し戻さないと直せません。`,
+      confirm: { title: `${month}支給の${what}を承認する`, message: `一覧で内容を確かめた人の${what}を承認します。`, notice: `承認した${what}は、差し戻さないと直せません。` },
+    }] : [];
     switch (this.current()) {
       case 'review':
-        return [{ key: 'requestBonusApproval', label: '承認を依頼', appliesTo: r => r.tone === 'action' }, ...approve('approveBonus')];
+        return [{
+          key: 'requestBonusApproval', label: '承認を依頼する', appliesTo: r => ['依頼前', '差し戻し'].includes(r.statusLabel),
+          caution: '承認された賞与額だけが保険料と届出に使われます。依頼中は直せません。',
+          confirm: { title: `${month}支給の賞与額の承認を依頼する`, message: '別の担当者（管理者・承認者）に、賞与額の承認を依頼します。承認者には通知が届きます。', notice: '依頼中は賞与額を直せません。直すときは差し戻してもらいます。' },
+        }, ...approve('approveBonus', '賞与額')];
       case 'premium':
         return [
-          { key: 'calculate', label: '保険料を計算', appliesTo: r => ['未計算', '計算し直し', '差し戻し'].includes(r.statusLabel) },
-          { key: 'requestPremiumApproval', label: '承認を依頼', appliesTo: r => ['依頼前', '差し戻し'].includes(r.statusLabel) },
-          ...approve('approvePremium'),
+          { key: 'calculate', label: '保険料を計算する', appliesTo: r => ['未計算', '計算し直し', '差し戻し'].includes(r.statusLabel),
+            caution: '上限（健保は年度累計573万円・厚年は月150万円）・産休育休の免除・70歳以上はシステムが判定します。' },
+          { key: 'requestPremiumApproval', label: '承認を依頼する', appliesTo: r => ['依頼前', '差し戻し'].includes(r.statusLabel),
+            caution: '賞与から控除する保険料です。承認されると届出に載せられます。',
+            confirm: { title: `${month}支給の保険料の承認を依頼する`, message: '計算した保険料の承認を、別の担当者（管理者・承認者）に依頼します。', notice: '依頼中は計算し直せません。' } },
+          ...approve('approvePremium', '保険料'),
         ];
       default:
         return [];
+    }
+  });
+  /** 操作バーの文言（一括操作のないステップ） */
+  barInfo = computed(() => {
+    if (!this.data()) return '';
+    switch (this.current()) {
+      case 'entry': return `${this.paidCount()}名の賞与を登録済み。名前を押すと1人ずつ直せます。`;
+      case 'filing': return this.toFile().length ? `${this.toFile().length}名が届出にまだ載っていません`
+        : this.activeFilings().length ? `賞与支払届 ${this.activeFilings().length}件` : '届出に載せる人はいません（保険料が承認された人が対象です）';
+      default: return '';
     }
   });
   cellHeader = computed(() => ({ entry: '賞与額', review: '賞与額 / 標準賞与額', premium: '保険料（本人 / 会社）', filing: '標準賞与額' })[this.current()]);
@@ -223,14 +270,6 @@ export class BonusComponent implements OnInit {
 
   chooseOffice(id: string) { void this.office.change(id); }
   selectStep(key: StepKey) { this.selectedStep.set(key); }
-
-  stepView(key: StepKey) {
-    const s = this.summaries().find(x => x.key === key)!;
-    if (s.done) return 'done';
-    if (s.empty) return 'empty';
-    if (s.todo === 0 && s.waiting > 0) return 'waiting';
-    return 'todo';
-  }
 
   private call<T>(name: string, data: object, timeout = 70_000) {
     return httpsCallable<object, T>(this.functions, name, { timeout })({ companyId: this.auth.companyId, officeId: this.office.selected(), payMonth: this.payMonth, ...data });
@@ -441,6 +480,22 @@ export class BonusComponent implements OnInit {
 
   // ---- 届出 ----
 
+  /** 届出のステップの注意（期限） */
+  filingCaution = computed(() => {
+    const d = this.data();
+    return d?.deadline ? `賞与支払届の期限は ${d.deadline}（支給日から5日以内）。保留中の人と保険料が未承認の人は載りません。` : '保留中の人と保険料が未承認の人は載りません。';
+  });
+
+  /** 期限の色（過ぎた・3日以内） */
+  dueClass(date: string | null) {
+    if (!date) return '';
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+    if (date < today) return 'due-over';
+    const soon = new Date(`${today}T00:00:00Z`);
+    soon.setUTCDate(soon.getUTCDate() + 3);
+    return date <= soon.toISOString().slice(0, 10) ? 'due-soon' : '';
+  }
+
   async createFiling() {
     this.busy.set(true);
     try {
@@ -466,6 +521,14 @@ export class BonusComponent implements OnInit {
       }).afterClosed());
       if (value === undefined || value === null) return;
       extra = action === 'reject' ? { comment: value } : action === 'paperSubmit' ? { date: value } : {};
+    } else if (action === 'requestApproval' || action === 'approve') {
+      const report = f.filingType === 'bonusNonPayment';
+      const what = report ? '賞与不支給報告書' : `${f.number}件目の賞与支払届`;
+      const count = report ? '1件' : `${f.personCount}名`;
+      const ok = await this.confirm.ask(action === 'requestApproval'
+        ? { title: `${what}の承認を依頼する`, count, message: '別の担当者（管理者・承認者）に、届出の承認を依頼します。', notice: '依頼中は届出を直せません。直すときは差し戻してもらいます。', confirmLabel: '承認を依頼する' }
+        : { title: `${what}を承認する`, count, message: '内容とPDFを確かめた届出を承認します。承認すると提出できるようになります。', notice: '承認したあとに直すときは、承認を取り消します。', confirmLabel: '承認する' });
+      if (!ok) return;
     }
     this.busy.set(true);
     try {
@@ -553,15 +616,11 @@ export class BonusComponent implements OnInit {
     }
   }
 
-  /** 1人分の賞与の内訳と入力（2回目の支給の追加もここで行う） */
-  async open(id: string) {
+  /** 右のパネルで直した1人分の賞与を保存する（2回目の支給の追加もここで行う。空の一覧は登録を消す） */
+  async savePerson(id: string, payments: BonusPayment[]) {
     const r = this.row(id);
-    const d = this.data();
-    if (!r || !d) return;
-    const payments = await firstValueFrom(this.dialog.open(BonusEntryDialogComponent, {
-      data: { row: r, payMonth: d.payMonth, canEdit: !r.bonus?.confirmed && !r.bonus?.pending }, width: '720px', maxWidth: '95vw',
-    }).afterClosed()) as BonusPayment[] | undefined;
-    if (!payments) return;
+    if (!r) return;
+    if (!payments.length && !(await this.confirm.ask({ title: `${r.name}さんの賞与の登録を消す`, message: `${monthLabel(this.payMonth)}の支給をすべて消します。`, confirmLabel: '登録を消す', warn: true }))) return;
     this.busy.set(true);
     try {
       const { data } = await this.call<{ warnings: string[] }>('bonusRunEntry', { employeeId: id, payments, expectedVersion: r.bonus?.version ?? 0 });

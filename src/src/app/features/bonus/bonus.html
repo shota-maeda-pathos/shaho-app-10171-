@@ -1,7 +1,6 @@
 <div class="app-page">
-  <h1 class="app-page-title">賞与<app-term key="bonusFiling" [showLabel]="false" /></h1>
-
   @if (!office.selected()) {
+    <app-page-head heading="賞与" kicker="まとめて" />
     <p class="app-page-guide">賞与を登録する事業所を選んでください。</p>
     <div class="offices">
       @for (item of office.offices(); track item.id) {
@@ -9,20 +8,25 @@
       }
     </div>
   } @else {
-    <div class="period">
-      <label>賞与の支給月
-        <input type="month" [ngModel]="payMonth" (ngModelChange)="changeMonth($event)" [disabled]="busy()">
-      </label>
+    <!-- 1. 見出し -->
+    <app-page-head [heading]="monthLabel(payMonth) + '支給の賞与'" kicker="まとめて">
+      <ng-container headingExtra><app-term key="bonusFiling" [showLabel]="false" /></ng-container>
       @if (data(); as d) {
-        <div class="period-note">
-          {{ d.office.name }}・{{ monthLabel(d.payMonth) }}に支給した賞与。
-          支給予定月：{{ d.office.bonusMonths.length ? d.office.bonusMonths.join('・') + '月' : '未登録' }}
-          @if (!d.office.bonusMonths.length) { （<a routerLink="/settings">設定の事業所</a>で登録すると、不支給のときに知らせます） }
-          @if (d.deadline) { ／ 賞与支払届の期限：<strong>{{ d.deadline }}</strong>（支給日から5日以内） }
-        </div>
+        <ng-container meta>
+          <span>{{ d.office.name }}</span>
+          <span>支給予定月 {{ d.office.bonusMonths.length ? d.office.bonusMonths.join('・') + '月' : '未登録' }}
+            @if (!d.office.bonusMonths.length) { （<a routerLink="/settings">設定</a>で登録すると不支給を知らせます） }</span>
+          <span>支給 <b>{{ d.totals.paidCount }}名</b></span>
+          @if (d.deadline) { <span>賞与支払届の期限 <b [class]="complete() ? '' : dueClass(d.deadline)">{{ d.deadline }}</b></span> }
+        </ng-container>
       }
-      <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || busy()"><mat-icon>refresh</mat-icon>読み込み直す</button>
-    </div>
+      <ng-container actions>
+        <label class="month">支給月
+          <input type="month" [ngModel]="payMonth" (ngModelChange)="changeMonth($event)" [disabled]="busy()">
+        </label>
+        <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || busy()"><mat-icon>refresh</mat-icon>読み込み直す</button>
+      </ng-container>
+    </app-page-head>
 
     @if (job(); as j) {
       @if (j.status === 'running') {
@@ -56,7 +60,7 @@
               <button mat-stroked-button type="button" (click)="nonPaymentPdf(r)" [disabled]="busy()"><mat-icon>picture_as_pdf</mat-icon>公式様式のPDFを作る</button>
               @switch (r.status) {
                 @case ('draft') {
-                  <button mat-flat-button type="button" (click)="updateFiling(r, 'requestApproval')" [disabled]="busy()">承認を依頼</button>
+                  <button mat-flat-button type="button" (click)="updateFiling(r, 'requestApproval')" [disabled]="busy()">承認を依頼する</button>
                   <button mat-button type="button" (click)="updateFiling(r, 'cancel')" [disabled]="busy()">取り消す</button>
                 }
                 @case ('pending') {
@@ -121,43 +125,14 @@
         </div>
       }
 
-      <nav class="steps" aria-label="賞与のステップ">
-        <ol>
-          @for (s of steps; track s.key; let i = $index) {
-            @let sum = summaries()[i];
-            <li [attr.data-view]="stepView(s.key)" [class.current]="current() === s.key">
-              <button type="button" (click)="selectStep(s.key)" [attr.aria-current]="current() === s.key ? 'step' : null">
-                <span class="mark" aria-hidden="true">
-                  @switch (stepView(s.key)) {
-                    @case ('done') { <mat-icon>check</mat-icon> }
-                    @case ('waiting') { <mat-icon>hourglass_empty</mat-icon> }
-                    @default { {{ i + 1 }} }
-                  }
-                </span>
-                <span class="step-text">
-                  <span class="step-label">{{ s.label }}</span>
-                  <span class="step-count">
-                    @if (s.key === 'entry') { {{ paidCount() }}名に支給{{ sum.todo ? '・要対応' + sum.todo + '名' : '' }} }
-                    @else if (sum.empty) { 対象なし }
-                    @else if (sum.done) { 完了 }
-                    @else if (s.key === 'filing' && toFile().length) { {{ toFile().length }}名が届出 未作成 }
-                    @else if (sum.todo) { 残り{{ sum.todo }}{{ s.key === 'filing' ? '件' : sum.unit }} }
-                    @else { {{ sum.waiting }}{{ s.key === 'filing' ? '件' : sum.unit }} 承認待ち }
-                  </span>
-                </span>
-              </button>
-            </li>
-          }
-        </ol>
-      </nav>
+      <!-- 2. 横並びのステップ -->
+      <app-stepper [steps]="stepItems()" [current]="current()" label="賞与のステップ" (select)="selectStep($any($event))" />
 
+      <!-- 3. 本体 -->
       <section class="panel" aria-labelledby="step-title">
-        <h2 id="step-title">{{ currentDef().label }}</h2>
-        <dl class="guide">
-          <div><dt>やること</dt><dd>{{ currentDef().what }}</dd></div>
-          <div><dt>なぜ必要か</dt><dd>{{ currentDef().why }}</dd></div>
-          <div><dt>次に起きること</dt><dd>{{ currentDef().next }}</dd></div>
-        </dl>
+        <app-step-lead [heading]="currentDef().label" [text]="currentDef().what" headingId="step-title">
+          @if (current() === 'premium') { <span right><app-term key="standardBonus" /></span> }
+        </app-step-lead>
 
         @if (reviewNote(); as note) {
           <div class="note" [attr.data-mine]="note.mine" role="status"><mat-icon aria-hidden="true">{{ note.mine ? 'hourglass_empty' : 'fact_check' }}</mat-icon>{{ note.text }}</div>
@@ -167,12 +142,13 @@
           @case ('entry') {
             <div class="import">
               <div class="import-actions">
-                <button mat-stroked-button type="button" (click)="downloadTemplate()"><mat-icon>download</mat-icon>取込用のCSVをダウンロード</button>
                 <label class="file" [class.disabled]="busy()">
                   <mat-icon>upload_file</mat-icon>CSVを選んで確認する
                   <input type="file" accept=".csv,text/csv" (change)="pickCsv($event)" [disabled]="busy()">
                 </label>
-                <button mat-button type="button" (click)="pasting.set(!pasting())" [disabled]="busy()"><mat-icon>content_paste</mat-icon>表を貼り付けて取り込む</button>
+                <button mat-stroked-button type="button" (click)="pasting.set(!pasting())" [disabled]="busy()"><mat-icon>content_paste</mat-icon>表を貼り付けて取り込む</button>
+                <button mat-button type="button" (click)="downloadTemplate()"><mat-icon>download</mat-icon>取込用のCSV</button>
+                <span class="hint">1行に1回の支給。同じ月に2回支給した人は2行に分けます（合算して計算）。支給なしの人に足すときは「すべて」から名前を押します。</span>
               </div>
               @if (pasting()) {
                 <div class="paste">
@@ -183,17 +159,13 @@
                   </div>
                 </div>
               }
-              <p class="hint">
-                1行に1回の支給を入れます。同じ月に2回支給した人は、支給日を分けて2行入れてください（合算して計算します）。
-                取り込んだ人は、その月の支給がCSVの内容に置き換わります。1人ずつ直すときや、支給なしの人に足すときは、一覧の名前を押します（「すべて表示」で支給なしの人も出ます）。
-                <app-term key="standardBonus" />
-              </p>
               @if (importResult(); as res) {
                 <div class="import-result">
                   <h3>{{ res.dryRun ? '取込前の確認' : '取込の結果' }}{{ csvName() ? '：' + csvName() : '' }}</h3>
                   <p>
                     {{ res.dryRun ? '取り込める人' : '取り込んだ人' }}：<strong>{{ res.dryRun ? res.rows.length : res.imported }}名</strong>
                     @if (res.errors.length) { ／ 誤りのある行：<strong class="bad">{{ res.errors.length }}行</strong>（取り込みません） }
+                    @if (res.dryRun) { ／ 取り込んだ人は、その月の支給がこの内容に置き換わります }
                   </p>
                   @if (res.errors.length) {
                     <div class="table-wrap">
@@ -225,82 +197,67 @@
                         </div>
                       </details>
                     }
-                    <div class="import-actions">
-                      <button mat-flat-button type="button" (click)="importCsv(false)" [disabled]="busy() || !res.rows.length">
-                        {{ res.rows.length }}名を取り込む{{ res.errors.length ? '（誤りの行の人は除く）' : '' }}
-                      </button>
-                      <button mat-button type="button" (click)="cancelImport()" [disabled]="busy()">やめる</button>
-                    </div>
                   }
                 </div>
               }
             </div>
           }
           @case ('premium') {
-            <div class="totals" aria-label="事業所の合計">
-              <div><span>賞与額の合計</span><strong>{{ d.totals.total | number }}円</strong><small>{{ d.totals.paidCount }}名</small></div>
-              <div><span>標準賞与額の合計</span><strong>{{ d.totals.standard | number }}円</strong></div>
-              <div><span>保険料（本人負担）</span><strong>{{ d.totals.employee | number }}円</strong><small>計算済みの人の合計</small></div>
-              <div><span>保険料（会社負担）</span><strong>{{ d.totals.employer | number }}円</strong></div>
-            </div>
+            <p class="totals" aria-label="事業所の合計">
+              賞与額の合計 <b>{{ d.totals.total | number }}円</b>（{{ d.totals.paidCount }}名）・標準賞与額 <b>{{ d.totals.standard | number }}円</b>・
+              保険料 本人 <b>{{ d.totals.employee | number }}円</b>／会社 <b>{{ d.totals.employer | number }}円</b>（計算済みの人の合計）
+            </p>
           }
           @case ('filing') {
-            <div class="filing-create">
-              @if (toFile().length) {
-                <button mat-flat-button type="button" (click)="createFiling()" [disabled]="busy()">
-                  <mat-icon>note_add</mat-icon>{{ toFile().length }}名分の賞与支払届を作る
-                </button>
-                <span class="hint">保留中の人と、保険料がまだ承認されていない人は載りません。後から追加の届出にできます。</span>
-              } @else if (!activeFilings().length) {
-                <span class="hint">届出に載せる人はいません（保険料が承認された人が対象です）。</span>
-              }
-            </div>
-            <ul class="filings">
-              @for (f of activeFilings(); track f.id) {
-                <li class="filing" [attr.data-tone]="filingTone(f)">
-                  <div class="filing-head">
-                    <strong>{{ f.number }}件目の賞与支払届</strong>
-                    <span>{{ f.personCount }}名</span>
-                    <span class="filing-status">{{ statusLabels[f.status] }}</span>
-                    @if (f.deadline && f.status !== 'submitted') { <span class="filing-status">期限 {{ f.deadline }}</span> }
-                  </div>
-                  @if (f.rejection && f.status === 'draft') { <p class="bad">差し戻されました。理由：{{ f.rejection }}（取り消して作り直すか、そのまま承認を依頼し直します）</p> }
-                  @if (f.status === 'pending') {
-                    <p class="hint">{{ canApprove() && !f.mine ? '承認を頼まれています。内容とPDFを確かめてください。' : '別の担当者（管理者・承認者）の承認を待っています。' }}</p>
-                  }
-                  <div class="filing-actions">
-                    <button mat-stroked-button type="button" (click)="openFiling(f)" [disabled]="busy()"><mat-icon>description</mat-icon>内容とPDFを見る</button>
-                    @switch (f.status) {
-                      @case ('draft') {
-                        <button mat-flat-button type="button" (click)="updateFiling(f, 'requestApproval')" [disabled]="busy()">承認を依頼</button>
-                        <button mat-button type="button" (click)="updateFiling(f, 'cancel')" [disabled]="busy()">取り消す</button>
-                      }
-                      @case ('pending') {
-                        @if (canApprove() && !f.mine) {
-                          <button mat-flat-button type="button" (click)="updateFiling(f, 'approve')" [disabled]="busy()">承認する</button>
-                          <button mat-button type="button" (click)="updateFiling(f, 'reject')" [disabled]="busy()">差し戻す</button>
+            @if (activeFilings().length) {
+              <ul class="filings">
+                @for (f of activeFilings(); track f.id) {
+                  <li class="filing" [attr.data-tone]="filingTone(f)">
+                    <div class="filing-head">
+                      <strong>{{ f.number }}件目の賞与支払届</strong>
+                      <span>{{ f.personCount }}名</span>
+                      <span class="app-status" [attr.data-tone]="filingTone(f)">{{ statusLabels[f.status] }}</span>
+                      @if (f.deadline && f.status !== 'submitted') { <span class="filing-status" [class]="dueClass(f.deadline)">期限 {{ f.deadline }}</span> }
+                    </div>
+                    @if (f.rejection && f.status === 'draft') { <p class="bad">差し戻されました。理由：{{ f.rejection }}（取り消して作り直すか、そのまま承認を依頼し直します）</p> }
+                    @if (f.status === 'pending') {
+                      <p class="hint">{{ canApprove() && !f.mine ? '承認を頼まれています。内容とPDFを確かめてください。' : '別の担当者（管理者・承認者）の承認を待っています。' }}</p>
+                    }
+                    <div class="filing-actions">
+                      <button mat-stroked-button type="button" (click)="openFiling(f)" [disabled]="busy()"><mat-icon>description</mat-icon>内容とPDFを見る</button>
+                      @switch (f.status) {
+                        @case ('draft') {
+                          <button mat-flat-button type="button" (click)="updateFiling(f, 'requestApproval')" [disabled]="busy()">承認を依頼する</button>
+                          <button mat-button type="button" (click)="updateFiling(f, 'cancel')" [disabled]="busy()">取り消す</button>
+                        }
+                        @case ('pending') {
+                          @if (canApprove() && !f.mine) {
+                            <button mat-flat-button type="button" (click)="updateFiling(f, 'approve')" [disabled]="busy()">承認する</button>
+                            <button mat-button type="button" (click)="updateFiling(f, 'reject')" [disabled]="busy()">差し戻す</button>
+                          }
                         }
                       }
+                    </div>
+                    @if (f.status === 'approved' || f.status === 'submitted') {
+                      <app-filing-submission [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" (changed)="load()" />
+                      <details class="attachments"><summary>添付書類</summary>
+                        <app-filing-attachments [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" />
+                      </details>
                     }
-                  </div>
-                  @if (f.status === 'approved' || f.status === 'submitted') {
-                    <app-filing-submission [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" (changed)="load()" />
-                    <details class="attachments"><summary>添付書類</summary>
-                      <app-filing-attachments [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" />
-                    </details>
-                  }
-                </li>
-              }
-            </ul>
+                  </li>
+                }
+              </ul>
+            }
             @if (cancelledFilings().length) {
               <p class="hint">取り消した届出：{{ cancelledFilings().length }}件</p>
             }
           }
         }
 
+        <!-- 対象者の表と、下に固定の操作バー -->
         <app-target-list [rows]="targetRows()" [actions]="actions()" [busy]="busy() || loading()" [loading]="loading()" [cellHeader]="cellHeader()" [includeYours]="true"
-                         (run)="run($event)" (retryFailed)="retry($event)" (hold)="hold($event.id, $event.reason)"
-                         (release)="hold($event, null)" (open)="open($event.id)">
+                         [emptyInfo]="barInfo()"
+                         (run)="run($event)" (retryFailed)="retry($event)" (hold)="hold($event.id, $event.reason)" (release)="hold($event, null)">
           <ng-template appTargetCell let-t>
             @if (row(t.id); as r) {
               @if (r.bonus; as b) {
@@ -324,11 +281,21 @@
               } @else { — }
             }
           </ng-template>
+          <ng-template appTargetDetail let-t>
+            @if (row(t.id); as r) {
+              <app-bonus-person [row]="r" [payMonth]="d.payMonth" [canEdit]="!r.bonus?.confirmed && !r.bonus?.pending" [busy]="busy()"
+                                (save)="savePerson(r.employeeId, $event)" />
+            }
+          </ng-template>
+          @if (current() === 'filing' && toFile().length) {
+            <ng-container barActions>
+              <span class="bar-notice"><mat-icon aria-hidden="true">info</mat-icon>{{ filingCaution() }}</span>
+              <button mat-flat-button type="button" (click)="createFiling()" [disabled]="busy()">
+                賞与支払届を作る（{{ toFile().length }}名）<mat-icon iconPositionEnd>arrow_forward</mat-icon>
+              </button>
+            </ng-container>
+          }
         </app-target-list>
-
-        <p class="links">
-          1人分の支給の内訳・年度の累計・保険料の内訳は名前を押すと見られます。賞与額・保険料の差し戻しは <a routerLink="/approvals">承認の画面</a> から行えます。
-        </p>
       </section>
     }
   }

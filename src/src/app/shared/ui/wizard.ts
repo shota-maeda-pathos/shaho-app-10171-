@@ -2,151 +2,128 @@ import { Component, computed, input, model, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { ActionBarComponent, PageHeadComponent, StepLeadComponent, StepperComponent, StepperItem } from './procedure-frame';
 
 /**
  * ウィザードの1ステップ。label は動詞で書く（例：「資格取得届を作る」）。
- * what・why・next は1文ずつ、初心者が説明書なしで読める言葉にする。
+ * 画面に出すのは what（やることの1行）だけ。why は注意（caution）の文言の材料にする
  */
 export interface WizardStep {
   key: string;
   label: string;
-  /** やること */
+  /** やること（本体の見出しの横に1行で出す） */
   what: string;
-  /** なぜ必要か */
-  why: string;
-  /** 次に何が起きるか */
-  next: string;
+  /** なぜ必要か（画面には出さない。注意の文言を書くときの材料） */
+  why?: string;
+  /** 次に何が起きるか（画面には出さない。主ボタンの文言で伝える） */
+  next?: string;
+  /** 主ボタンを押す前に知っておくべき注意（取り返しのつかない操作・期限・迷いやすい決まり）。操作バーに1行で出す */
+  caution?: string;
   /** 完了したステップ。省略時は現在より前のステップを完了とみなす */
   done?: boolean;
   /** 他の人の操作を待っているステップ（承認など）。待っている相手を書く */
   waitingFor?: string;
+  /** 要確認（差し戻し・返戻など）があるステップ */
+  attention?: boolean;
+  /** ステップの下の1行（例：「10/27 完了」）。省略時は状態の名前 */
+  note?: string;
 }
 
-type StepView = WizardStep & { index: number; view: 'done' | 'current' | 'waiting' | 'todo' };
-
 /**
- * 個人型の手続きの枠。進捗・ステップ一覧・各ステップの説明・戻る／次へを表示し、
- * 現在のステップの入力フォームは <app-wizard> の中に書く。
- * 「次へ」は advance を出すだけなので、保存などが終わってから呼び出し側で current を進める。
+ * 1人の手続きの枠（docs/ui-unification-design.md の1章）。見出し→横並びのステップ→本体→下に固定の操作バー。
+ * 現在のステップの入力フォームは <app-wizard> の中に書く。見出しの補足は [meta]、右上の補助のボタンは [headActions] で渡す。
+ * 主ボタンは advance を出すだけなので、保存などが終わってから呼び出し側で current を進める。
  */
 @Component({
   selector: 'app-wizard',
   standalone: true,
-  imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule, MatProgressSpinnerModule],
+  imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, PageHeadComponent, StepperComponent, StepLeadComponent, ActionBarComponent],
   template: `
-    <div class="wizard">
-      <header class="wizard-header">
-        <div>
-          <h1 class="wizard-title">{{ heading() }}</h1>
-          @if (subtitle()) { <div class="wizard-subtitle">{{ subtitle() }}</div> }
+    <app-page-head [heading]="heading()" [kicker]="kicker()" [backLink]="backLink()" [backQuery]="backQuery()" [backLabel]="backLabel()">
+      <ng-container ngProjectAs="[meta]">
+        @if (subtitle()) { <span>{{ subtitle() }}</span> }
+        <ng-content select="[meta]" />
+      </ng-container>
+      <ng-container ngProjectAs="[actions]"><ng-content select="[headActions]" /></ng-container>
+    </app-page-head>
+
+    <app-stepper [steps]="items()" [current]="step().key" [label]="heading() + 'のステップ'" (select)="jump($event)" />
+
+    <section class="step-panel" [attr.aria-labelledby]="'wizard-step-' + step().key">
+      <app-step-lead [heading]="step().label" [text]="step().what" [headingId]="'wizard-step-' + step().key" />
+
+      @if (step().waitingFor) {
+        <div class="waiting" role="status">
+          <mat-icon aria-hidden="true">hourglass_empty</mat-icon>
+          <div><strong>{{ step().waitingFor }}の操作を待っています。</strong>ここで待つ必要はありません。終わるとホームの「やること」に出ます。</div>
         </div>
-        <div class="wizard-progress">
-          <span>{{ doneCount() }} / {{ steps().length }} ステップ完了</span>
-          <mat-progress-bar mode="determinate" [value]="percent()" aria-label="進み具合"></mat-progress-bar>
-        </div>
-      </header>
+      }
 
-      <div class="wizard-body">
-        <nav class="step-list" aria-label="ステップ一覧">
-          <ol>
-            @for (s of views(); track s.key) {
-              <li [attr.data-view]="s.view" [attr.aria-current]="s.index === current() ? 'step' : null">
-                <button type="button" class="step-button" [disabled]="!canJump(s)" (click)="current.set(s.index)">
-                  <span class="step-mark" aria-hidden="true">
-                    @switch (s.view) {
-                      @case ('done') { <mat-icon>check</mat-icon> }
-                      @case ('waiting') { <mat-icon>hourglass_empty</mat-icon> }
-                      @default { {{ s.index + 1 }} }
-                    }
-                  </span>
-                  <span class="step-label">{{ s.label }}<span class="visually-hidden">（{{ viewLabels[s.view] }}）</span></span>
-                </button>
-              </li>
-            }
-          </ol>
-        </nav>
+      <div class="step-content"><ng-content /></div>
+    </section>
 
-        <section class="step-panel" [attr.aria-labelledby]="'wizard-step-' + step().key">
-          <h2 class="step-title" [id]="'wizard-step-' + step().key">
-            <span class="step-number">ステップ {{ current() + 1 }}</span>{{ step().label }}
-          </h2>
-          <dl class="step-guide">
-            <div><dt>やること</dt><dd>{{ step().what }}</dd></div>
-            <div><dt>なぜ必要か</dt><dd>{{ step().why }}</dd></div>
-            <div><dt>次に起きること</dt><dd>{{ step().next }}</dd></div>
-          </dl>
-
-          @if (step().waitingFor) {
-            <div class="waiting" role="status">
-              <mat-icon aria-hidden="true">hourglass_empty</mat-icon>
-              <div>
-                <strong>{{ step().waitingFor }}の操作を待っています。</strong>
-                ここで待つ必要はありません。終わるとホームの「やること」に表示されるので、そこから続きを進めてください。
-              </div>
-            </div>
-          }
-
-          <div class="step-content"><ng-content /></div>
-
-          <footer class="step-nav">
-            <button mat-stroked-button type="button" (click)="back()" [disabled]="current() === 0 || busy()">
-              <mat-icon>arrow_back</mat-icon> 戻る
-            </button>
-            @if (step().waitingFor) {
-              <a mat-flat-button routerLink="/home">ホームへ戻る</a>
-            } @else if (!hideNext()) {
-              <button mat-flat-button type="button" (click)="advance.emit(step())" [disabled]="nextDisabled() || busy()">
-                @if (busy()) { <mat-spinner diameter="18"></mat-spinner> }
-                {{ nextLabel() ?? (isLast() ? '完了する' : '次へ') }}
-                @if (!busy() && !isLast()) { <mat-icon iconPositionEnd>arrow_forward</mat-icon> }
-              </button>
-            }
-          </footer>
-        </section>
-      </div>
-    </div>
+    <app-action-bar [info]="info()" [notice]="notice() ?? step().caution">
+      <button mat-button type="button" (click)="back()" [disabled]="current() === 0 || busy()">
+        <mat-icon>arrow_back</mat-icon> 戻る
+      </button>
+      @if (step().waitingFor) {
+        <a mat-flat-button routerLink="/home">ホームへ戻る</a>
+      } @else if (!hideNext()) {
+        <button mat-flat-button type="button" (click)="advance.emit(step())" [disabled]="nextDisabled() || busy()">
+          @if (busy()) { <mat-spinner diameter="18"></mat-spinner> }
+          {{ nextLabel() ?? (isLast() ? '完了する' : '次へ') }}
+          @if (!busy() && !isLast()) { <mat-icon iconPositionEnd>arrow_forward</mat-icon> }
+        </button>
+      }
+    </app-action-bar>
   `,
   styleUrl: './wizard.scss',
 })
 export class WizardComponent {
   heading = input.required<string>();
-  /** 対象者や期限など（例：「山田 太郎・提出期限 11月5日」） */
+  /** 対象者や期限など（例：「山田 太郎・提出期限 11月5日」）。見出しの下に出す */
   subtitle = input<string>();
+  /** 種類のタグ（例：「入社」） */
+  kicker = input<string>();
+  backLink = input<string | unknown[]>();
+  backQuery = input<Record<string, string> | null>(null);
+  backLabel = input('戻る');
   steps = input.required<WizardStep[]>();
   /** 表示中のステップ番号（0始まり） */
   current = model(0);
-  /** 「次へ」の文字。省略時は「次へ」（最後のステップは「完了する」） */
+  /** 主ボタンの文字。次に起こることが分かる文言にする（例：「台帳に登録して雇用条件へ」）。省略時は「次へ」（最後は「完了する」） */
   nextLabel = input<string>();
   nextDisabled = input(false);
   /** 保存中など。ボタンを押せなくして読み込み中を表示する */
   busy = input(false);
-  /** ステップの中に独自のボタンがある場合など、「次へ」を出さない */
+  /** ステップの中に独自のボタンがある場合など、主ボタンを出さない */
   hideNext = input(false);
+  /** 操作バーの左（保存の状態など。例：「保存済み 10:42」） */
+  info = input('');
+  /** 操作バーの注意。省略時はステップの caution */
+  notice = input<string | null>();
   advance = output<WizardStep>();
-
-  readonly viewLabels = { done: '完了', current: '進行中', waiting: '待ち', todo: '未着手' };
 
   step = computed(() => this.steps()[this.current()]);
   isLast = computed(() => this.current() === this.steps().length - 1);
-  views = computed<StepView[]>(() => this.steps().map((s, index) => ({
-    ...s, index,
-    view: this.isDone(s, index) ? 'done' : index === this.current() ? (s.waitingFor ? 'waiting' : 'current') : 'todo',
-  })));
-  doneCount = computed(() => this.views().filter(v => v.view === 'done').length);
-  percent = computed(() => this.steps().length ? (this.doneCount() / this.steps().length) * 100 : 0);
+  items = computed<StepperItem[]>(() => this.steps().map((s, index) => {
+    const done = s.done ?? index < this.current();
+    const state = done ? 'done' : s.attention ? 'attention' : s.waitingFor ? 'waiting' : 'todo';
+    return {
+      key: s.key, label: s.label, state,
+      note: s.note ?? (index === this.current() && !done && !s.waitingFor && !s.attention ? 'あなたの番' : s.waitingFor ? `${s.waitingFor}待ち` : undefined),
+      // 完了したステップにだけ戻れる（先のステップへは飛ばせない）
+      disabled: this.busy() || !done,
+    };
+  }));
 
   back() {
     if (this.current() > 0) this.current.set(this.current() - 1);
   }
 
-  /** 完了したステップにだけ戻れる（先のステップへは飛ばせない） */
-  canJump(s: StepView) {
-    return !this.busy() && s.index !== this.current() && s.view === 'done';
-  }
-
-  private isDone(s: WizardStep, index: number) {
-    return s.done ?? index < this.current();
+  jump(key: string) {
+    const index = this.steps().findIndex(s => s.key === key);
+    if (index >= 0) this.current.set(index);
   }
 }
