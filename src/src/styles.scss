@@ -76,6 +76,9 @@ body {
 
   --app-radius: 8px;
   --app-radius-pill: 999px;
+
+  // 左のサイドバーの幅（下に固定の操作バーを本文の幅に合わせるのに使う）
+  --app-sidebar-width: 240px;
 }
 
 // 状態の表示（app-status-badge と同じ見た目。表の中などで部品を使えない場合に使う）

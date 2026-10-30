@@ -7,8 +7,8 @@
 }
 
 .sidebar {
-  width: 240px;
-  min-width: 240px;
+  width: var(--app-sidebar-width);
+  min-width: var(--app-sidebar-width);
   @include mat.list-overrides((
     list-item-label-text-color: #e4edf7,
     list-item-hover-label-text-color: #ffffff,
