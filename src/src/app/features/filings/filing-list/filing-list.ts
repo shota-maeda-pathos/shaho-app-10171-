@@ -149,6 +149,28 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
         </div>
       </form>
 
+      <details class="zip" [open]="zipOpen()" (toggle)="zipOpen.set($any($event.target).open)">
+        <summary>PDFをまとめて保存する（ZIP）</summary>
+        <p class="sub">承認した届出の保存原本（承認した時点の内容）から公式様式のPDFを作り、ZIPにまとめます。上の「届出の種類」と事業所の選択も使います。</p>
+        <div class="zip-row">
+          <mat-form-field appearance="outline">
+            <mat-label>期間の基準</mat-label>
+            <mat-select [(ngModel)]="zipBase" name="zipBase">
+              <mat-option value="submitted">提出日</mat-option>
+              <mat-option value="created">作成日</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline"><mat-label>から</mat-label><input matInput type="date" [(ngModel)]="zipFrom" name="zipFrom"></mat-form-field>
+          <mat-form-field appearance="outline"><mat-label>まで</mat-label><input matInput type="date" [(ngModel)]="zipTo" name="zipTo"></mat-form-field>
+          <button mat-flat-button type="button" (click)="makeZip()" [disabled]="zipBusy() || !zipFrom || !zipTo">ZIPを作る</button>
+        </div>
+        @if (zipStatus()) { <p role="status">{{ zipStatus() }}</p> }
+        @if (zipWarnings().length) {
+          <details><summary>確かめてほしいこと（{{ zipWarnings().length }}件）</summary><ul>@for (w of zipWarnings(); track $index) { <li>{{ w }}</li> }</ul></details>
+        }
+        @if (zipUrl(); as z) { <a mat-stroked-button [href]="z.url" [download]="z.name"><mat-icon>download</mat-icon>{{ z.name }} を保存する</a> }
+      </details>
+
       @if (employeeId) {
         <p class="note">従業員を絞り込んでいます。<button mat-button type="button" (click)="clearEmployee()">すべての従業員を表示</button></p>
       }
@@ -212,6 +234,10 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
     .filters mat-form-field { width: 180px; }
     .filter-actions { display: flex; gap: var(--app-space-2); margin-bottom: 20px; }
     .note { color: var(--app-color-text-sub); }
+    .zip { margin: 0 0 var(--app-space-4); padding: var(--app-space-2) var(--app-space-3); border: 1px solid var(--app-color-border); border-radius: 8px; background: var(--app-color-surface); }
+    .zip summary { cursor: pointer; color: var(--app-color-link); }
+    .zip-row { display: flex; flex-wrap: wrap; gap: 0 var(--app-space-3); align-items: center; }
+    .zip-row mat-form-field { width: 180px; }
     .count { color: var(--app-color-text-sub); margin: 0 0 var(--app-space-2); }
     .warn-text { color: var(--app-status-action-fg); margin-left: var(--app-space-2); }
     .table-wrap { overflow-x: auto; border: 1px solid var(--app-color-border); border-radius: 8px; background: var(--app-color-surface); }
@@ -259,6 +285,66 @@ export class FilingListComponent implements OnInit {
   from = '';
   to = '';
   employeeId = '';
+
+  // ---- ZIP でまとめて保存 ----
+  zipOpen = signal(false);
+  zipBusy = signal(false);
+  zipStatus = signal('');
+  zipWarnings = signal<string[]>([]);
+  zipUrl = signal<{ url: string; name: string } | null>(null);
+  zipBase: 'submitted' | 'created' = 'submitted';
+  zipFrom = '';
+  zipTo = '';
+
+  async makeZip() {
+    const old = this.zipUrl();
+    if (old) URL.revokeObjectURL(old.url);
+    this.zipUrl.set(null);
+    this.zipWarnings.set([]);
+    this.zipBusy.set(true);
+    try {
+      const [{ pdfFromArchive, archiveFileName }, { createZip, uniqueNames }] = await Promise.all([import('../archive/archive-pdf'), import('../archive/zip')]);
+      const call = httpsCallable<object, { items: any[]; total: number; truncated: boolean }>(this.functions, 'filingArchiveBatch', { timeout: 120_000 });
+      const files: { name: string; data: Uint8Array }[] = [];
+      const warnings: string[] = [];
+      let offset = 0;
+      let total = 0;
+      let current = 0;
+      do {
+        const { data } = await call({
+          companyId: this.auth.companyId, ...this.office.params(), ...(this.filingType ? { filingType: this.filingType } : {}),
+          base: this.zipBase, from: this.zipFrom, to: this.zipTo, offset, limit: 20,
+        });
+        total = data.total;
+        if (data.truncated) warnings.push('届出が多いため、一部だけを探しました。期間や種類を絞ってください。');
+        for (const item of data.items) {
+          this.zipStatus.set(`PDFを作っています（${files.length + 1}/${total}件）…`);
+          const name = archiveFileName(item);
+          try {
+            const pdf = await pdfFromArchive(item.archive);
+            files.push({ name, data: pdf.bytes });
+            if (item.current) current += 1;
+            for (const w of pdf.warnings) warnings.push(`${name}：${w}`);
+          } catch (e) {
+            warnings.push(`${name}：PDFを作れませんでした（${e instanceof Error ? e.message : e}）`);
+          }
+        }
+        offset += data.items.length;
+        if (!data.items.length) break;
+      } while (offset < total);
+      if (!files.length) { this.zipStatus.set('条件に合う承認済みの届出はありません。'); return; }
+      const names = uniqueNames(files.map(f => f.name));
+      const zip = createZip(files.map((f, i) => ({ name: names[i], data: f.data })));
+      const name = `届出PDF_${this.zipFrom}_${this.zipTo}.zip`;
+      this.zipUrl.set({ url: URL.createObjectURL(new Blob([zip as unknown as BlobPart], { type: 'application/zip' })), name });
+      this.zipStatus.set(`${files.length}件のPDFをZIPにまとめました（${(zip.length / 1024 / 1024).toFixed(1)}MB）${current ? `。うち${current}件は保存原本がないため、今の内容から作りました（ファイル名の末尾が「今の内容」）` : ''}。`);
+      this.zipWarnings.set(warnings);
+    } catch (e: unknown) {
+      this.zipStatus.set(e instanceof Error ? e.message : 'ZIPを作れませんでした');
+    } finally {
+      this.zipBusy.set(false);
+    }
+  }
 
   ngOnInit() {
     const q = this.route.snapshot.queryParamMap;

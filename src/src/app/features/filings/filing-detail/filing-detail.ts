@@ -41,6 +41,9 @@ const FILING_TYPE_LABELS: Record<string, string> = {
 const WORKFLOW_STATUS_LABELS: Record<string, string> = {
   draft: '下書き', pending: '承認待ち', approved: '承認済', rejected: '差戻し',
 };
+/** 保存原本の一覧の1行 */
+interface ArchiveRow { id: string; approvedAt: string | null; approvedByName: string; filingVersion: number; form: { checkedOn: string } | null }
+
 @Component({
   selector: 'app-filing-detail',
   standalone: true,
@@ -159,6 +162,19 @@ const WORKFLOW_STATUS_LABELS: Record<string, string> = {
         </mat-card>
 
         <mat-card class="actions-card">
+          <h2>保存原本</h2>
+          @if (!archives().length) { <p class="muted">承認すると、承認した時点の記入内容を保存原本として残します（消せません）。</p> }
+          @else {
+            <ul class="archives">
+              @for (a of archives(); track a.id) {
+                <li>{{ a.approvedAt | date:'yyyy/MM/dd HH:mm' }} {{ a.approvedByName }}が承認（版 {{ a.filingVersion }}・様式 {{ a.form?.checkedOn ?? '—' }}取得）
+                  <button mat-button type="button" (click)="archivePdf(a.id)" [disabled]="processing()">このときのPDF</button></li>
+              }
+            </ul>
+          }
+        </mat-card>
+
+        <mat-card class="actions-card">
           <h2>添付書類</h2>
           <app-filing-attachments [target]="{ source: 'employee', parentId: employeeId, filingId: filingId }" />
         </mat-card>
@@ -235,6 +251,7 @@ const WORKFLOW_STATUS_LABELS: Record<string, string> = {
     .edit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 12px; }
     .wide { width: min(100%, 480px); }
     .muted { color: var(--app-color-text-sub); }
+    .archives { margin: 0; padding-left: 20px; }
     .note { padding: 8px 12px; border-radius: 8px; background: var(--app-status-yours-bg); }
   `],
 })
@@ -267,6 +284,7 @@ export class FilingDetailComponent implements OnInit {
 
   private destroyRef = inject(DestroyRef);
   correctionKind = signal<'correction' | 'cancellation' | null>(null);
+  archives = signal<ArchiveRow[]>([]);
   newReason = '';
   edits: Record<string, string> = {};
   editReason = '';
@@ -372,6 +390,32 @@ export class FilingDetailComponent implements OnInit {
     }
   }
 
+  /** 承認した時点の内容（保存原本）から PDF を作り直す */
+  async archivePdf(archiveId: string) {
+    this.processing.set(true);
+    try {
+      const { data } = await httpsCallable<object, { archive: import('../archive/archive-pdf').FilingArchive | null }>(this.functions, 'filingArchiveGet')({
+        companyId: this.auth.companyId, source: 'employee', parentId: this.employeeId, filingId: this.filingId, archiveId,
+      });
+      if (!data.archive) throw new Error('保存原本が見つかりません');
+      const [{ pdfFromArchive }, { OFFICIAL_FORMS }, { OfficialPdfPreviewComponent }] = await Promise.all([
+        import('../archive/archive-pdf'), import('../templates/official-filing-pdf'), import('../templates/official-pdf-preview'),
+      ]);
+      const output = await pdfFromArchive(data.archive);
+      const form = OFFICIAL_FORMS[data.archive.formType];
+      this.dialog.open(OfficialPdfPreviewComponent, {
+        width: '1100px', height: '94vh', maxWidth: '96vw',
+        data: { ...output, title: `${form?.title ?? '届出'}（保存原本 ${data.archive.approvedAt?.slice(0, 10) ?? ''}）`,
+          filename: `${form?.title ?? '届出'}_保存原本_${(data.archive.approvedAt ?? '').slice(0, 10)}.pdf`,
+          sourceUrl: form ? `https://www.nenkin.go.jp/shinsei/kounen/tekiyo/${form.source}` : '', originalUrl: form ? `/filing-forms/${form.file}.pdf` : '' },
+      });
+    } catch (e: any) {
+      this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 6000 });
+    } finally {
+      this.processing.set(false);
+    }
+  }
+
   async printPdf() {
     if (this.processing()) return;
     this.processing.set(true);
@@ -437,6 +481,9 @@ export class FilingDetailComponent implements OnInit {
         filingId: this.filingId,
       });
       this.filing.set(result.data);
+      void httpsCallable<object, { items: ArchiveRow[] }>(this.functions, 'filingArchiveList')({
+        companyId: this.auth.companyId, source: 'employee', parentId: this.employeeId, filingId: this.filingId,
+      }).then(r => this.archives.set(r.data.items)).catch(() => this.archives.set([]));
       this.edits = Object.fromEntries(this.editableKeys().map(k => [k, result.data.formData[k] == null ? '' : String(result.data.formData[k])]));
       this.editReason = result.data.reason ?? '';
     } catch {

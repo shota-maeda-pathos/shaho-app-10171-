@@ -1,5 +1,6 @@
 // 算定基礎届（定時決定）。一括型：事業所×年ごとに、対象者を確かめる → 等級の承認 → 届出を作る → 届出の承認と提出
 import { filingContentHash } from '../utils/hash';
+import { buildArchive } from '../filings/archive/rules';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
@@ -518,6 +519,8 @@ export async function updateSanteiFiling(input: SanteiFilingUpdateInput, auth: A
         break;
     }
     tx.update(ref, { ...patch, updatedAt: now, version: f.version + 1 });
+    // 保存原本：承認時点の記入内容と様式の版。追記するだけで消さない
+    if (input.action === 'approve') tx.set(ref.collection('archives').doc(), { ...buildArchive({ source: 'santei', data: f, approvedBy: auth.uid }), approvedAt: now });
     tx.set(db.collection(`${base(auth.companyId)}/auditLogs`).doc(), {
       entity: 'santeiFiling', entityId: input.filingId, action: 'update', changes: { status: { from: f.status, to: patch.status ?? f.status } },
       note: input.comment ?? null, performedBy: auth.uid, performedAt: now, version: f.version + 1,

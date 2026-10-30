@@ -7,6 +7,7 @@ import { notFound, invalidArg } from '../../utils/errors';
 import { ApprovalRequestApproveInput } from './schema';
 import { validateApprovalTarget } from '../target';
 import { filingContentHash } from '../../utils/hash';
+import { buildArchive } from '../../filings/archive/rules';
 
 export async function approveApprovalRequest(
   input: ApprovalRequestApproveInput,
@@ -80,6 +81,11 @@ export async function approveApprovalRequest(
       if (existing.exists && existing.data()!.isConfirmed === true) throw invalidArg('この月の等級は既に確定しています');
     }
 
+    // 届出の保存原本に残す事業所・会社の情報（承認時点の値）。トランザクションの書き込みより前に読む
+    const [archiveCompany, archiveOffice] = reqData.requestType === 'filing'
+      ? await Promise.all([tx.get(db.doc(`companies/${auth.companyId}`)), tx.get(db.doc(`companies/${auth.companyId}/offices/${employee.officeId}`))])
+      : [null, null];
+
     const now = Timestamp.now();
 
     tx.update(reqRef, {
@@ -120,6 +126,12 @@ export async function approveApprovalRequest(
         approvedHash: filingContentHash(targetData),
         version: targetData.version + 1,
         updatedAt: now,
+      });
+      // 保存原本：承認時点の記入内容と様式の版。追記するだけで消さない
+      tx.set(targetRef.collection('archives').doc(), {
+        ...buildArchive({ source: 'employee', data: targetData, approvedBy: auth.uid, approvalRequestId: reqRef.id,
+          company: archiveCompany?.data() ?? null, office: archiveOffice?.data() ?? null, employee }),
+        approvedAt: now,
       });
       if (filingGrade && filingGradeRef) {
         tx.set(filingGradeRef, {

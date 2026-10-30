@@ -1,5 +1,6 @@
 // 賞与（一括型）。事業所×支給月ごとに、賞与を登録する → 賞与額の承認 → 保険料の計算と承認 → 賞与支払届の作成・承認・提出
 import { filingContentHash } from '../utils/hash';
+import { buildArchive } from '../filings/archive/rules';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
@@ -778,6 +779,8 @@ export async function updateBonusFiling(input: BonusFilingUpdateInput, auth: Aut
         break;
     }
     tx.update(ref, { ...patch, updatedAt: now, version: f.version + 1 });
+    // 保存原本：承認時点の記入内容と様式の版。追記するだけで消さない
+    if (input.action === 'approve') tx.set(ref.collection('archives').doc(), { ...buildArchive({ source: 'bonus', data: f, approvedBy: auth.uid }), approvedAt: now });
     tx.set(db.collection(`${base(auth.companyId)}/auditLogs`).doc(), {
       entity: 'bonusFiling', entityId: input.filingId, action: 'update', changes: { status: { from: f.status, to: patch.status ?? f.status } },
       note: input.comment ?? null, performedBy: auth.uid, performedAt: now, version: f.version + 1,
