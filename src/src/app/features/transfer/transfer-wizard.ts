@@ -81,7 +81,7 @@ export class TransferWizardComponent implements OnInit {
     const cur = this.currentIndex();
     const filing = v.facts?.filingRequired ?? true;
     return [
-      { key: 'entry', label: '異動先と異動日', done: done || cur > 0,
+      { key: 'entry', label: '異動の内容', done: done || cur > 0,
         what: '異動先の事業所と異動日を入れます。保険料率・届出・新しい料率を使う月をシステムが判定します。',
         why: '都道府県が変わると健康保険の料率が変わり、別の適用事業所なら届出が要るためです。', next: '台帳の所属事業所を変えます。' },
       { key: 'apply', label: '所属の変更', done: done || cur > 1,

@@ -91,11 +91,11 @@ export class EmploymentChangeWizardComponent implements OnInit, OnDestroy {
     const skipped = this.noFiling();
     const filing = v.filingLabel || '届出';
     return [
-      { key: 'entry', label: v.procedure.reason === 'renewal' ? '更新後の契約' : '新しい雇用条件', done: done || cur > 0,
+      { key: 'entry', label: v.procedure.reason === 'renewal' ? '更新後の契約' : '新しい条件', done: done || cur > 0,
         what: '新しい条件を使い始める日と、雇用区分・労働時間・給与・契約期間を入れます。社会保険に加入するかはシステムが判定し直します。',
         why: '労働時間や契約の変更で、社会保険の加入・喪失や、等級の見直しが必要になることがあるためです。',
         next: '別の担当者に雇用条件の確認を依頼します。' },
-      { key: 'change_approval', label: '雇用条件の承認', done: done || cur > 1,
+      { key: 'change_approval', label: '条件の承認', done: done || cur > 1,
         what: '入れた人とは別の担当者が、新しい雇用条件を確認します。承認されると台帳に反映します。',
         why: '雇用条件の変更は、別の担当者の承認で確定する決まりのためです。',
         next: skipped || v.effect === 'none' ? '加入が変わらないため、届出はありません。' : `${filing}を作ります。`,

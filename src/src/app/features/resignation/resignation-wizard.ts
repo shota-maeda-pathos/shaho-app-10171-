@@ -11,7 +11,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
-import { GroupNavComponent } from '../procedures/procedure-groups';
+import { GroupNavComponent, groupBackLabel } from '../procedures/procedure-groups';
 import {
   ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
 } from '../../shared/ui';
@@ -39,6 +39,7 @@ export class ResignationWizardComponent implements OnInit, OnDestroy {
 
   readonly dueSourceLabel = DUE_SOURCE_LABEL;
   readonly monthLabel = monthLabel;
+  readonly groupBackLabel = groupBackLabel;
   procedureId = '';
   view = signal<ResignationView | null>(null);
   loading = signal(true);
@@ -90,7 +91,7 @@ export class ResignationWizardComponent implements OnInit, OnDestroy {
     const noFiling = '社会保険に加入していないため、このステップはありません。';
     const waitingApproval = v.current === 'approval' && v.approval?.status === 'pending';
     return [
-      { key: 'entry', label: '退職日と理由', done: done || cur > 0,
+      { key: 'entry', label: '退職日', done: done || cur > 0,
         what: '退職日を入れて、従業員台帳に退職を登録します。資格喪失日や保険料がかかる月はシステムが決めます。',
         why: '資格喪失日（退職日の翌日）から、届出の期限と最後の保険料が決まるためです。',
         next: '最後の保険料をどう集めるかを決めます。' },
@@ -98,7 +99,7 @@ export class ResignationWizardComponent implements OnInit, OnDestroy {
         what: this.settlementSkipped() ? '保険料がかかる月がないため、このステップはありません。' : '最後の月までの保険料のうち、まだ集めていない分を、どの給与から引くか（引けなければ別途入金）を決めます。',
         why: '退職後は給与がなくなることがあり、引き忘れると本人から回収できなくなるためです。',
         next: '退職後のポータルのアカウントを確かめます。' },
-      { key: 'account', label: '退職後のアカウント', done: done || cur > 2,
+      { key: 'account', label: 'アカウント', done: done || cur > 2,
         what: '退職後に本人がポータルで明細を見られる期間を確かめます。必要なら延ばしたり縮めたりします。',
         why: '退職日の翌日から申請はできなくなり、閲覧だけになります。期間が過ぎるとログインできなくなります。',
         next: f?.needsFiling === false ? '届出は不要です。完了を確認します。' : '資格喪失届を作ります。' },

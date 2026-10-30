@@ -1,4 +1,5 @@
 import { FilingSubmissionComponent } from '../filings/submission/filing-submission';
+import { GroupNavComponent, groupBackLabel } from '../procedures/procedure-groups';
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -18,7 +19,7 @@ import {
   ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
 } from '../../shared/ui';
 import {
-  ContractForm, EMPLOYMENT_TYPES, errorMessage, Evaluation, inviteUrl, OnboardingListItem, OnboardingView, RELATIONSHIPS, SelfInput, STEP_LABELS, WizardKey,
+  ContractForm, EMPLOYMENT_TYPES, errorMessage, Evaluation, inviteUrl, OnboardingView, RELATIONSHIPS, SelfInput, STEP_LABELS, WizardKey,
 } from './onboarding.types';
 
 const KEYS: WizardKey[] = ['invite', 'register', 'contract', 'filing', 'approval', 'submit', 'confirm'];
@@ -41,7 +42,7 @@ const defaultContract = (): ContractForm => ({
   selector: 'app-onboarding-wizard',
   standalone: true,
   imports: [
-    FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule,
+    GroupNavComponent, FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule,
     MatInputModule, MatRadioModule, MatSelectModule, WizardComponent, TermComponent, StatusBadgeComponent,
     LoadingStateComponent, ErrorStateComponent,
   ],
@@ -179,60 +180,16 @@ export class OnboardingWizardComponent implements OnInit, OnDestroy {
     return this.override || this.evaluation()?.judgement.result === 'manual';
   }
 
-  private async loadSiblings() {
-    const p = this.view()?.procedure;
-    if (!p) return;
-    try {
-      const { data } = await httpsCallable<object, { items: OnboardingListItem[] }>(this.functions, 'onboardingList')({
-        companyId: this.auth.companyId, officeId: p.officeId, hireDate: p.hireDate, includeCompleted: true,
-      });
-      this.siblings.set(data.items.filter(i => i.hireDate === p.hireDate && i.status !== 'cancelled'));
-    } catch {
-      // 前後の人が分からなくても、この人の手続きは進められる
-    }
-  }
-
-  goSibling(delta: number) {
-    const next = this.siblings()[this.siblingIndex() + delta];
-    if (next) void this.router.navigate(['/onboarding', next.id]);
-  }
-
   monthDay(date: string) {
     const [, m, d] = date.split('-').map(Number);
     return `${m}月${d}日`;
   }
 
-  /** 同じまとめ（事業所×入社日）の人。前後の人へ移るのに使う */
-  siblings = signal<OnboardingListItem[]>([]);
-  /** 表示中の手続き（前後の人へ移ると変わる。procedureId は読み込みに使うふつうの値） */
-  private currentId = signal('');
-  siblingIndex = computed(() => this.siblings().findIndex(i => i.id === this.currentId()));
-  groupQuery = computed(() => {
-    const p = this.view()?.procedure;
-    return p ? { officeId: p.officeId, date: p.hireDate } : null;
-  });
+  readonly groupBackLabel = groupBackLabel;
 
   async ngOnInit() {
-    // 前後の人へ移るときは同じ画面のまま id だけ変わるので、id が変わるたびに読み込み直す
-    this.route.paramMap.subscribe(params => {
-      const id = params.get('id') ?? '';
-      if (!id || id === this.procedureId) return;
-      const first = !this.procedureId;
-      this.procedureId = id;
-      this.currentId.set(id);
-      if (first) return;
-      // 前の人の入力を持ち越さない
-      this.contractDirty.set(false);
-      this.evaluation.set(null);
-      this.employeeNumber = '';
-      this.insuredPersonNumber = '';
-      this.contract = defaultContract();
-      void this.load(true);
-    });
     this.procedureId = this.route.snapshot.paramMap.get('id') ?? '';
-    this.currentId.set(this.procedureId);
     await this.load(true);
-    void this.loadSiblings();
   }
 
   ngOnDestroy() {

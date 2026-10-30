@@ -5,8 +5,8 @@
   } @else if (loadError()) {
     <app-error-state [message]="loadError()" (retry)="load(true)" />
   } @else if (view(); as v) {
-    <app-wizard kicker="年齢到達" backLink="/age-events" [backQuery]="{ officeId: v.procedure.officeId, key: v.facts.reachDate.slice(0, 7) }" [backLabel]="'年齢到達のまとめ'"
-                [heading]="v.procedure.title"
+    <app-wizard kicker="年齢到達" backLink="/age-events" [backQuery]="{ officeId: v.procedure.officeId, key: v.facts.reachDate.slice(0, 7) }" [backLabel]="groupBackLabel('age_event', v.facts.reachDate.slice(0, 7))"
+                [heading]="v.procedure.title" [personName]="v.procedure.employeeName"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + '・資格喪失日 ' + (v.facts.lossDate | date:'yyyy年M月d日')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
                 [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"

@@ -40,7 +40,7 @@ export interface WizardStep {
   standalone: true,
   imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, PageHeadComponent, StepperComponent, StepLeadComponent, ActionBarComponent],
   template: `
-    <app-page-head [heading]="heading()" [kicker]="kicker()" [backLink]="backLink()" [backQuery]="backQuery()" [backLabel]="backLabel()">
+    <app-page-head [heading]="displayHeading()" [kicker]="kicker()" [backLink]="backLink()" [backQuery]="backQuery()" [backLabel]="backLabel()">
       <ng-container ngProjectAs="[meta]">
         @if (subtitle()) { <span>{{ subtitle() }}</span> }
         <ng-content select="[meta]" />
@@ -48,7 +48,7 @@ export interface WizardStep {
       <ng-container ngProjectAs="[actions]"><ng-content select="[headActions]" /></ng-container>
     </app-page-head>
 
-    <app-stepper [steps]="items()" [current]="step().key" [label]="heading() + 'のステップ'" (select)="jump($event)" />
+    <app-stepper [steps]="items()" [current]="step().key" [label]="displayHeading() + 'のステップ'" (select)="jump($event)" />
 
     <section class="step-panel" [attr.aria-labelledby]="'wizard-step-' + step().key">
       <app-step-lead [heading]="step().label" [text]="step().what" [headingId]="'wizard-step-' + step().key" />
@@ -83,6 +83,8 @@ export interface WizardStep {
 })
 export class WizardComponent {
   heading = input.required<string>();
+  /** 対象の人の名前。渡すと、件名「山田 太郎 退職手続き」を「山田 太郎 の退職」の形にそろえる */
+  personName = input<string>();
   /** 対象者や期限など（例：「山田 太郎・提出期限 11月5日」）。見出しの下に出す */
   subtitle = input<string>();
   /** 種類のタグ（例：「入社」） */
@@ -106,6 +108,11 @@ export class WizardComponent {
   notice = input<string | null>();
   advance = output<WizardStep>();
 
+  displayHeading = computed(() => {
+    const [heading, name] = [this.heading(), this.personName()];
+    if (!name || !heading.startsWith(`${name} `)) return heading;
+    return `${name} の${heading.slice(name.length + 1).replace(/の?手続き$/, '')}`;
+  });
   step = computed(() => this.steps()[this.current()]);
   isLast = computed(() => this.current() === this.steps().length - 1);
   items = computed<StepperItem[]>(() => this.steps().map((s, index) => {

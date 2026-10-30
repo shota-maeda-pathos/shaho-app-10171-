@@ -214,6 +214,8 @@
 - 入社のまとめ：データでは持たず、`onboarding.types.ts` の `groupOnboarding`（事業所×入社日）。`onboardingList` は `hireDate` で絞れ、1000件ずつ最後まで読む（旧方式の資格取得の手続きが上限を埋めていた。2026-10-30 デプロイ）。古い `?batchId=` のリンクはまとめの画面へ移す。
 - ブラウザーペインは背景にあるとアニメーションが止まるため、パネルにアニメーションを付けない。
 - 操作バー `app-action-bar` はカードの中の最後に置き、カードの一番下の段にする（左右・下の余白を打ち消し、角をカードに合わせる）。画面の下に固定する形・カードからはみ出す形・表に別の枠を付ける形はユーザーが嫌った（2026-10-30）。
+- そろえた決まり（2026-10-30 ユーザー確認）：見出しの上のタグは手続きの種類（賞与・入社・退職…）、1人の画面の件名は「〇〇 の退職」（`app-wizard` の personName）、戻るリンクは「11月30日 退職のまとめ」（`groupBackLabel`）、右上の補助ボタンは枠付き、ステップ名は6文字まで、見出しのある画面では上の道順表示を出さない（styles.scss の `:has`）、保留を使えない表はメニュー・チップ・案内を出さない（`allowHold`）、操作も文言もない表は操作バーを出さない。本文の入力欄は密度 -3・14px。
+- 入社・退職・年齢到達のまとめは同じ部品 `features/procedures/procedure-groups.ts`（GROUP_CONFIGS。入社は `/onboarding?officeId=&key=入社日`。旧 onboarding-list・onboarding-group は削除）。
 - 退職・年齢到達のまとめ：`features/procedures/procedure-groups.ts`（ルートの data.groupType、`?officeId=&key=` でまとめの画面）、`procedureGroupList`（`functions/src/procedures/group-list.ts`、デプロイ済み）。1人の画面の前後の移動は `app-group-nav`（同じ部品のまま id だけ変わると読み込み直さないため、いったん別の URL を経由する）。新しく作った関数は作成直後に一度だけ 401（CORS エラーに見える）が出たが、読み込み直すと通った。
 
 ## 5. 現在の状態（本番）

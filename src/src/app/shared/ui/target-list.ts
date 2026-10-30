@@ -94,7 +94,7 @@ export class TargetDetailDirective {
       <input class="search" type="search" [ngModel]="query()" (ngModelChange)="query.set($event)" placeholder="氏名・社員番号で探す" aria-label="氏名・社員番号で探す">
       <span class="grow"></span>
       <div class="chips" role="group" aria-label="絞り込み">
-        @for (c of chips(); track c.key) {
+        @for (c of visibleChips(); track c.key) {
           <button type="button" class="chip" [class.on]="filter() === c.key" [attr.data-tone]="c.tone" [attr.aria-pressed]="filter() === c.key" (click)="filter.set(c.key)">
             {{ c.label }} <span class="n">{{ c.count }}</span>
           </button>
@@ -109,24 +109,28 @@ export class TargetDetailDirective {
       <table class="target-table">
         <thead>
           <tr>
+            @if (actions().length) {
             <th class="col-check">
               <mat-checkbox [checked]="allVisibleSelected()" [indeterminate]="someVisibleSelected()"
                             [disabled]="selectable().length === 0" (change)="toggleAllVisible($event.checked)"
                             aria-label="表示中の人をすべて選ぶ"></mat-checkbox>
             </th>
+            }
             <th>従業員</th>
             @if (cell()) { <th>{{ cellHeader() }}</th> }
             <th>状態</th>
-            <th class="col-menu"><span class="visually-hidden">個別の操作</span></th>
+            @if (allowHold()) { <th class="col-menu"><span class="visually-hidden">個別の操作</span></th> }
           </tr>
         </thead>
         <tbody>
           @for (row of visible(); track row.id) {
             <tr [class.is-held]="row.held" [class.is-failed]="row.error" [class.is-open]="panelRow()?.id === row.id" [class.is-selected]="selected().has(row.id)">
+              @if (actions().length) {
               <td class="col-check">
                 <mat-checkbox [checked]="selected().has(row.id)" [disabled]="!!row.held" (change)="toggle(row.id)"
                               [attr.aria-label]="row.name + 'を選ぶ'"></mat-checkbox>
               </td>
+              }
               <td>
                 <button type="button" class="name" (click)="openRow(row)">{{ row.name }}</button>
                 @if (row.sub) { <div class="sub">{{ row.sub }}</div> }
@@ -142,19 +146,23 @@ export class TargetDetailDirective {
                 }
                 @if (row.error) { <div class="error">失敗：{{ row.error }}</div> }
               </td>
+              @if (allowHold()) {
               <td class="col-menu">
                 <button mat-icon-button type="button" [matMenuTriggerFor]="rowMenu" [attr.aria-label]="row.name + 'の操作'" [disabled]="busy()">
                   <mat-icon>more_vert</mat-icon>
                 </button>
                 <mat-menu #rowMenu="matMenu">
                   <button mat-menu-item type="button" (click)="openRow(row)"><mat-icon>open_in_new</mat-icon>内訳を見る</button>
-                  @if (row.held) {
-                    <button mat-menu-item type="button" (click)="release.emit(row.id)"><mat-icon>play_arrow</mat-icon>保留を解除する</button>
-                  } @else {
-                    <button mat-menu-item type="button" (click)="askHold(row)"><mat-icon>pause</mat-icon>保留にする</button>
+                  @if (allowHold()) {
+                    @if (row.held) {
+                      <button mat-menu-item type="button" (click)="release.emit(row.id)"><mat-icon>play_arrow</mat-icon>保留を解除する</button>
+                    } @else {
+                      <button mat-menu-item type="button" (click)="askHold(row)"><mat-icon>pause</mat-icon>保留にする</button>
+                    }
                   }
                 </mat-menu>
               </td>
+              }
             </tr>
           }
         </tbody>
@@ -167,10 +175,11 @@ export class TargetDetailDirective {
     </div>
     <div class="table-foot">
       @if (detail()) { 名前を押すと、1人分の内訳が右に開きます。 }
-      1人だけ止めたいときは、行の右端のメニューから<app-term key="hold" />にしてください。他の人の処理は止まりません。
+      @if (allowHold()) { 1人だけ止めたいときは、行の右端のメニューから<app-term key="hold" />にしてください。他の人の処理は止まりません。 }
       @if (hasMore() && !loading()) { <button mat-stroked-button type="button" (click)="loadMore.emit()">さらに読み込む</button> }
     </div>
 
+    @if (actions().length || emptyInfo()) {
     <app-action-bar [notice]="primaryAction()?.caution">
       <span info>
         @if (selected().size > 0) {
@@ -192,6 +201,7 @@ export class TargetDetailDirective {
         </button>
       }
     </app-action-bar>
+    }
 
     @if (detail(); as d) {
       <app-side-panel [open]="!!panelRow()" (openChange)="!$event && panelId.set(null)" [heading]="panelRow()?.name ?? ''" [kicker]="panelRow()?.sub"
@@ -229,6 +239,8 @@ export class TargetListComponent {
   includeYours = input(false);
   /** 一括操作がないときの操作バーの文言 */
   emptyInfo = input('');
+  /** 1人だけ保留にできるか（できない画面ではメニューと案内を出さない） */
+  allowHold = input(true);
   /** 最初に選ぶ絞り込み。まとめの画面のように全員を見せたいときは all */
   defaultFilter = input<Filter>('attention');
 
@@ -280,6 +292,8 @@ export class TargetListComponent {
   idleInfo = computed(() => this.emptyInfo() || (this.actions().length
     ? '未選択なら対象の全員（保留を除く）'
     : ''));
+  /** 保留を使わない画面では、保留のチップも出さない */
+  visibleChips = computed(() => this.allowHold() ? this.chips() : this.chips().filter(c => c.key !== 'held'));
   emptyMessage = computed(() => this.query().trim() ? '探している人は、この絞り込みにはいません'
     : ({ attention: 'いま対応が必要な人はいません', held: '保留中の人はいません', ok: '問題のない人はまだいません', all: '対象の人はいません' })[this.filter()]);
   /** パネルで開いている人（表から消えたら、読み込み直した行で開き続ける） */

@@ -1,6 +1,6 @@
 <div class="app-page">
   @if (!office.selected()) {
-    <app-page-head heading="賞与" kicker="まとめて" />
+    <app-page-head heading="賞与" kicker="賞与" />
     <p class="app-page-guide">賞与を登録する事業所を選んでください。</p>
     <div class="offices">
       @for (item of office.offices(); track item.id) {
@@ -9,7 +9,7 @@
     </div>
   } @else {
     <!-- 1. 見出し -->
-    <app-page-head [heading]="monthLabel(payMonth) + '支給の賞与'" kicker="まとめて">
+    <app-page-head [heading]="monthLabel(payMonth) + '支給の賞与'" kicker="賞与">
       <ng-container headingExtra><app-term key="bonusFiling" [showLabel]="false" /></ng-container>
       @if (data(); as d) {
         <ng-container meta>

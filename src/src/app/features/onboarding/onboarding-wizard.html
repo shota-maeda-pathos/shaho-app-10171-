@@ -5,18 +5,12 @@
     <app-error-state [message]="loadError()" (retry)="load(true)" />
   } @else if (view(); as v) {
     <app-wizard [heading]="(v.employee?.name ?? v.procedure.plannedName) + ' の入社'" kicker="入社"
-                backLink="/onboarding/group" [backQuery]="groupQuery()" [backLabel]="(v.procedure.hireDate | date:'M月d日') + ' 入社のまとめ'"
+                backLink="/onboarding" [backQuery]="{ officeId: v.procedure.officeId, key: v.procedure.hireDate }" [backLabel]="groupBackLabel('onboarding', v.procedure.hireDate)"
                 [subtitle]="v.procedure.officeName + (v.employee ? '・' + v.employee.employeeNumber : '') + '・入社日 ' + (v.procedure.hireDate | date:'yyyy年M月d日') + '・資格取得届の期限 ' + (v.procedure.deadline | date:'M月d日')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
                 [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
                 (advance)="advance()">
-      @if (siblings().length > 1) {
-        <span headActions class="siblings">
-          <span class="sub">{{ siblingIndex() + 1 }} / {{ siblings().length }}人目</span>
-          <button mat-stroked-button type="button" (click)="goSibling(-1)" [disabled]="siblingIndex() <= 0 || busy()" aria-label="前の人">‹ 前</button>
-          <button mat-stroked-button type="button" (click)="goSibling(1)" [disabled]="siblingIndex() >= siblings().length - 1 || busy()" aria-label="次の人">次 ›</button>
-        </span>
-      }
+      <app-group-nav headActions type="onboarding" [officeId]="v.procedure.officeId" [groupKey]="v.procedure.hireDate" [currentId]="v.procedure.id" />
 
       @switch (key()) {
 

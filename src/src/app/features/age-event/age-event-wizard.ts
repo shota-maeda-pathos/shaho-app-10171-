@@ -11,7 +11,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
-import { GroupNavComponent } from '../procedures/procedure-groups';
+import { GroupNavComponent, groupBackLabel } from '../procedures/procedure-groups';
 import {
   ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
 } from '../../shared/ui';
@@ -42,6 +42,7 @@ export class AgeEventWizardComponent implements OnInit, OnDestroy {
   private snackBar = inject(MatSnackBar);
 
   readonly monthLabel = monthLabel;
+  readonly groupBackLabel = groupBackLabel;
   procedureId = '';
   view = signal<AgeView | null>(null);
   loading = signal(true);
@@ -80,7 +81,7 @@ export class AgeEventWizardComponent implements OnInit, OnDestroy {
     const p70 = this.is70();
     const skipped = this.noFiling();
     return [
-      { key: 'check', label: '到達日と届出の要否', done: done || cur > 0,
+      { key: 'check', label: '到達日の確認', done: done || cur > 0,
         what: p70
           ? '70歳に達する日と、その日の報酬月額を確かめます。報酬月額から標準報酬月額相当額を出し、届出が要るかをシステムが判定します。'
           : '75歳の誕生日に健康保険の資格を失います。被扶養者と、回収する保険証などの枚数を確かめます。',

@@ -81,7 +81,7 @@ export class RevisionWizardComponent implements OnInit, OnDestroy {
     const leave = this.isLeave();
     const closed = !!v.closedReason;
     return [
-      { key: 'change', label: leave ? '休業の終わりと申出' : '変動の確認', done: done || cur > 0,
+      { key: 'change', label: leave ? '休業の終わり' : '変動の確認', done: done || cur > 0,
         what: leave
           ? '休業を終えた日と養育する子、本人から申出があったかを入れます。'
           : '固定的賃金（基本給や手当）が変わった給与の支給月（変動月）を入れます。前の月と比べて上がったか下がったかはシステムが見ます。',

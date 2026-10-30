@@ -161,20 +161,15 @@ export const routes: Routes = [
         children: [
           {
             path: '',
+            data: { groupType: 'onboarding' },
             loadComponent: () =>
-              import('./features/onboarding/onboarding-list').then((m) => m.OnboardingListComponent),
+              import('./features/procedures/procedure-groups').then((m) => m.ProcedureGroupsComponent),
           },
           {
             path: 'new',
             data: { title: '人が入社する' },
             loadComponent: () =>
               import('./features/onboarding/onboarding-start').then((m) => m.OnboardingStartComponent),
-          },
-          {
-            path: 'group',
-            data: { title: '入社' },
-            loadComponent: () =>
-              import('./features/onboarding/onboarding-group').then((m) => m.OnboardingGroupComponent),
           },
           {
             path: ':id',

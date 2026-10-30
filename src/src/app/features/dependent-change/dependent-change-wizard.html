@@ -6,7 +6,7 @@
     <app-error-state [message]="loadError()" (retry)="load(true)" />
   } @else if (view(); as v) {
     <app-wizard kicker="扶養" backLink="/procedures" backLabel="進行中の手続き"
-                [heading]="v.procedure.title"
+                [heading]="v.procedure.title" [personName]="v.procedure.employeeName"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + ((summary()?.deadline ?? v.deadline) ? '・届出の期限 ' + ((summary()?.deadline ?? v.deadline) | date:'M月d日') : '')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
                 [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"

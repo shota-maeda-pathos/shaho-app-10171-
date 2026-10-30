@@ -168,7 +168,7 @@ export class OnboardingStartComponent {
         companyId: this.auth.companyId, officeId: this.officeId, hireDate: this.hireDate, people, skipInvite: this.inviteMode === 'staff',
       });
       // 1名だけでも、事業所×入社日のまとめの画面を通る（docs/ui-unification-design.md の3章）
-      await this.router.navigate(['/onboarding/group'], { queryParams: { officeId: this.officeId, date: this.hireDate } });
+      await this.router.navigate(['/onboarding'], { queryParams: { officeId: this.officeId, key: this.hireDate } });
     } catch (e) {
       this.error.set(errorMessage(e, '入社手続きを始められませんでした'));
     } finally {

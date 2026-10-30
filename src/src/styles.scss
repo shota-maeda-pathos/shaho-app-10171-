@@ -98,6 +98,9 @@ body {
   &[data-tone='error'] { color: var(--app-status-error-fg); background: var(--app-status-error-bg); }
 }
 
+// 手続きの画面は見出しに戻るリンクを持つので、上の道順表示は出さない
+.main-area:has(app-page-head) app-breadcrumb { display: none; }
+
 // 画面の共通の枠
 .app-page {
   padding: var(--app-space-5); max-width: 1280px;
