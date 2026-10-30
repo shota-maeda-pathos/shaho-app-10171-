@@ -46,7 +46,7 @@
             <h2>賞与不支給報告書<app-term key="bonusNonPayment" [showLabel]="false" /></h2>
             <p>{{ monthLabel(d.payMonth) }}は事業所の賞与支給予定月でしたが、賞与を支給しなかったことを年金事務所に報告します（期限：速やかに）。</p>
             <p>状態：<strong>{{ statusLabels[r.status] }}</strong>
-              @if (r.change) { ・支給予定月を {{ monthsText(r.change.before) }} から {{ r.change.noMoreBonus ? '「今後は支給しない」' : monthsText(r.change.after) }} に変更します（提出を終えると事業所の設定に反映します）。 }
+              @if (r.change) { ・支給予定月を {{ monthsText(r.change.before) }} から {{ r.change.noMoreBonus ? '「今後は支給しない」' : monthsText(r.change.after) }} に{{ r.status === 'submitted' ? '変更しました（事業所の設定に反映済み）' : '変更します（提出を終えると事業所の設定に反映します）' }}。 }
             </p>
             @if (r.rejection && r.status === 'draft') { <p class="bad">差し戻されました。理由：{{ r.rejection }}（取り消して作り直すか、そのまま承認を依頼し直します）</p> }
             @if (r.status === 'pending') {
