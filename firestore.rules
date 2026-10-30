@@ -395,5 +395,218 @@ service cloud.firestore {
         allow delete: if false;
       }
     }
+
+    // ── 課題管理アプリ（task-app）────────────────────
+    // 同じ Firebase プロジェクトで課題管理アプリも動かしているため、そのルールをここに統合する。
+    // 元は task-app/firestore.rules。task-app のルールを変えたら、両方をそろえること。
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isActiveMember() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/members/$(request.auth.uid))
+        && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.get('disabled', false) == false;
+    }
+
+    function isManager() {
+      return isActiveMember()
+        && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role == 'manager';
+    }
+
+    function validUid(value) {
+      return value is string && value.size() > 0 && value.size() <= 128;
+    }
+
+    function isValidMember(data) {
+      return data.keys().hasAll(['uid', 'name', 'role', 'weeklyCapacityHours', 'avatarColor'])
+        && data.keys().hasOnly(['uid', 'name', 'role', 'weeklyCapacityHours', 'avatarColor', 'disabled', 'theme', 'displayName', 'photoURL', 'fcmToken', 'leaves', 'weeklyCapacity'])
+        && validUid(data.uid)
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 256
+        && data.role in ['member', 'manager']
+        && data.weeklyCapacityHours is number && data.weeklyCapacityHours > 0 && data.weeklyCapacityHours <= 168
+        && data.avatarColor is string && data.avatarColor.size() <= 64
+        && data.get('disabled', false) is bool
+        && (!('theme' in data) || (data.theme is string && data.theme.size() <= 64))
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 256))
+        && (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 4096))
+        && (!('fcmToken' in data) || data.fcmToken == null || (data.fcmToken is string && data.fcmToken.size() <= 4096))
+        && (!('leaves' in data) || (data.leaves is list && data.leaves.size() <= 2000))
+        && (!('weeklyCapacity' in data) || (data.weeklyCapacity is number && data.weeklyCapacity > 0 && data.weeklyCapacity <= 168));
+    }
+
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    match /members/{memberId} {
+      allow get: if isActiveMember() || (isSignedIn() && request.auth.uid == memberId);
+      allow list: if isActiveMember();
+      allow create: if isSignedIn()
+                    && request.auth.uid == memberId
+                    && isValidMember(request.resource.data)
+                    && request.resource.data.uid == memberId
+                    && request.resource.data.role == 'member'
+                    && request.resource.data.get('disabled', false) == false;
+      allow update: if isManager() && isValidMember(request.resource.data)
+                    && request.resource.data.uid == resource.data.uid;
+      allow update: if isActiveMember() && isValidMember(request.resource.data)
+                    && request.auth.uid == memberId
+                    && request.resource.data.uid == resource.data.uid
+                    && onlyChanges(['name', 'displayName', 'theme', 'weeklyCapacityHours', 'weeklyCapacity', 'photoURL', 'fcmToken', 'leaves']);
+      // Keep disabled records so the same account cannot register again.
+      allow delete: if false;
+
+      // Personal display order: only the active owner can read or write it.
+      // { taskIds: unique list (max 3000), updatedAt: server timestamp }
+      match /taskOrders/{scope} {
+        function isValidTaskOrder(data) {
+          return data.keys().hasAll(['taskIds', 'updatedAt'])
+            && data.keys().hasOnly(['taskIds', 'updatedAt'])
+            && data.taskIds is list && data.taskIds.size() <= 3000
+            && data.taskIds.toSet().size() == data.taskIds.size()
+            && data.updatedAt is timestamp && data.updatedAt == request.time
+            && (scope in ['root:未着手', 'root:進行中', 'root:完了']
+              || scope.matches('children:[A-Za-z0-9_-]{1,128}'));
+        }
+        allow read, delete: if isActiveMember() && request.auth.uid == memberId;
+        allow create, update: if isActiveMember() && request.auth.uid == memberId
+          && isValidTaskOrder(request.resource.data);
+      }
+
+      match /notifications/{notifId} {
+        allow read: if isActiveMember()
+                    && (request.auth.uid == memberId || isManager());
+        allow create: if isActiveMember();
+        allow update: if isActiveMember() && request.auth.uid == memberId;
+        allow delete: if isActiveMember()
+                      && (request.auth.uid == memberId || isManager());
+      }
+    }
+
+    match /tasks/{taskId} {
+      function isValidTaskIdentity(data) {
+        return 'createdBy' in data && (data.createdBy == null || validUid(data.createdBy))
+          && (data.get('recurrencePreviousTaskId', null) == null || validUid(data.recurrencePreviousTaskId));
+      }
+      function validRecurrenceCreator(data) {
+        let previous = get(/databases/$(database)/documents/tasks/$(data.recurrencePreviousTaskId)).data;
+        return previous.status in ['完了', 'アーカイブ済み']
+          && previous.recurrence != null
+          && (isManager() || previous.createdBy == request.auth.uid || previous.assigneeId == request.auth.uid)
+          && data.createdBy == previous.createdBy
+          && data.recurrence == previous.recurrence
+          && data.recurrenceSourceId == (previous.get('recurrenceSourceId', null) == null ? data.recurrencePreviousTaskId : previous.recurrenceSourceId)
+          && data.title == previous.title
+          && data.assigneeId == previous.assigneeId
+          && data.parentId == previous.parentId
+          && data.estimatedHours == previous.estimatedHours
+          && data.status == '未着手';
+      }
+      function taskExistsAfterWrite() {
+        return existsAfter(/databases/$(database)/documents/tasks/$(taskId));
+      }
+      function validParent(data) {
+        return data.get('parentId', null) == null
+          || (data.parentId != taskId && existsAfter(/databases/$(database)/documents/tasks/$(data.parentId)));
+      }
+      allow read: if isActiveMember();
+      allow create: if isActiveMember() && isValidTaskIdentity(request.resource.data)
+        && !exists(/databases/$(database)/documents/taskDeletionMarkers/$(taskId))
+        && (request.resource.data.createdBy == request.auth.uid
+          || (request.resource.data.get('recurrencePreviousTaskId', null) != null && validRecurrenceCreator(request.resource.data)))
+        && validParent(request.resource.data);
+      allow update: if isActiveMember() && isValidTaskIdentity(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && validParent(request.resource.data);
+      // Task trees are deleted only through deleteTaskSafely, which checks every
+      // task's manager/creator/assignee and commits all record deletions atomically.
+      allow delete: if false;
+
+      match /comments/{commentId} {
+        allow read: if isActiveMember();
+        allow create: if isActiveMember() && taskExistsAfterWrite()
+                      && request.resource.data.authorId == request.auth.uid;
+        allow update: if isActiveMember() && taskExistsAfterWrite()
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
+        allow delete: if isActiveMember()
+                      && resource.data.authorId == request.auth.uid;
+      }
+
+      match /attachments/{attachmentId} {
+        // Immutable attachment records. New files live under the author's UID.
+        function isValidAttachment(data) {
+          return data.keys().hasAll(['taskId', 'fileName', 'fileType', 'fileSize', 'dataUrl', 'storagePath', 'authorId', 'authorName', 'createdAt'])
+            && data.keys().hasOnly(['taskId', 'fileName', 'fileType', 'fileSize', 'dataUrl', 'storagePath', 'authorId', 'authorName', 'createdAt'])
+            && data.taskId == taskId
+            && data.authorId == request.auth.uid
+            && data.fileName is string && data.fileName.size() > 0 && data.fileName.size() <= 1024
+            && data.fileType is string && data.fileType.size() <= 256
+            && data.fileSize is int && data.fileSize >= 0 && data.fileSize <= 10 * 1024 * 1024
+            && data.dataUrl is string && data.dataUrl.size() <= 8192
+            && data.authorName is string && data.authorName.size() <= 256
+            && data.createdAt == request.time
+            && data.storagePath is string && data.storagePath.size() <= 2048
+            && data.storagePath.split('/').size() == 4
+            && data.storagePath.split('/')[0] == 'task-attachments'
+            && data.storagePath.split('/')[1] == taskId
+            && data.storagePath.split('/')[2] == request.auth.uid
+            && data.storagePath.split('/')[3].size() > 0;
+        }
+        allow read: if isActiveMember();
+        allow create: if isActiveMember() && taskExistsAfterWrite() && isValidAttachment(request.resource.data);
+        allow delete: if isActiveMember() && resource.data.authorId == request.auth.uid;
+      }
+
+      // Legacy files have no UID in their path. Claims are verified against
+      // the original immutable attachment, and cannot be changed or deleted.
+      match /attachmentOwners/{fileName} {
+        function isValidLegacyOwner(data) {
+          let attachment = get(/databases/$(database)/documents/tasks/$(taskId)/attachments/$(data.attachmentId)).data;
+          return data.keys().hasAll(['attachmentId', 'authorId'])
+            && data.keys().hasOnly(['attachmentId', 'authorId'])
+            && data.attachmentId is string && data.attachmentId.size() > 0 && data.attachmentId.size() <= 128
+            && data.authorId == request.auth.uid
+            && attachment.authorId == request.auth.uid
+            && attachment.storagePath == 'task-attachments/' + taskId + '/' + fileName;
+        }
+        allow read: if isActiveMember();
+        allow create: if isActiveMember() && taskExistsAfterWrite() && isValidLegacyOwner(request.resource.data);
+      }
+
+      match /activities/{activityId} {
+        allow read: if isActiveMember();
+        allow create: if isActiveMember() && taskExistsAfterWrite() && request.resource.data.authorId == request.auth.uid;
+        allow delete: if isActiveMember();
+      }
+    }
+
+    // Server-only manifests and permanent markers prevent ID reuse while
+    // asynchronous cleanup still owns paths belonging to a deleted task.
+    match /taskDeletionJobs/{jobId} {
+      allow read: if isActiveMember() && (resource.data.requestedBy == request.auth.uid || isManager());
+      allow write: if false;
+    }
+    match /taskDeletionMarkers/{taskId} {
+      allow read, write: if false;
+    }
+
+    match /teamSettings/{docId} {
+      allow read: if isActiveMember();
+      allow write: if isManager();
+    }
+
+    match /taskTemplates/{templateId} {
+      function isValidTemplateIdentity(data) {
+        return 'createdBy' in data && validUid(data.createdBy);
+      }
+      allow read: if isActiveMember() && resource.data.createdBy == request.auth.uid;
+      allow create: if isActiveMember() && isValidTemplateIdentity(request.resource.data) && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isActiveMember() && isValidTemplateIdentity(request.resource.data)
+        && resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isActiveMember() && resource.data.createdBy == request.auth.uid;
+    }
   }
 }
