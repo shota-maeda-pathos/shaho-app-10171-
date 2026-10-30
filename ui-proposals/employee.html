@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordia 従業員</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/shell.js"></script>
+<style>
+  .profile { display: flex; gap: 16px; align-items: center; padding: 18px; }
+  .profile .avatar { width: 52px; height: 52px; font-size: 18px; }
+  .profile h1 { font-size: 20px; }
+  .facts { display: flex; gap: 0; border-top: 1px solid var(--line-2); }
+  .facts div { flex: 1; padding: 12px 18px; }
+  .facts div + div { border-left: 1px solid var(--line-2); }
+  .facts .l { font-size: 11px; color: var(--muted); }
+  .facts .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body data-nav="people" data-crumbs="従業員|田中 直樹">
+<div data-page class="content">
+  <section class="card" style="margin-bottom:16px">
+    <div class="profile">
+      <span class="avatar">田</span>
+      <div>
+        <h1>田中 直樹 <span class="muted small">タナカ ナオキ</span></h1>
+        <div class="muted small">EMP-001・東京本社・営業部・正社員</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <span class="pill ok">加入中</span>
+        <details class="menu"><summary class="btn">手続きを始める ▾</summary></details>
+      </div>
+    </div>
+    <div class="facts">
+      <div><div class="l">健保 標準報酬月額</div><div class="v">380,000円（22等級）</div></div>
+      <div><div class="l">厚年 標準報酬月額</div><div class="v">380,000円（19等級）</div></div>
+      <div><div class="l">資格取得日</div><div class="v">2019/04/01</div></div>
+      <div><div class="l">被扶養者</div><div class="v">2名</div></div>
+    </div>
+  </section>
+
+  <div class="split">
+    <section class="card">
+      <div class="tabs">
+        <button class="on">基本情報</button><button>等級の履歴</button><button>扶養家族</button><button>手続きの履歴</button>
+      </div>
+      <div class="form-sec">
+        <h3>本人</h3>
+        <dl class="kv">
+          <dt>生年月日</dt><dd>1994/05/18（32歳）</dd>
+          <dt>住所</dt><dd>〒100-0001 東京都千代田区千代田1-1</dd>
+          <dt>基礎年金番号</dt><dd>1234-567890</dd>
+          <dt>マイナンバー</dt><dd>登録済み <a href="#" class="small">表示（記録が残ります）</a></dd>
+        </dl>
+      </div>
+      <div class="form-sec">
+        <h3>雇用</h3>
+        <dl class="kv">
+          <dt>雇用形態</dt><dd>正社員（無期）</dd>
+          <dt>所定労働</dt><dd>週40時間・月21日</dd>
+          <dt>報酬月額</dt><dd>372,000円（基本給 340,000・通勤 12,000・手当 20,000）</dd>
+        </dl>
+      </div>
+    </section>
+    <div class="rail">
+      <section class="card">
+        <div class="card-head"><h2>最近の動き</h2></div>
+        <div class="card-body">
+          <ul class="timeline">
+            <li><div class="when">2026/10</div>賞与 858,000円（標準賞与額 858,000円）</li>
+            <li><div class="when">2026/09</div>算定基礎で 360,000円 → 380,000円</li>
+            <li><div class="when">2026/04</div>扶養に配偶者を追加</li>
+            <li><div class="when">2019/04</div>入社・資格取得</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</body>
+</html>

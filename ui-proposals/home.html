@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordia ホーム</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/shell.js"></script>
+<style>
+  .greet { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 18px; }
+  .greet h1 { font-size: 22px; }
+  .greet .date { color: var(--muted); font-size: 13px; }
+  .stats { display: flex; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; }
+  .stats a { flex: 1; padding: 12px 18px; color: var(--ink); display: block; }
+  .stats a + a { border-left: 1px solid var(--line-2); }
+  .stats a:hover { background: var(--bg); text-decoration: none; }
+  .stats .n { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stats .n small { font-size: 12px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+  .stats .l { font-size: 12px; color: var(--muted); }
+  .stats .warn .n { color: var(--warn); }
+  .todo-group { padding: 6px 18px 2px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .05em; background: #fafbfc; border-bottom: 1px solid var(--line-2); }
+  .todo { display: grid; grid-template-columns: 92px 1fr auto auto; gap: 14px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--line-2); }
+  .todo:hover { background: #fafbfd; }
+  .todo .title b { font-weight: 600; }
+  .todo .title .sub { margin-top: 1px; }
+  .start-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .start-list a { padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
+  .start-list a:hover { background: var(--brand-tint); border-color: var(--brand-tint-2); text-decoration: none; color: var(--brand-strong); }
+  .cal li { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+  .cal li:last-child { border: 0; }
+  .cal .d { width: 44px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .cal ul { list-style: none; margin: 0; padding: 0; }
+</style>
+</head>
+<body data-nav="home" data-crumbs="ホーム">
+<div data-page class="content">
+  <div class="greet">
+    <div>
+      <div class="date">2026年10月30日（金）・東京本社</div>
+      <h1>おはようございます、山本さん</h1>
+    </div>
+    <div style="margin-left:auto" class="actions">
+      <a class="btn primary" href="procedures.html">＋ 手続きを始める</a>
+    </div>
+  </div>
+
+  <!-- 数字は1列だけ。押すとその一覧に飛ぶ -->
+  <div class="stats">
+    <a href="procedures.html"><div class="n">5<small>件</small></div><div class="l">あなたの対応</div></a>
+    <a href="approvals.html"><div class="n">2<small>件</small></div><div class="l">あなたの承認待ち</div></a>
+    <a href="filings.html" class="warn"><div class="n">3<small>件</small></div><div class="l">今週が提出期限</div></a>
+    <a href="procedures.html"><div class="n">2<small>件</small></div><div class="l">本人・他の人の作業待ち</div></a>
+  </div>
+
+  <div class="split">
+    <section class="card">
+      <div class="card-head"><h2>やること</h2><span class="badge soft">7</span>
+        <div class="right chips"><button class="chip on">すべて</button><button class="chip">自分</button><button class="chip">承認</button></div>
+      </div>
+      <div class="todo-group">期限切れ・今日</div>
+      <div class="todo">
+        <span class="due over">10/30（今日）</span>
+        <div class="title"><b>賞与支払届を提出する</b><div class="sub">10月の賞与・8名 ／ 承認済み</div></div>
+        <span class="pill you">提出</span>
+        <a class="btn sm" href="bonus.html">開く</a>
+      </div>
+      <div class="todo-group">今週</div>
+      <div class="todo">
+        <span class="due soon">11/2（月）</span>
+        <div class="title"><b>本人の入力を確かめて台帳に登録</b><div class="sub">入社・田中 直樹 ほか2名</div></div>
+        <span class="pill you">確認</span>
+        <a class="btn sm" href="onboarding.html">開く</a>
+      </div>
+      <div class="todo">
+        <span class="due soon">11/4（水）</span>
+        <div class="title"><b>資格喪失届を作る</b><div class="sub">退職・佐々木 恵（10/31退職）</div></div>
+        <span class="pill you">作成</span>
+        <a class="btn sm" href="procedures.html">開く</a>
+      </div>
+      <div class="todo">
+        <span class="due">11/5（木）</span>
+        <div class="title"><b>扶養の追加を承認する</b><div class="sub">扶養・伊藤 美咲（子の出生）／ 依頼：高橋</div></div>
+        <span class="pill warn">承認</span>
+        <a class="btn sm" href="approvals.html">開く</a>
+      </div>
+      <div class="todo-group">来週以降</div>
+      <div class="todo">
+        <span class="due">11/10（火）</span>
+        <div class="title"><b>随時改定の対象を確かめる</b><div class="sub">月額変更・7〜9月の固定的賃金の変動 3名</div></div>
+        <span class="pill you">確認</span>
+        <a class="btn sm" href="procedures.html">開く</a>
+      </div>
+      <div class="todo">
+        <span class="due">11/16（月）</span>
+        <div class="title"><b>70歳到達届を作る</b><div class="sub">年齢到達・中村 茂（12/1 到達）</div></div>
+        <span class="pill you">作成</span>
+        <a class="btn sm" href="procedures.html">開く</a>
+      </div>
+      <div class="todo">
+        <span class="due">—</span>
+        <div class="title"><b>本人の入力待ち</b><div class="sub">入社・鈴木 花子、伊藤 美咲（依頼から3日）</div></div>
+        <span class="pill wait">待ち</span>
+        <button class="btn sm ghost">催促する</button>
+      </div>
+    </section>
+
+    <div class="rail">
+      <section class="card">
+        <div class="card-head"><h2>新しく始める</h2></div>
+        <div class="card-body start-list">
+          <a href="onboarding-person.html">入社</a><a href="#">退職</a>
+          <a href="#">扶養の変更</a><a href="#">住所・氏名の変更</a>
+          <a href="#">産休・育休</a><a href="#">雇用条件の変更</a>
+          <a href="bonus.html">賞与</a><a href="#">算定基礎</a>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>今後の期限</h2><a class="right small" href="filings.html">届出を見る</a></div>
+        <div class="card-body cal">
+          <ul>
+            <li><span class="d">10/30</span><span>賞与支払届（10月支給）</span></li>
+            <li><span class="d">11/4</span><span>資格喪失届・佐々木</span></li>
+            <li><span class="d">11/5</span><span>資格取得届・田中ほか2名</span></li>
+            <li><span class="d">11/30</span><span>被扶養者異動届・伊藤</span></li>
+          </ul>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>お知らせ</h2></div>
+        <div class="card-body small">
+          <p><b>12月は賞与支給予定月です。</b><br><span class="muted">支給しない場合は賞与不支給報告書が必要です。</span></p>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</body>
+</html>

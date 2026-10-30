@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordia 比較 1人ずつ</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/shell.js"></script>
+<script src="assets/variants.js"></script>
+<style>
+  .mock .card, .mock .stepper { box-shadow: none; }
+  .s { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 10px; font-weight: 700; }
+  .s.d { background: var(--ok-tint); color: var(--ok); }
+  .s.c { background: var(--brand-strong); color: #fff; }
+  .s.w { background: var(--line-2); color: var(--muted); border: 1px dashed #c3c9d1; }
+  .s.n { color: #c3c9d1; }
+  td.st, th.st { text-align: center; }
+  .kanban { display: grid; grid-template-columns: repeat(6, minmax(140px, 1fr)); gap: 10px; overflow-x: auto; }
+  .col { background: var(--line-2); border-radius: 10px; padding: 8px; min-height: 220px; }
+  .col h4 { margin: 2px 4px 8px; font-size: 12px; display: flex; justify-content: space-between; color: var(--ink-2); }
+  .kc { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-bottom: 6px; }
+  .kc b { display: block; font-size: 13px; }
+  .kc.you { border-left: 3px solid var(--brand-strong); }
+  .batch-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 10px; }
+  .batch-head h3 { font-size: 16px; }
+</style>
+</head>
+<body data-nav="" data-crumbs="決めること|1人ずつの手続きの一覧">
+<div data-page class="content">
+  <div class="page-head">
+    <div><h1>入社など「1人ずつ」の手続きを、一覧でどう見せるか</h1>
+    <div class="meta">例は入社。11/1入社4名＋11/16入社1名が進行中。どの案でも、行（カード）を押すと1人の画面（同じ骨組み）に移ります。</div></div>
+  </div>
+
+  <div class="variants">
+    <button data-v="b" class="on">A. 入社日ごとにまとめる<span class="rec">推し</span><small>賞与と同じ見た目</small></button>
+    <button data-v="a">B. 人×ステップの表<small>最初の提案</small></button>
+    <button data-v="c">C. カンバン<small>ステップを列にしたカード</small></button>
+    <button data-v="d">D. 手続き一覧だけ<small>種類ごとの画面は作らない</small></button>
+  </div>
+
+  <!-- A: まとめ -->
+  <section class="variant on" data-v="b">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="batch-head"><span class="tag">入社</span><h3>11月1日入社（4名）</h3><span class="small muted">資格取得届の期限 <b class="due soon">11/5</b></span><span style="margin-left:auto" class="small"><a href="#">11月16日入社（1名）へ</a></span></div>
+      <nav class="stepper">
+        <button class="done"><span class="dot">✓</span><span class="t"><b>入力依頼</b><span>4名 済み</span></span></button>
+        <button class="cur"><span class="dot">2</span><span class="t"><b>本人情報</b><span>2名 あなたの番・1名 本人待ち</span></span></button>
+        <button><span class="dot">3</span><span class="t"><b>雇用条件</b><span>—</span></span></button>
+        <button class="done"><span class="dot">4</span><span class="t"><b>届出作成</b><span>1名 済み</span></span></button>
+        <button><span class="dot">5</span><span class="t"><b>承認</b><span>1名 待ち</span></span></button>
+        <button><span class="dot">6</span><span class="t"><b>提出</b><span>—</span></span></button>
+      </nav>
+      <div class="card">
+        <div class="lead"><h2>本人情報の確認</h2><p>本人が入力した内容を確かめ、台帳に登録します。</p></div>
+        <table class="list">
+          <thead><tr><th>従業員</th><th>進み具合</th><th>状態</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="who"><b>田中 直樹</b><span>EMP-101</span></td><td><div class="mini-steps"><i class="d"></i><i class="c"></i><i></i><i></i><i></i><i></i></div></td><td><span class="pill you">あなたの番</span></td><td class="r"><button class="btn sm primary">確認する</button></td></tr>
+            <tr><td class="who"><b>佐藤 一郎</b><span>EMP-102</span></td><td><div class="mini-steps"><i class="d"></i><i class="c"></i><i></i><i></i><i></i><i></i></div></td><td><span class="pill you">あなたの番</span></td><td class="r"><button class="btn sm primary">確認する</button></td></tr>
+            <tr><td class="who"><b>鈴木 花子</b><span>EMP-103</span></td><td><div class="mini-steps"><i class="c"></i><i></i><i></i><i></i><i></i><i></i></div></td><td><span class="pill wait">本人の入力待ち</span></td><td class="r"><button class="btn sm ghost">催促</button></td></tr>
+          </tbody>
+        </table>
+        <div class="table-foot">ステップを押すと、そのステップにいる人に絞り込みます（伊藤 美咲は「承認」にいます）</div>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li><b>賞与・算定と完全に同じ見た目</b>になる（ステップ＋対象者の表＋下の操作バー）。覚える画面が1種類</li><li>4月の新卒一斉入社（数十名）でも、まとめて依頼・まとめて承認依頼ができる</li><li>同じ入社日の資格取得届を1件にまとめやすい</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>中途で1人だけの入社は「1名のまとめ」になる（その場合はまとめを飛ばして1人の画面を直接開く）</li><li>人によって進み具合がばらばらなので、ステップの数字が「人数の内訳」になる</li><li>データ上「入社日ごとのまとめ」を持つ（または表示時に入社日で束ねる）必要がある</li></ul></div>
+    </div>
+    <div class="verdict"><b>推す理由：</b>「1人向けの設計なので一覧が使いにくい」という悩みは、入社を<b>入社日ごとのまとめ</b>として扱うと、賞与と同じ「多人数型」に吸収できます。1人の画面は、まとめの中の1行を開いた先として残ります。退職（退職日ごと）にも同じ考え方を使えます。扶養や産休のように時期がばらばらな手続きは、手続き一覧（D）で十分です。</div>
+  </section>
+
+  <!-- B: 人×ステップ -->
+  <section class="variant" data-v="a">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="card">
+        <table class="list">
+          <thead><tr><th>従業員</th><th class="st">依頼</th><th class="st">本人</th><th class="st">条件</th><th class="st">届出</th><th class="st">承認</th><th class="st">提出</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="who"><b>田中 直樹</b><span>11/1入社</span></td><td class="st"><i class="s d">✓</i></td><td class="st"><i class="s c">●</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="r"><button class="btn sm primary">続ける</button></td></tr>
+            <tr><td class="who"><b>鈴木 花子</b><span>11/1入社</span></td><td class="st"><i class="s w">…</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="r"><button class="btn sm ghost">催促</button></td></tr>
+            <tr><td class="who"><b>伊藤 美咲</b><span>11/1入社</span></td><td class="st"><i class="s d">✓</i></td><td class="st"><i class="s d">✓</i></td><td class="st"><i class="s d">✓</i></td><td class="st"><i class="s d">✓</i></td><td class="st"><i class="s w">…</i></td><td class="st"><i class="s n">○</i></td><td class="r"><span class="sub">承認待ち</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>全員の進み具合が一目で分かる</li><li>データの持ち方を変えなくてよい</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>賞与の画面とは見た目が別物になり、統一感が出ない</li><li>まとめて操作する場所がない</li><li>手続きごとにステップ数が違い、列の数がばらばら</li></ul></div>
+    </div>
+  </section>
+
+  <!-- C: カンバン -->
+  <section class="variant" data-v="c">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="kanban">
+        <div class="col"><h4>入力依頼 <span>1</span></h4><div class="kc you"><b>渡辺 翔太</b>11/16入社</div></div>
+        <div class="col"><h4>本人情報 <span>3</span></h4><div class="kc you"><b>田中 直樹</b>11/1・あなたの番</div><div class="kc you"><b>佐藤 一郎</b>11/1・あなたの番</div><div class="kc"><b>鈴木 花子</b>11/1・本人待ち</div></div>
+        <div class="col"><h4>雇用条件 <span>0</span></h4></div>
+        <div class="col"><h4>届出作成 <span>0</span></h4></div>
+        <div class="col"><h4>承認 <span>1</span></h4><div class="kc"><b>伊藤 美咲</b>11/1・承認待ち</div></div>
+        <div class="col"><h4>提出 <span>0</span></h4></div>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>どこに人が溜まっているかが直感的</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>人数が増えると縦に長くなり破綻する（新卒50名など）</li><li>ドラッグで動かすものではない（ステップは作業を終えて進む）ので、カンバンの良さが活きない</li><li>他の画面と見た目が別物</li></ul></div>
+    </div>
+  </section>
+
+  <!-- D: 手続き一覧だけ -->
+  <section class="variant" data-v="d">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="card">
+        <div class="toolbar chips"><span class="small muted">種類</span><button class="chip">すべて</button><button class="chip on">入社</button><button class="chip">退職</button><button class="chip">扶養</button></div>
+        <table class="list">
+          <thead><tr><th>対象</th><th>いまのステップ</th><th>次に動く人</th><th>期限</th></tr></thead>
+          <tbody>
+            <tr><td class="who"><b>田中 直樹</b><span>入社・11/1</span></td><td><div class="mini-steps"><i class="d"></i><i class="c"></i><i></i><i></i><i></i><i></i></div><div class="sub">本人情報の確認 2/6</div></td><td>あなた</td><td><span class="due soon">11/5</span></td></tr>
+            <tr><td class="who"><b>鈴木 花子</b><span>入社・11/1</span></td><td><div class="mini-steps"><i class="c"></i><i></i><i></i><i></i><i></i><i></i></div><div class="sub">入力依頼 1/6</div></td><td>本人</td><td><span class="due soon">11/5</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>作る画面が一番少ない</li><li>扶養・産休など時期がばらばらな手続きにはこれで十分</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>新卒一斉入社など、まとめて動かしたい場面に弱い</li></ul></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

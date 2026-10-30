@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordia 承認</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/shell.js"></script>
+<style>
+  .inbox { display: grid; grid-template-columns: 360px 1fr; gap: 0; min-height: 560px; overflow: hidden; }
+  .inbox-list { border-right: 1px solid var(--line); }
+  .req { display: block; padding: 12px 16px; border-bottom: 1px solid var(--line-2); cursor: pointer; color: var(--ink); }
+  .req:hover { background: #fafbfd; text-decoration: none; }
+  .req.on { background: var(--brand-tint); box-shadow: inset 3px 0 0 var(--brand-strong); }
+  .req .top { display: flex; gap: 8px; align-items: center; }
+  .req .top .due { margin-left: auto; }
+  .req b { font-weight: 600; }
+  .detail { display: flex; flex-direction: column; }
+  .detail-head { padding: 18px 22px; border-bottom: 1px solid var(--line-2); }
+  .detail-head h2 { font-size: 18px; margin-top: 4px; }
+  .detail-body { padding: 18px 22px; flex: 1; }
+  .diff { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .diff th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  .diff td { padding: 9px 10px; border-bottom: 1px solid var(--line-2); }
+  .diff td.new { background: var(--warn-tint); font-weight: 600; }
+  .detail-foot { padding: 12px 22px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+  .detail-foot .right { margin-left: auto; display: flex; gap: 8px; }
+  @media (max-width: 960px) { .inbox { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body data-nav="approve" data-crumbs="承認">
+<div data-page class="content wide">
+  <div class="page-head">
+    <div><h1>承認</h1><div class="meta">頼まれた確認をここで済ませます。内容を開いて、承認するか差し戻します。</div></div>
+  </div>
+  <section class="card">
+    <div class="tabs">
+      <button class="on">あなたの承認待ち <span class="badge">2</span></button>
+      <button>あなたが依頼中 <span class="badge">3</span></button>
+      <button>処理済み</button>
+    </div>
+    <div class="inbox">
+      <div class="inbox-list">
+        <a class="req on">
+          <div class="top"><span class="tag">扶養の変更</span><span class="due">期限 11/30</span></div>
+          <b>伊藤 美咲 ― 被扶養者の追加（子）</b>
+          <div class="sub">依頼：高橋 健太・10/29 17:40</div>
+        </a>
+        <a class="req">
+          <div class="top"><span class="tag">賞与</span><span class="due soon">期限 10/30</span></div>
+          <b>10月支給 ― 保険料 2名分</b>
+          <div class="sub">依頼：高橋 健太・10/29 15:02</div>
+        </a>
+      </div>
+      <div class="detail">
+        <div class="detail-head">
+          <div class="kicker"><span class="tag">扶養の変更</span> 承認 3/4</div>
+          <h2>伊藤 美咲 ― 被扶養者の追加</h2>
+          <div class="meta muted small">依頼：高橋 健太（10/29）・提出期限 11/30（事実発生から5日以内を過ぎています）</div>
+        </div>
+        <div class="detail-body">
+          <div class="callout" style="margin-bottom:14px"><b>確認してほしい点</b>出生日から5日を過ぎています。遅延理由の記入が必要です（依頼者が記入済み）。</div>
+          <div class="section-title">追加する被扶養者</div>
+          <table class="diff">
+            <thead><tr><th>項目</th><th>内容</th></tr></thead>
+            <tbody>
+              <tr><td>氏名</td><td class="new">伊藤 陽向（イトウ ヒナタ）</td></tr>
+              <tr><td>続柄</td><td class="new">子（長男）</td></tr>
+              <tr><td>生年月日</td><td class="new">2026/10/18</td></tr>
+              <tr><td>収入</td><td class="new">なし</td></tr>
+              <tr><td>遅延理由</td><td class="new">出生届の受理証明の取得に時間を要したため</td></tr>
+            </tbody>
+          </table>
+          <div class="section-title">作られる届出</div>
+          <p class="small">健康保険 被扶養者（異動）届 1件 <a href="#">PDFを見る</a></p>
+        </div>
+        <div class="detail-foot">
+          <span class="small muted">承認すると、届出を提出できる状態になります。</span>
+          <div class="right"><button class="btn">差し戻す</button><button class="btn primary">承認する</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

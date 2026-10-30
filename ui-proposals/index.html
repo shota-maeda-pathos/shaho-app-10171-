@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordia UI提案</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/shell.js"></script>
+<style>
+  .rules { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .rule { padding: 16px 18px; }
+  .rule .no { font-size: 11px; font-weight: 700; color: var(--brand-strong); letter-spacing: .06em; }
+  .rule h3 { font-size: 15px; margin: 4px 0 6px; }
+  .rule p { font-size: 13px; color: var(--ink-2); }
+  h2.sec { font-size: 16px; margin: 28px 0 12px; }
+  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ba .lbl { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+  .old-guide { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px; }
+  .old-guide div { background: var(--bg); border-radius: 8px; padding: 10px; font-size: 12px; }
+  .old-guide b { display: block; font-size: 11px; color: var(--muted); }
+  .frame { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 14px; font-size: 12px; }
+  .frame div { border: 1px dashed #c3c9d1; border-radius: 8px; padding: 10px 12px; color: var(--ink-2); }
+  .frame div b { color: var(--ink); }
+  .frame .two { display: grid; grid-template-columns: 1fr 120px; gap: 6px; border: 0; padding: 0; }
+  .logos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .logos .card { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .lg { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 26px; }
+  .lg.dark { background: var(--brand-ink); color: #fff; padding: 12px 14px; border-radius: 8px; font-size: 20px; }
+  .favs { display: flex; gap: 10px; align-items: center; }
+  .fav { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--brand-tint); }
+  .fav.s { width: 18px; height: 18px; border-radius: 4px; }
+  table.cmp { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.cmp th, table.cmp td { padding: 9px 12px; border-bottom: 1px solid var(--line-2); text-align: left; vertical-align: top; }
+  table.cmp th { background: #fafbfc; font-size: 12px; color: var(--muted); }
+  @media (max-width: 960px) { .ba, .logos { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body data-nav="" data-crumbs="UI提案|考え方">
+<div data-page class="content">
+  <div class="page-head">
+    <div>
+      <h1>どの手続きも「同じ骨組み」で見せる</h1>
+      <div class="meta">上のバーで各画面を開けます。右上の丸で配色（ロゴ4案）を切り替えられます。データはすべて架空です。</div>
+    </div>
+  </div>
+
+  <div class="rules">
+    <div class="card rule"><div class="no">01</div><h3>手続きの画面は1つの型</h3><p>見出し → 横並びのステップ → 本体 → 下の操作バー。1人の入社も、8名の賞与も同じ並び。違うのは本体が「入力欄」か「対象者の表」かだけ。</p></div>
+    <div class="card rule"><div class="no">02</div><h3>ステップは1本だけ</h3><p>数字（8/8名・要確認1名）はステップの中に入れ、別の集計カードは作らない。賞与の「4つ横並び×3段」は1段にまとまります。</p></div>
+    <div class="card rule"><div class="no">03</div><h3>説明は1行＋「詳しく」</h3><p>「やること」は見出し横の1行に。「なぜ必要か」は ⓘ 詳しく の中へ。「次に起こること」は主ボタンの文言（例：登録して雇用条件へ →）に吸収。</p></div>
+    <div class="card rule"><div class="no">04</div><h3>主ボタンは1画面に1つ</h3><p>いつも右下の固定バー。何名を選んでいるか・押すと次に何が起きるかもそこに出す。</p></div>
+    <div class="card rule"><div class="no">05</div><h3>1人分は横から開く</h3><p>多人数の表で名前を押すと右にパネルが開く。一覧を見失わずに内訳を確かめられます。</p></div>
+    <div class="card rule"><div class="no">06</div><h3>入社も「一覧 → 1人」</h3><p>1人ずつの手続きは「人 × ステップ」の表で全員の進み具合を一望し、行を押して1人の画面へ。賞与の表と同じ部品です。</p></div>
+    <div class="card rule"><div class="no">07</div><h3>色は意味だけに使う</h3><p>ブランド色＝あなたの番・主ボタン、緑＝完了、橙＝要確認、灰＝待ち。それ以外は白と灰で静かに。</p></div>
+    <div class="card rule"><div class="no">08</div><h3>注意は必要なときだけ</h3><p>常設の案内枠はやめ、期限超過・差し戻し・本人の変更など「今この人に関係あること」だけを帯で出す。</p></div>
+  </div>
+
+  <h2 class="sec">説明欄の before / after</h2>
+  <div class="ba">
+    <div>
+      <div class="lbl">いま</div>
+      <div class="card">
+        <div class="card-head"><h2>保険料の計算と承認</h2></div>
+        <div class="old-guide">
+          <div><b>やること</b>標準賞与額から保険料を計算し、結果を確かめて承認を依頼します。上限…</div>
+          <div><b>なぜ必要か</b>賞与の保険料は賞与から控除します。計算の誤りは過少控除に…</div>
+          <div><b>次に起きること</b>保険料が承認された人で賞与支払届を作ります。</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="lbl">提案</div>
+      <div class="card">
+        <div class="lead">
+          <h2>保険料の計算</h2>
+          <p>標準賞与額から保険料を計算し、承認を依頼します。</p>
+          <div class="right"><details class="why"><summary>ⓘ 詳しく</summary><div class="pop"><dl><dt>なぜ必要か</dt><dd>賞与の保険料は賞与から控除します。計算の誤りは過少控除につながるため、別の目で確かめます。</dd><dt>この後</dt><dd>保険料が承認された人で賞与支払届を作ります。</dd></dl></div></details></div>
+        </div>
+        <div class="card-body small muted">ボタン：<span class="btn sm primary">承認を依頼する（6名） →</span>　＋ 横に「次：賞与支払届を作ります」</div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">手続き画面の骨組み（全手続き共通）</h2>
+  <div class="ba">
+    <div class="card frame">
+      <div><b>見出し</b>　種類タグ／件名／期限・対象数　　　　右：補助ボタン</div>
+      <div><b>ステップ</b>　① 登録 ✓ ─ ② 承認 ✓ ─ ③ 計算 ─ ④ 届出（数字入り）</div>
+      <div><b>本体：多人数</b>　1行説明＋ⓘ ／ 絞り込みチップ ／ 対象者の表（名前→右パネル）</div>
+      <div><b>操作バー（固定）</b>　6名を選択中　　　次：…　［承認を依頼する →］</div>
+    </div>
+    <div class="card frame">
+      <div><b>見出し</b>　← 一覧／氏名の入社／期限　　　　右：前後の人</div>
+      <div><b>ステップ</b>　① 依頼 ✓ ─ ② 本人情報 ─ ③ 雇用条件 ─ … ─ ⑥ 提出</div>
+      <div class="two"><div><b>本体：1人</b>　1行説明＋ⓘ ／ 入力欄（変更箇所に色）</div><div><b>右</b>　担当・記録</div></div>
+      <div><b>操作バー（固定）</b>　保存済み　　　　［台帳に登録して雇用条件へ →］</div>
+    </div>
+  </div>
+
+  <h2 class="sec">ロゴと配色（アプリに載せた見え方）</h2>
+  <div class="logos">
+    <div class="card" data-theme-preview="slate" style="--brand:#53749B;--brand-ink:#273447;--brand-tint:#eef3f8">
+      <div class="small muted">03 Slate blue（推し）</div>
+      <div class="lg" style="color:#273447"><span data-mark="34"></span>Ordia</div>
+      <div class="lg dark"><span data-mark="26"></span>Ordia</div>
+      <div class="favs"><span class="fav"><span data-mark="20"></span></span><span class="fav s"><span data-mark="12"></span></span><span class="small muted">アイコン</span></div>
+    </div>
+    <div class="card" style="--brand:#257F7A;--brand-ink:#233A3A;--brand-tint:#ebf5f3">
+      <div class="small muted">02 Deep teal（次点）</div>
+      <div class="lg" style="color:#233A3A"><span data-mark="34"></span>Ordia</div>
+      <div class="lg dark"><span data-mark="26"></span>Ordia</div>
+      <div class="favs"><span class="fav"><span data-mark="20"></span></span><span class="fav s"><span data-mark="12"></span></span></div>
+    </div>
+    <div class="card" style="--brand:#7162C5;--brand-ink:#29263B;--brand-tint:#f1effa">
+      <div class="small muted">01 Iris</div>
+      <div class="lg" style="color:#29263B"><span data-mark="34"></span>Ordia</div>
+      <div class="lg dark"><span data-mark="26"></span>Ordia</div>
+      <div class="favs"><span class="fav"><span data-mark="20"></span></span><span class="fav s"><span data-mark="12"></span></span></div>
+    </div>
+    <div class="card" style="--brand:#53565D;--brand-ink:#282A30;--brand-tint:#f1f2f4">
+      <div class="small muted">04 Graphite</div>
+      <div class="lg" style="color:#282A30"><span data-mark="34"></span>Ordia</div>
+      <div class="lg dark"><span data-mark="26"></span>Ordia</div>
+      <div class="favs"><span class="fav"><span data-mark="20"></span></span><span class="fav s"><span data-mark="12"></span></span></div>
+    </div>
+  </div>
+  <p class="small muted" style="margin-top:10px">マークはこの試作用に3本線を簡単に描き直したものです（本番は元のデータを使ってください）。</p>
+</div>
+</body>
+</html>

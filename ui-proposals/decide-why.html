@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordia 比較 説明</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/shell.js"></script>
+<script src="assets/variants.js"></script>
+<style>
+  .mock .card { box-shadow: none; }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--line); background: var(--surface); }
+  .bar .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .warnline { font-size: 12px; color: var(--warn); display: flex; gap: 6px; align-items: center; }
+  .rows { padding: 6px 18px 12px; font-size: 13px; color: var(--muted); }
+  .rows div { padding: 7px 0; border-bottom: 1px solid var(--line-2); }
+  .firsttime { margin: 12px 18px 0; padding: 12px 14px; border: 1px solid var(--brand-tint-2); background: var(--brand-tint); border-radius: 8px; font-size: 13px; display: flex; gap: 10px; }
+  .firsttime dl { margin: 0; display: grid; grid-template-columns: 80px 1fr; gap: 4px 10px; }
+  .firsttime dt { color: var(--muted); font-size: 12px; }
+  .firsttime dd { margin: 0; }
+</style>
+</head>
+<body data-nav="" data-crumbs="決めること|説明の出し方">
+<div data-page class="content">
+  <div class="page-head">
+    <div><h1>「やること・なぜ必要か・次に起こること」の出し方</h1>
+    <div class="meta">例は賞与の「保険料の計算」ステップ。上の切り替えで案を見比べてください。</div></div>
+  </div>
+
+  <div class="variants">
+    <button data-v="a">A. 1行だけ<small>なぜ・次は出さない</small></button>
+    <button data-v="b">B. 1行＋「詳しく」<small>最初の提案</small></button>
+    <button data-v="c" class="on">C. 1行＋必要なときだけ注意<span class="rec">推し</span><small>理由は大事な場面だけ</small></button>
+    <button data-v="d">D. 慣れるまで開いておく<small>初回は3つ全部、以後は1行</small></button>
+  </div>
+
+  <!-- A -->
+  <section class="variant" data-v="a">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="card">
+        <div class="lead"><h2>保険料の計算</h2><p>標準賞与額から保険料を計算し、承認を依頼します。</p></div>
+        <div class="rows"><div>田中 直樹　…</div><div>佐藤 一郎　…</div></div>
+        <div class="bar"><span class="small"><b>6名</b>を選択中</span><div class="right"><button class="btn primary">承認を依頼する（6名） →</button></div></div>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>いちばんすっきり</li><li>文言の管理が「やること」1本で済む</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>押すと何が起きるか（承認後は直せない等）が分からない</li><li>初めての人・たまにしか触らない業務（算定・賞与は年1〜3回）では迷いやすい</li></ul></div>
+    </div>
+  </section>
+
+  <!-- B -->
+  <section class="variant" data-v="b">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="card">
+        <div class="lead"><h2>保険料の計算</h2><p>標準賞与額から保険料を計算し、承認を依頼します。</p>
+          <div class="right"><details class="why" open><summary>ⓘ 詳しく</summary><div class="pop"><dl><dt>なぜ必要か</dt><dd>賞与の保険料は賞与から控除します。計算の誤りは過少控除につながるため、別の目で確かめます。</dd><dt>この後</dt><dd>保険料が承認された人で賞与支払届を作ります。</dd></dl></div></details></div>
+        </div>
+        <div class="rows"><div>田中 直樹　…</div><div>佐藤 一郎　…</div><div>&nbsp;</div><div>&nbsp;</div></div>
+        <div class="bar"><span class="small"><b>6名</b>を選択中</span><div class="right"><span class="small muted">次：賞与支払届を作ります</span><button class="btn primary">承認を依頼する（6名） →</button></div></div>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>説明は全部残る</li><li>普段は1行で静か</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>「詳しく」はほとんど押されない（押さないと大事な注意も見えない）</li><li>全ステップに「なぜ」を書き続ける手間が残る</li></ul></div>
+    </div>
+  </section>
+
+  <!-- C -->
+  <section class="variant on" data-v="c">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="card">
+        <div class="lead"><h2>保険料の計算</h2><p>標準賞与額から保険料を計算し、承認を依頼します。</p></div>
+        <div class="rows"><div>田中 直樹　…</div><div>佐藤 一郎　…</div></div>
+        <div class="bar">
+          <span class="small"><b>6名</b>を選択中</span>
+          <div class="right">
+            <span class="warnline">⚠ 承認されると、差し戻さない限り直せません</span>
+            <button class="btn primary">承認を依頼する（6名） →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>理由を「取り返しがつかない操作」「期限」「法律上の決まりで迷う所」だけに絞るので、出たときに読まれる</li><li>「次に起こること」はボタンの文言（〜して○○へ →）で伝わる</li><li>用語の意味は今ある用語集（<code>app-term</code>）の ⓘ に任せられる</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>どのステップに注意を出すかを1つずつ決める必要がある</li><li>今の「なぜ必要か」の文章はほぼ使わなくなる</li></ul></div>
+    </div>
+    <div class="verdict"><b>推す理由：</b>3つの枠が重く感じる原因は、毎回同じ説明が並んでいて読まれなくなることです。説明を「押す前に知っておくべきこと」だけに減らすと、すっきりして、しかも大事な注意は見落とされにくくなります。</div>
+  </section>
+
+  <!-- D -->
+  <section class="variant" data-v="d">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="card">
+        <div class="lead"><h2>保険料の計算</h2><p>標準賞与額から保険料を計算し、承認を依頼します。</p></div>
+        <div class="firsttime">
+          <dl><dt>なぜ必要か</dt><dd>賞与の保険料は賞与から控除します。計算の誤りは過少控除につながるため、別の目で確かめます。</dd><dt>この後</dt><dd>保険料が承認された人で賞与支払届を作ります。</dd></dl>
+          <button class="btn sm ghost" style="margin-left:auto;align-self:flex-start">分かった・次から隠す</button>
+        </div>
+        <div class="rows"><div>田中 直樹　…</div><div>佐藤 一郎　…</div></div>
+        <div class="bar"><span class="small"><b>6名</b>を選択中</span><div class="right"><button class="btn primary">承認を依頼する（6名） →</button></div></div>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>初めての人には親切、慣れた人には静か</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>「隠した」状態を人ごとに保存する仕組みが要る</li><li>年1回の業務（算定）は毎年忘れている</li></ul></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

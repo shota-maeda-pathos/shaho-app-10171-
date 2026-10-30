@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordia 入社</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/shell.js"></script>
+<style>
+  /* 人×ステップの進み具合（1人ずつの手続きを並べて見る） */
+  .matrix th.st, .matrix td.st { text-align: center; width: 84px; }
+  .s { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; }
+  .s.d { background: var(--ok-tint); color: var(--ok); }
+  .s.c { background: var(--brand-strong); color: #fff; }
+  .s.w { background: var(--line-2); color: var(--muted); border: 1px dashed #c3c9d1; }
+  .s.n { background: transparent; color: #c3c9d1; }
+  .group td { background: #fafbfc; font-size: 12px; font-weight: 700; color: var(--muted); padding: 7px 14px; cursor: default; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); align-items: center; }
+  .legend .s { width: 16px; height: 16px; font-size: 9px; margin-right: 4px; vertical-align: -3px; }
+</style>
+</head>
+<body data-nav="proc" data-crumbs="手続き|入社">
+<div data-page class="content">
+  <div class="page-head">
+    <div>
+      <div class="kicker"><span class="tag">1人ずつ</span>入社</div>
+      <h1>入社</h1>
+      <div class="meta"><span>進行中 <b>5名</b></span><span>あなたの対応 <b>3名</b></span><span>直近の期限 <b class="due soon">11/5（木）</b></span></div>
+    </div>
+    <div class="actions">
+      <button class="btn">まとめて本人に入力を依頼</button>
+      <a class="btn primary" href="onboarding-person.html">＋ 入社予定者を追加</a>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="tabs">
+      <button class="on">進行中 <span class="badge">5</span></button>
+      <button>あなたの対応 <span class="badge">3</span></button>
+      <button>本人・承認待ち <span class="badge">2</span></button>
+      <button>完了</button>
+    </div>
+    <div class="toolbar">
+      <input class="input" placeholder="氏名・社員番号で探す">
+      <span class="grow"></span>
+      <div class="legend"><span><i class="s d">✓</i>完了</span><span><i class="s c">●</i>あなたの番</span><span><i class="s w">…</i>他の人の番</span></div>
+    </div>
+    <div class="table-wrap">
+      <table class="list matrix">
+        <thead><tr><th>従業員</th><th class="st">入力依頼</th><th class="st">本人情報</th><th class="st">雇用条件</th><th class="st">届出作成</th><th class="st">承認</th><th class="st">提出</th><th>期限</th><th></th></tr></thead>
+        <tbody>
+          <tr class="group"><td colspan="9">11月1日 入社（4名）</td></tr>
+          <tr onclick="location.href='onboarding-person.html'">
+            <td class="who"><b>田中 直樹</b><span>EMP-101・営業部</span></td>
+            <td class="st"><i class="s d">✓</i></td><td class="st"><i class="s c">●</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td>
+            <td><span class="due soon">11/5</span></td><td class="r"><a class="btn sm primary" href="onboarding-person.html">続ける</a></td>
+          </tr>
+          <tr onclick="location.href='onboarding-person.html'">
+            <td class="who"><b>佐藤 一郎</b><span>EMP-102・開発部</span></td>
+            <td class="st"><i class="s d">✓</i></td><td class="st"><i class="s c">●</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td>
+            <td><span class="due soon">11/5</span></td><td class="r"><a class="btn sm primary" href="onboarding-person.html">続ける</a></td>
+          </tr>
+          <tr>
+            <td class="who"><b>鈴木 花子</b><span>EMP-103・営業部</span></td>
+            <td class="st"><i class="s w">…</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td>
+            <td><span class="due soon">11/5</span></td><td class="r"><button class="btn sm ghost">催促</button></td>
+          </tr>
+          <tr>
+            <td class="who"><b>伊藤 美咲</b><span>EMP-104・総務部</span></td>
+            <td class="st"><i class="s d">✓</i></td><td class="st"><i class="s d">✓</i></td><td class="st"><i class="s d">✓</i></td><td class="st"><i class="s d">✓</i></td><td class="st"><i class="s w">…</i></td><td class="st"><i class="s n">○</i></td>
+            <td><span class="due soon">11/5</span></td><td class="r"><span class="sub">承認待ち</span></td>
+          </tr>
+          <tr class="group"><td colspan="9">11月16日 入社（1名）</td></tr>
+          <tr>
+            <td class="who"><b>渡辺 翔太</b><span>EMP-105・開発部</span></td>
+            <td class="st"><i class="s c">●</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td><td class="st"><i class="s n">○</i></td>
+            <td><span class="due">11/20</span></td><td class="r"><a class="btn sm primary" href="onboarding-person.html">続ける</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="table-foot">1人ずつの手続きは、手続き一覧からも同じように開けます</div>
+  </section>
+</div>
+</body>
+</html>

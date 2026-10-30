@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordia 比較 内訳</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/shell.js"></script>
+<script src="assets/variants.js"></script>
+<style>
+  .mock { height: 430px; }
+  .mock .card { box-shadow: none; }
+  .ov { position: absolute; inset: 0; background: rgba(17,24,39,.22); }
+  .pane { position: absolute; top: 0; right: 0; bottom: 0; width: 46%; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(16,24,40,.12); display: flex; flex-direction: column; }
+  .pane-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+  .pane-head h3 { font-size: 15px; }
+  .pane-body { padding: 14px 16px; flex: 1; font-size: 13px; }
+  .pane-foot { padding: 10px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
+  .splitv { display: grid; grid-template-columns: 300px 1fr; height: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .splitv .l { border-right: 1px solid var(--line); }
+  .splitv .l div { padding: 10px 14px; border-bottom: 1px solid var(--line-2); font-size: 13px; display: flex; justify-content: space-between; }
+  .splitv .l div.on { background: var(--brand-tint); box-shadow: inset 3px 0 0 var(--brand-strong); }
+  .expand td { background: #fafbfd; }
+  .expand .kv { padding: 4px 0; }
+  .fullpage { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; height: 100%; padding: 16px 18px; }
+</style>
+</head>
+<body data-nav="" data-crumbs="決めること|1人分の内訳の見せ方">
+<div data-page class="content">
+  <div class="page-head">
+    <div><h1>多人数の表で、1人分の内訳をどう見せるか</h1>
+    <div class="meta">例は賞与の「保険料の計算」で鈴木 花子を開いたところ。実際に動くものは <a href="bonus.html">賞与（多人数）</a> で名前を押すと見られます（案A）。</div></div>
+  </div>
+
+  <div class="variants">
+    <button data-v="a" class="on">A. 右から重ねるパネル＋前後送り<span class="rec">推し</span><small>表の幅はそのまま</small></button>
+    <button data-v="b">B. 左右に分割<small>受信箱の形</small></button>
+    <button data-v="c">C. 行の下に展開<small>表の中で開く</small></button>
+    <button data-v="d">D. 別の画面に移る<small>今の形</small></button>
+  </div>
+
+  <section class="variant on" data-v="a">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="card">
+        <table class="list">
+          <thead><tr><th>従業員</th><th class="r">標準賞与額</th><th class="r">本人負担</th><th class="r">会社負担</th><th>状態</th></tr></thead>
+          <tbody>
+            <tr><td class="who"><b>田中 直樹</b></td><td class="r">858,000円</td><td class="r">121,200円</td><td class="r">121,200円</td><td><span class="pill ok">計算済み</span></td></tr>
+            <tr class="sel"><td class="who"><b>鈴木 花子</b></td><td class="r">1,200,000円</td><td class="r">169,500円</td><td class="r">169,500円</td><td><span class="pill ok">計算済み</span></td></tr>
+            <tr><td class="who"><b>高橋 健太</b></td><td class="r">1,500,000円</td><td class="r">—</td><td class="r">—</td><td><span class="pill warn">上限を確認</span></td></tr>
+            <tr><td class="who"><b>渡辺 翔太</b></td><td class="r">760,000円</td><td class="r">107,300円</td><td class="r">107,300円</td><td><span class="pill ok">計算済み</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="ov"></div>
+      <div class="pane">
+        <div class="pane-head"><h3>鈴木 花子</h3><span class="small muted">2 / 8人目</span><span style="margin-left:auto;display:flex;gap:4px"><button class="btn sm">‹ 前</button><button class="btn sm">次 ›</button><button class="btn sm ghost">×</button></span></div>
+        <div class="pane-body"><dl class="kv"><dt>賞与額</dt><dd>1,200,000円</dd><dt>標準賞与額</dt><dd>1,200,000円</dd><dt>健康保険</dt><dd>59,700円 / 59,700円</dd><dt>厚生年金</dt><dd>109,800円 / 109,800円</dd><dt>年度の累計</dt><dd>2,020,000円</dd></dl></div>
+        <div class="pane-foot"><button class="btn">保留にする</button><button class="btn">賞与額を直す</button></div>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>表は広いまま（算定の270名・列の多い表でも崩れない）</li><li>閉じれば元の位置・絞り込みのまま</li><li>「次 ›」で1人ずつ順に確かめられる（Bのよさも取り込める）</li><li>直す・保留などの操作もパネルの中で完結</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>パネルを開いている間は表の右側が隠れる</li><li>入力項目が多い操作（入社の本人情報など）はパネルには狭い → それは1人の画面に移る</li></ul></div>
+    </div>
+    <div class="verdict"><b>推す理由：</b>多人数の画面は「表を見渡す」ことが主な作業なので、表を崩さないAが合っています。ルールは「見る・少し直す＝パネル、しっかり入力する＝1人の画面」の2段にすると、どの手続きでも迷いません。</div>
+  </section>
+
+  <section class="variant" data-v="b">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="splitv">
+        <div class="l"><div>田中 直樹 <span class="pill ok plain">済</span></div><div class="on">鈴木 花子 <span class="pill ok plain">済</span></div><div>高橋 健太 <span class="pill warn plain">要確認</span></div><div>渡辺 翔太 <span class="pill ok plain">済</span></div><div>山本 彩 <span class="pill ok plain">済</span></div></div>
+        <div style="padding:16px 18px"><h3 style="font-size:15px;margin-bottom:10px">鈴木 花子</h3><dl class="kv"><dt>賞与額</dt><dd>1,200,000円</dd><dt>標準賞与額</dt><dd>1,200,000円</dd><dt>健康保険</dt><dd>59,700円 / 59,700円</dd><dt>厚生年金</dt><dd>109,800円 / 109,800円</dd></dl></div>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>上から順に1人ずつ確かめる作業（承認など）に向く</li><li>常に詳細が見えている</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>表の列が入らない（金額を見比べられない）</li><li>全員を一覧で眺める・まとめて選ぶ作業に弱い</li><li>承認の画面には合うが、手続きの画面に使うと賞与などで窮屈</li></ul></div>
+    </div>
+    <div class="verdict">承認の画面（<a href="approvals.html">承認</a>）はこの形が合っています。手続きの画面はA、承認はB、という使い分けもありです。</div>
+  </section>
+
+  <section class="variant" data-v="c">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="card">
+        <table class="list">
+          <thead><tr><th>従業員</th><th class="r">標準賞与額</th><th class="r">本人負担</th><th class="r">会社負担</th><th>状態</th></tr></thead>
+          <tbody>
+            <tr><td class="who"><b>田中 直樹</b></td><td class="r">858,000円</td><td class="r">121,200円</td><td class="r">121,200円</td><td><span class="pill ok">計算済み</span></td></tr>
+            <tr class="sel"><td class="who"><b>▾ 鈴木 花子</b></td><td class="r">1,200,000円</td><td class="r">169,500円</td><td class="r">169,500円</td><td><span class="pill ok">計算済み</span></td></tr>
+            <tr class="expand"><td colspan="5"><dl class="kv"><dt>健康保険</dt><dd>59,700円 / 59,700円</dd><dt>厚生年金</dt><dd>109,800円 / 109,800円</dd><dt>年度の累計</dt><dd>2,020,000円</dd></dl><div style="margin-top:8px;display:flex;gap:8px"><button class="btn sm">保留にする</button><button class="btn sm">賞与額を直す</button></div></td></tr>
+            <tr><td class="who"><b>高橋 健太</b></td><td class="r">1,500,000円</td><td class="r">—</td><td class="r">—</td><td><span class="pill warn">上限を確認</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>画面が動かず、その場で見られる</li><li>複数人を同時に開いて見比べられる</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>開くたびに表が伸び縮みし、位置を見失いやすい</li><li>内訳が長いと表が崩れる。操作ボタンを置く場所が窮屈</li></ul></div>
+    </div>
+  </section>
+
+  <section class="variant" data-v="d">
+    <div class="mock"><span class="mock-label">MOCK</span>
+      <div class="fullpage">
+        <div class="small"><a href="#">← 賞与の一覧に戻る</a></div>
+        <h3 style="font-size:18px;margin:6px 0 12px">鈴木 花子 の賞与</h3>
+        <dl class="kv"><dt>賞与額</dt><dd>1,200,000円</dd><dt>標準賞与額</dt><dd>1,200,000円</dd><dt>健康保険</dt><dd>59,700円 / 59,700円</dd><dt>厚生年金</dt><dd>109,800円 / 109,800円</dd><dt>年度の累計</dt><dd>2,020,000円</dd></dl>
+      </div>
+    </div>
+    <div class="proscons">
+      <div class="p"><h4>よい点</h4><ul><li>広く使える。URLで直接開ける</li><li>今の作りに近い</li></ul></div>
+      <div class="c"><h4>気になる点</h4><ul><li>戻ると絞り込み・スクロール位置が失われやすい</li><li>1人ずつ見るたびに画面が切り替わり、テンポが悪い</li></ul></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
