@@ -98,6 +98,53 @@ export const CURRENT_LABELS: Record<WizardKey, string> = {
   done: '完了',
 };
 
+/** ウィザードのステップの順（完了を除く） */
+export const ONBOARDING_KEYS: Exclude<WizardKey, 'done'>[] = ['invite', 'register', 'contract', 'filing', 'approval', 'submit', 'confirm'];
+
+/** 横並びのステップに出す短い名前（1人の画面とまとめの画面で同じにする） */
+export const STEP_LABELS: Record<Exclude<WizardKey, 'done'>, string> = {
+  invite: '本人へ入力依頼',
+  register: '本人情報の確認',
+  contract: '雇用条件',
+  filing: '届出の作成',
+  approval: '承認',
+  submit: '提出',
+  confirm: '完了の確認',
+};
+
+/**
+ * 入社の「まとめ」（docs/ui-unification-design.md の3章）。データとしては持たず、表示するときに
+ * 事業所×入社日で束ねる。同じ日に追加した人は自動で同じまとめに入る
+ */
+export interface OnboardingGroup {
+  officeId: string;
+  hireDate: string;
+  items: OnboardingListItem[];
+}
+
+export function groupOnboarding(items: OnboardingListItem[]): OnboardingGroup[] {
+  const map = new Map<string, OnboardingGroup>();
+  for (const item of items) {
+    const key = `${item.officeId}|${item.hireDate}`;
+    if (!map.has(key)) map.set(key, { officeId: item.officeId, hireDate: item.hireDate, items: [] });
+    map.get(key)!.items.push(item);
+  }
+  return [...map.values()].sort((a, b) => a.hireDate.localeCompare(b.hireDate) || a.officeId.localeCompare(b.officeId));
+}
+
+/** 一覧での1人の状態。本人の入力待ち・承認待ちは「待ち」、差し戻し・返戻は「要確認」 */
+export function itemTone(i: OnboardingListItem): 'yours' | 'attention' | 'waiting' | 'done' {
+  if (i.current === 'done') return 'done';
+  if (i.currentDetail && /差戻|差し戻|返戻/.test(i.currentDetail)) return 'attention';
+  if ((i.current === 'invite' && i.inviteToken) || i.current === 'approval') return 'waiting';
+  return 'yours';
+}
+
+/** 待っている相手（本人・承認者） */
+export function waitingFor(i: OnboardingListItem) {
+  return i.current === 'invite' ? '本人待ち' : i.current === 'approval' ? '承認待ち' : '待ち';
+}
+
 export function inviteUrl(token: string) {
   return `${location.origin}/onboard/${token}`;
 }

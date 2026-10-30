@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -121,10 +121,12 @@ export class OnboardingStartComponent {
   private functions = inject(Functions);
   private auth = inject(AuthService);
   private router = inject(Router);
+  private query = inject(ActivatedRoute).snapshot.queryParamMap;
 
   mode = signal<'single' | 'bulk'>('single');
-  officeId = this.office.selected() || (this.office.offices().length === 1 ? this.office.offices()[0].id : '');
-  hireDate = '';
+  // まとめの画面の「この日に入社する人を追加」から来たときは、事業所と入社日を引き継ぐ
+  officeId = this.query.get('officeId') || this.office.selected() || (this.office.offices().length === 1 ? this.office.offices()[0].id : '');
+  hireDate = this.query.get('hireDate') ?? '';
   lastName = '';
   firstName = '';
   email = '';
@@ -165,8 +167,8 @@ export class OnboardingStartComponent {
       const { data } = await httpsCallable<object, { batchId: string | null; items: { procedureId: string }[] }>(this.functions, 'onboardingStart')({
         companyId: this.auth.companyId, officeId: this.officeId, hireDate: this.hireDate, people, skipInvite: this.inviteMode === 'staff',
       });
-      if (data.batchId) await this.router.navigate(['/onboarding'], { queryParams: { batchId: data.batchId } });
-      else await this.router.navigate(['/onboarding', data.items[0].procedureId]);
+      // 1名だけでも、事業所×入社日のまとめの画面を通る（docs/ui-unification-design.md の3章）
+      await this.router.navigate(['/onboarding/group'], { queryParams: { officeId: this.officeId, date: this.hireDate } });
     } catch (e) {
       this.error.set(errorMessage(e, '入社手続きを始められませんでした'));
     } finally {

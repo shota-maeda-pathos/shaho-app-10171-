@@ -104,7 +104,7 @@ export interface StepperItem {
       background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius);
     }
     button {
-      flex: 1; display: flex; align-items: center; gap: 10px; min-width: 150px; padding: 10px 14px; position: relative;
+      flex: 1 1 0; display: flex; align-items: center; gap: 8px; min-width: 104px; padding: 10px 12px; position: relative;
       border: 0; background: none; font: inherit; text-align: left; color: var(--app-color-text); cursor: pointer;
     }
     button + button { border-left: 1px solid var(--app-color-border); }
@@ -123,8 +123,8 @@ export interface StepperItem {
     .cur .dot { background: var(--app-status-yours-fg); color: #fff; }
     .cur b { color: var(--app-status-yours-fg); }
     .t { min-width: 0; }
-    .t b { display: block; font-size: var(--app-font-sm); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .note { display: block; font-size: 11px; color: var(--app-color-text-sub); white-space: nowrap; }
+    .t b { display: block; font-size: var(--app-font-sm); font-weight: 600; line-height: 1.35; }
+    .note { display: block; font-size: 11px; line-height: 1.35; color: var(--app-color-text-sub); }
   `],
 })
 export class StepperComponent {

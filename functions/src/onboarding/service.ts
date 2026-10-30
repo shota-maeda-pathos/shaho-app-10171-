@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'crypto';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
@@ -349,16 +349,29 @@ export async function getOnboarding(companyId: string, procedureId: string, auth
   };
 }
 
-/** 入社手続きの一覧（まとめて始めた入社の進み具合を見る） */
-export async function listOnboarding(input: { officeId?: string; batchId?: string; includeCompleted: boolean }, auth: AuthContext) {
+/**
+ * 入社手続きの一覧。画面は事業所×入社日で束ねて「まとめ」として出す（hireDate を渡すと、そのまとめの人だけ）。
+ * 従業員を登録したときに自動で作られる旧方式の資格取得の手続き（onboarding がない）も同じ種類のため、
+ * 件数で切ると新しい入社手続きが漏れる。1000件ずつ最後まで読む（条件はすべて等価で、複合索引に頼らない）
+ */
+export async function listOnboarding(input: { officeId?: string; batchId?: string; hireDate?: string; includeCompleted: boolean }, auth: AuthContext) {
   if (input.officeId) requireOffice(auth, input.officeId);
   let query: FirebaseFirestore.Query = db.collection(`companies/${auth.companyId}/procedures`)
     .where('procedureType', '==', 'acquisition')
     .where('deletedAt', '==', null);
   if (!input.includeCompleted) query = query.where('status', '==', 'in_progress');
   if (input.batchId) query = query.where('onboarding.batchId', '==', input.batchId);
-  const snap = await query.limit(1000).get();
-  const items = snap.docs
+  if (input.hireDate) query = query.where('onboarding.hireDate', '==', input.hireDate);
+  if (input.officeId) query = query.where('officeId', '==', input.officeId);
+  const docs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  for (let page = 0; page < 20; page++) {
+    let q = query.orderBy(FieldPath.documentId()).limit(1000);
+    if (docs.length) q = q.startAfter(docs[docs.length - 1].id);
+    const snap = await q.get();
+    docs.push(...snap.docs);
+    if (snap.size < 1000) break;
+  }
+  const items = docs
     .map(d => ({ id: d.id, ...(d.data() as ProcedureDoc) }))
     .filter(p => p.onboarding)
     .filter(p => !input.officeId || p.officeId === input.officeId)

@@ -28,6 +28,8 @@ export const OnboardingListSchema = z.object({
   companyId: id,
   officeId: id.optional(),
   batchId: id.optional(),
+  /** 入社日のまとめの人だけ */
+  hireDate: calendarDate.optional(),
   includeCompleted: z.boolean().default(false),
 });
 

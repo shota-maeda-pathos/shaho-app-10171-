@@ -18,7 +18,7 @@ import {
   ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
 } from '../../shared/ui';
 import {
-  ContractForm, EMPLOYMENT_TYPES, errorMessage, Evaluation, inviteUrl, OnboardingView, RELATIONSHIPS, SelfInput, WizardKey,
+  ContractForm, EMPLOYMENT_TYPES, errorMessage, Evaluation, inviteUrl, OnboardingListItem, OnboardingView, RELATIONSHIPS, SelfInput, STEP_LABELS, WizardKey,
 } from './onboarding.types';
 
 const KEYS: WizardKey[] = ['invite', 'register', 'contract', 'filing', 'approval', 'submit', 'confirm'];
@@ -113,37 +113,26 @@ export class OnboardingWizardComponent implements OnInit, OnDestroy {
     const waitingApproval = v.current === 'approval' && v.approval?.status === 'pending';
     const skipped = this.insuranceSkipped();
     const skipText = '社会保険に加入しないため、このステップはありません。';
+    const deadline = this.monthDay(v.procedure.deadline);
     return [
-      { key: 'invite', label: '本人に入力を依頼する', done: done || cur > 0,
+      { key: 'invite', label: STEP_LABELS.invite, done: done || cur > 0,
         what: '入力用のリンクを本人に渡し、住所・生年月日・家族などを入れてもらいます。',
-        why: '本人の情報は本人がいちばん正確に分かり、書き写しの誤りを防げるためです。',
-        next: '本人が入力を終えると、ホームの「やること」とこの画面に表示されます。',
         ...(waitingInvite ? { waitingFor: '入社する本人' } : {}) },
-      { key: 'register', label: '本人の入力を確かめて台帳に登録する', done: done || cur > 1,
-        what: '本人の入力に漏れや誤りがないかを確かめ、社員番号を付けて従業員台帳に登録します。',
-        why: '届出に載る氏名・フリガナ・生年月日は、誤りがあると年金事務所から差し戻されるためです。',
-        next: '雇用条件（雇用区分・労働時間・給与）を入れます。' },
-      { key: 'contract', label: '雇用条件を入れる', done: done || cur > 2,
-        what: '雇用区分・所定労働時間・給与を入れます。社会保険に加入するかをシステムが判定します。',
-        why: '加入するかどうかと、最初の標準報酬月額は、この内容から決まるためです。',
-        next: skipped ? '加入しない場合は届出は不要です。完了を確認します。' : '等級を確かめて資格取得届を作ります。' },
-      { key: 'filing', label: '等級を確かめて資格取得届を作る', done: done || cur > 3,
-        what: skipped ? skipText : 'システムが決めた等級を確かめ、資格取得届を作って承認者に確認を依頼します。',
-        why: `資格取得届は入社日から5日以内（${this.monthDay(v.procedure.deadline)}まで）に出す決まりがあるためです。`,
-        next: '承認者が届出と等級を確認します。' },
-      { key: 'approval', label: '承認者が確認する', done: done || cur > 4,
-        what: skipped ? skipText : '作った人とは別の担当者が、届出と等級を確認します。',
-        why: '1人で作った届出の誤りを防ぐためです。承認されると等級が確定します。',
-        next: '承認されると、届出を提出できるようになります。',
+      { key: 'register', label: STEP_LABELS.register, done: done || cur > 1,
+        what: '本人の入力を確かめ、社員番号を付けて従業員台帳に登録します。',
+        caution: '氏名・フリガナ・生年月日は資格取得届にそのまま載ります。誤りは返戻の原因になります。' },
+      { key: 'contract', label: STEP_LABELS.contract, done: done || cur > 2,
+        what: '雇用区分・労働時間・給与を入れると、社会保険に入るかと最初の等級をシステムが判定します。' },
+      { key: 'filing', label: STEP_LABELS.filing, done: done || cur > 3,
+        what: skipped ? skipText : 'システムが決めた等級を確かめ、資格取得届を作って承認を依頼します。',
+        caution: skipped ? undefined : `資格取得届の期限は ${deadline}（入社日から5日以内）。依頼中は雇用条件と届出を直せません。` },
+      { key: 'approval', label: STEP_LABELS.approval, done: done || cur > 4,
+        what: skipped ? skipText : '作った人とは別の担当者が、届出と等級を確認します。承認されると等級が確定します。',
         ...(waitingApproval ? { waitingFor: '承認者' } : {}) },
-      { key: 'submit', label: '提出する', done: done || cur > 5,
-        what: skipped ? skipText : '電子申請か紙のどちらかで提出し、結果を記録します。',
-        why: '期限内に提出したことを記録に残すためです。',
-        next: '提出が済んだら、完了を確認します。' },
-      { key: 'confirm', label: '完了を確認する', done,
-        what: '登録した内容と届出の結果を見直して、手続きを完了にします。',
-        why: '漏れがないことを確かめてから、やることリストから外すためです。',
-        next: 'これで入社の手続きは完了です。扶養に入れたい家族がいる場合は、扶養の手続きを始めます。' },
+      { key: 'submit', label: STEP_LABELS.submit, done: done || cur > 5,
+        what: skipped ? skipText : '電子申請か紙のどちらかで提出し、結果を記録します。' },
+      { key: 'confirm', label: STEP_LABELS.confirm, done,
+        what: '登録した内容と届出の結果を見直して、手続きを完了にします。' },
     ];
   });
 
@@ -154,8 +143,8 @@ export class OnboardingWizardComponent implements OnInit, OnDestroy {
     if (k === 'contract' && this.contractDirty()) return '雇用条件を保存する';
     if (this.index() < this.currentIndex()) return undefined;
     switch (k) {
-      case 'register': return '台帳に登録する';
-      case 'contract': return '雇用条件を保存する';
+      case 'register': return '台帳に登録して雇用条件へ';
+      case 'contract': return '雇用条件を保存して届出へ';
       case 'filing': return '資格取得届を作って承認を依頼する';
       case 'confirm': return '手続きを完了する';
       default: return undefined;
@@ -190,14 +179,60 @@ export class OnboardingWizardComponent implements OnInit, OnDestroy {
     return this.override || this.evaluation()?.judgement.result === 'manual';
   }
 
+  private async loadSiblings() {
+    const p = this.view()?.procedure;
+    if (!p) return;
+    try {
+      const { data } = await httpsCallable<object, { items: OnboardingListItem[] }>(this.functions, 'onboardingList')({
+        companyId: this.auth.companyId, officeId: p.officeId, hireDate: p.hireDate, includeCompleted: true,
+      });
+      this.siblings.set(data.items.filter(i => i.hireDate === p.hireDate && i.status !== 'cancelled'));
+    } catch {
+      // 前後の人が分からなくても、この人の手続きは進められる
+    }
+  }
+
+  goSibling(delta: number) {
+    const next = this.siblings()[this.siblingIndex() + delta];
+    if (next) void this.router.navigate(['/onboarding', next.id]);
+  }
+
   monthDay(date: string) {
     const [, m, d] = date.split('-').map(Number);
     return `${m}月${d}日`;
   }
 
+  /** 同じまとめ（事業所×入社日）の人。前後の人へ移るのに使う */
+  siblings = signal<OnboardingListItem[]>([]);
+  /** 表示中の手続き（前後の人へ移ると変わる。procedureId は読み込みに使うふつうの値） */
+  private currentId = signal('');
+  siblingIndex = computed(() => this.siblings().findIndex(i => i.id === this.currentId()));
+  groupQuery = computed(() => {
+    const p = this.view()?.procedure;
+    return p ? { officeId: p.officeId, date: p.hireDate } : null;
+  });
+
   async ngOnInit() {
+    // 前後の人へ移るときは同じ画面のまま id だけ変わるので、id が変わるたびに読み込み直す
+    this.route.paramMap.subscribe(params => {
+      const id = params.get('id') ?? '';
+      if (!id || id === this.procedureId) return;
+      const first = !this.procedureId;
+      this.procedureId = id;
+      this.currentId.set(id);
+      if (first) return;
+      // 前の人の入力を持ち越さない
+      this.contractDirty.set(false);
+      this.evaluation.set(null);
+      this.employeeNumber = '';
+      this.insuredPersonNumber = '';
+      this.contract = defaultContract();
+      void this.load(true);
+    });
     this.procedureId = this.route.snapshot.paramMap.get('id') ?? '';
+    this.currentId.set(this.procedureId);
     await this.load(true);
+    void this.loadSiblings();
   }
 
   ngOnDestroy() {

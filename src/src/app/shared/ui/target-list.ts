@@ -1,4 +1,4 @@
-import { Component, Directive, TemplateRef, computed, contentChild, inject, input, output, signal } from '@angular/core';
+import { Component, Directive, TemplateRef, computed, contentChild, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -50,7 +50,8 @@ export interface BulkRun {
   ids: string[];
 }
 
-type Filter = 'attention' | 'held' | 'ok' | 'all';
+export type TargetFilter = 'attention' | 'held' | 'ok' | 'all';
+type Filter = TargetFilter;
 
 /** 行ごとの独自の列（給与額など）。<ng-template appTargetCell let-row> で渡す */
 @Directive({ selector: 'ng-template[appTargetCell]', standalone: true })
@@ -228,6 +229,8 @@ export class TargetListComponent {
   includeYours = input(false);
   /** 一括操作がないときの操作バーの文言 */
   emptyInfo = input('');
+  /** 最初に選ぶ絞り込み。まとめの画面のように全員を見せたいときは all */
+  defaultFilter = input<Filter>('attention');
 
   run = output<BulkRun>();
   hold = output<{ id: string; reason: string }>();
@@ -238,7 +241,7 @@ export class TargetListComponent {
 
   cell = contentChild(TargetCellDirective);
   detail = contentChild(TargetDetailDirective);
-  filter = signal<Filter>('attention');
+  filter = linkedSignal<Filter>(() => this.defaultFilter());
   query = signal('');
   selected = signal<ReadonlySet<string>>(new Set());
   panelId = signal<string | null>(null);

@@ -31,3 +31,5 @@ h3 { font-size: var(--app-font-lg); font-weight: 500; margin: var(--app-space-4)
 .complete { display: flex; gap: var(--app-space-3); align-items: center; margin-bottom: var(--app-space-4); padding: var(--app-space-3) var(--app-space-4); border-radius: var(--app-radius); background: var(--app-status-done-bg); }
 .complete mat-icon { color: var(--app-status-done-fg); }
 .complete a { margin-left: var(--app-space-2); color: var(--app-color-link); }
+
+.siblings { display: inline-flex; align-items: center; gap: var(--app-space-2); }
