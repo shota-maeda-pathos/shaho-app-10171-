@@ -125,7 +125,7 @@ export class RevisionWizardComponent implements OnInit, OnDestroy {
       case 'change': return '保存して判定する';
       case 'judge': return this.judgement()?.status === 'eligible' ? 'この判定で改定する' : undefined;
       case 'filing': return '届出を作って承認を依頼する';
-      case 'confirm': return '手続きを完了にする';
+      case 'confirm': return '手続きを完了する';
       default: return undefined;
     }
   }

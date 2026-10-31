@@ -119,13 +119,13 @@ export class LeaveWizardComponent implements OnInit, OnDestroy {
   nextLabel(): string | undefined {
     const k = this.key();
     if (!this.view() || this.isDone()) return undefined;
-    if (k === 'plan' && this.dirty()) return '期間を保存する';
-    if (k === 'during' && this.canRecord()) return '記録する';
+    if (k === 'plan' && this.dirty()) return '期間を保存して届出へ';
+    if (k === 'during' && this.canRecord()) return '休業中のことを記録する';
     if (this.index() < this.currentIndex()) return undefined;
     switch (k) {
-      case 'plan': return '期間を保存する';
+      case 'plan': return '期間を保存して届出へ';
       case 'filing': return '届出を作って承認を依頼する';
-      case 'confirm': return '手続きを完了にする';
+      case 'confirm': return '手続きを完了する';
       default: return undefined;
     }
   }

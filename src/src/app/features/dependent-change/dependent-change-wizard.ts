@@ -103,7 +103,7 @@ export class DependentChangeWizardComponent implements OnInit, OnDestroy {
     if (k === 'change' && this.dirty()) return '内容を保存する';
     if (this.index() < this.currentIndex()) return undefined;
     switch (k) {
-      case 'change': return '内容を保存する';
+      case 'change': return '内容を保存して届出へ';
       case 'filing': return '届出を作って承認を依頼する';
       case 'confirm': return '完了して台帳に反映する';
       default: return undefined;

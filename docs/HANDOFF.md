@@ -215,6 +215,7 @@
 - ブラウザーペインは背景にあるとアニメーションが止まるため、パネルにアニメーションを付けない。
 - 操作バー `app-action-bar` はカードの中の最後に置き、カードの一番下の段にする（左右・下の余白を打ち消し、角をカードに合わせる）。画面の下に固定する形・カードからはみ出す形・表に別の枠を付ける形はユーザーが嫌った（2026-10-30）。
 - そろえた決まり（2026-10-30 ユーザー確認）：見出しの上のタグは手続きの種類（賞与・入社・退職…）、1人の画面の件名は「〇〇 の退職」（`app-wizard` の personName）、戻るリンクは「11月30日 退職のまとめ」（`groupBackLabel`）、右上の補助ボタンは枠付き、ステップ名は6文字まで、見出しのある画面では上の道順表示を出さない（styles.scss の `:has`）、保留を使えない表はメニュー・チップ・案内を出さない（`allowHold`）、操作も文言もない表は操作バーを出さない。本文の入力欄は密度 -3・14px。
+- 毎月の処理・算定も賞与と同じ型（1人分は `MonthlyPersonComponent`・`SanteiPersonComponent` を右のパネルに）。`BulkAction.selectedOnly` は選んだ人だけに行う操作（無給の記録）。
 - 入社・退職・年齢到達のまとめは同じ部品 `features/procedures/procedure-groups.ts`（GROUP_CONFIGS。入社は `/onboarding?officeId=&key=入社日`。旧 onboarding-list・onboarding-group は削除）。
 - 退職・年齢到達のまとめ：`features/procedures/procedure-groups.ts`（ルートの data.groupType、`?officeId=&key=` でまとめの画面）、`procedureGroupList`（`functions/src/procedures/group-list.ts`、デプロイ済み）。1人の画面の前後の移動は `app-group-nav`（同じ部品のまま id だけ変わると読み込み直さないため、いったん別の URL を経由する）。新しく作った関数は作成直後に一度だけ 401（CORS エラーに見える）が出たが、読み込み直すと通った。
 
@@ -246,11 +247,9 @@
 
 ## 6. 次にやるべきタスク
 
-0. **段階7.5（UI統一）の続き**（2026-10-30 18:50 時点）：①共通部品・②賞与と入社・③のうち退職・年齢到達のまとめと全ウィザードの見出しはそろえて画面で確認済み（4-18）。次は：
-   - ③ 毎月の処理（`features/monthly/`）と算定基礎届（`features/santei/`）を賞与と同じ多人数の型に（`app-page-head`・`app-stepper`・`app-step-lead`・カードの一番下の操作バー・右のパネル。状態色を attention・yours に置き換え、`stepState` のサーバー側の判定はそのまま）。`monthly.ts` の明細の公開の `window.confirm` を `ConfirmService` に。
-   - ③ 扶養・産休育休・雇用条件の変更・異動・随時改定のウィザードを画面で確認（ビルドのみ）。主ボタンの文言を「次に起こること」が分かる形に。
-   - 退職・年齢到達のまとめての操作（まとめて承認依頼など。今は1人ずつ）。1人の画面の自動下書き保存（サーバーに下書きの関数が要る。ユーザーと相談）。
-   - ④ ホーム・手続き一覧・承認（左右に分けた受信箱）・届出。`homeTodos` の速さ（17〜20秒）もここで。提出の部品・添付の確認を `ConfirmService` に、`procedure-detail.ts`・`office-context.service.ts` の `window.confirm` も。
+0. **段階7.5（UI統一）の続き**（2026-10-31 時点）：①共通部品・②賞与と入社・③残りの手続き（毎月の処理・算定・退職と年齢到達のまとめ・全ウィザード）はそろえて画面で確認済み（4-18、チェックリスト末尾）。次は：
+   - ④ ホーム（`dashboard`）・手続き一覧（`procedures`。完了した手続きを開くと旧い詳細画面 `/procedures/:id` になる。ウィザードのある種類はウィザードへ）・承認（左右に分けた受信箱 `ui-proposals/approvals.html`）・届出（`filings`）。`homeTodos` の速さ（17〜20秒）もここで。提出の部品・添付の確認を `ConfirmService` に、`procedure-detail.ts`・`office-context.service.ts` の `window.confirm` も。
+   - 退職・年齢到達のまとめての操作（今は1人ずつ）。1人の画面の自動下書き保存（サーバーに下書きの関数が要る。ユーザーと相談）。
 1. **段階7の残り（ユーザー判断・小さな直し）**：
    - ZIPの大きさ（約150MB）：PDFごとに日本語フォントを丸ごと埋め込んでいる。フォントを使う文字に絞るか（以前、絞り込みで文字が抜けたため丸ごとにした経緯あり）を決める。
    - 算定基礎届・賞与支払届（run の届出）の訂正届・取消届：1人分を取り出す作り方を決める。

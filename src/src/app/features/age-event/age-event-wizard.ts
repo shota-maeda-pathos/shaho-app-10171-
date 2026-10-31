@@ -112,11 +112,11 @@ export class AgeEventWizardComponent implements OnInit, OnDestroy {
   nextLabel(): string | undefined {
     const k = this.key();
     if (!this.view() || this.isDone()) return undefined;
-    if (k === 'check' && (this.dirty() || this.index() === this.currentIndex())) return '保存する';
+    if (k === 'check' && (this.dirty() || this.index() === this.currentIndex())) return '保存して次へ';
     if (this.index() < this.currentIndex()) return undefined;
     switch (k) {
       case 'filing': return '届出を作って承認を依頼する';
-      case 'confirm': return '手続きを完了にする';
+      case 'confirm': return '手続きを完了する';
       default: return undefined;
     }
   }

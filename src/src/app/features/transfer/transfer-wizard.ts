@@ -99,11 +99,11 @@ export class TransferWizardComponent implements OnInit {
   nextLabel(): string | undefined {
     const k = this.key();
     if (!this.view() || this.isDone()) return undefined;
-    if (k === 'entry' && (this.dirty() || this.index() === this.currentIndex())) return '保存する';
+    if (k === 'entry' && (this.dirty() || this.index() === this.currentIndex())) return '保存して所属の変更へ';
     if (this.index() < this.currentIndex()) return undefined;
     switch (k) {
       case 'apply': return this.view()!.facts?.filingRequired ? '台帳を変えて届出を作る' : '台帳を変える';
-      case 'confirm': return '手続きを完了にする';
+      case 'confirm': return '手続きを完了する';
       default: return undefined;
     }
   }
