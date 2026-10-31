@@ -7,10 +7,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
-import { SimulationComponent } from '../simulation/simulation';
+import { SimulationsComponent } from '../simulation/simulations';
 import { CostAnalysisComponent } from './cost-analysis';
 interface Analytics {insuranceTrends:{yearMonth:string;totalEmployee:number;totalEmployer:number;healthTotal:number;pensionTotal:number;employeeCount:number}[];filingStats:{draft:number;pending:number;approved:number;submitted:number;accepted:number};forecast:{nextMonth:string;estimatedTotal:number;estimatedEmployee:number;estimatedEmployer:number;basis:string}|null;monthOverMonth:{currentTotal:number;previousTotal:number;changePercent:number|null}|null}
-@Component({standalone:true,imports:[CommonModule,FormsModule,MatTabsModule,MatButtonModule,SimulationComponent,CostAnalysisComponent],template:`
+@Component({standalone:true,imports:[CommonModule,FormsModule,MatTabsModule,MatButtonModule,SimulationsComponent,CostAnalysisComponent],template:`
   <section class="analytics"><h1>集計・試算</h1><p>{{office.label()}}の確定済み保険料を表示しています。試算結果は実績に登録されません。</p>
     <mat-tab-group [selectedIndex]="tab" (selectedIndexChange)="changeTab($event)">
       <mat-tab label="保険料・届出の集計"><ng-template matTabContent>
@@ -27,11 +27,13 @@ interface Analytics {insuranceTrends:{yearMonth:string;totalEmployee:number;tota
         }
       </ng-template></mat-tab>
       <mat-tab label="保険料の分析"><ng-template matTabContent><app-cost-analysis /></ng-template></mat-tab>
-      <mat-tab label="保険料の試算"><ng-template matTabContent><app-simulation /></ng-template></mat-tab>
+      @if (canSimulate) { <mat-tab label="保険料の試算"><ng-template matTabContent><app-simulations /></ng-template></mat-tab> }
     </mat-tab-group>
   </section>`,styles:[`.analytics{padding:24px}.filter,.totals{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin:24px 0}.filter select{padding:8px;margin-left:12px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:720px}td,th{padding:14px;text-align:right;border-bottom:1px solid #ddd}td:first-child,th:first-child{text-align:left}th{background:#f4f6f8}.forecast{padding:16px 0;border-top:1px solid #ddd}`]})
 export class AnalyticsComponent implements OnInit {
   office=inject(OfficeContextService);private auth=inject(AuthService);private functions=inject(Functions);private route=inject(ActivatedRoute);private router=inject(Router);
+  /** 試算は管理者・担当者だけ（カタログ13章） */
+  canSimulate=this.auth.hasAnyRole('admin','operator');
   months=6;tab=0;data=signal<Analytics|null>(null);loading=signal(false);error=signal('');private sequence=0;
   ngOnInit(){const t=this.route.snapshot.queryParamMap.get('tab');this.tab=t==='simulation'?2:t==='analysis'?1:0;void this.load();}
   changeTab(value:number){this.tab=value;void this.router.navigate([],{queryParams:{tab:['overview','analysis','simulation'][value]},queryParamsHandling:'merge'});}
