@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl, SafeUrl } from '@angular/platform-browser';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
@@ -38,6 +39,12 @@ const KINDS: { kind: Kind; label: string; note: string; needs: ('month' | 'emplo
       </section>
     }
     @if (busy()) { <p class="sub">作っています…（PDF は日本語フォントを読み込むため少し時間がかかります）</p> }
+    @if (preview(); as p) {
+      <section class="card preview">
+        <div class="head"><h2>{{ p.title }}</h2><a [href]="p.raw" [download]="p.title + '.pdf'">PDFを保存</a><button mat-button type="button" (click)="closePreview()">閉じる</button></div>
+        <iframe [src]="p.url" title="帳票のプレビュー"></iframe>
+      </section>
+    }
   `,
   styles: [`
     :host { display: block; padding: var(--app-space-5); max-width: 960px; }
@@ -48,6 +55,8 @@ const KINDS: { kind: Kind; label: string; note: string; needs: ('month' | 'emplo
     .form label { display: flex; flex-direction: column; gap: 2px; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
     .form input { padding: 6px 8px; font: inherit; border: 1px solid var(--app-color-border); border-radius: 6px; }
     .sub { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
+    .preview iframe { width: 100%; height: 75vh; border: 1px solid var(--app-color-border); margin-top: 8px; }
+    .preview .head a { margin-left: auto; color: var(--app-color-link); }
   `],
 })
 export class ReportsComponent {
@@ -61,6 +70,14 @@ export class ReportsComponent {
   year = Number(this.yearMonth.slice(0, 4));
   employeeId = '';
   busy = signal(false);
+  private sanitizer = inject(DomSanitizer);
+  preview = signal<{ title: string; raw: SafeUrl; url: SafeResourceUrl; objectUrl: string } | null>(null);
+
+  closePreview() {
+    const p = this.preview();
+    if (p) URL.revokeObjectURL(p.objectUrl);
+    this.preview.set(null);
+  }
 
   async output(kind: Kind, format: 'pdf' | 'csv') {
     this.busy.set(true);
@@ -75,9 +92,14 @@ export class ReportsComponent {
         ? new Blob([await createReportPdf(data) as BlobPart], { type: 'application/pdf' })
         : new Blob([reportCsv(data)], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
-      if (format === 'pdf') window.open(url, '_blank');
-      else { const a = document.createElement('a'); a.href = url; a.download = `${data.title}.csv`; a.click(); }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (format === 'pdf') {
+        // サーバーを待ったあとに新しい窓を開くとブラウザーに止められるので、画面の中でプレビューする
+        this.closePreview();
+        this.preview.set({ title: data.title, raw: this.sanitizer.bypassSecurityTrustUrl(url), url: this.sanitizer.bypassSecurityTrustResourceUrl(url), objectUrl: url });
+      } else {
+        const a = document.createElement('a'); a.href = url; a.download = `${data.title}.csv`; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
     } catch (e: any) {
       this.snackBar.open(`作れませんでした：${e?.message ?? ''}`, '閉じる', { duration: 6000 });
     } finally {

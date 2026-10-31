@@ -25,4 +25,10 @@ describe('保険料の分析', () => {
     const r = annualCost(months, new Map([['2026-04', 100], ['2026-05', 120]]), 50);
     expect(r).toMatchObject({ actualMonthly: 220, actual: 270, confirmedMonths: 2, remainingMonths: 10, forecast: 220 + 50 + 120 * 10 });
   });
+  it('確定が途中の月は見込みの元にしない', () => {
+    const months = fiscalMonths(2026);
+    const r = annualCost(months, new Map([['2026-04', 100], ['2026-05', 100], ['2026-06', 5]]), 0, '2026-05');
+    expect(r.actual).toBe(205);
+    expect(r.forecast).toBe(200 + 100 * 10);
+  });
 });

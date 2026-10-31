@@ -67,11 +67,14 @@ export function gradeHistogram(records: MonthRecord[]): { grade: number; count: 
 }
 
 /** 年間の会社負担：実績（確定した月＋賞与）と、見込み（直近の月が年度末まで続くと仮定） */
-export function annualCost(months: string[], employerByMonth: Map<string, number>, bonusEmployer: number) {
+export function annualCost(months: string[], employerByMonth: Map<string, number>, bonusEmployer: number, basisMonth: string | null = null) {
   const done = months.filter(m => employerByMonth.has(m));
   const actualMonthly = done.reduce((a, m) => a + (employerByMonth.get(m) ?? 0), 0);
-  const latest = done.at(-1);
+  // 見込みの元にする月（確定が途中の月は使わない）。それより後の月は、元の月と同じ額が続くとみなす
+  const basis = basisMonth && employerByMonth.has(basisMonth) ? basisMonth : done.at(-1);
   const remaining = months.length - done.length;
-  const forecast = actualMonthly + bonusEmployer + (latest ? (employerByMonth.get(latest) ?? 0) * remaining : 0);
+  const upToBasis = basis ? months.filter(m => m <= basis).reduce((a, m) => a + (employerByMonth.get(m) ?? 0), 0) : 0;
+  const after = basis ? months.filter(m => m > basis).length : 0;
+  const forecast = upToBasis + bonusEmployer + (basis ? (employerByMonth.get(basis) ?? 0) * after : 0);
   return { actualMonthly, bonusEmployer, actual: actualMonthly + bonusEmployer, confirmedMonths: done.length, forecast, remainingMonths: remaining };
 }

@@ -8,7 +8,7 @@ import { PageHeadComponent } from '../../shared/ui';
 
 const PREFS = ['北海道', '青森', '岩手', '宮城', '秋田', '山形', '福島', '茨城', '栃木', '群馬', '埼玉', '千葉', '東京', '神奈川', '新潟', '富山', '石川', '福井', '山梨', '長野', '岐阜', '静岡', '愛知', '三重', '滋賀', '京都', '大阪', '兵庫', '奈良', '和歌山', '鳥取', '島根', '岡山', '広島', '山口', '徳島', '香川', '愛媛', '高知', '福岡', '佐賀', '長崎', '熊本', '大分', '宮崎', '鹿児島', '沖縄'];
 
-interface Row { healthGrade: number; pensionGrade: number | null; standardRemuneration: number; lowerBound: number; upperBound: number; healthFull: number | null; healthHalf: number | null; careFull: number | null; careHalf: number | null; pensionFull: number | null; pensionHalf: number | null }
+interface Row { healthGrade: number; pensionGrade: number | null; standardRemuneration: number; lowerBound: number; upperBound: number | null; healthFull: number | null; healthHalf: number | null; careFull: number | null; careHalf: number | null; pensionFull: number | null; pensionHalf: number | null }
 interface Table { yearMonth: string; prefectureCode: string; rates: { health: number; longTermCare: number | null; pension: number | null; healthFrom: string }; rows: Row[] }
 
 /** 保険料額表の閲覧（カタログ1章）。都道府県と年月を選ぶと、その時点の料率で額表を出す */
@@ -31,7 +31,7 @@ interface Table { yearMonth: string; prefectureCode: string; rates: { health: nu
           <tr><th class="num">全額</th><th class="num">折半額</th><th class="num">全額</th><th class="num">折半額</th><th class="num">全額</th><th class="num">折半額</th></tr></thead>
         <tbody>@for (r of t.rows; track r.healthGrade) {
           <tr><td>{{ r.healthGrade }}{{ r.pensionGrade ? '（' + r.pensionGrade + '）' : '' }}</td><td class="num">{{ r.standardRemuneration | number }}</td>
-            <td class="num">{{ r.lowerBound | number }}〜{{ r.upperBound >= 99999999 ? '' : (r.upperBound | number) }}</td>
+            <td class="num">{{ r.lowerBound | number }}〜{{ r.upperBound === null ? '' : (r.upperBound | number) }}</td>
             <td class="num">{{ r.healthFull | number: '1.0-2' }}</td><td class="num">{{ r.healthHalf | number }}</td>
             <td class="num">{{ r.careFull | number: '1.0-2' }}</td><td class="num">{{ r.careHalf | number }}</td>
             <td class="num">{{ r.pensionFull === null ? '' : (r.pensionFull | number: '1.0-2') }}</td><td class="num">{{ r.pensionHalf === null ? '' : (r.pensionHalf | number) }}</td></tr>

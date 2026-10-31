@@ -91,7 +91,8 @@ export async function gradeTableView(auth: AuthContext, prefectureCode: string, 
     rows: healthTable.map(g => {
       const p = pensionTable.find(x => x.standardRemuneration === g.standardRemuneration) ?? (g.standardRemuneration < (pensionTable[0]?.standardRemuneration ?? 0) ? pensionTable[0] : g.standardRemuneration > (pensionTable.at(-1)?.standardRemuneration ?? Infinity) ? pensionTable.at(-1) : null);
       return {
-        healthGrade: g.gradeNumber, pensionGrade: p?.gradeNumber ?? null, standardRemuneration: g.standardRemuneration, lowerBound: g.lowerBound, upperBound: g.upperBound,
+        // 最高等級の上限は無限大（JSON で返せないので null）
+        healthGrade: g.gradeNumber, pensionGrade: p?.gradeNumber ?? null, standardRemuneration: g.standardRemuneration, lowerBound: g.lowerBound, upperBound: Number.isFinite(g.upperBound) ? g.upperBound : null,
         healthFull: full(g.standardRemuneration, rates.health), healthHalf: half(g.standardRemuneration, rates.health),
         careFull: full(g.standardRemuneration, careTotal), careHalf: half(g.standardRemuneration, careTotal),
         pensionFull: p ? full(p.standardRemuneration, rates.pension) : null, pensionHalf: p ? half(p.standardRemuneration, rates.pension) : null,

@@ -56,7 +56,10 @@ export async function getCostAnalysis(auth: AuthContext, fiscalYear: number, off
   };
   const thisYear = group(months), lastYear = group(prevMonths);
   const employerOf = (m: Map<string, MonthRecord[]>) => new Map([...m.entries()].map(([k, rs]) => [k, rs.reduce((a, r) => a + r.totalEmployer, 0)]));
-  const latestMonth = [...thisYear.keys()].sort().at(-1) ?? null;
+  // 確定が途中の月（人数が少ない月）を「直近」にすると、前月比が退職のように見えてしまう。
+  // 確定した人数が最も多い月の8割以上ある月のうち、いちばん新しい月を直近とする
+  const peak = Math.max(0, ...[...thisYear.values()].map(rs => rs.length));
+  const latestMonth = [...thisYear.entries()].filter(([, rs]) => rs.length >= peak * 0.8).map(([m]) => m).sort().at(-1) ?? null;
   const latest = latestMonth ? thisYear.get(latestMonth)! : [];
   const prevKey = latestMonth ? [...new Set(records.map(r => r.yearMonth))].filter(m => m < latestMonth).sort().at(-1) ?? null : null;
   const previous = prevKey ? records.filter(r => r.yearMonth === prevKey) : [];
@@ -80,7 +83,7 @@ export async function getCostAnalysis(auth: AuthContext, fiscalYear: number, off
     changeFactors: latest.length || previous.length ? changeFactors(previous, latest) : null,
     departments: [...departments.entries()].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.employer - a.employer),
     gradeHistogram: gradeHistogram(latest),
-    annual: annualCost(months, employerOf(thisYear), bonusThis),
+    annual: annualCost(months, employerOf(thisYear), bonusThis, latestMonth),
     previousAnnual: annualCost(prevMonths, employerOf(lastYear), bonusPrev),
   };
 }
