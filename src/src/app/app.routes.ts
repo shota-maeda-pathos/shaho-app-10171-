@@ -299,6 +299,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'reports',
+        canActivate: [roleGuard('admin', 'operator', 'approver', 'viewer')],
+        data: { title: '帳票' },
+        loadComponent: () =>
+          import('./features/reports/reports').then((m) => m.ReportsComponent),
+      },
+      {
         path: 'calendar',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '手続きカレンダー' },
