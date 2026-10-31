@@ -1,3 +1,4 @@
+import { ConfirmService } from '../../../shared/confirm-dialog/confirm-dialog';
 import { Component, DestroyRef, OnChanges, inject, input, output, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -204,7 +205,7 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
           </div>
         }
 
-        <!-- 画面内の確認 -->
+        <!-- 返戻（練習用）の理由だけは画面内で聞く。ほかの確認は確認ダイアログ -->
         @if (confirm(); as c) {
           <div class="confirm" role="alertdialog" aria-label="確認">
             <p>{{ confirmText(c) }}</p>
@@ -267,6 +268,7 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
 export class FilingSubmissionComponent implements OnChanges {
   private functions = inject(Functions);
   private auth = inject(AuthService);
+  private confirmService = inject(ConfirmService);
 
   target = input.required<FilingTarget>();
   /** 提出の状態が変わった（手続きや一覧を読み直す合図） */
@@ -338,9 +340,20 @@ export class FilingSubmissionComponent implements OnChanges {
     return { send: '送信する', cancel: '取り消す', paper: '記録する', result: '記録する', reopen: '下書きに戻す', advance: '進める', return: '返戻にする' }[c];
   }
 
-  ask(c: Confirm) {
+  /** 取り返しのつかない操作は確認ダイアログを通す。返戻（練習用）だけは理由を入れるため、画面内で聞く */
+  async ask(c: Confirm) {
     this.returnReason = '';
-    this.confirm.set(c);
+    if (!c || c === 'return') { this.confirm.set(c); return; }
+    const titles: Record<Exclude<Confirm, null | 'return'>, string> = {
+      send: '模擬電子申請で送信する', cancel: '送信を取り消す', paper: '紙で提出したことを記録する', result: '提出の結果を記録する',
+      reopen: '届出を下書きに戻す', advance: '模擬電子申請を次の状態へ進める',
+    };
+    const missing = (c === 'send' || c === 'paper') ? (this.view()?.attachmentWarnings ?? []) : [];
+    const ok = await this.confirmService.ask({
+      title: titles[c], message: this.confirmText(c), confirmLabel: this.confirmLabel(c),
+      notice: missing.length ? `添付がまだの書類があります：${missing.join('、')}` : undefined,
+    });
+    if (ok) await this.run(c);
   }
 
   async load() {

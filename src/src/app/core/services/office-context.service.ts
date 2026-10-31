@@ -2,11 +2,12 @@ import { Injectable, inject, signal, effect, untracked } from '@angular/core';
 import { Router, NavigationStart } from '@angular/router';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from './auth.service';
+import { ConfirmService } from '../../shared/confirm-dialog/confirm-dialog';
 
 export interface OfficeOption {id:string;name:string}
 @Injectable({providedIn:'root'})
 export class OfficeContextService {
-  private auth=inject(AuthService);private functions=inject(Functions);private router=inject(Router);
+  private auth=inject(AuthService);private functions=inject(Functions);private router=inject(Router);private confirm=inject(ConfirmService);
   offices=signal<OfficeOption[]>([]); selected=signal('');ready=signal(false);error=signal('');busy=signal(false);
   constructor() {
     effect(()=>{const profile=this.auth.profile(); if(!this.auth.loading()&&profile) untracked(()=>void this.load(profile.uid));else {this.ready.set(false);this.offices.set([]);this.selected.set('');}});
@@ -40,7 +41,7 @@ export class OfficeContextService {
   async change(id:string) {
     if(id===this.selected()||this.busy()) return;
     if(id&&!this.offices().some(o=>o.id===id)) return;
-    if(!window.confirm('事業所を切り替えて画面を読み込み直します。未保存の入力は失われます。切り替えますか？')) return;
+    if(!(await this.confirm.ask({title:'事業所を切り替える',message:'事業所を切り替えて画面を読み込み直します。',notice:'未保存の入力は失われます。',confirmLabel:'切り替える'}))) return;
     this.selected.set(id);this.error.set('');
     try {sessionStorage.setItem(this.key(this.auth.profile()!.uid),id);}catch{}
     await this.router.navigate([],{queryParams:this.queryParams(),queryParamsHandling:'merge'});
