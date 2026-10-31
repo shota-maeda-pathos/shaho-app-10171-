@@ -74,7 +74,7 @@ import { LogoComponent } from '../../shared/ui';
       box-sizing: border-box;
     }
     .login-card { border: 1px solid var(--app-color-border); box-shadow: var(--app-shadow); border-radius: var(--app-radius); }
-    .brand { display: flex; flex-direction: column; gap: var(--app-space-2); }
+    .brand { display: flex; flex-direction: column; align-items: center; gap: var(--app-space-2); text-align: center; }
     .brand app-logo ::ng-deep .word { font-size: 28px; }
     .tagline { margin: 0; font-size: var(--app-font-sm); color: var(--app-color-muted); }
     .heading { margin: var(--app-space-5) 0 0; font-size: var(--app-font-lg); font-weight: 700; }
