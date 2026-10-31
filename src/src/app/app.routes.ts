@@ -299,6 +299,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'portal-requests',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '本人からの申請' },
+        loadComponent: () =>
+          import('./features/portal-requests/portal-request-list').then((m) => m.PortalRequestListComponent),
+      },
+      {
         path: 'account',
         data: { title: '自分のアカウント' },
         loadComponent: () =>

@@ -6,6 +6,7 @@ import { OfficeManagementComponent } from './office-management/office-management
 import { AuditLogComponent } from './audit-log/audit-log';
 import { NotificationManagementComponent } from './notification-management/notification-management';
 import { MockSubmissionSettingsComponent } from './mock-submission/mock-submission-settings';
+import { PortalSettingsComponent } from './portal-settings/portal-settings';
 
 @Component({
   selector: 'app-settings',
@@ -18,6 +19,7 @@ import { MockSubmissionSettingsComponent } from './mock-submission/mock-submissi
     AuditLogComponent,
     NotificationManagementComponent,
     MockSubmissionSettingsComponent,
+    PortalSettingsComponent,
   ],
   template: `
     <div class="settings-container">
@@ -37,6 +39,9 @@ import { MockSubmissionSettingsComponent } from './mock-submission/mock-submissi
         </mat-tab>
         <mat-tab label="提出・承認">
           <ng-template matTabContent><app-mock-submission-settings /></ng-template>
+        </mat-tab>
+        <mat-tab label="本人ポータル">
+          <ng-template matTabContent><app-portal-settings /></ng-template>
         </mat-tab>
         <mat-tab label="監査ログ">
           <ng-template matTabContent><app-audit-log /></ng-template>

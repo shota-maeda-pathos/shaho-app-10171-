@@ -10,6 +10,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { PortalInfoComponent } from './portal-info';
+import { PortalRequestsComponent } from './portal-requests';
 
 @Component({
   selector: 'app-portal',
@@ -17,7 +19,7 @@ import { AuthService } from '../../core/services/auth.service';
   imports: [
     CommonModule,
     MatButtonModule, MatIconModule, MatCardModule, MatListModule,
-    MatProgressSpinnerModule, MatDividerModule,
+    MatProgressSpinnerModule, MatDividerModule, PortalInfoComponent, PortalRequestsComponent,
   ],
   template: `
     <div class="page-container">
@@ -81,6 +83,8 @@ import { AuthService } from '../../core/services/auth.service';
             @if (hasMore()) { <button mat-stroked-button (click)="load(true)" [disabled]="loading()">{{ loading() ? '読み込み中...' : '過去の月を読み込む' }}</button> }
           </mat-card>
         </div>
+        <app-portal-info />
+        <app-portal-requests />
       }
     </div>
   `,
@@ -89,6 +93,8 @@ import { AuthService } from '../../core/services/auth.service';
     .page-header { margin-bottom: 24px; }
     .page-header h1 { margin: 0; font-size: 24px; font-weight: 500; }
     .portal-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 16px; }
+    /* スマートフォン（カタログ11章：レスポンシブ） */
+    @media (max-width: 720px) { .page-container { padding: 12px; } .portal-grid { grid-template-columns: 1fr; } }
     .profile-card { padding: 24px; }
     .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
     .profile-icon { font-size: 56px; width: 56px; height: 56px; color: var(--app-brand-strong); }
