@@ -1,6 +1,7 @@
 // 賞与（一括型）。事業所×支給月ごとに、賞与を登録する → 賞与額の承認 → 保険料の計算と承認 → 賞与支払届の作成・承認・提出
 import { filingContentHash } from '../utils/hash';
 import { buildArchive } from '../filings/archive/rules';
+import { laborConsultantText } from '../companies/labor-consultant';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
@@ -680,6 +681,7 @@ export async function createBonusFiling(input: BonusRunInput, auth: AuthContext)
   const header = {
     '事業所整理記号': office.officeNumber ?? '', '事業所名称': office.name ?? '', '事業所所在地': office.address ?? '',
     '電話番号': office.phone ?? '', '事業主氏名': company.data()?.representativeName ?? '', '会社名': company.data()?.name ?? '',
+    '社会保険労務士': laborConsultantText(company.data()?.laborConsultant),
     '支給月': input.payMonth, '賞与支払年月日': commonPaymentDate(firstDates) ?? '',
   };
   const deadline = bonusFilingDeadline(firstDates[0]);
