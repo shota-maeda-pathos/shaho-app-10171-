@@ -186,3 +186,4 @@ lazy(() => require('./transfer/functions'), ['transferStart', 'transferGet', 'tr
 lazy(() => require('./employees/employee-other-employer/functions'), ['employeeOtherEmployerSet']);
 lazy(() => require('./age-event/functions'), ['ageEventStart', 'ageEventGet', 'ageEventPreview', 'ageEventUpdate', 'sampleAgeCreate']);
 lazy(() => require('./procedures/group-list'), ['procedureGroupList']);
+lazy(() => require('./procedures/draft'), ['procedureDraftGet', 'procedureDraftSave']);

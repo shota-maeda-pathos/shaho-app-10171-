@@ -16,7 +16,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import {
-  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
+  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep, createDraftAutosave,
 } from '../../shared/ui';
 import {
   ContractForm, EMPLOYMENT_TYPES, errorMessage, Evaluation, inviteUrl, OnboardingView, RELATIONSHIPS, SelfInput, STEP_LABELS, WizardKey,
@@ -187,9 +187,62 @@ export class OnboardingWizardComponent implements OnInit, OnDestroy {
 
   readonly groupBackLabel = groupBackLabel;
 
+  /** 本人情報・雇用条件の入力の自動下書き保存（確定するまで、閉じても入力が残る） */
+  autosave = createDraftAutosave({
+    procedureId: () => this.procedureId,
+    step: () => this.key(),
+    read: () => this.draftData(),
+  });
+
+  /** 今のステップの下書きにする入力。確定済み・直せないステップは null */
+  private draftData() {
+    const v = this.view();
+    if (!v || this.busy() || this.loading()) return null;
+    if (this.key() === 'register' && !v.employee) {
+      return { employeeNumber: this.employeeNumber, insuredPersonNumber: this.insuredPersonNumber, profile: this.profile };
+    }
+    if (this.key() === 'contract' && v.employee && !this.locked()) {
+      return { contract: this.contract, override: this.override, overrideHealth: this.overrideHealth, overridePension: this.overridePension, overrideReason: this.overrideReason };
+    }
+    return null;
+  }
+
+  /** 前回の下書きを戻す（まだ確定していないステップだけ） */
+  private async restoreDrafts() {
+    const drafts = await this.autosave.load();
+    const v = this.view();
+    if (!v) return;
+    const reg = drafts['register'];
+    if (reg && !v.employee) {
+      const d = reg.data as { employeeNumber: string; insuredPersonNumber: string; profile: SelfInput };
+      this.employeeNumber = d.employeeNumber ?? '';
+      this.insuredPersonNumber = d.insuredPersonNumber ?? '';
+      this.profile = { ...this.profile, ...d.profile };
+      this.autosave.restored('register', this.draftDataFor('register'), reg.savedAt);
+    }
+    const con = drafts['contract'];
+    if (con && v.employee && !this.locked()) {
+      const d = con.data as { contract: ContractForm; override: boolean; overrideHealth: boolean; overridePension: boolean; overrideReason: string };
+      this.contract = { ...this.contract, ...d.contract };
+      this.override = !!d.override;
+      this.overrideHealth = d.overrideHealth ?? true;
+      this.overridePension = d.overridePension ?? true;
+      this.overrideReason = d.overrideReason ?? '';
+      this.autosave.restored('contract', this.draftDataFor('contract'), con.savedAt);
+      this.contractChanged();
+    }
+  }
+
+  private draftDataFor(step: 'register' | 'contract') {
+    return step === 'register'
+      ? { employeeNumber: this.employeeNumber, insuredPersonNumber: this.insuredPersonNumber, profile: this.profile }
+      : { contract: this.contract, override: this.override, overrideHealth: this.overrideHealth, overridePension: this.overridePension, overrideReason: this.overrideReason };
+  }
+
   async ngOnInit() {
     this.procedureId = this.route.snapshot.paramMap.get('id') ?? '';
     await this.load(true);
+    await this.restoreDrafts();
   }
 
   ngOnDestroy() {
@@ -255,6 +308,8 @@ export class OnboardingWizardComponent implements OnInit, OnDestroy {
         companyId: this.auth.companyId, procedureId: this.procedureId, expectedVersion: v.procedure.version, step, ...payload(),
       });
       after?.();
+      // 確定したステップの下書きは消す
+      if (step === 'register' || step === 'contract') void this.autosave.clear(step);
       this.snackBar.open(done, '閉じる', { duration: 4000 });
       await this.load(true);
     } catch (e) {

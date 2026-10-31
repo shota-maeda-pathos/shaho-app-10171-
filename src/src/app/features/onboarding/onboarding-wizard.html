@@ -8,7 +8,7 @@
                 backLink="/onboarding" [backQuery]="{ officeId: v.procedure.officeId, key: v.procedure.hireDate }" [backLabel]="groupBackLabel('onboarding', v.procedure.hireDate)"
                 [subtitle]="v.procedure.officeName + (v.employee ? '・' + v.employee.employeeNumber : '') + '・入社日 ' + (v.procedure.hireDate | date:'yyyy年M月d日') + '・資格取得届の期限 ' + (v.procedure.deadline | date:'M月d日')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
-                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()" [info]="autosave.state()"
                 (advance)="advance()">
       <app-group-nav headActions type="onboarding" [officeId]="v.procedure.officeId" [groupKey]="v.procedure.hireDate" [currentId]="v.procedure.id" />
 

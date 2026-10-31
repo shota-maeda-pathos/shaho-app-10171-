@@ -5,3 +5,4 @@ export * from './term';
 export * from './procedure-frame';
 export * from './wizard';
 export * from './target-list';
+export * from './draft-autosave';
