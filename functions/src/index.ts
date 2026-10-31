@@ -123,7 +123,7 @@ lazy(() => require('./employees/employee-history-list/functions'), ['employeeHis
 lazy(() => require('./leaves/leave-update/functions'), ['leaveUpdate']);
 lazy(() => require('./exemptions/premium-exemption-update/functions'), ['premiumExemptionUpdate']);
 
-lazy(() => require('./portal/functions'), ['portalOverview', 'portalPayslipGet']);
+lazy(() => require('./portal/functions'), ['portalOverview', 'portalPayslipGet', 'portalDetails', 'portalSettingsGet', 'portalSettingsUpdate', 'portalRequestCreate', 'portalRequestAttach', 'portalRequestMine', 'portalRequestList', 'portalRequestAttachmentGet', 'portalRequestHandle']);
 lazy(() => require('./bonuses/workflow/functions'), ['bonusGet', 'bonusUpdate']);
 
 // 届出自動生成・模擬申請・PDF

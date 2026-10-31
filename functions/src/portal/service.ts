@@ -5,7 +5,7 @@ import { mapConcurrent } from '../utils/parallel';
 import { notFound } from '../utils/errors';
 import { PortalOverviewInput, PortalPayslipGetInput } from './schema';
 import { portalAccessDeadline } from './access-period';
-async function self(auth: AuthContext) {
+export async function self(auth: AuthContext) {
   requireLoginEnabled(auth);
   if (!auth.employeeId) return null;
   if (auth.employeeId.includes('/')) throw new HttpsError('permission-denied', '従業員の紐付けを確認してください');
