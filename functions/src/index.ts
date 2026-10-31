@@ -34,6 +34,7 @@ lazy(() => require('./auth-session/functions'), ['authLogin', 'authGoogleLogin',
 // 組織マスタAPI
 lazy(() => require('./offices/office-list/functions'), ['officeList']);
 lazy(() => require('./offices/department-list/functions'), ['departmentList']);
+lazy(() => require('./offices/departments'), ['departmentSave']);
 lazy(() => require('./offices/insurance-rate-list/functions'), ['insuranceRateList']);
 lazy(() => require('./offices/office-update/functions'), ['officeUpdate']);
 lazy(() => require('./offices/office-create/functions'), ['officeCreate']);

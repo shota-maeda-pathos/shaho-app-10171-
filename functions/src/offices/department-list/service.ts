@@ -21,31 +21,17 @@ function toDepartmentResponse(
   };
 }
 
+/** 部署の一覧。件数が少ないので全件を読み、絞り込みと並べ替えはここで行う（複合索引に頼らない） */
 export async function listDepartments(
   input: DepartmentListInput,
   auth: AuthContext,
 ): Promise<{ items: DepartmentResponse[] }> {
-  const collRef = db.collection(`companies/${auth.companyId}/departments`);
-
-  let query: FirebaseFirestore.Query = collRef.orderBy('sortOrder', 'asc');
-
-  if (!(input.includeInactive ?? false)) {
-    query = query.where('isActive', '==', true);
-  }
-
-  if (input.officeId) {
-    query = query.where('officeId', '==', input.officeId);
-  } else if (!auth.roles.includes('admin')) {
-    if (auth.officeIds.length === 0) {
-      return { items: [] };
-    }
-    query = query.where('officeId', 'in', auth.officeIds);
-  }
-
-  const snap = await query.get();
-  const items = snap.docs.map((d) =>
-    toDepartmentResponse(d.id, d.data() as DepartmentDoc),
-  );
-
+  if (!input.officeId && !auth.roles.includes('admin') && auth.officeIds.length === 0) return { items: [] };
+  const snap = await db.collection(`companies/${auth.companyId}/departments`).get();
+  const items = snap.docs
+    .map(d => toDepartmentResponse(d.id, d.data() as DepartmentDoc))
+    .filter(d => input.includeInactive || d.isActive)
+    .filter(d => (input.officeId ? d.officeId === input.officeId : auth.roles.includes('admin') || auth.officeIds.includes(d.officeId)))
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name, 'ja'));
   return { items };
 }

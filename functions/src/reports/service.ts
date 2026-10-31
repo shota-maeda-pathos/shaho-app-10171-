@@ -18,6 +18,8 @@ export const ReportSchema = z.object({
   yearMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
   officeId: z.string().regex(/^[^/]+$/).optional(),
   employeeId: z.string().regex(/^[^/]+$/).optional(),
+  /** 部署で絞る（事業所別月次一覧・等級一覧・被扶養者一覧） */
+  departmentId: z.string().regex(/^[^/]+$/).optional(),
 });
 export type ReportInput = z.infer<typeof ReportSchema>;
 
@@ -44,20 +46,25 @@ const STATUS: Record<string, string> = {
   completed: '完了', mockFailed: '送信エラー', returned: '返戻', cancelled: '取消',
 };
 
-async function employeesInScope(auth: AuthContext, officeId?: string) {
+async function employeesInScope(auth: AuthContext, officeId?: string, departmentId?: string) {
   if (officeId) requireOffice(auth, officeId);
   const [emps, offices] = await Promise.all([
     db.collection(`companies/${auth.companyId}/employees`).where('deletedAt', '==', null).get(),
     db.collection(`companies/${auth.companyId}/offices`).get(),
   ]);
   const officeName = new Map(offices.docs.map(o => [o.id, o.data().name as string]));
-  const list = emps.docs.filter(e => (!officeId || e.data().officeId === officeId) && (auth.roles.includes('admin') || auth.officeIds.includes(e.data().officeId)))
+  const list = emps.docs.filter(e => (!officeId || e.data().officeId === officeId) && (!departmentId || e.data().departmentId === departmentId)
+    && (auth.roles.includes('admin') || auth.officeIds.includes(e.data().officeId)))
     .sort((a, b) => String(a.data().employeeNumber).localeCompare(String(b.data().employeeNumber)));
   return { list, officeName };
 }
 
 export async function buildReport(auth: AuthContext, input: ReportInput): Promise<ReportTable> {
-  const scopeLabel = async () => input.officeId ? ((await db.doc(`companies/${auth.companyId}/offices/${input.officeId}`).get()).data()?.name ?? '') : '全事業所';
+  const scopeLabel = async () => {
+    const office = input.officeId ? ((await db.doc(`companies/${auth.companyId}/offices/${input.officeId}`).get()).data()?.name ?? '') : '全事業所';
+    const dept = input.departmentId ? (await db.doc(`companies/${auth.companyId}/departments/${input.departmentId}`).get()).data()?.name : null;
+    return dept ? `${office}・${dept}` : office;
+  };
   let table: ReportTable;
   switch (input.kind) {
     case 'employeePremium': {
@@ -84,7 +91,7 @@ export async function buildReport(auth: AuthContext, input: ReportInput): Promis
     }
     case 'officeMonthly': {
       if (!input.yearMonth) throw invalidArg('月を選んでください');
-      const { list, officeName } = await employeesInScope(auth, input.officeId);
+      const { list, officeName } = await employeesInScope(auth, input.officeId, input.departmentId);
       const docs = (await mapConcurrent(list, 10, async e => ({ e, d: (await e.ref.collection('monthlyInsurance').doc(input.yearMonth!).get()).data() }))).filter(x => x.d?.isConfirmed === true);
       const cols = ['healthInsurance', 'longTermCareInsurance', 'pensionInsurance'] as const;
       const t = { emp: 0, er: 0, h: [0, 0], c: [0, 0], p: [0, 0], s: [0, 0] };
@@ -107,7 +114,7 @@ export async function buildReport(auth: AuthContext, input: ReportInput): Promis
     }
     case 'gradeList': {
       const ym = input.yearMonth ?? new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0, 7);
-      const { list, officeName } = await employeesInScope(auth, input.officeId);
+      const { list, officeName } = await employeesInScope(auth, input.officeId, input.departmentId);
       const active = list.filter(e => e.data().isActive === true);
       const rows = (await mapConcurrent(active, 10, async e => {
         const g = (await e.ref.collection('grades').where('effectiveMonth', '<=', ym).orderBy('effectiveMonth', 'desc').limit(1).get()).docs[0]?.data();
@@ -122,7 +129,7 @@ export async function buildReport(auth: AuthContext, input: ReportInput): Promis
       break;
     }
     case 'filingStatus': {
-      const { officeName } = await employeesInScope(auth, input.officeId);
+      const { officeName } = await employeesInScope(auth, input.officeId, input.departmentId);
       const snap = await db.collection(`companies/${auth.companyId}/filingIndex`).get();
       const rows = snap.docs.map(d => d.data())
         .filter(f => (!input.officeId || f.officeId === input.officeId) && (auth.roles.includes('admin') || auth.officeIds.includes(f.officeId)))
@@ -137,7 +144,7 @@ export async function buildReport(auth: AuthContext, input: ReportInput): Promis
       break;
     }
     case 'dependents': {
-      const { list, officeName } = await employeesInScope(auth, input.officeId);
+      const { list, officeName } = await employeesInScope(auth, input.officeId, input.departmentId);
       const rows = (await mapConcurrent(list.filter(e => e.data().isActive === true), 10, async e => {
         const x = e.data();
         const deps = await e.ref.collection('dependents').where('deletedAt', '==', null).get();

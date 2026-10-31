@@ -26,6 +26,13 @@ const KINDS: { kind: Kind; label: string; note: string; needs: ('month' | 'emplo
   imports: [FormsModule, MatButtonModule, PageHeadComponent],
   template: `
     <app-page-head heading="帳票"><span meta>{{ office.label() }}が対象です（上の事業所の切り替えで絞れます）。</span></app-page-head>
+    @if (departments().length) {
+      <p class="form"><label>部署で絞る（事業所別月次一覧・等級一覧・被扶養者一覧）
+        <select [(ngModel)]="departmentId" name="departmentId">
+          <option value="">すべての部署</option>
+          @for (d of departments(); track d.id) { <option [value]="d.id">{{ d.name }}</option> }
+        </select></label></p>
+    }
     @for (k of kinds; track k.kind) {
       <section class="card">
         <div class="head"><h2>{{ k.label }}</h2><span class="sub">{{ k.note }}</span></div>
@@ -69,7 +76,15 @@ export class ReportsComponent {
   yearMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0, 7);
   year = Number(this.yearMonth.slice(0, 4));
   employeeId = '';
+  departmentId = '';
+  departments = signal<{ id: string; name: string }[]>([]);
   busy = signal(false);
+
+  constructor() {
+    // 部署で絞る選択肢（部署がなければ出さない）
+    httpsCallable<object, { items: { id: string; name: string }[] }>(this.functions, 'departmentList')({ companyId: this.auth.companyId, ...this.office.params() })
+      .then(r => this.departments.set(r.data.items)).catch(() => this.departments.set([]));
+  }
   private sanitizer = inject(DomSanitizer);
   preview = signal<{ title: string; raw: SafeUrl; url: SafeResourceUrl; objectUrl: string } | null>(null);
 
@@ -86,6 +101,7 @@ export class ReportsComponent {
         companyId: this.auth.companyId, kind, format, ...this.office.params(),
         ...(kind === 'filingStatus' ? { yearMonth: `${this.year}-01` } : kind === 'dependents' ? {} : { yearMonth: this.yearMonth }),
         ...(kind === 'employeePremium' ? { employeeId: this.employeeId.trim() } : {}),
+        ...(this.departmentId && ['officeMonthly', 'gradeList', 'dependents'].includes(kind) ? { departmentId: this.departmentId } : {}),
       });
       if (!data.rows.length) this.snackBar.open('当てはまるデータがありません（空の帳票を出します）', '閉じる', { duration: 4000 });
       const blob = format === 'pdf'
