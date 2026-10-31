@@ -23,7 +23,7 @@ import { LogoComponent } from '../../shared/ui';
       <mat-card class="login-card">
         <div class="brand">
           <app-logo [size]="36" />
-          <p class="tagline">社会保険の手続きと保険料の管理</p>
+          <p class="tagline">人と手続きを、整える。</p>
         </div>
         <h1 class="heading">ログイン</h1>
         <mat-card-content>
