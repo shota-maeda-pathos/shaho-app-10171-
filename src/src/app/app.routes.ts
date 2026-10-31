@@ -306,6 +306,13 @@ export const routes: Routes = [
           import('./features/reports/reports').then((m) => m.ReportsComponent),
       },
       {
+        path: 'grade-table',
+        canActivate: [roleGuard('admin', 'operator', 'approver', 'viewer')],
+        data: { title: '保険料額表' },
+        loadComponent: () =>
+          import('./features/reports/grade-table').then((m) => m.GradeTableComponent),
+      },
+      {
         path: 'calendar',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '手続きカレンダー' },

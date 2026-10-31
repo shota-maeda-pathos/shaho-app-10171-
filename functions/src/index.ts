@@ -99,6 +99,7 @@ lazy(() => require('./dashboard/calendar/functions'), ['calendarGet', 'checklist
 lazy(() => require('./dashboard/cost-analysis/functions'), ['costAnalysis']);
 lazy(() => require('./simulation/functions'), ['simulationRaise', 'simulationHire', 'simulationAnnual', 'simulationRateChange', 'simulationBonus']);
 lazy(() => require('./reports/functions'), ['reportData']);
+lazy(() => require('./insurance-rates/functions'), ['rateImportPreview', 'rateImportApply', 'rateHistoryList', 'gradeTableGet']);
 
 // エクスポートAPI
 lazy(() => require('./exports/employee-export/functions'), ['employeeExport']);

@@ -7,6 +7,7 @@ import { AuditLogComponent } from './audit-log/audit-log';
 import { NotificationManagementComponent } from './notification-management/notification-management';
 import { MockSubmissionSettingsComponent } from './mock-submission/mock-submission-settings';
 import { PortalSettingsComponent } from './portal-settings/portal-settings';
+import { RateManagementComponent } from './rate-management/rate-management';
 
 @Component({
   selector: 'app-settings',
@@ -20,6 +21,7 @@ import { PortalSettingsComponent } from './portal-settings/portal-settings';
     NotificationManagementComponent,
     MockSubmissionSettingsComponent,
     PortalSettingsComponent,
+    RateManagementComponent,
   ],
   template: `
     <div class="settings-container">
@@ -39,6 +41,9 @@ import { PortalSettingsComponent } from './portal-settings/portal-settings';
         </mat-tab>
         <mat-tab label="提出・承認">
           <ng-template matTabContent><app-mock-submission-settings /></ng-template>
+        </mat-tab>
+        <mat-tab label="料率">
+          <ng-template matTabContent><app-rate-management /></ng-template>
         </mat-tab>
         <mat-tab label="本人ポータル">
           <ng-template matTabContent><app-portal-settings /></ng-template>
