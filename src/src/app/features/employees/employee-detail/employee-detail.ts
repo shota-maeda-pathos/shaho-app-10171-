@@ -27,6 +27,7 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import { OfficeContextService } from '../../../core/services/office-context.service';
 import { relationshipLabel } from '../../dependent-change/dependent-change.types';
+import { PageHeadComponent, StatusBadgeComponent } from '../../../shared/ui';
 
 interface Office {
   id: string;
@@ -124,8 +125,11 @@ interface OnboardResult {
 
 @Component({
   selector: 'app-employee-detail',
+  // 本文の共通の枠（入力欄の詰め方などを、ほかの画面とそろえる）
+  host: { class: 'app-page' },
   standalone: true,
   imports: [
+    PageHeadComponent, StatusBadgeComponent,
     EmployeeLeavesComponent, EmployeeExemptionsComponent, EmployeeBonusComponent,
     DecimalPipe, FormsModule, RouterLink, MatCardModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatButtonModule, MatIconModule, MatDatepickerModule,
@@ -134,31 +138,23 @@ interface OnboardResult {
     MatStepperModule, MatCheckboxModule, MatListModule,
   ],
   template: `
-    <div class="page-header">
-      <button mat-icon-button (click)="goBack()">
-        <mat-icon>arrow_back</mat-icon>
-      </button>
-      <h1>{{ isNew ? '従業員 新規登録' : '従業員 詳細' }}</h1>
+    <app-page-head [heading]="isNew ? '従業員を登録する' : (form.lastName + ' ' + form.firstName)" kicker="従業員" backLink="/employees" backLabel="従業員の一覧">
       @if (!isNew) {
-        <span class="spacer"></span>
-        @if (employeeStatus() === 'resigned') {
-          <mat-chip-set><mat-chip color="warn" highlighted>退職済</mat-chip></mat-chip-set>
-        } @else {
-          <button mat-stroked-button [routerLink]="['/employment-changes', 'new']" [queryParams]="{ employeeId }">
-            <mat-icon>edit_note</mat-icon> 雇用条件を変える
-          </button>
-          <button mat-stroked-button [routerLink]="['/revisions', 'new']" [queryParams]="{ employeeId }">
-            <mat-icon>trending_up</mat-icon> 随時改定
-          </button>
-          <button mat-stroked-button color="primary" [routerLink]="['/transfers', 'new']" [queryParams]="{ employeeId }">
-            <mat-icon>swap_horiz</mat-icon> 異動
-          </button>
-          <button mat-stroked-button color="warn" (click)="startResignation()" [disabled]="resigning()">
-            <mat-icon>exit_to_app</mat-icon> 退職
-          </button>
-        }
+        <ng-container meta>
+          @if (form.employeeNumber) { <span>社員番号 <b>{{ form.employeeNumber }}</b></span> }
+          @if (officeName()) { <span>{{ officeName() }}</span> }
+          @if (employeeStatus() === 'resigned') { <span><app-status-badge tone="waiting" label="退職済み" /></span> }
+        </ng-container>
       }
-    </div>
+      @if (!isNew && employeeStatus() !== 'resigned') {
+          <ng-container actions>
+            <a mat-stroked-button [routerLink]="['/employment-changes', 'new']" [queryParams]="{ employeeId }">雇用条件を変える</a>
+            <a mat-stroked-button [routerLink]="['/revisions', 'new']" [queryParams]="{ employeeId }">随時改定</a>
+            <a mat-stroked-button [routerLink]="['/transfers', 'new']" [queryParams]="{ employeeId }">異動</a>
+            <button mat-stroked-button type="button" class="danger" (click)="startResignation()" [disabled]="resigning()">退職</button>
+          </ng-container>
+      }
+    </app-page-head>
 
     @if (!isNew && employeeStatus() !== 'resigned' && contract()?.type === 'fixed' && contract()?.endDate) {
       <div class="notice-banner" role="status">
@@ -784,6 +780,7 @@ interface OnboardResult {
     }
   `,
   styles: [`
+    .danger { color: var(--app-status-error-fg); }
     .page-header {
       display: flex;
       align-items: center;
@@ -861,6 +858,7 @@ export class EmployeeDetailComponent implements OnInit {
   transferOfficeId = '';
   transferReason = '';
   offices = signal<Office[]>([]);
+  officeName = () => this.offices().find(o => o.id === this.form.officeId)?.name ?? '';
   departments = signal<Department[]>([]);
   isNew = true;
   employeeId = '';
