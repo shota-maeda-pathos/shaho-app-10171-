@@ -1,8 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -43,14 +43,13 @@ export class NoPayDialogComponent {
   reason = '';
 }
 
-/** 1人分の詳細。無給の記録と、別途入金・返金の記録はここで行う */
+/** 1人分の内訳（右のパネルの中身）。別途入金・返金の記録はここで行う。記録したら changed を出す */
 @Component({
-  selector: 'app-monthly-detail-dialog',
+  selector: 'app-monthly-person',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, RouterLink, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   template: `
-    <h2 mat-dialog-title>{{ r.name }}（{{ r.employeeNumber }}）</h2>
-    <mat-dialog-content>
+      @let r = row();
       @if (r.hold) { <p class="hold">保留中：{{ r.hold.reason }}</p> }
       @for (i of r.issues; track i) { <p class="bad">{{ i }}</p> }
       @if (r.rejected?.salary) { <p class="bad">給与が差し戻されました。理由：{{ r.rejected?.salary }}</p> }
@@ -60,14 +59,14 @@ export class NoPayDialogComponent {
       @if (r.revision; as rv) {
         <div class="row-actions">
           @if (rv.procedureId) {
-            <a mat-stroked-button [routerLink]="['/revisions', rv.procedureId]" mat-dialog-close>{{ rv.procedureDone ? '随時改定の手続きを見る' : '随時改定の手続きを開く' }}</a>
+            <a mat-stroked-button [routerLink]="['/revisions', rv.procedureId]">{{ rv.procedureDone ? '随時改定の手続きを見る' : '随時改定の手続きを開く' }}</a>
           } @else {
-            <a mat-flat-button [routerLink]="['/revisions', 'new']" [queryParams]="{ employeeId: r.employeeId, startMonth: rv.startMonth }" mat-dialog-close>随時改定の対象か確かめる</a>
+            <a mat-flat-button [routerLink]="['/revisions', 'new']" [queryParams]="{ employeeId: r.employeeId, startMonth: rv.startMonth }">随時改定の対象か確かめる</a>
           }
         </div>
       }
 
-      <h3>{{ month(data.payMonth) }}支給の給与</h3>
+      <h3>{{ month(payMonth()) }}支給の給与</h3>
       @if (r.salary; as s) {
         <dl>
           <div><dt>支給額</dt><dd>{{ s.noPay ? '無給（' + s.noPayReason + '）' : (s.total | number) + '円' }}</dd></div>
@@ -82,11 +81,11 @@ export class NoPayDialogComponent {
       }
       @if (r.salaryRequired && !r.salary?.confirmed && !r.salary?.pending) {
         <div class="row-actions">
-          <a mat-stroked-button [routerLink]="['/salary', r.employeeId]" [queryParams]="{ yearMonth: data.payMonth, officeId: data.officeId }" mat-dialog-close>給与を1人分入力・修正する</a>
+          <a mat-stroked-button [routerLink]="['/salary', r.employeeId]" [queryParams]="{ yearMonth: payMonth(), officeId: officeId() }">給与を1人分入力・修正する</a>
         </div>
       }
 
-      <h3>{{ month(data.premiumMonth) }}分の保険料</h3>
+      <h3>{{ month(premiumMonth()) }}分の保険料</h3>
       @if (r.premium; as p) {
         <dl>
           <div><dt>本人負担</dt><dd>{{ p.employee | number }}円</dd></div>
@@ -116,7 +115,7 @@ export class NoPayDialogComponent {
         <form class="entry" (ngSubmit)="addEntry()">
           <mat-form-field appearance="outline">
             <mat-label>種類</mat-label>
-            <mat-select [(ngModel)]="method" name="method">
+            <mat-select [ngModel]="method()" (ngModelChange)="method.set($event)" name="method">
               <mat-option value="transfer">別途入金を受け取った</mat-option>
               <mat-option value="payroll">給与から控除した</mat-option>
               <mat-option value="refund">返金した</mat-option>
@@ -124,81 +123,79 @@ export class NoPayDialogComponent {
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>金額（円）</mat-label>
-            <input matInput type="number" min="1" [(ngModel)]="amount" name="amount" required>
+            <input matInput type="number" min="1" [ngModel]="amount()" (ngModelChange)="amount.set($event)" name="amount" required>
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>日付</mat-label>
-            <input matInput type="date" [(ngModel)]="date" name="date" required>
+            <input matInput type="date" [ngModel]="date()" (ngModelChange)="date.set($event)" name="date" required>
           </mat-form-field>
           <mat-form-field appearance="outline" class="wide">
             <mat-label>メモ</mat-label>
-            <input matInput [(ngModel)]="note" name="note" maxlength="200" required placeholder="例：11月5日 振込を確認">
+            <input matInput [ngModel]="note()" (ngModelChange)="note.set($event)" name="note" maxlength="200" required placeholder="例：11月5日 振込を確認">
           </mat-form-field>
-          <button mat-flat-button type="submit" [disabled]="saving() || !amount || amount < 1 || !date || !note.trim()">記録する</button>
+          <button mat-flat-button type="submit" [disabled]="saving() || !amount() || amount() < 1 || !date() || !note().trim()">記録する</button>
         </form>
         @if (error()) { <p class="bad" role="alert">{{ error() }}</p> }
       }
 
       @if (r.salary?.pending || r.premium?.pending) {
-        <p class="hint">内容を直す必要があるときは、<a routerLink="/approvals" mat-dialog-close>承認の画面</a>で差し戻してください。</p>
+        <p class="hint">内容を直す必要があるときは、<a routerLink="/approvals">承認の画面</a>で差し戻してください。</p>
       }
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button type="button" (click)="close()">閉じる</button>
-    </mat-dialog-actions>
   `,
   styles: [`
-    h3 { margin: var(--app-space-4) 0 var(--app-space-2); font-size: var(--app-font-md); }
+    h3 { margin: 18px 0 8px; font-size: 12px; font-weight: 700; color: var(--app-color-text-sub); letter-spacing: .04em; }
+    p { margin: 0 0 8px; line-height: 1.6; font-size: 13px; }
+    dl { font-size: 13px; }
     dl { margin: 0; display: grid; gap: var(--app-space-1); }
     dl div { display: grid; grid-template-columns: 9em 1fr; gap: var(--app-space-2); }
     dt { color: var(--app-color-text-sub); }
     dd { margin: 0; }
-    .bad { color: var(--app-status-action-fg); }
+    .bad { color: var(--app-status-error-fg); background: var(--app-status-error-bg); padding: 6px 10px; border-radius: 6px; }
     .warn, .hold { color: var(--app-color-text-sub); background: var(--app-color-surface-sub); padding: var(--app-space-2); border-radius: var(--app-radius); }
     .row-actions { margin-top: var(--app-space-2); }
     .entries { margin: var(--app-space-2) 0; padding-left: 1.2em; }
     .entry { display: flex; flex-wrap: wrap; gap: var(--app-space-2); align-items: center; margin-top: var(--app-space-3); }
-    .entry mat-form-field { width: 11em; }
+    .entry mat-form-field { width: 12em; }
     .entry .wide { flex: 1 1 14em; }
     .hint { color: var(--app-color-text-sub); }
     a { color: var(--app-color-link); }
     a[mat-stroked-button] { color: inherit; }
   `],
 })
-export class MonthlyDetailDialogComponent {
-  data = inject<{ row: MonthlyRow; payMonth: string; premiumMonth: string; officeId: string; step: StepKey }>(MAT_DIALOG_DATA);
-  private ref = inject(MatDialogRef<MonthlyDetailDialogComponent>);
+export class MonthlyPersonComponent {
+  row = input.required<MonthlyRow>();
+  payMonth = input.required<string>();
+  premiumMonth = input.required<string>();
+  officeId = input.required<string>();
+  changed = output<void>();
   private functions = inject(Functions);
   private auth = inject(AuthService);
 
-  r = this.data.row;
-  method: 'transfer' | 'payroll' | 'refund' = this.data.row.collection.status === 'over' ? 'refund' : this.data.row.collection.plan === 'payroll' ? 'payroll' : 'transfer';
-  amount = Math.abs(this.data.row.collection.due - (this.data.row.collection.collected ?? 0));
-  date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
-  note = '';
+  // 別の人に切り替えたとき・読み込み直したときは、その人の集める額などに戻す
+  method = linkedSignal<'transfer' | 'payroll' | 'refund'>(() => this.row().collection.status === 'over' ? 'refund' : this.row().collection.plan === 'payroll' ? 'payroll' : 'transfer');
+  amount = linkedSignal(() => Math.abs(this.row().collection.due - (this.row().collection.collected ?? 0)));
+  date = linkedSignal(() => { this.row(); return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }); });
+  note = linkedSignal(() => { this.row(); return ''; });
   saving = signal(false);
-  error = signal('');
-  private changed = false;
+  error = linkedSignal(() => { this.row(); return ''; });
 
   month(ym: string) { const [y, m] = ym.split('-'); return `${y}年${Number(m)}月`; }
   methodLabel(m: string) { return METHOD_LABELS[m] ?? m; }
 
   async addEntry() {
+    const r = this.row();
     this.saving.set(true);
     this.error.set('');
     try {
       await httpsCallable(this.functions, 'monthlyCollectionEntry')({
-        companyId: this.auth.companyId, officeId: this.data.officeId, payMonth: this.data.payMonth, employeeId: this.r.employeeId,
-        method: this.method, amount: Number(this.amount), date: this.date, note: this.note.trim(), expectedVersion: this.r.collection.version,
+        companyId: this.auth.companyId, officeId: this.officeId(), payMonth: this.payMonth(), employeeId: r.employeeId,
+        method: this.method(), amount: Number(this.amount()), date: this.date(), note: this.note().trim(), expectedVersion: r.collection.version,
       });
-      this.changed = true;
-      this.ref.close(true);
+      this.changed.emit();
     } catch (e) {
       this.error.set(e instanceof Error && e.message ? e.message : '記録できませんでした');
     } finally {
       this.saving.set(false);
     }
   }
-
-  close() { this.ref.close(this.changed); }
 }

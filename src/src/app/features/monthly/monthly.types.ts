@@ -79,33 +79,36 @@ export const ACTION_STEP: Record<MonthlyAction, StepKey> = {
 
 const yen = (n: number) => `${n.toLocaleString('ja-JP')}円`;
 
-/** 各ステップでの1人分の状態。要対応（action）の人が残っているステップは未完了 */
+/**
+ * 各ステップでの1人分の状態。自分が手を動かす状態（yours・attention）の人が残っているステップは未完了。
+ * 判定はサーバーの home/monthly-progress.ts の stepTone と同じ（変えるときは両方を直す）。色は画面だけ：自分が進める＝yours、差し戻し・要確認＝attention
+ */
 export function stepState(step: StepKey, r: MonthlyRow): StepState | null {
   const s = r.salary;
   const p = r.premium;
   switch (step) {
     case 'salary':
       if (!r.salaryRequired) return null;
-      if (!s) return { tone: 'action', label: '給与 未登録', reason: '取り込むか、給与がない月なら「無給として記録」してください' };
+      if (!s) return { tone: 'yours', label: '給与 未登録', reason: '取り込むか、給与がない月なら「無給として記録」してください' };
       return { tone: 'done', label: s.noPay ? '無給' : `給与 ${yen(s.total)}`, reason: s.noPay ? s.noPayReason : undefined };
     case 'salaryReview':
       if (!s) return null;
       if (s.confirmed) return { tone: 'done', label: '承認済み' };
       if (s.pending) return { tone: 'waiting', label: '承認待ち' };
-      if (r.rejected?.salary) return { tone: 'action', label: '差し戻し', reason: `理由：${r.rejected?.salary}。給与を直して（取り込み直すか名前から入力）、もう一度確認を依頼してください` };
+      if (r.rejected?.salary) return { tone: 'attention', label: '差し戻し', reason: `理由：${r.rejected?.salary}。給与を直して（取り込み直すか名前から入力）、もう一度確認を依頼してください` };
       return { tone: 'yours', label: '確認の依頼前' };
     case 'calculate':
-      if (r.issues.length) return { tone: 'action', label: '計算できません', reason: r.issues.join('／') };
+      if (r.issues.length) return { tone: 'attention', label: '計算できません', reason: r.issues.join('／') };
       if (!r.premiumDue) return null;
       if (!p) return { tone: 'yours', label: '未計算' };
-      if (r.stale) return { tone: 'action', label: '計算し直しが必要', reason: '計算した後に料率が変わりました' };
+      if (r.stale) return { tone: 'attention', label: '計算し直しが必要', reason: '計算した後に料率が変わりました' };
       return { tone: 'done', label: `本人 ${yen(p.employee)}` };
     case 'premiumReview':
       if (!p) return null;
       if (p.confirmed) return { tone: 'done', label: '承認済み' };
       if (p.pending) return { tone: 'waiting', label: '承認待ち' };
-      if (r.rejected?.premium) return { tone: 'action', label: '差し戻し', reason: `理由：${r.rejected?.premium}。内容を確かめ、必要なら計算し直してから、もう一度確認を依頼してください` };
-      if (r.warnings.length) return { tone: 'action', label: '確認が必要', reason: r.warnings.join('／') };
+      if (r.rejected?.premium) return { tone: 'attention', label: '差し戻し', reason: `理由：${r.rejected?.premium}。内容を確かめ、必要なら計算し直してから、もう一度確認を依頼してください` };
+      if (r.warnings.length) return { tone: 'attention', label: '確認が必要', reason: r.warnings.join('／') };
       return { tone: 'yours', label: '確認の依頼前', reason: r.diffReasons.join('／') || undefined };
     case 'publish':
       if (!s) return null;
@@ -120,11 +123,11 @@ export function stepState(step: StepKey, r: MonthlyRow): StepState | null {
       const method = c.plan === 'payroll' ? '給与から控除' : '別途入金';
       switch (c.status) {
         case 'done': return { tone: 'done', label: `徴収済み（${method}）` };
-        case 'over': return { tone: 'action', label: '過徴収', reason: `${yen((c.collected ?? 0) - c.due)}を返金してください` };
-        case 'partial': return { tone: 'action', label: '一部未徴収', reason: `残り ${yen(c.due - (c.collected ?? 0))}` };
+        case 'over': return { tone: 'attention', label: '過徴収', reason: `${yen((c.collected ?? 0) - c.due)}を返金してください` };
+        case 'partial': return { tone: 'attention', label: '一部未徴収', reason: `残り ${yen(c.due - (c.collected ?? 0))}` };
         default: return c.plan === 'payroll'
           ? { tone: 'yours', label: '控除の記録前', reason: `${yen(c.due)}を給与から控除` }
-          : { tone: 'action', label: '別途入金 未入金', reason: `${yen(c.due)}を本人から集めてください` };
+          : { tone: 'yours', label: '別途入金 未入金', reason: `${yen(c.due)}を本人から集めてください` };
       }
     }
   }

@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, input, output, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -9,99 +9,108 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { FilingDetail, INSURED_CATEGORY_LABELS, SanteiRow, gradeChangeText } from './santei.types';
 
-/** 1人分の4〜6月の内訳と判定。支払基礎日数が足りない人の決め方はここでも選べる */
+/** 1人分の4〜6月の内訳と判定（右のパネルの中身）。支払基礎日数が足りない人の決め方はここでも選べる */
 @Component({
-  selector: 'app-santei-detail-dialog',
+  selector: 'app-santei-person',
   standalone: true,
-  imports: [DecimalPipe, RouterLink, MatDialogModule, MatButtonModule],
+  imports: [DecimalPipe, RouterLink, MatButtonModule],
   template: `
-    <h2 mat-dialog-title>{{ r.employeeName }}（{{ r.employeeNumber }}）</h2>
-    <mat-dialog-content>
-      @if (r.hold) { <p class="hold">保留中：{{ r.hold.reason }}</p> }
-      <p [class.bad]="r.status === 'needsAction' || r.status === 'pending'">{{ r.reason }}</p>
-      @if (r.approval.status === 'rejected') { <p class="bad">差し戻されました。理由：{{ r.approval.rejection }}</p> }
-      @if (r.septemberTaken) { <p class="bad">{{ data.year }}年9月の等級が、定時決定以外（手入力など）で既に登録されています。</p> }
-      <p class="sub">被保険者の区分：{{ categoryLabels[r.insuredCategory] }}</p>
+    @let r = row();
+    @if (r.hold) { <p class="msg hold">保留中：{{ r.hold.reason }}</p> }
+    <p [class.msg]="r.status === 'needsAction' || r.status === 'pending'" [class.warn]="r.status === 'needsAction' || r.status === 'pending'">{{ r.reason }}</p>
+    @if (r.approval.status === 'rejected') { <p class="msg bad">差し戻されました。理由：{{ r.approval.rejection }}</p> }
+    @if (r.septemberTaken) { <p class="msg bad">{{ year() }}年9月の等級が、定時決定以外（手入力など）で既に登録されています。</p> }
+    <p class="sub">被保険者の区分：{{ categoryLabels[r.insuredCategory] }}</p>
 
-      @if (r.months.length) {
-        <table>
-          <thead><tr><th>支払月</th><th class="num">支払基礎日数</th><th class="num">通貨</th><th class="num">現物</th><th class="num">判定に使う額</th><th>平均に</th></tr></thead>
-          <tbody>
-            @for (m of r.months; track m.yearMonth) {
-              <tr>
-                <td>{{ month(m.yearMonth) }}</td>
-                <td class="num">{{ m.paymentBasisDays ?? '—' }}{{ m.paymentBasisDays !== null ? '日' : '' }}</td>
-                <td class="num">{{ m.cash !== null ? (m.cash | number) + '円' : '未登録' }}</td>
-                <td class="num">{{ m.inKind ? (m.inKind | number) + '円' : '' }}</td>
-                <td class="num">{{ m.remuneration !== null ? (m.remuneration | number) + '円' : '' }}{{ m.retroactive ? '（遡及差額 ' + (m.retroactive | number) + '円を除く）' : '' }}</td>
-                <td>{{ m.used ? '使う' : (m.paymentBasisDays !== null ? '使わない' : '') }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
+    @if (r.months.length) {
+      <h3>4〜6月の給与</h3>
+      <table>
+        <thead><tr><th>支払月</th><th class="num">日数</th><th class="num">判定に使う額</th><th>平均に</th></tr></thead>
+        <tbody>
+          @for (m of r.months; track m.yearMonth) {
+            <tr>
+              <td>{{ month(m.yearMonth) }}</td>
+              <td class="num">{{ m.paymentBasisDays ?? '—' }}{{ m.paymentBasisDays !== null ? '日' : '' }}</td>
+              <td class="num">
+                @if (m.cash === null) { 未登録 } @else { {{ m.remuneration !== null ? (m.remuneration | number) + '円' : '' }} }
+                @if (m.inKind) { <div class="sub">現物 {{ m.inKind | number }}円を含む</div> }
+                @if (m.retroactive) { <div class="sub">遡及差額 {{ m.retroactive | number }}円を除く</div> }
+              </td>
+              <td>{{ m.used ? '使う' : (m.paymentBasisDays !== null ? '使わない' : '') }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    <h3>等級</h3>
+    <dl>
+      <dt>平均</dt><dd>{{ r.average !== null ? (r.average | number) + '円' : (r.basis === 'previous' ? '従前の標準報酬月額で決定' : '—') }}</dd>
+      <dt>今の等級</dt><dd>
+        @if (r.current; as c) { 健保 {{ c.healthGradeNumber }}・厚年 {{ c.pensionGradeNumber }}（{{ c.healthStandardRemuneration | number }}円）{{ r.currentEffectiveMonth ? '　' + month(r.currentEffectiveMonth) + 'から' : '' }} }
+        @else { なし }
+      </dd>
+      @if (r.proposed; as p) {
+        <dt>{{ year() }}年9月から</dt><dd [class.changed]="r.changed">健保 {{ p.healthGradeNumber }}・厚年 {{ p.pensionGradeNumber }}（{{ p.healthStandardRemuneration | number }}円）</dd>
+        <dt>変化</dt><dd>{{ change() }}</dd>
       }
+      <dt>承認</dt><dd>{{ approvalLabel() }}</dd>
+    </dl>
 
-      <dl>
-        <div><dt>平均</dt><dd>{{ r.average !== null ? (r.average | number) + '円' : (r.basis === 'previous' ? '従前の標準報酬月額で決定' : '—') }}</dd></div>
-        <div><dt>今の等級</dt><dd>
-          @if (r.current; as c) { 健保 {{ c.healthGradeNumber }}等級（{{ c.healthStandardRemuneration | number }}円）・厚年 {{ c.pensionGradeNumber }}等級（{{ c.pensionStandardRemuneration | number }}円）{{ r.currentEffectiveMonth ? '　' + month(r.currentEffectiveMonth) + 'から' : '' }} }
-          @else { なし }
-        </dd></div>
-        @if (r.proposed; as p) {
-          <div><dt>{{ data.year }}年9月から</dt><dd [class.changed]="r.changed">健保 {{ p.healthGradeNumber }}等級（{{ p.healthStandardRemuneration | number }}円）・厚年 {{ p.pensionGradeNumber }}等級（{{ p.pensionStandardRemuneration | number }}円）</dd></div>
-          <div><dt>変化</dt><dd>{{ change() }}</dd></div>
-        }
-        <div><dt>承認</dt><dd>{{ approvalLabel() }}</dd></div>
-      </dl>
-
+    @if (r.status === 'pending') {
+      <p class="sub">給与の登録・承認は毎月の処理で行います。無給の休職などで決められない人は保留にしてください（他の人の届出は進められます）。</p>
+    }
+    @if (r.status === 'needsAction' && r.current) {
+      <p class="sub">支払基礎日数の基準を満たす月がないため、従前の標準報酬月額（今の等級）で決めるのが原則です。</p>
+    }
+    <div class="row-actions">
       @if (r.status === 'pending') {
-        <p class="sub">給与の登録・承認は毎月の処理で行います。無給の休職などで決められない人は、一覧で保留にしてください（他の人の届出は進められます）。</p>
-      }
-      @if (r.status === 'needsAction' && r.current) {
-        <p class="sub">支払基礎日数の基準を満たす月がないため、従前の標準報酬月額（今の等級）で決めるのが原則です。休職で給与がない場合なども同じです。</p>
-      }
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      @if (r.status === 'pending') {
-        <a mat-stroked-button routerLink="/monthly" [queryParams]="{ officeId: data.officeId, payMonth: firstMissing() }" mat-dialog-close>毎月の処理を開く</a>
+        <a mat-stroked-button routerLink="/monthly" [queryParams]="{ officeId: officeId(), payMonth: firstMissing() }">毎月の処理を開く</a>
       }
       @if (r.status === 'needsAction' && r.current && r.approval.status !== 'pending' && r.approval.status !== 'approved') {
-        <button mat-flat-button type="button" mat-dialog-close="previous">従前の等級で決める</button>
+        <button mat-flat-button type="button" (click)="decide.emit('previous')" [disabled]="busy()">従前の等級で決める</button>
       }
       @if (r.decision && r.approval.status !== 'pending' && r.approval.status !== 'approved') {
-        <button mat-stroked-button type="button" mat-dialog-close="undo">決め方を取り消す</button>
+        <button mat-stroked-button type="button" (click)="decide.emit('undo')" [disabled]="busy()">決め方を取り消す</button>
       }
       @if (r.approval.status === 'pending') {
-        <a mat-stroked-button routerLink="/approvals" mat-dialog-close>承認の画面で見る</a>
+        <a mat-stroked-button routerLink="/approvals">承認の画面で見る</a>
       }
-      <button mat-button mat-dialog-close type="button">閉じる</button>
-    </mat-dialog-actions>
+    </div>
   `,
   styles: [`
-    p { line-height: 1.7; margin: 0 0 8px; }
-    .sub { color: var(--app-color-text-sub); }
-    .bad { color: var(--app-status-action-fg); }
-    .hold { color: var(--app-status-waiting-fg); }
-    .changed { color: var(--app-status-yours-fg); font-weight: 500; }
-    table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0 16px; }
-    th, td { padding: 4px 8px; border-bottom: 1px solid var(--app-color-border); text-align: left; }
+    p { line-height: 1.6; margin: 0 0 8px; font-size: 13px; }
+    .msg { padding: 6px 10px; border-radius: 6px; }
+    .warn { color: var(--app-status-attention-fg); background: var(--app-status-attention-bg); }
+    .bad { color: var(--app-status-error-fg); background: var(--app-status-error-bg); }
+    .hold { color: var(--app-status-waiting-fg); background: var(--app-status-waiting-bg); }
+    .sub { color: var(--app-color-text-sub); font-size: 12px; }
+    .changed { color: var(--app-status-attention-fg); font-weight: 600; }
+    h3 { margin: 18px 0 8px; font-size: 12px; font-weight: 700; color: var(--app-color-text-sub); letter-spacing: .04em; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 0 0 8px; }
+    th, td { padding: 4px 6px; border-bottom: 1px solid var(--app-color-border); text-align: left; vertical-align: top; }
+    th { font-size: 12px; color: var(--app-color-text-sub); font-weight: 600; }
     .num { text-align: right; white-space: nowrap; }
-    dl { display: grid; gap: 4px; margin: 0 0 8px; }
-    dl div { display: grid; grid-template-columns: 8em 1fr; gap: 8px; }
+    dl { display: grid; grid-template-columns: 8em 1fr; gap: 6px 12px; margin: 0 0 8px; font-size: 13px; }
     dt { color: var(--app-color-text-sub); }
     dd { margin: 0; }
+    .row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   `],
 })
-export class SanteiDetailDialogComponent {
-  data = inject<{ row: SanteiRow; year: number; officeId: string }>(MAT_DIALOG_DATA);
-  r = this.data.row;
+export class SanteiPersonComponent {
+  row = input.required<SanteiRow>();
+  year = input.required<number>();
+  officeId = input.required<string>();
+  busy = input(false);
+  /** previous＝従前の等級で決める、undo＝決め方を取り消す */
+  decide = output<'previous' | 'undo'>();
   categoryLabels = INSURED_CATEGORY_LABELS;
 
   month(ym: string) { const [y, m] = ym.split('-'); return `${y}年${Number(m)}月`; }
-  change() { return gradeChangeText(this.r); }
-  firstMissing() { return this.r.months.find(m => m.cash === null)?.yearMonth ?? `${this.data.year}-06`; }
+  change() { return gradeChangeText(this.row()); }
+  firstMissing() { return this.row().months.find(m => m.cash === null)?.yearMonth ?? `${this.year()}-06`; }
   approvalLabel() {
-    return ({ none: '依頼前', pending: '承認待ち', approved: '承認済み', rejected: '差し戻し' } as const)[this.r.approval.status];
+    return ({ none: '依頼前', pending: '承認待ち', approved: '承認済み', rejected: '差し戻し' } as const)[this.row().approval.status];
   }
 }
 

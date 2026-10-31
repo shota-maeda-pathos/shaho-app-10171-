@@ -1,7 +1,7 @@
 import { Component, computed, DestroyRef, effect, inject, OnInit, signal, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -12,36 +12,49 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
 import {
-  BulkAction, BulkRun, ErrorStateComponent, LoadingStateComponent, StatusTone, TargetCellDirective,
-  TargetListComponent, TargetRow, TermComponent,
+  BulkAction, BulkRun, ErrorStateComponent, LoadingStateComponent, PageHeadComponent, StatusTone, StepLeadComponent, StepperComponent, StepperItem,
+  TargetCellDirective, TargetDetailDirective, TargetListComponent, TargetRow, TermComponent, needsMe,
 } from '../../shared/ui';
 import { ACTION_STEP, ImportResult, JobSummary, MonthlyAction, MonthlyRow, Overview, SalaryItem, StepKey, stepState } from './monthly.types';
-import { MonthlyDetailDialogComponent, NoPayDialogComponent } from './monthly-dialogs';
+import { MonthlyPersonComponent, NoPayDialogComponent } from './monthly-dialogs';
 
-interface StepDef { key: StepKey; label: string; what: string; why: string; next: string }
+/** ステップ。what は本体の見出しの横に出す1行。注意は操作バーの主ボタンの横に出す（BulkAction の caution） */
+interface StepDef { key: StepKey; label: string; what: string }
 
 const STEPS: StepDef[] = [
-  { key: 'salary', label: '給与を取り込む', what: '今月支給する給与をCSVで取り込みます。無給の休職者など給与がない人は「無給として記録」します。', why: '給与から保険料を控除するため、また給与と等級が大きく離れた人（随時改定の候補）を見つけるためです。', next: '取り込んだ給与を、別の担当者に確認してもらいます。' },
-  { key: 'salaryReview', label: '給与の確認', what: '取り込んだ給与の確認を、別の担当者に依頼します。承認者はこの画面で内容を見て、まとめて承認します。', why: '入力の誤りを、作った人とは別の目で確かめるためです。', next: '承認された給与は変更できなくなり、明細に使えます。' },
-  { key: 'calculate', label: '保険料を計算', what: '対象の全員の保険料を計算します。人数が多くても画面を閉じて待てます。', why: '保険料は等級（標準報酬月額）から決まります。給与がない人も、休業の免除がなければ保険料がかかります。', next: '計算結果を前月と比べて確かめます。' },
-  { key: 'premiumReview', label: '結果の確認', what: '前月との差額と理由、注意が出ている人を確かめてから、別の担当者に確認を依頼します。', why: '等級の変更や40歳到達など、金額が変わった理由が正しいかを確かめるためです。', next: '承認されると、明細の公開と徴収の記録ができるようになります。' },
-  { key: 'publish', label: '明細を公開', what: '承認済みの給与と保険料を、本人が見られるようにします。', why: '本人が控除額と内訳を確かめられるようにするためです。', next: '公開した明細は従業員のポータルに表示されます。' },
-  { key: 'collection', label: '徴収を記録', what: '給与から控除した人はまとめて記録します。別途入金の人は、入金があったら1人ずつ記録します。', why: '会社は本人負担分も含めて納めるため、本人から集め終わったかを確かめるためです。', next: 'すべて徴収済みになれば、この月の処理は完了です。' },
+  { key: 'salary', label: '給与の取込', what: '今月支給する給与をCSVで取り込みます。給与がない人は「無給」として記録します。' },
+  { key: 'salaryReview', label: '給与の確認', what: '取り込んだ給与を、別の担当者に確認してもらいます。' },
+  { key: 'calculate', label: '保険料の計算', what: '対象の全員の保険料を計算します。画面を閉じても計算は続きます。' },
+  { key: 'premiumReview', label: '結果の確認', what: '前月との差と理由、注意が出ている人を確かめて、別の担当者に確認してもらいます。' },
+  { key: 'publish', label: '明細の公開', what: '承認済みの給与と保険料を、本人がポータルで見られるようにします。' },
+  { key: 'collection', label: '徴収の記録', what: '給与から控除した人はまとめて、別途入金の人は入金があったら1人ずつ記録します。' },
 ];
 
 const ACTIONS: Record<StepKey, (c: MonthlyComponent) => BulkAction[]> = {
-  salary: () => [{ key: 'noPay', label: '無給として記録', appliesTo: r => !r.held && r.statusLabel === '給与 未登録' }],
+  salary: () => [{ key: 'noPay', label: '選んだ人を無給として記録する', selectedOnly: true, appliesTo: r => !r.held && r.statusLabel === '給与 未登録',
+    caution: '無給でも、休業の免除がなければ保険料はかかります（本人負担は別途入金）。' }],
   salaryReview: c => [
-    { key: 'requestSalaryApproval', label: '確認を依頼', appliesTo: r => c.row(r.id)?.salary?.confirmed === false && !c.row(r.id)?.salary?.pending },
-    ...(c.canApproveReview('salary') ? [{ key: 'approveSalary', label: '承認する', appliesTo: (r: TargetRow) => !!c.row(r.id)?.salary?.pending }] : []),
+    { key: 'requestSalaryApproval', label: '確認を依頼する', appliesTo: r => c.row(r.id)?.salary?.confirmed === false && !c.row(r.id)?.salary?.pending,
+      caution: '依頼中は給与を直せません。直すときは差し戻してもらいます。',
+      confirm: { title: `${c.monthLabel(c.payMonth)}支給の給与の確認を依頼する`, message: '別の担当者（管理者・承認者）に、取り込んだ給与の確認を依頼します。承認者には通知が届きます。', notice: '依頼中は給与を直せません。' } },
+    ...(c.canApproveReview('salary') ? [{ key: 'approveSalary', label: '承認する', appliesTo: (r: TargetRow) => !!c.row(r.id)?.salary?.pending,
+      caution: '承認した給与は、差し戻さないと直せません。',
+      confirm: { title: `${c.monthLabel(c.payMonth)}支給の給与を承認する`, message: '一覧で内容を確かめた人の給与を承認します。', notice: '承認した給与は、差し戻さないと直せません。' } }] : []),
   ],
-  calculate: c => [{ key: 'calculate', label: '計算する', appliesTo: r => { const x = c.row(r.id); return !!x && x.premiumDue && !x.issues.length && !x.premium?.confirmed && !x.premium?.pending; } }],
+  calculate: c => [{ key: 'calculate', label: '保険料を計算する', appliesTo: r => { const x = c.row(r.id); return !!x && x.premiumDue && !x.issues.length && !x.premium?.confirmed && !x.premium?.pending; },
+    caution: '保険料は等級から決まります。給与がない人も、休業の免除がなければかかります。' }],
   premiumReview: c => [
-    { key: 'requestPremiumApproval', label: '確認を依頼', appliesTo: r => c.row(r.id)?.premium?.confirmed === false && !c.row(r.id)?.premium?.pending },
-    ...(c.canApproveReview('premium') ? [{ key: 'approvePremium', label: '承認する', appliesTo: (r: TargetRow) => !!c.row(r.id)?.premium?.pending }] : []),
+    { key: 'requestPremiumApproval', label: '確認を依頼する', appliesTo: r => c.row(r.id)?.premium?.confirmed === false && !c.row(r.id)?.premium?.pending,
+      caution: '依頼中は計算し直せません。承認されると明細の公開と徴収の記録ができます。',
+      confirm: { title: `${c.monthLabel(c.data()?.premiumMonth ?? c.payMonth)}分の保険料の確認を依頼する`, message: '計算した保険料の確認を、別の担当者（管理者・承認者）に依頼します。', notice: '依頼中は計算し直せません。' } },
+    ...(c.canApproveReview('premium') ? [{ key: 'approvePremium', label: '承認する', appliesTo: (r: TargetRow) => !!c.row(r.id)?.premium?.pending,
+      caution: '承認した保険料は、差し戻さないと直せません。',
+      confirm: { title: `${c.monthLabel(c.data()?.premiumMonth ?? c.payMonth)}分の保険料を承認する`, message: '一覧で前月との差と理由を確かめた人の保険料を承認します。', notice: '承認した保険料は、差し戻さないと直せません。' } }] : []),
   ],
-  publish: () => [{ key: 'publish', label: '明細を公開', appliesTo: r => r.statusLabel === '公開前' }],
-  collection: c => [{ key: 'recordPayroll', label: '給与からの控除を記録', appliesTo: r => { const x = c.row(r.id); return !!x?.premium?.confirmed && x.collection.plan === 'payroll' && x.collection.status === 'unpaid'; } }],
+  publish: c => [{ key: 'publish', label: '明細を公開する', appliesTo: r => r.statusLabel === '公開前',
+    caution: '公開した明細は、本人がポータルで見られるようになります。',
+    confirm: { title: `${c.monthLabel(c.payMonth)}支給の明細を公開する`, message: '承認済みの給与と保険料の明細を、本人がポータルで見られるようにします。', notice: '公開した明細は本人にすぐ見えます。', confirmLabel: '公開する' } }],
+  collection: c => [{ key: 'recordPayroll', label: '給与からの控除を記録する', appliesTo: r => { const x = c.row(r.id); return !!x?.premium?.confirmed && x.collection.plan === 'payroll' && x.collection.status === 'unpaid'; } }],
 };
 
 /**
@@ -52,8 +65,9 @@ const ACTIONS: Record<StepKey, (c: MonthlyComponent) => BulkAction[]> = {
   selector: 'app-monthly',
   standalone: true,
   imports: [
-    DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule,
-    TargetListComponent, TargetCellDirective, ErrorStateComponent, LoadingStateComponent, TermComponent,
+    DecimalPipe, FormsModule, MatButtonModule, MatIconModule, MatProgressBarModule,
+    TargetListComponent, TargetCellDirective, TargetDetailDirective, ErrorStateComponent, LoadingStateComponent, TermComponent,
+    PageHeadComponent, StepperComponent, StepLeadComponent, MonthlyPersonComponent,
   ],
   templateUrl: './monthly.html',
   styleUrl: './monthly.scss',
@@ -92,11 +106,22 @@ export class MonthlyComponent implements OnInit {
 
   /** ステップごとの人数と状態 */
   summaries = computed(() => STEPS.map(step => {
-    const rows = (this.data()?.rows ?? []).filter(r => !r.hold).map(r => this.stateFor(step.key, r)).filter(s => s !== null);
-    const todo = rows.filter(s => s!.tone === 'action' || s!.tone === 'yours').length;
-    const waiting = rows.filter(s => s!.tone === 'waiting').length;
-    return { key: step.key, total: rows.length, todo, waiting, done: rows.length > 0 && todo === 0 && waiting === 0, empty: rows.length === 0 };
+    const fails = this.failures()?.step === step.key ? this.failures()!.byId : {};
+    const rows = (this.data()?.rows ?? []).filter(r => !r.hold).flatMap(r => {
+      const s = this.stateFor(step.key, r);
+      return s ? [fails[r.employeeId] ? { ...s, tone: 'error' as StatusTone } : s] : [];
+    });
+    const todo = rows.filter(s => needsMe(s.tone)).length;
+    const attention = rows.filter(s => s.tone === 'attention' || s.tone === 'error').length;
+    const waiting = rows.filter(s => s.tone === 'waiting').length;
+    return { key: step.key, total: rows.length, todo, attention, waiting, done: rows.length > 0 && todo === 0 && waiting === 0, empty: rows.length === 0 };
   }));
+  /** 横並びのステップ。数字は1つだけ（要確認 → 残り → 承認待ち → 完了 → —） */
+  stepItems = computed<StepperItem[]>(() => this.summaries().map((s, i) => ({
+    key: s.key, label: STEPS[i].label,
+    state: s.attention ? 'attention' : s.done ? 'done' : !s.todo && s.waiting ? 'waiting' : 'todo',
+    note: s.attention ? `要確認 ${s.attention}名` : s.todo ? `残り ${s.todo}名` : s.waiting ? `承認待ち ${s.waiting}名` : s.done ? '完了' : '—',
+  })));
   /**
    * 開くステップ。承認者に承認を頼まれていればその確認のステップ、なければ自分がやることのある最初のステップ、
    * それもなければ（他の人の承認待ちだけなら）最初の未完了ステップ。全部終わっていれば最後
@@ -234,21 +259,12 @@ export class MonthlyComponent implements OnInit {
     this.selectedStep.set(key);
   }
 
-  stepView(key: StepKey) {
-    const s = this.summaries().find(x => x.key === key)!;
-    if (s.done) return 'done';
-    if (s.empty) return 'empty';
-    if (s.todo === 0 && s.waiting > 0) return 'waiting';
-    return 'todo';
-  }
-
   // ---- 一括操作 ----
 
   async run(req: BulkRun) {
     if (req.action === 'noPay') return this.noPay(req.ids);
-    const action = req.action as MonthlyAction;
-    if (action === 'publish' && !window.confirm(`${req.ids.length}名の明細を本人に公開します。公開した明細は本人がポータルで見られます。よろしいですか？`)) return;
-    await this.startJob(action, req.ids);
+    // 公開などの確認は、一括操作の confirm で済んでいる
+    await this.startJob(req.action as MonthlyAction, req.ids);
   }
 
   retry(ids: string[]) {
@@ -434,17 +450,9 @@ export class MonthlyComponent implements OnInit {
     this.csvName.set('');
   }
 
-  // ---- 詳細 ----
+  /** 操作バーの文言（一括操作のないときなど） */
+  barInfo = computed(() => this.current() === 'salary' ? '給与がない月の人（無給の休職など）は、選んでから記録します。' : '');
 
-  async open(id: string) {
-    const r = this.row(id);
-    const d = this.data();
-    if (!r || !d) return;
-    const changed = await firstValueFrom(this.dialog.open(MonthlyDetailDialogComponent, {
-      data: { row: r, payMonth: d.payMonth, premiumMonth: d.premiumMonth, officeId: d.office.id, step: this.current() }, width: '640px', maxWidth: '95vw',
-    }).afterClosed());
-    if (changed) await this.load();
-  }
 }
 
 function csvCell(v: string) { return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; }

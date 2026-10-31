@@ -41,6 +41,8 @@ export interface BulkAction {
   appliesTo?: (row: TargetRow) => boolean;
   /** 主ボタンのときに操作バーへ出す注意の1行 */
   caution?: string;
+  /** 選んだ人だけに行う操作（無給の記録など、全員にまとめて行うものではない操作） */
+  selectedOnly?: boolean;
   /** 取り返しのつかない操作は、確認ダイアログを通す（対象の人数と名前は部品が足す） */
   confirm?: { title: string; message: string; notice?: string; confirmLabel?: string };
 }
@@ -307,6 +309,7 @@ export class TargetListComponent {
   /** 操作の対象：選んだ人がいれば選んだ人、いなければ全員。どちらも保留中と対象外の人は除く */
   targetsOf(action: BulkAction) {
     const sel = this.selected();
+    if (action.selectedOnly && sel.size === 0) return [];
     return this.rows().filter(r =>
       !r.held && (sel.size === 0 || sel.has(r.id)) && (action.appliesTo?.(r) ?? true));
   }

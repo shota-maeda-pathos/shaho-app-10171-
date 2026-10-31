@@ -14,21 +14,24 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
 import {
-  BulkAction, BulkRun, ErrorStateComponent, LoadingStateComponent, StatusTone, TargetCellDirective, TargetListComponent, TargetRow, TermComponent,
+  BulkAction, BulkRun, ErrorStateComponent, LoadingStateComponent, PageHeadComponent, StatusTone, StepLeadComponent, StepperComponent, StepperItem,
+  TargetCellDirective, TargetDetailDirective, TargetListComponent, TargetRow, TermComponent, needsMe,
 } from '../../shared/ui';
+import { ConfirmService } from '../../shared/confirm-dialog/confirm-dialog';
 import {
   ACTION_STEP, defaultSanteiYear, FILING_STATUS_LABELS, FilingDetail, FilingSummary, gradeChangeText, JobSummary, Overview, SanteiAction, SanteiRow,
   StepKey, stepState,
 } from './santei.types';
-import { SanteiDetailDialogComponent, SanteiFilingDialogComponent, SanteiInputDialogComponent } from './santei-dialogs';
+import { SanteiFilingDialogComponent, SanteiInputDialogComponent, SanteiPersonComponent } from './santei-dialogs';
 
-interface StepDef { key: StepKey; label: string; what: string; why: string; next: string }
+/** ステップ。what は本体の見出しの横に出す1行。注意は操作バーの主ボタンの横に出す */
+interface StepDef { key: StepKey; label: string; what: string }
 
 const STEPS: StepDef[] = [
-  { key: 'target', label: '対象者を確かめる', what: '4〜6月に支払った承認済みの給与から、対象の人と対象外の人をシステムが分けます。給与が未承認・未登録の人は毎月の処理で承認するか、決められない人（無給の休職など）は保留にします。支払基礎日数が足りない人は決め方を選びます。', why: '6月1日以降に資格を取った人や、7〜9月に随時改定がある人は定時決定の対象外です。給与の誤りがあると等級を誤るため、承認済みの給与だけを使います。', next: '対象の人の新しい等級を確かめ、承認を依頼します。' },
-  { key: 'review', label: '等級の承認', what: '4〜6月の平均と、今の等級・新しい等級を見比べ、別の担当者に承認を依頼します。承認者はこの画面で内容を見て、まとめて承認します。', why: '新しい等級は9月分から1年間の保険料を決めるため、作った人とは別の目で確かめます。', next: '承認された等級は9月分から使われます。承認された人で算定基礎届を作ります。' },
-  { key: 'filing', label: '算定基礎届を作る', what: '等級が承認された人をまとめて、事業所の算定基礎届を1件作ります。後から承認された人は、追加の届出にします。', why: '届出は承認された値から作るため、手で書き写す必要がありません。', next: '届出の承認を依頼し、提出します。' },
-  { key: 'submit', label: '届出の承認と提出', what: '届出の内容を確かめて承認を依頼し、承認されたら模擬電子申請するか、紙で提出したことを記録します。', why: '算定基礎届は毎年7月1日〜10日に、事業所の全員分をまとめて提出します。', next: 'すべて提出すれば、この年の算定基礎届は完了です。' },
+  { key: 'target', label: '対象の確認', what: '4〜6月に支払った承認済みの給与から、対象の人と決め方が必要な人をシステムが分けます。' },
+  { key: 'review', label: '等級の承認', what: '4〜6月の平均と新しい等級を確かめて、別の担当者に承認してもらいます。' },
+  { key: 'filing', label: '届出の作成', what: '等級が承認された人をまとめて、事業所の算定基礎届を作ります。' },
+  { key: 'submit', label: '届出の提出', what: '届出の承認を受けて、模擬電子申請するか紙で提出したことを記録します。' },
 ];
 
 /**
@@ -40,7 +43,8 @@ const STEPS: StepDef[] = [
   standalone: true,
   imports: [
     DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule,
-    TargetListComponent, TargetCellDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent, FilingAttachmentsComponent,
+    TargetListComponent, TargetCellDirective, TargetDetailDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent,
+    FilingAttachmentsComponent, PageHeadComponent, StepperComponent, StepLeadComponent, SanteiPersonComponent,
   ],
   templateUrl: './santei.html',
   styleUrl: './santei.scss',
@@ -53,6 +57,7 @@ export class SanteiComponent implements OnInit {
   private router = inject(Router);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
+  private confirm = inject(ConfirmService);
   private destroyRef = inject(DestroyRef);
 
   readonly steps = STEPS;
@@ -92,29 +97,44 @@ export class SanteiComponent implements OnInit {
   filingTone(f: FilingSummary): StatusTone {
     if (f.status === 'submitted') return 'done';
     if (f.status === 'approved' && ['sent', 'received', 'processing'].includes(f.mockStatus ?? '')) return 'waiting';
+    if (f.status === 'approved' && ['failed', 'returned'].includes(f.mockStatus ?? '')) return 'error';
     if (f.status === 'pending') return this.canApprove() && !f.mine ? 'yours' : 'waiting';
-    return 'action';
+    return f.rejection && f.status === 'draft' ? 'attention' : 'yours';
   }
 
   summaries = computed(() => STEPS.map(step => {
     if (step.key === 'submit') {
       const filings = this.activeFilings();
       const tones = filings.map(f => this.filingTone(f));
-      const todo = tones.filter(t => t === 'action' || t === 'yours').length;
+      const todo = tones.filter(t => needsMe(t)).length;
+      const attention = tones.filter(t => t === 'attention' || t === 'error').length;
       const waiting = tones.filter(t => t === 'waiting').length;
-      return { key: step.key, total: filings.length, todo, waiting, done: filings.length > 0 && todo === 0 && waiting === 0 && this.toFile().length === 0, empty: filings.length === 0, unit: '件' };
+      return { key: step.key, total: filings.length, todo, attention, waiting, done: filings.length > 0 && todo === 0 && waiting === 0 && this.toFile().length === 0, empty: filings.length === 0, unit: '件' };
     }
-    const rows = (this.data()?.rows ?? []).filter(r => !r.hold).map(r => this.stateFor(step.key, r)).filter(s => s !== null);
-    const todo = rows.filter(s => s!.tone === 'action' || s!.tone === 'yours').length;
-    const waiting = rows.filter(s => s!.tone === 'waiting').length;
-    return { key: step.key, total: rows.length, todo, waiting, done: rows.length > 0 && todo === 0 && waiting === 0, empty: rows.length === 0, unit: '名' };
+    const fails = this.failures()?.step === step.key ? this.failures()!.byId : {};
+    const rows = (this.data()?.rows ?? []).filter(r => !r.hold).flatMap(r => {
+      const s = this.stateFor(step.key, r);
+      return s ? [fails[r.employeeId] ? { ...s, tone: 'error' as StatusTone } : s] : [];
+    });
+    const todo = rows.filter(s => needsMe(s.tone)).length;
+    const attention = rows.filter(s => s.tone === 'attention' || s.tone === 'error').length;
+    const waiting = rows.filter(s => s.tone === 'waiting').length;
+    return { key: step.key, total: rows.length, todo, attention, waiting, done: rows.length > 0 && todo === 0 && waiting === 0, empty: rows.length === 0, unit: '名' };
   }));
+  /** 横並びのステップ。数字は1つだけ（要確認 → 残り → 承認待ち → 完了 → —） */
+  stepItems = computed<StepperItem[]>(() => this.summaries().map((s, i) => ({
+    key: s.key, label: STEPS[i].label,
+    state: s.attention ? 'attention' : s.done ? 'done' : !s.todo && s.waiting ? 'waiting' : 'todo',
+    note: s.attention ? `要確認 ${s.attention}${s.unit}`
+      : s.key === 'filing' && this.toFile().length ? `${this.toFile().length}名 届出 未作成`
+      : s.todo ? `残り ${s.todo}${s.unit}` : s.waiting ? `承認待ち ${s.waiting}${s.unit}` : s.done ? '完了' : '—',
+  })));
   /** 開くステップ。承認を頼まれていればそのステップ、なければ自分がやることのある最初のステップ、それもなければ最初の未完了ステップ */
   firstOpen = computed<StepKey>(() => {
     const sums = this.summaries();
     const rows = (this.data()?.rows ?? []).filter(r => !r.hold);
     if (rows.some(r => this.approvable(r))) return 'review';
-    if (this.activeFilings().some(f => this.filingTone(f) === 'yours')) return 'submit';
+    if (this.activeFilings().some(f => f.status === 'pending' && this.filingTone(f) === 'yours')) return 'submit';
     return sums.find(s => s.todo > 0)?.key ?? sums.find(s => !s.done && !s.empty)?.key ?? 'submit';
   });
   current = computed(() => this.selectedStep() ?? this.firstOpen());
@@ -132,18 +152,34 @@ export class SanteiComponent implements OnInit {
   });
 
   actions = computed<BulkAction[]>(() => {
+    const year = `${this.year}年`;
     switch (this.current()) {
       case 'target':
-        return [{ key: 'decidePrevious', label: '従前の等級で決める', appliesTo: r => r.statusLabel === '決め方が必要' && !!this.rowsById().get(r.id)?.current }];
+        return [{ key: 'decidePrevious', label: '従前の等級で決める', appliesTo: r => r.statusLabel === '決め方が必要' && !!this.rowsById().get(r.id)?.current,
+          caution: '支払基礎日数の基準を満たす月がない人は、従前の標準報酬月額（今の等級）で決めるのが原則です。' }];
       case 'review':
         return [
-          { key: 'requestGradeApproval', label: '承認を依頼', appliesTo: r => r.tone === 'action' },
-          ...(this.canApprove() ? [{ key: 'approveGrade', label: '承認する', appliesTo: (r: TargetRow) => r.tone === 'yours' }] : []),
+          { key: 'requestGradeApproval', label: '承認を依頼する', appliesTo: r => ['依頼前', '差し戻し'].includes(r.statusLabel),
+            caution: '新しい等級は9月分から1年間の保険料を決めます。依頼中は直せません。',
+            confirm: { title: `${year}の定時決定の等級の承認を依頼する`, message: '4〜6月の平均から決めた新しい等級の承認を、別の担当者（管理者・承認者）に依頼します。', notice: '承認する直前に、サーバーが判定し直します。' } },
+          ...(this.canApprove() ? [{ key: 'approveGrade', label: '承認する', appliesTo: (r: TargetRow) => r.statusLabel === 'あなたの承認待ち',
+            caution: '承認した等級は9月分から使われます。',
+            confirm: { title: `${year}の定時決定の等級を承認する`, message: '一覧で平均と等級を確かめた人の等級を承認します。9月分からの保険料に使われます。', notice: '内容が変わっていた人は承認されず、差し戻しになります。' } }] : []),
         ];
       default:
         return [];
     }
   });
+  /** 操作バーの文言（一括操作のないステップ） */
+  barInfo = computed(() => {
+    if (!this.data()) return '';
+    switch (this.current()) {
+      case 'filing': return this.toFile().length ? `${this.toFile().length}名が届出にまだ載っていません` : '届出に載せる人はいません（等級が承認された人が対象です）';
+      default: return '';
+    }
+  });
+  /** 届出のステップの注意（期限） */
+  filingCaution = computed(() => `算定基礎届の期限は ${this.year}年7月10日。保留中の人と、等級がまだ承認されていない人は載りません。`);
   cellHeader = computed(() => ({ target: '4〜6月の平均', review: '平均 / 等級', filing: '新しい等級', submit: '' })[this.current()]);
 
   targetRows = computed<TargetRow[]>(() => {
@@ -154,7 +190,7 @@ export class SanteiComponent implements OnInit {
       if (!state) return [];
       const reason = step === 'review' && r.approval.status === 'rejected' ? `差し戻しの理由：${r.approval.rejection}`
         : step === 'review' && state.tone !== 'done' && r.septemberTaken ? '9月の等級が定時決定以外で登録済みです（等級の画面で確かめてください）'
-        : step === 'target' || state.tone === 'action' ? r.reason : undefined;
+        : step === 'target' || state.tone === 'attention' ? r.reason : undefined;
       return [{
         id: r.employeeId, name: r.employeeName, sub: r.employeeNumber, tone: state.tone, statusLabel: state.label, reason,
         held: r.hold ?? undefined, error: fails[r.employeeId],
@@ -205,14 +241,6 @@ export class SanteiComponent implements OnInit {
 
   chooseOffice(id: string) { void this.office.change(id); }
   selectStep(key: StepKey) { this.selectedStep.set(key); }
-
-  stepView(key: StepKey) {
-    const s = this.summaries().find(x => x.key === key)!;
-    if (s.done) return 'done';
-    if (s.empty) return 'empty';
-    if (s.todo === 0 && s.waiting > 0) return 'waiting';
-    return 'todo';
-  }
 
   private call<T>(name: string, data: object, timeout = 70_000) {
     return httpsCallable<object, T>(this.functions, name, { timeout })({ companyId: this.auth.companyId, officeId: this.office.selected(), year: this.year, ...data });
@@ -378,6 +406,12 @@ export class SanteiComponent implements OnInit {
       }).afterClosed());
       if (value === undefined || value === null) return;
       extra = action === 'reject' ? { comment: value } : action === 'paperSubmit' ? { date: value } : {};
+    } else if (action === 'requestApproval' || action === 'approve') {
+      const what = `${f.number}件目の算定基礎届`;
+      const ok = await this.confirm.ask(action === 'requestApproval'
+        ? { title: `${what}の承認を依頼する`, count: `${f.personCount}名`, message: '別の担当者（管理者・承認者）に、届出の承認を依頼します。', notice: '依頼中は届出を直せません。直すときは差し戻してもらいます。', confirmLabel: '承認を依頼する' }
+        : { title: `${what}を承認する`, count: `${f.personCount}名`, message: '内容とPDFを確かめた届出を承認します。承認すると提出できるようになります。', notice: '承認したあとに直すときは、承認を取り消します。', confirmLabel: '承認する' });
+      if (!ok) return;
     }
     this.busy.set(true);
     try {
@@ -410,14 +444,9 @@ export class SanteiComponent implements OnInit {
     }
   }
 
-  async open(id: string) {
-    const r = this.row(id);
-    const d = this.data();
-    if (!r || !d) return;
-    const changed = await firstValueFrom(this.dialog.open(SanteiDetailDialogComponent, {
-      data: { row: r, year: d.year, officeId: d.office.id }, width: '680px', maxWidth: '95vw',
-    }).afterClosed());
-    if (changed === 'previous' || changed === 'undo') await this.decide([id], changed === 'previous' ? 'previous' : null);
+  /** 右のパネルで選んだ決め方（従前の等級で決める・取り消す） */
+  personDecide(id: string, choice: 'previous' | 'undo') {
+    return this.decide([id], choice === 'previous' ? 'previous' : null);
   }
 }
 

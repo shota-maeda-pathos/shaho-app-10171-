@@ -1,7 +1,6 @@
 <div class="app-page">
-  <h1 class="app-page-title">毎月の処理</h1>
-
   @if (!office.selected()) {
+    <app-page-head heading="毎月の処理" kicker="毎月の処理" />
     <p class="app-page-guide">毎月の処理を進める事業所を選んでください。</p>
     <div class="offices">
       @for (item of office.offices(); track item.id) {
@@ -9,18 +8,22 @@
       }
     </div>
   } @else {
-    <div class="period">
-      <label>給与の支給月
-        <input type="month" [ngModel]="payMonth" (ngModelChange)="changeMonth($event)" [disabled]="busy()">
-      </label>
+    <!-- 1. 見出し -->
+    <app-page-head [heading]="monthLabel(payMonth) + '支給の給与と保険料'" kicker="毎月の処理">
       @if (data(); as d) {
-        <div class="period-note">
-          {{ d.office.name }}・{{ monthLabel(d.payMonth) }}に支給する給与から、<strong>{{ monthLabel(d.premiumMonth) }}分</strong>の保険料を控除します
-          （{{ d.deductionMethod === 'previous' ? '翌月控除' : '当月控除' }}<app-term key="deduction" [showLabel]="false" />）
-        </div>
+        <ng-container meta>
+          <span>{{ d.office.name }}</span>
+          <span><b>{{ monthLabel(d.premiumMonth) }}分</b>の保険料を控除（{{ d.deductionMethod === 'previous' ? '翌月控除' : '当月控除' }}<app-term key="deduction" [showLabel]="false" />）</span>
+          <span>対象 <b>{{ d.rows.length }}名</b></span>
+        </ng-container>
       }
-      <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || busy()"><mat-icon>refresh</mat-icon>読み込み直す</button>
-    </div>
+      <ng-container actions>
+        <label class="month">支給月
+          <input type="month" [ngModel]="payMonth" (ngModelChange)="changeMonth($event)" [disabled]="busy()">
+        </label>
+        <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || busy()"><mat-icon>refresh</mat-icon>読み込み直す</button>
+      </ng-container>
+    </app-page-head>
 
     @if (job(); as j) {
       @if (j.status === 'running') {
@@ -38,41 +41,12 @@
     } @else if (!data() && loading()) {
       <app-loading-state message="対象者の状況を読み込んでいます…" />
     } @else if (data(); as d) {
-      <nav class="steps" aria-label="毎月の処理のステップ">
-        <ol>
-          @for (s of steps; track s.key; let i = $index) {
-            @let sum = summaries()[i];
-            <li [attr.data-view]="stepView(s.key)" [class.current]="current() === s.key">
-              <button type="button" (click)="selectStep(s.key)" [attr.aria-current]="current() === s.key ? 'step' : null">
-                <span class="mark" aria-hidden="true">
-                  @switch (stepView(s.key)) {
-                    @case ('done') { <mat-icon>check</mat-icon> }
-                    @case ('waiting') { <mat-icon>hourglass_empty</mat-icon> }
-                    @default { {{ i + 1 }} }
-                  }
-                </span>
-                <span class="step-text">
-                  <span class="step-label">{{ s.label }}</span>
-                  <span class="step-count">
-                    @if (sum.empty) { 対象なし }
-                    @else if (sum.done) { 完了 }
-                    @else if (sum.todo) { 残り{{ sum.todo }}名 }
-                    @else { {{ sum.waiting }}名 承認待ち }
-                  </span>
-                </span>
-              </button>
-            </li>
-          }
-        </ol>
-      </nav>
+      <!-- 2. 横並びのステップ -->
+      <app-stepper [steps]="stepItems()" [current]="current()" label="毎月の処理のステップ" (select)="selectStep($any($event))" />
 
+      <!-- 3. 本体 -->
       <section class="panel" aria-labelledby="step-title">
-        <h2 id="step-title">{{ currentDef().label }}</h2>
-        <dl class="guide">
-          <div><dt>やること</dt><dd>{{ currentDef().what }}</dd></div>
-          <div><dt>なぜ必要か</dt><dd>{{ currentDef().why }}</dd></div>
-          <div><dt>次に起きること</dt><dd>{{ currentDef().next }}</dd></div>
-        </dl>
+        <app-step-lead [heading]="currentDef().label" [text]="currentDef().what" headingId="step-title" />
 
         @if (reviewNote(); as note) {
           <div class="note" [attr.data-mine]="note.mine" role="status"><mat-icon aria-hidden="true">{{ note.mine ? 'hourglass_empty' : 'fact_check' }}</mat-icon>{{ note.text }}</div>
@@ -82,14 +56,15 @@
           @case ('salary') {
             <div class="import">
               <div class="import-actions">
-                <button mat-stroked-button type="button" (click)="downloadTemplate()"><mat-icon>download</mat-icon>取込用のCSVをダウンロード</button>
                 <label class="file" [class.disabled]="busy()">
                   <mat-icon>upload_file</mat-icon>CSVを選んで確認する
                   <input type="file" accept=".csv,text/csv" (change)="pickCsv($event)" [disabled]="busy()">
                 </label>
+                <button mat-button type="button" (click)="downloadTemplate()"><mat-icon>download</mat-icon>取込用のCSV</button>
+                <span class="hint">手当の列は下の給与項目（「固定:〇〇」「非固定:〇〇」でも可）。給与がない月の人は「無給」の列に 1。<app-term key="paymentBasisDays" /></span>
               </div>
               <div class="items">
-                <span class="items-label">給与項目（CSVの手当の列）：</span>
+                <span class="items-label">給与項目：</span>
                 @for (item of salaryItems(); track item.name) {
                   <span class="item-chip">{{ item.name }}（{{ item.kind === 'fixed' ? '固定的' : '非固定的' }}）</span>
                 }
@@ -115,10 +90,6 @@
                   </div>
                 </div>
               }
-              <p class="hint">
-                ダウンロードしたCSVに金額を入れて取り込みます。手当の列は上の給与項目です（「固定:〇〇」「非固定:〇〇」と書けば、登録していない手当も使えます）。
-                給与がない月の人は「無給」の列に 1 を入れるか、一覧で「無給として記録」を押します。<app-term key="paymentBasisDays" />
-              </p>
               @if (importResult(); as res) {
                 <div class="import-result">
                   <h3>{{ res.dryRun ? '取込前の確認' : '取込の結果' }}{{ csvName() ? '：' + csvName() : '' }}</h3>
@@ -167,28 +138,25 @@
             </div>
           }
           @case ('premiumReview') {
-            <div class="totals" aria-label="事業所の合計">
-              <div><span>本人負担の合計</span><strong>{{ d.totals.employee | number }}円</strong>
-                <small>前月比 {{ d.totals.employee - d.totals.previousEmployee >= 0 ? '+' : '' }}{{ d.totals.employee - d.totals.previousEmployee | number }}円</small></div>
-              <div><span>会社負担の合計</span><strong>{{ d.totals.employer | number }}円</strong>
-                <small>前月比 {{ d.totals.employer - d.totals.previousEmployer >= 0 ? '+' : '' }}{{ d.totals.employer - d.totals.previousEmployer | number }}円</small></div>
-              <div><span>納付する額（合計）</span><strong>{{ d.totals.employee + d.totals.employer | number }}円</strong>
-                <small>{{ monthLabel(d.premiumMonth) }}分</small></div>
-            </div>
+            <p class="totals" aria-label="事業所の合計">
+              本人負担 <b>{{ d.totals.employee | number }}円</b>（前月比 {{ d.totals.employee - d.totals.previousEmployee >= 0 ? '+' : '' }}{{ d.totals.employee - d.totals.previousEmployee | number }}円）・
+              会社負担 <b>{{ d.totals.employer | number }}円</b>（前月比 {{ d.totals.employer - d.totals.previousEmployer >= 0 ? '+' : '' }}{{ d.totals.employer - d.totals.previousEmployer | number }}円）・
+              納付する額 <b>{{ d.totals.employee + d.totals.employer | number }}円</b>（{{ monthLabel(d.premiumMonth) }}分）
+            </p>
           }
           @case ('collection') {
-            <div class="totals" aria-label="徴収の合計">
-              <div><span>集める本人負担</span><strong>{{ d.totals.due | number }}円</strong></div>
-              <div><span>徴収済み</span><strong>{{ d.totals.collected | number }}円</strong></div>
-              <div><span>未徴収</span><strong [class.bad]="d.totals.due - d.totals.collected > 0">{{ d.totals.due - d.totals.collected | number }}円</strong>
-                <small>別途入金<app-term key="separateCollection" [showLabel]="false" />の人は、名前を押して入金を記録します</small></div>
-            </div>
+            <p class="totals" aria-label="徴収の合計">
+              集める本人負担 <b>{{ d.totals.due | number }}円</b>・徴収済み <b>{{ d.totals.collected | number }}円</b>・
+              未徴収 <b [class.bad]="d.totals.due - d.totals.collected > 0">{{ d.totals.due - d.totals.collected | number }}円</b>
+              （別途入金<app-term key="separateCollection" [showLabel]="false" />の人は、名前を押して入金を記録します）
+            </p>
           }
         }
 
+        <!-- 対象者の表と、カードの一番下の操作バー -->
         <app-target-list [rows]="targetRows()" [actions]="actions()" [busy]="busy() || loading()" [loading]="loading()" [cellHeader]="cellHeader()" [includeYours]="true"
-                         (run)="run($event)" (retryFailed)="retry($event)" (hold)="hold($event.id, $event.reason)"
-                         (release)="hold($event, null)" (open)="open($event.id)">
+                         [emptyInfo]="barInfo()"
+                         (run)="run($event)" (retryFailed)="retry($event)" (hold)="hold($event.id, $event.reason)" (release)="hold($event, null)">
           <ng-template appTargetCell let-t>
             @if (row(t.id); as r) {
               @switch (current()) {
@@ -205,11 +173,12 @@
               }
             }
           </ng-template>
+          <ng-template appTargetDetail let-t>
+            @if (row(t.id); as r) {
+              <app-monthly-person [row]="r" [payMonth]="d.payMonth" [premiumMonth]="d.premiumMonth" [officeId]="d.office.id" (changed)="load()" />
+            }
+          </ng-template>
         </app-target-list>
-
-        <p class="links">
-          給与を1人ずつ直すときは名前を押してください。承認の差し戻しは <a routerLink="/approvals">承認の画面</a> から行えます。
-        </p>
       </section>
     }
   }

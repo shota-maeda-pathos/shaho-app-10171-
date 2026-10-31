@@ -136,24 +136,25 @@ export const FILING_STATUS_LABELS: Record<FilingStatus, string> = {
 };
 
 /**
- * 1人分のステップごとの状態。サーバーの santei/progress.ts の santeiStepState と同じ判定（変えるときは両方を直す）。
+ * 1人分のステップごとの状態。サーバーの santei/progress.ts の santeiStepState と同じ判定（変えるときは両方を直す。色は画面だけ：
+ * 自分が進める＝yours、給与の未承認・決め方・差し戻し＝attention）。
  * そのステップの対象でなければ null
  */
 export function stepState(step: Exclude<StepKey, 'submit'>, r: SanteiRow): { tone: StatusTone; label: string } | null {
   switch (step) {
     case 'target':
       if (r.status === 'excluded') return { tone: 'done', label: '対象外' };
-      if (r.status === 'pending') return { tone: 'action', label: r.months.some(m => m.cash === null) ? '給与 未登録' : '給与 未承認' };
-      if (r.status === 'needsAction') return { tone: 'action', label: '決め方が必要' };
+      if (r.status === 'pending') return { tone: 'attention', label: r.months.some(m => m.cash === null) ? '給与 未登録' : '給与 未承認' };
+      if (r.status === 'needsAction') return { tone: 'attention', label: '決め方が必要' };
       return { tone: 'done', label: '対象' };
     case 'review':
       if (r.approval.status === 'approved') return { tone: 'done', label: '承認済み' };
       if (r.approval.status === 'pending') return { tone: 'waiting', label: '承認待ち' };
       if (r.status !== 'ok') return null;
-      return { tone: 'action', label: r.approval.status === 'rejected' ? '差し戻し' : '依頼前' };
+      return r.approval.status === 'rejected' ? { tone: 'attention', label: '差し戻し' } : { tone: 'yours', label: '依頼前' };
     case 'filing':
       if (r.approval.status !== 'approved') return null;
-      return r.filingId ? { tone: 'done', label: '届出に記載' } : { tone: 'action', label: '届出 未作成' };
+      return r.filingId ? { tone: 'done', label: '届出に記載' } : { tone: 'yours', label: '届出 未作成' };
   }
 }
 

@@ -1,7 +1,6 @@
 <div class="app-page">
-  <h1 class="app-page-title">算定基礎届<app-term key="santei" [showLabel]="false" /></h1>
-
   @if (!office.selected()) {
+    <app-page-head heading="算定基礎届" kicker="算定基礎届" />
     <p class="app-page-guide">算定基礎届を作る事業所を選んでください。</p>
     <div class="offices">
       @for (item of office.offices(); track item.id) {
@@ -9,20 +8,26 @@
       }
     </div>
   } @else {
-    <div class="period">
-      <label>対象の年
-        <select [ngModel]="year" (ngModelChange)="changeYear($event)" [disabled]="busy()" aria-label="対象の年">
-          @for (y of years; track y) { <option [ngValue]="y">{{ y }}年</option> }
-        </select>
-      </label>
+    <!-- 1. 見出し -->
+    <app-page-head [heading]="year + '年の定時決定'" kicker="算定基礎届">
+      <ng-container headingExtra><app-term key="santei" [showLabel]="false" /></ng-container>
       @if (data(); as d) {
-        <div class="period-note">
-          {{ d.office.name }}・{{ d.year }}年4〜6月に支払った給与から、<strong>{{ d.year }}年9月分</strong>からの標準報酬月額を決めます。
-          届出期間は <strong>{{ d.year }}年7月1日〜10日</strong>です。
-        </div>
+        <ng-container meta>
+          <span>{{ d.office.name }}</span>
+          <span>4〜6月の給与から <b>{{ d.year }}年9月分</b>からの等級を決める</span>
+          <span>対象 <b>{{ d.rows.length }}名</b></span>
+          <span>届出期間 <b>7月1日〜10日</b></span>
+        </ng-container>
       }
-      <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || busy()"><mat-icon>refresh</mat-icon>読み込み直す</button>
-    </div>
+      <ng-container actions>
+        <label class="month">対象の年
+          <select [ngModel]="year" (ngModelChange)="changeYear($event)" [disabled]="busy()" aria-label="対象の年">
+            @for (y of years; track y) { <option [ngValue]="y">{{ y }}年</option> }
+          </select>
+        </label>
+        <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || busy()"><mat-icon>refresh</mat-icon>読み込み直す</button>
+      </ng-container>
+    </app-page-head>
 
     @if (job(); as j) {
       @if (j.status === 'running') {
@@ -46,75 +51,33 @@
           <div>
             <strong>{{ d.year }}年の算定基礎届は提出済みです。</strong>
             {{ changedCounts().total }}名の新しい等級（上がる {{ changedCounts().up }}名・下がる {{ changedCounts().down }}名・変わらない {{ changedCounts().same }}名）が、{{ d.year }}年9月分の保険料から使われます。
-            毎月の処理で9月分を計算するときに、新しい等級が自動で使われます。
           </div>
         </div>
       }
 
-      <nav class="steps" aria-label="算定基礎届のステップ">
-        <ol>
-          @for (s of steps; track s.key; let i = $index) {
-            @let sum = summaries()[i];
-            <li [attr.data-view]="stepView(s.key)" [class.current]="current() === s.key">
-              <button type="button" (click)="selectStep(s.key)" [attr.aria-current]="current() === s.key ? 'step' : null">
-                <span class="mark" aria-hidden="true">
-                  @switch (stepView(s.key)) {
-                    @case ('done') { <mat-icon>check</mat-icon> }
-                    @case ('waiting') { <mat-icon>hourglass_empty</mat-icon> }
-                    @default { {{ i + 1 }} }
-                  }
-                </span>
-                <span class="step-text">
-                  <span class="step-label">{{ s.label }}</span>
-                  <span class="step-count">
-                    @if (sum.empty) { 対象なし }
-                    @else if (sum.done) { 完了 }
-                    @else if (sum.todo) { 残り{{ sum.todo }}{{ sum.unit }} }
-                    @else { {{ sum.waiting }}{{ sum.unit }} 承認待ち }
-                  </span>
-                </span>
-              </button>
-            </li>
-          }
-        </ol>
-      </nav>
+      <!-- 2. 横並びのステップ -->
+      <app-stepper [steps]="stepItems()" [current]="current()" label="算定基礎届のステップ" (select)="selectStep($any($event))" />
 
+      <!-- 3. 本体 -->
       <section class="panel" aria-labelledby="step-title">
-        <h2 id="step-title">{{ currentDef().label }}</h2>
-        <dl class="guide">
-          <div><dt>やること</dt><dd>{{ currentDef().what }}</dd></div>
-          <div><dt>なぜ必要か</dt><dd>{{ currentDef().why }}</dd></div>
-          <div><dt>次に起きること</dt><dd>{{ currentDef().next }}</dd></div>
-        </dl>
+        <app-step-lead [heading]="currentDef().label" [text]="currentDef().what" headingId="step-title">
+          @if (current() === 'target') { <span right><app-term key="paymentBasisDays" /></span> }
+        </app-step-lead>
 
         @if (reviewNote(); as note) {
           <div class="note" [attr.data-mine]="note.mine" role="status"><mat-icon aria-hidden="true">{{ note.mine ? 'hourglass_empty' : 'fact_check' }}</mat-icon>{{ note.text }}</div>
         }
 
-        @switch (current()) {
-          @case ('target') {
-            <p class="hint">
-              支払基礎日数<app-term key="paymentBasisDays" [showLabel]="false" />の基準は、一般 17日以上・パート 17日以上（なければ15日以上）・短時間労働者 11日以上です。
-              給与の承認は <a routerLink="/monthly" [queryParams]="{ officeId: d.office.id, payMonth: d.year + '-06' }">毎月の処理</a> で行います。
-            </p>
-          }
-          @case ('filing') {
-            <div class="filing-create">
-              @if (toFile().length) {
-                <button mat-flat-button type="button" (click)="createFiling()" [disabled]="busy()">
-                  <mat-icon>note_add</mat-icon>{{ toFile().length }}名分の算定基礎届を作る
-                </button>
-                <span class="hint">保留中の人と、まだ承認されていない人は載りません。後から追加の届出にできます。</span>
-              } @else {
-                <span class="hint">届出に載せる人はいません（等級が承認された人が対象です）。</span>
-              }
-            </div>
-          }
+        @if (current() === 'target') {
+          <p class="hint">
+            支払基礎日数の基準は、一般 17日以上・パート 17日以上（なければ15日以上）・短時間労働者 11日以上。
+            給与の承認は <a routerLink="/monthly" [queryParams]="{ officeId: d.office.id, payMonth: d.year + '-06' }">毎月の処理</a> で行います。
+          </p>
         }
 
         @if (current() === 'submit') {
           @if (!activeFilings().length) {
-            <p class="hint">まだ届出がありません。「算定基礎届を作る」で作ってください。</p>
+            <p class="hint">まだ届出がありません。「届出の作成」で作ってください。</p>
           }
           <ul class="filings">
             @for (f of activeFilings(); track f.id) {
@@ -122,7 +85,7 @@
                 <div class="filing-head">
                   <strong>{{ f.number }}件目の算定基礎届</strong>
                   <span>{{ f.personCount }}名</span>
-                  <span class="filing-status">{{ statusLabels[f.status] }}</span>
+                  <span class="app-status" [attr.data-tone]="filingTone(f)">{{ statusLabels[f.status] }}</span>
                 </div>
                 @if (f.rejection && f.status === 'draft') { <p class="bad">差し戻されました。理由：{{ f.rejection }}（取り消して作り直すか、そのまま承認を依頼し直します）</p> }
                 @if (f.status === 'pending') {
@@ -132,7 +95,7 @@
                   <button mat-stroked-button type="button" (click)="openFiling(f)" [disabled]="busy()"><mat-icon>description</mat-icon>内容とPDFを見る</button>
                   @switch (f.status) {
                     @case ('draft') {
-                      <button mat-flat-button type="button" (click)="updateFiling(f, 'requestApproval')" [disabled]="busy()">承認を依頼</button>
+                      <button mat-flat-button type="button" (click)="updateFiling(f, 'requestApproval')" [disabled]="busy()">承認を依頼する</button>
                       <button mat-button type="button" (click)="updateFiling(f, 'cancel')" [disabled]="busy()">取り消す</button>
                     }
                     @case ('pending') {
@@ -153,15 +116,16 @@
             }
           </ul>
           @if (toFile().length) {
-            <p class="hint">まだ届出に載っていない人が{{ toFile().length }}名います。「算定基礎届を作る」で追加の届出を作ってください。</p>
+            <p class="hint">まだ届出に載っていない人が{{ toFile().length }}名います。「届出の作成」で追加の届出を作ってください。</p>
           }
           @if (cancelledFilings().length) {
             <p class="hint">取り消した届出：{{ cancelledFilings().length }}件</p>
           }
         } @else {
+          <!-- 対象者の表と、カードの一番下の操作バー -->
           <app-target-list [rows]="targetRows()" [actions]="actions()" [busy]="busy() || loading()" [loading]="loading()" [cellHeader]="cellHeader()" [includeYours]="true"
-                           (run)="run($event)" (retryFailed)="retry($event)" (hold)="hold($event.id, $event.reason)"
-                           (release)="hold($event, null)" (open)="open($event.id)">
+                           [emptyInfo]="barInfo()"
+                           (run)="run($event)" (retryFailed)="retry($event)" (hold)="hold($event.id, $event.reason)" (release)="hold($event, null)">
             <ng-template appTargetCell let-t>
               @if (row(t.id); as r) {
                 @switch (current()) {
@@ -174,12 +138,21 @@
                 }
               }
             </ng-template>
+            <ng-template appTargetDetail let-t>
+              @if (row(t.id); as r) {
+                <app-santei-person [row]="r" [year]="d.year" [officeId]="d.office.id" [busy]="busy()" (decide)="personDecide(r.employeeId, $event)" />
+              }
+            </ng-template>
+            @if (current() === 'filing' && toFile().length) {
+              <ng-container barActions>
+                <span class="bar-notice"><mat-icon aria-hidden="true">info</mat-icon>{{ filingCaution() }}</span>
+                <button mat-flat-button type="button" (click)="createFiling()" [disabled]="busy()">
+                  算定基礎届を作る（{{ toFile().length }}名）<mat-icon iconPositionEnd>arrow_forward</mat-icon>
+                </button>
+              </ng-container>
+            }
           </app-target-list>
         }
-
-        <p class="links">
-          1人分の4〜6月の内訳は名前を押すと見られます。等級の差し戻しは <a routerLink="/approvals">承認の画面</a> から行えます。
-        </p>
       </section>
     }
   }
