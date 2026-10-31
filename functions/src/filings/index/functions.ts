@@ -1,4 +1,5 @@
 import { onCall } from 'firebase-functions/v2/https';
+import { auditAccess } from '../../utils/audit';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { getAuthContext, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validation';
@@ -19,7 +20,9 @@ export const filingSearch = onCall({ timeoutSeconds: 60, memory: '512MiB' }, asy
   const input = validate(FilingSearchSchema, request.data);
   const auth = await getAuthContext(request, input.companyId);
   requireRole(auth, 'admin', 'operator', 'approver');
-  return searchFilings(input, auth);
+  const data = await searchFilings(input, auth);
+  if (input.keyword) await auditAccess(auth, 'filing', 'search', 'search', { keyword: input.keyword });
+  return data;
 });
 
 /** 既存の届出を索引に入れ直す（移行用。管理者だけ） */

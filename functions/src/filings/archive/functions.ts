@@ -1,4 +1,5 @@
 import { onCall } from 'firebase-functions/v2/https';
+import { auditAccess } from '../../utils/audit';
 import { getAuthContext, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validation';
 import { ArchiveBatchSchema, ArchiveGetSchema, ArchiveListSchema } from './schema';
@@ -19,11 +20,17 @@ export const filingArchiveList = onCall(async (request) => {
 /** 保存原本の中身（PDFを作り直す） */
 export const filingArchiveGet = onCall(async (request) => {
   const input = validate(ArchiveGetSchema, request.data);
-  return getArchive(input, await staff(request, input.companyId));
+  const auth = await staff(request, input.companyId);
+  const data = await getArchive(input, auth);
+  await auditAccess(auth, 'filingArchive', input.archiveId ?? 'latest', 'pdfGenerate', { ...input, companyId: undefined });
+  return data;
 });
 
 /** ZIP の一括ダウンロード用に、選んだ届出の原本をまとめて返す */
 export const filingArchiveBatch = onCall({ timeoutSeconds: 120, memory: '512MiB' }, async (request) => {
   const input = validate(ArchiveBatchSchema, request.data);
-  return batchArchives(input, await staff(request, input.companyId));
+  const auth = await staff(request, input.companyId);
+  const data = await batchArchives(input, auth);
+  await auditAccess(auth, 'filingArchive', 'zip', 'zipDownload', { ...input, companyId: undefined });
+  return data;
 });

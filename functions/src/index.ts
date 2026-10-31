@@ -88,7 +88,8 @@ lazy(() => require('./users/user-suspend/functions'), ['userSuspend', 'userUnsus
 lazy(() => require('./users/invitation-list/functions'), ['invitationList']);
 
 // 監査ログAPI
-lazy(() => require('./audit/audit-log-list/functions'), ['auditLogList']);
+lazy(() => require('./audit/audit-log-list/functions'), ['auditLogList', 'auditLogExport', 'auditLogVerify']);
+lazy(() => require('./audit/seal'), ['auditLogSeal']);
 
 // ダッシュボードAPI
 lazy(() => require('./dashboard/dashboard-stats/functions'), ['dashboardStats']);

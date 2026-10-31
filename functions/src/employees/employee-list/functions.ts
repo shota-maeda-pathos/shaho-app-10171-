@@ -1,4 +1,5 @@
 import { onCall } from 'firebase-functions/v2/https';
+import { auditAccess } from '../../utils/audit';
 import {
   getAuthContext,
   requireLoginEnabled,
@@ -15,5 +16,7 @@ export const employeeList = onCall(async (request) => {
   requireLoginEnabled(auth);
   requireNotSuspended(auth);
   requireRole(auth, 'admin', 'operator', 'approver', 'viewer');
-  return listEmployees(input, auth);
+  const data = await listEmployees(input, auth);
+  if (input.keyword) await auditAccess(auth, 'employee', 'search', 'search', { keyword: input.keyword });
+  return data;
 });

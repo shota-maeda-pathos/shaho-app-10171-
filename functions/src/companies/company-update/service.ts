@@ -36,11 +36,21 @@ export async function updateCompany(
       'postalCode', 'specificApplicableOffice', 'laborConsultant', 'allowedGoogleDomains',
     ] as const;
 
+    // 設定の変更は前後の値を監査ログに残す（カタログ14章）
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
     for (const f of fields) {
-      if (input[f] !== undefined) updates[f] = input[f];
+      if (input[f] === undefined) continue;
+      updates[f] = input[f];
+      if (JSON.stringify(data[f] ?? null) !== JSON.stringify(input[f])) changes[f] = { from: data[f] ?? null, to: input[f] };
     }
 
     tx.set(ref, updates, { merge: true });
+    if (Object.keys(changes).length > 0) {
+      tx.set(db.collection(`companies/${auth.companyId}/auditLogs`).doc(), {
+        entity: 'company', entityId: auth.companyId, action: 'update', changes,
+        performedBy: auth.uid, performedAt: updates.updatedAt, version: currentVersion + 1,
+      });
+    }
   });
 
   return { success: true, id: auth.companyId };
