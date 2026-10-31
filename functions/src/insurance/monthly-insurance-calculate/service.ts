@@ -188,6 +188,8 @@ export async function calculateMonthlyInsurance(
       sameMonthAcquisitionAndLoss: coverage.sameMonthAcquisitionAndLoss,
       roundingRule,
       rateFingerprint: rateFingerprint(rates),
+      // 今の等級で計算したので、等級の変化の印（grades/outdated.ts）を外す
+      gradeOutdated: false,
       lastRejection: null,
       isConfirmed: false,
       approvalPending: false,

@@ -9,7 +9,7 @@ import {
 import { MutationResponse } from '../../types/response';
 import { notFound, invalidArg } from '../../utils/errors';
 import { isLongTermCareAge, isPensionExcluded, isHealthExcluded } from '../../utils/age';
-import { findAllRates } from '../../utils/insurance-rate';
+import { findAllRates, rateFingerprint } from '../../utils/insurance-rate';
 import { calculateChildSupportPayment } from '../../utils/child-support-payment';
 import { decideExemption } from '../../utils/exemption-period';
 import { normalizeEmployment, qualificationDates } from '../../utils/employment';
@@ -186,6 +186,8 @@ export async function calculateBonusInsurance(
       isPensionExcluded: pensionExcl,
       isLongTermCareApplicable: ltcAge,
       exemptionIds: exemption.exemptionIds,
+      // 計算後に料率マスタが変わったかを見分ける（毎月の保険料と同じ）
+      rateFingerprint: rateFingerprint(rates),
       isConfirmed: false,
       approvalPending: false,
       version,

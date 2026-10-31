@@ -8,6 +8,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { ConfirmService } from '../../../shared/confirm-dialog/confirm-dialog';
 
 interface PreviewItem { line: number; typeLabel: string; prefectureCode: string; insurerId: string; appliedFrom: string; totalRate: number; employeeRate: number; employerRate: number; current: { totalRate: number; appliedFrom: string } | null; change: number | null; duplicate: boolean }
+interface ImpactRow { officeId: string; officeName: string; kind: 'monthly' | 'bonus'; yearMonth: string; unconfirmed: number; pending: number; confirmed: number }
 interface HistoryItem { typeLabel: string; prefectureCode: string; insurerId: string; appliedFrom: string; appliedUntil: string | null; totalRate: number; employeeRate: number; employerRate: number; note: string }
 
 const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始年月,料率(‰),本人負担(‰),会社負担(‰),備考\n健康保険,13,,2027-03,99.1,,,東京都\n介護保険,,,2027-03,15.9,,,\n';
@@ -38,6 +39,17 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
           }
         </tbody></table>
         @if (hasDuplicate()) { <p class="errors">同じ開始月の料率がもう登録されている行があります（色の付いた行）。CSV から外してください。</p> }
+        <h3>切替月以降で、すでに計算した保険料</h3>
+        @if (impact().length) {
+          <p class="sub">切り替えたあと、未確定の人は毎月の処理で「計算し直しが必要」、確定済みの人は「訂正が必要」と出ます（料率の値が同じなら出ません）。自動では計算し直しません。
+            切り替える前に新しい料率での額を見るなら <a routerLink="/simulation">試算の「料率改定」</a> を使います。</p>
+          <table><thead><tr><th>事業所</th><th>月</th><th>種類</th><th class="num">未確定</th><th class="num">依頼中</th><th class="num">確定済み</th></tr></thead><tbody>
+            @for (r of impact(); track r.officeId + r.kind + r.yearMonth) {
+              <tr><td>{{ r.officeName }}</td><td>{{ r.yearMonth }}</td><td>{{ r.kind === 'monthly' ? '毎月' : '賞与' }}</td>
+                <td class="num">{{ r.unconfirmed || '' }}</td><td class="num">{{ r.pending || '' }}</td><td class="num" [class.warn]="r.confirmed > 0">{{ r.confirmed || '' }}</td></tr>
+            }
+          </tbody></table>
+        } @else { <p class="sub">切替月以降に計算した保険料はありません。</p> }
         <button mat-flat-button color="primary" type="button" (click)="apply()" [disabled]="busy() || errors().length > 0 || hasDuplicate()">この内容で取り込んで切り替える</button>
       }
 
@@ -59,6 +71,7 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
     td, th { padding: 4px 6px; border-bottom: 1px solid var(--app-color-border); text-align: left; }
     .num { text-align: right; } .small { font-size: var(--app-font-xs); color: var(--app-color-text-sub); }
     tr.dup td { background: var(--app-status-error-bg); }
+    td.warn { color: var(--app-status-error-fg); font-weight: 600; }
     .errors { color: var(--app-status-error-fg); font-size: var(--app-font-sm); }
     h3 { margin: 24px 0 8px; }
   `],
@@ -74,6 +87,7 @@ export class RateManagementComponent implements OnInit {
   busy = signal(false);
   items = signal<PreviewItem[]>([]);
   errors = signal<string[]>([]);
+  impact = signal<ImpactRow[]>([]);
   history = signal<HistoryItem[]>([]);
 
   ngOnInit() { void this.loadHistory(); }
@@ -92,9 +106,10 @@ export class RateManagementComponent implements OnInit {
   async preview() {
     this.busy.set(true);
     try {
-      const { data } = await httpsCallable<object, { items: PreviewItem[]; errors: string[] }>(this.functions, 'rateImportPreview')({ companyId: this.auth.companyId, csv: this.csv });
+      const { data } = await httpsCallable<object, { items: PreviewItem[]; errors: string[]; impact?: ImpactRow[] }>(this.functions, 'rateImportPreview')({ companyId: this.auth.companyId, csv: this.csv });
       this.items.set(data.items);
       this.errors.set(data.errors);
+      this.impact.set(data.impact ?? []);
     } catch (e: any) {
       this.snackBar.open(`確かめられませんでした：${e?.message ?? ''}`, '閉じる', { duration: 6000 });
     } finally {
@@ -105,7 +120,7 @@ export class RateManagementComponent implements OnInit {
   async apply() {
     const ok = await this.confirm.ask({
       title: '料率を取り込んで切り替えますか',
-      message: '開始月より後の保険料の計算に新しい料率が使われます。すでに計算した月は、計算し直すまで前の料率のままです。',
+      message: '開始月より後の保険料の計算に新しい料率が使われます。すでに計算した月は、計算し直すまで前の料率のままです（確定済みの月は訂正して計算し直します）。',
       count: `${this.items().length}件`,
       items: this.items().map(i => `${i.typeLabel}（${i.prefectureCode || '全国'}）${i.appliedFrom}〜 ${i.totalRate}‰`),
       confirmLabel: '取り込む',

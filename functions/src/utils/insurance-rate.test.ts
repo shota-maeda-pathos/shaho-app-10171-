@@ -7,7 +7,21 @@ jest.mock('../config', () => ({
   },
 }));
 
-import { findApplicableRate, rateMatchScore } from './insurance-rate';
+import { findApplicableRate, rateMatchScore, rateValuesChanged } from './insurance-rate';
+
+describe('料率の変化（rateValuesChanged）', () => {
+  const fp = (cs: string) => `health:2026-03:49.25/49.25/98.5|pension:2020-09:91.5/91.5/183|longTermCare:2026-03:7.95/7.95/15.9|childSupport:2026-04:0/3.6/3.6|childSupportPayment:${cs}`;
+  it('支援金がマスタになかった時の計算は、同じ値の支援金を取り込んでも変わらないとみなす', () => {
+    expect(rateValuesChanged(fp('-'), fp('2026-04:1.15/1.15/2.3'), '2026-10')).toBe(false);
+  });
+  it('値が違えば変わったとみなす', () => {
+    expect(rateValuesChanged(fp('-'), fp('2026-04:1.2/1.2/2.4'), '2026-10')).toBe(true);
+    expect(rateValuesChanged(fp('-'), fp('-').replace('49.25/49.25/98.5', '49.55/49.55/99.1'), '2026-10')).toBe(true);
+  });
+  it('開始月だけ違う（同じ値の料率が足された）なら変わらない', () => {
+    expect(rateValuesChanged(fp('-'), fp('-').replace('health:2026-03', 'health:2027-03'), '2027-03')).toBe(false);
+  });
+});
 
 const rates = 'companies/c1/insuranceRates';
 const put = (id: string, data: Record<string, unknown>) => mockDb.setDoc(`${rates}/${id}`, { appliedUntil: null, employeeRate: 1, employerRate: 1, totalRate: 2, ...data });

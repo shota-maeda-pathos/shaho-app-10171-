@@ -11,7 +11,7 @@ import { calculateMonthlyInsurance } from '../insurance/monthly-insurance-calcul
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
 import { approveApprovalRequest } from '../approvals/approval-request-approve/service';
 import { periodTarget } from '../operations/service';
-import { findAllRates, rateFingerprint } from '../utils/insurance-rate';
+import { findAllRates, rateFingerprint, rateValuesChanged } from '../utils/insurance-rate';
 import { RevisionAlert, revisionAlerts } from '../grade-revision/alerts';
 import {
   CollectionPlan, CollectionStatus, DEFAULT_SALARY_ITEMS, DeductionMethod, PremiumFacts, SalaryItem, collectionPlan, collectionStatus, diffReasons,
@@ -111,6 +111,8 @@ export interface MonthlyRow {
   hold: null | { reason: string };
   /** 計算した後に料率マスタが変わった（承認前なら計算し直す） */
   stale: boolean;
+  /** 計算した後に変わったもの（'料率'・'等級'）。確定済み・依頼中でも出す（確定済みは訂正、依頼中は差し戻してから計算し直す） */
+  outdated: string[];
   /** 差し戻しの理由（直して出し直すまで出す） */
   rejected: { salary: string | null; premium: string | null };
   /** 随時改定の可能性（この支給月が変動月から3か月目） */
@@ -211,8 +213,17 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
     // 計算の前に止めるものではなく、計算し直しを促す（止めると「計算する」が押せない）
     if (p && premiumMonth >= '2026-04' && !p.childSupportPayment) warnings.push(p.isConfirmed ? '子ども・子育て支援金が入っていません。保険料を訂正して計算し直してください' : '子ども・子育て支援金を含めて計算し直してください');
 
-    const stale = !!p && !p.isConfirmed && !p.approvalPending && typeof p.rateFingerprint === 'string' && currentFingerprint !== null && p.rateFingerprint !== currentFingerprint;
-    if (stale) warnings.push('計算した後に料率が変わりました。計算し直してください');
+    // 料率は額が変わりうるときだけ（同じ値の料率が足されただけなら出さない）。等級は等級の書き込みのトリガーが印を付ける（grades/outdated.ts）
+    const outdated: string[] = [];
+    if (p && typeof p.rateFingerprint === 'string' && currentFingerprint !== null && rateValuesChanged(p.rateFingerprint, currentFingerprint, premiumMonth)) outdated.push('料率');
+    if (p?.gradeOutdated === true) outdated.push('等級');
+    const stale = outdated.length > 0 && !p!.isConfirmed && !p!.approvalPending;
+    if (outdated.length) {
+      const what = outdated.join('と');
+      warnings.push(p!.isConfirmed ? `確定した後に${what}が変わりました。保険料を訂正して計算し直してください`
+        : p!.approvalPending ? `確認を依頼した後に${what}が変わりました。差し戻してから計算し直してください`
+        : `計算した後に${what}が変わりました。計算し直してください`);
+    }
     const rejectionOf = (d: FirebaseFirestore.DocumentData | undefined) =>
       d?.lastRejection && !d.isConfirmed && !d.approvalPending ? String(d.lastRejection.comment || '理由の記入なし') : null;
     const reasons = p ? diffReasons(premiumFacts(p), prev ? premiumFacts(prev) : null) : [];
@@ -241,7 +252,7 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
         entries: Array.isArray(r?.entries) ? r!.entries : (collected !== null ? [{ method: 'legacy', amount: collected, date: '', note: r?.note ?? '' }] : []),
       },
       hold: h?.reason ? { reason: h.reason } : null,
-      stale,
+      stale, outdated,
       rejected: { salary: rejectionOf(s), premium: rejectionOf(p) },
       revision,
       otherEmployer: employee.otherEmployer?.name ?? null,

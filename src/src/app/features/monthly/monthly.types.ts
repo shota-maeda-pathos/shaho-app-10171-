@@ -25,6 +25,8 @@ export interface MonthlyRow {
   };
   hold: null | { reason: string };
   stale?: boolean;
+  /** 計算した後に変わったもの（'料率'・'等級'）。確定済み・依頼中でも出る。古いサーバーは返さない */
+  outdated?: string[];
   // 古いサーバーは返さないため省略可
   rejected?: { salary: string | null; premium: string | null };
   /** 随時改定の可能性（この支給月が変動月から3か月目）。古いサーバーは返さない */
@@ -102,6 +104,12 @@ export function stepState(step: StepKey, r: MonthlyRow): StepState | null {
       if (r.issues.length) return { tone: 'attention', label: '計算できません', reason: r.issues.join('／') };
       if (!r.premiumDue) return null;
       if (!p) return { tone: 'yours', label: '未計算' };
+      if (r.outdated?.length) {
+        const what = r.outdated.join('と');
+        if (p.confirmed) return { tone: 'attention', label: '訂正が必要', reason: `確定した後に${what}が変わりました。選んで「選んだ人の保険料を訂正する」を押し、計算し直してください` };
+        if (p.pending) return { tone: 'attention', label: '計算し直しが必要', reason: `確認を依頼した後に${what}が変わりました。差し戻してから計算し直してください` };
+        return { tone: 'attention', label: '計算し直しが必要', reason: `計算した後に${what}が変わりました` };
+      }
       if (r.stale) return { tone: 'attention', label: '計算し直しが必要', reason: '計算した後に料率が変わりました' };
       return { tone: 'done', label: `本人 ${yen(p.employee)}` };
     case 'premiumReview':

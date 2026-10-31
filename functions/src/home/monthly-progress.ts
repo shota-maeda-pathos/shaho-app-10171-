@@ -25,7 +25,8 @@ export function stepTone(step: StepKey, r: MonthlyRow): Tone | null {
       if (r.issues.length) return 'action';
       if (!r.premiumDue) return null;
       if (!p) return 'yours';
-      return r.stale ? 'action' : 'done';
+      // 確定済み・依頼中でも、計算した後に料率・等級が変わっていれば直す（確定済みは訂正）
+      return r.stale || r.outdated?.length ? 'action' : 'done';
     case 'premiumReview':
       if (!p) return null;
       if (p.confirmed) return 'done';
@@ -87,7 +88,9 @@ export function monthlyProgress({ rows, reviews, canApprove }: MonthlyProgressIn
   const todo = sums.find(s => s.action + s.yours > 0);
   if (todo) {
     const detail = [todo.action ? `要対応 ${todo.action}名` : null, heldNote].filter(Boolean).join('／') || null;
-    return { next: `${NEXT[todo.step]}（残り${todo.action + todo.yours}名）`, tone: todo.action ? 'action' : 'yours', detail };
+    // 残っているのが確定した後に料率・等級が変わった人だけなら、計算ではなく訂正
+    const correcting = todo.step === 'calculate' && active.filter(r => stepTone('calculate', r) === 'action' || stepTone('calculate', r) === 'yours').every(r => r.premium?.confirmed && r.outdated?.length);
+    return { next: `${correcting ? '保険料を訂正する' : NEXT[todo.step]}（残り${todo.action + todo.yours}名）`, tone: todo.action ? 'action' : 'yours', detail };
   }
   const wait = sums.find(s => s.waiting > 0);
   if (wait) {

@@ -5,7 +5,7 @@ const row = (patch: Partial<MonthlyRow> = {}): MonthlyRow => ({
   employeeId: 'e', employeeNumber: '1', name: 'テスト', salaryRequired: true, premiumDue: true, premiumNote: '',
   salary: null, premium: null, previous: null, diff: null, diffReasons: [], issues: [], warnings: [],
   collection: { plan: 'payroll', due: 0, collected: null, status: 'none' as never, version: 0, entries: [] },
-  hold: null, stale: false, rejected: { salary: null, premium: null }, revision: null, otherEmployer: null, ...patch,
+  hold: null, stale: false, outdated: [], rejected: { salary: null, premium: null }, revision: null, otherEmployer: null, ...patch,
 });
 const salary = (patch = {}) => ({ total: 300000, inKind: 0, basisDays: 30, noPay: false, noPayReason: '', confirmed: false, pending: false, published: false, version: 1, ...patch });
 const premium = (patch = {}) => ({ employee: 15000, employer: 15000, healthGrade: 22, pensionGrade: 19, exempted: false, confirmed: false, pending: false, version: 1, ...patch });
@@ -32,5 +32,12 @@ describe('ホーム：毎月の処理で次にやること', () => {
       collection: { plan: 'payroll', due: 15000, collected: 15000, status: 'done', version: 1, entries: [] },
     });
     expect(monthlyProgress({ rows: [done, row({ hold: { reason: '休職' } })], reviews: noReviews, canApprove: false })).toBeNull();
+  });
+  it('確定した後に料率・等級が変わった人だけが残っていれば、保険料の訂正', () => {
+    const changed = row({
+      salary: salary({ confirmed: true, published: true }), premium: premium({ confirmed: true }), outdated: ['等級'],
+      collection: { plan: 'payroll', due: 15000, collected: 15000, status: 'done', version: 1, entries: [] },
+    });
+    expect(monthlyProgress({ rows: [changed], reviews: noReviews, canApprove: false })).toMatchObject({ next: '保険料を訂正する（残り1名）', tone: 'action' });
   });
 });

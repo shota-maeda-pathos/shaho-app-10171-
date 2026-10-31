@@ -110,3 +110,30 @@ export function rateFingerprint(rates: AllRates): string {
     .map(k => { const r = rates[k]; return r ? `${k}:${r.appliedFrom}:${r.employeeRate}/${r.employerRate}/${r.totalRate ?? ''}` : `${k}:-`; })
     .join('|');
 }
+
+/** 指紋から保険の種類ごとの「本人/会社/全体」を取り出す。支援金がマスタにない月は計算と同じ既定値（2026年度 1.15/1.15）とみなす */
+function rateValues(fingerprint: string, yearMonth: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const part of fingerprint.split('|')) {
+    const [k, from, values] = part.split(':');
+    if (!k) continue;
+    if (from === '-' || values === undefined) {
+      if (k === 'childSupportPayment' && yearMonth >= '2026-04' && yearMonth <= '2027-03') out.set(k, '1.15/1.15/2.3');
+      continue;
+    }
+    const [e, r, t] = values.split('/').map(v => (v === '' ? NaN : Number(v)));
+    out.set(k, `${e}/${r}/${Number.isFinite(t) ? t : Math.round((e + r) * 10000) / 10000}`);
+  }
+  return out;
+}
+
+/**
+ * 計算した時の料率と今の料率で、保険料の額が変わりうるか。適用開始月だけが違う（同じ値の料率が足された）場合は変わらないとみなす。
+ * 例：子ども・子育て支援金の料率をマスタに取り込んだ月より前に計算した保険料（既定値と同じ値なので額は変わらない）
+ */
+export function rateValuesChanged(before: string, after: string, yearMonth: string): boolean {
+  const a = rateValues(before, yearMonth);
+  const b = rateValues(after, yearMonth);
+  const keys = new Set([...a.keys(), ...b.keys()]);
+  return [...keys].some(k => a.get(k) !== b.get(k));
+}

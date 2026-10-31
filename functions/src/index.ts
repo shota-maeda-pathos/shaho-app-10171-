@@ -44,6 +44,7 @@ lazy(() => require('./employments/employment-create/functions'), ['employmentCre
 // 等級API
 lazy(() => require('./grades/grade-create/functions'), ['gradeCreate']);
 lazy(() => require('./grades/grade-update/functions'), ['gradeUpdate']);
+lazy(() => require('./grades/outdated'), ['gradeOutdatedMark']);
 lazy(() => require('./santei/functions'), [
   'santeiRunOverview', 'santeiRunHold', 'santeiDecision', 'santeiJobStart', 'santeiJobGet', 'santeiJobChunk', 'santeiFilingCreate', 'santeiFilingUpdate', 'santeiFilingGet', 'sampleSanteiCreate',
 ]);
