@@ -1,6 +1,7 @@
 import { EmployeeExemptionsComponent } from './employee-exemptions';
 import { EmployeeLeavesComponent } from './employee-leaves';
 import { EmployeeBonusComponent } from './employee-bonus';
+import { EmployeeMyNumberComponent } from './employee-my-number';
 import { Component, inject, signal, OnInit, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
@@ -53,7 +54,6 @@ interface EmployeeForm {
   healthInsuranceNumber: string;
   pensionNumber: string;
   basicPensionNumber: string;
-  myNumber: string;
   address: string;
   memo: string;
 }
@@ -130,7 +130,7 @@ interface OnboardResult {
   standalone: true,
   imports: [
     PageHeadComponent, StatusBadgeComponent,
-    EmployeeLeavesComponent, EmployeeExemptionsComponent, EmployeeBonusComponent,
+    EmployeeLeavesComponent, EmployeeExemptionsComponent, EmployeeBonusComponent, EmployeeMyNumberComponent,
     DecimalPipe, FormsModule, RouterLink, MatCardModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatButtonModule, MatIconModule, MatDatepickerModule,
     MatNativeDateModule, MatProgressSpinnerModule, MatSnackBarModule,
@@ -493,11 +493,8 @@ interface OnboardResult {
                     <input matInput [(ngModel)]="form.basicPensionNumber" name="basicPensionNumber">
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
-                    <mat-label>マイナンバー</mat-label>
-                    <input matInput [(ngModel)]="form.myNumber" name="myNumber">
-                  </mat-form-field>
                 </div>
+                @if (!isNew) { <app-employee-my-number [employeeId]="employeeId" /> }
 
                 <mat-form-field appearance="outline" class="full-width">
                   <mat-label>住所</mat-label>
@@ -904,7 +901,6 @@ export class EmployeeDetailComponent implements OnInit {
     healthInsuranceNumber: '',
     pensionNumber: '',
     basicPensionNumber: '',
-    myNumber: '',
     address: '',
     memo: '',
   };
@@ -997,7 +993,6 @@ export class EmployeeDetailComponent implements OnInit {
         healthInsuranceNumber: data.healthInsuranceNumber ?? '',
         pensionNumber: data.pensionNumber ?? '',
         basicPensionNumber: data.basicPensionNumber ?? '',
-        myNumber: data.myNumber ?? '',
         address: data.address ?? '',
         memo: data.memo ?? '',
       };
@@ -1090,7 +1085,7 @@ export class EmployeeDetailComponent implements OnInit {
       lastNameKana: '', firstNameKana: '', birthDate: '',
       gender: 'male', hireDate: '', officeId: '',
       healthInsuranceNumber: '', pensionNumber: '',
-      basicPensionNumber: '', myNumber: '', address: '', memo: '',
+      basicPensionNumber: '', address: '', memo: '',
     };
     this.empForm = {
       employmentType: 'regular', baseSalary: 0,
