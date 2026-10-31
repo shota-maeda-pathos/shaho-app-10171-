@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal, OnInit } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -7,15 +7,14 @@ import { MatInputModule } from '@angular/material/input';
 import { combineLatest } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatDividerModule } from '@angular/material/divider';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatStepperModule } from '@angular/material/stepper';
 import { MatDialog } from '@angular/material/dialog';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { ConfirmService } from '../../../shared/confirm-dialog/confirm-dialog';
+import {
+  ActionBarComponent, ErrorStateComponent, LoadingStateComponent, PageHeadComponent, StatusBadgeComponent, StatusTone, StepperComponent, StepperItem,
+} from '../../../shared/ui';
 import type { FilingPrintMeta } from '../templates/official-filing-pdf';
 import { FilingSubmissionComponent } from '../submission/filing-submission';
 import { FilingAttachmentsComponent } from '../attachments/filing-attachments';
@@ -48,215 +47,170 @@ interface ArchiveRow { id: string; approvedAt: string | null; approvedByName: st
   selector: 'app-filing-detail',
   standalone: true,
   imports: [
-    CommonModule,
-    MatButtonModule, MatIconModule, MatCardModule, MatChipsModule,
-    MatDividerModule, MatProgressSpinnerModule, MatSnackBarModule, MatStepperModule, FilingSubmissionComponent, FilingAttachmentsComponent,
+    CommonModule, MatButtonModule, MatIconModule, MatSnackBarModule, FilingSubmissionComponent, FilingAttachmentsComponent,
     RouterLink, FormsModule, MatFormFieldModule, MatInputModule,
+    PageHeadComponent, StepperComponent, ActionBarComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],
   template: `
-    <div class="page-container">
-      <div class="page-header">
-        <button mat-icon-button (click)="goBack()"><mat-icon>arrow_back</mat-icon></button>
-        <h1>届出詳細</h1>
-      </div>
-
+    <div class="app-page">
       @if (loading()) {
-        <div class="loading-container"><mat-spinner diameter="40"></mat-spinner></div>
-      } @else if (filing()) {
-        <mat-card class="info-card">
-          <div class="info-grid">
-            <div class="info-item">
-              <label>届出種類</label>
-              <span>{{ filingTypeLabel(filing()!.filingType) }}</span>
-            </div>
-            <div class="info-item">
-              <label>対象従業員</label>
-              <span>{{ filing()!.employeeName }}</span>
-            </div>
-            <div class="info-item">
-              <label>届出日</label>
-              <span>{{ filing()!.effectiveDate }}</span>
-            </div>
-            <div class="info-item">
-              <label>作成日</label>
-              <span>{{ filing()!.createdAt | date:'yyyy/MM/dd HH:mm' }}</span>
-            </div>
-          </div>
-        </mat-card>
+        <app-loading-state message="届出を読み込んでいます…" />
+      } @else if (filing(); as f) {
+        <app-page-head [heading]="filingTypeLabel(f.filingType)" kicker="届出" backLink="/filings" backLabel="届出一覧">
+          <ng-container meta>
+            <span><b>{{ f.employeeName }}</b></span>
+            @if (f.effectiveDate) { <span>届出日 {{ f.effectiveDate }}</span> }
+            <span>作成 {{ f.createdAt | date:'yyyy/MM/dd' }}</span>
+          </ng-container>
+          <ng-container actions>
+            <button mat-stroked-button type="button" (click)="printPdf()" [disabled]="processing()"><mat-icon>picture_as_pdf</mat-icon>公式様式のPDF</button>
+            <a mat-stroked-button [routerLink]="['/employees', employeeId]">従業員の画面</a>
+          </ng-container>
+        </app-page-head>
 
-        @if (isCorrection()) {
-          <mat-card class="correction-card">
-            <h2>{{ filing()!.filingType === 'correction' ? '訂正届' : '取消届' }}</h2>
-            <p>元の届出：<a [routerLink]="['/filings', filing()!.originalFilingId]" [queryParams]="{ employeeId: employeeId }">{{ filingTypeLabel(filing()!.originalFilingType) }}</a></p>
-            <p>理由：{{ filing()!.reason }}</p>
-            @if (filing()!.filingType === 'correction') {
-              <h3>訂正箇所（元の届出との違い）</h3>
-              @if (!filing()!.corrections.length) { <p class="muted">まだ直した項目はありません。下の記入内容を直して保存してください。</p> }
-              @else {
-                <table class="diff">
-                  <thead><tr><th>項目</th><th>訂正前</th><th>訂正後</th></tr></thead>
-                  <tbody>@for (c of filing()!.corrections; track c.field) { <tr><th>{{ c.field }}</th><td class="before">{{ c.before || '（空欄）' }}</td><td class="after">{{ c.after || '（空欄）' }}</td></tr> }</tbody>
-                </table>
-              }
-            }
-            <p class="note">台帳・等級・被扶養者などの登録は自動では直りません。必要なら<a [routerLink]="['/employees', employeeId]">従業員の画面</a>で直してください。</p>
-            @if (editable()) {
-              @if (filing()!.filingType === 'correction') {
-                <h3>記入内容を直す</h3>
-                <div class="edit-grid">
-                  @for (key of editableKeys(); track key) {
-                    <mat-form-field appearance="outline"><mat-label>{{ key }}</mat-label>
-                      <input matInput [(ngModel)]="edits[key]" [name]="key"></mat-form-field>
-                  }
-                </div>
-              }
-              <mat-form-field appearance="outline" class="wide"><mat-label>理由</mat-label><input matInput [(ngModel)]="editReason" name="editReason"></mat-form-field>
-              <div class="action-buttons">
-                <button mat-flat-button color="primary" (click)="saveCorrection()" [disabled]="processing()">保存する</button>
-                <button mat-button (click)="discardCorrection()" [disabled]="processing()">取り下げる</button>
-              </div>
-            }
-          </mat-card>
-        }
+        <app-stepper [steps]="stepItems()" [current]="currentStep()" label="届出のステップ" (select)="scrollTo($event)" />
 
-        @if (filing()!.cancelledByFilingId || filing()!.correctedByFilingIds.length) {
-          <mat-card class="correction-card">
-            @if (filing()!.cancelledByFilingId) { <p>この届出は<a [routerLink]="['/filings', filing()!.cancelledByFilingId]" [queryParams]="{ employeeId: employeeId }">取消届</a>で取り消しました。</p> }
-            @for (id of filing()!.correctedByFilingIds; track id) { <p>この届出には<a [routerLink]="['/filings', id]" [queryParams]="{ employeeId: employeeId }">訂正届</a>を出しています。</p> }
-          </mat-card>
-        }
-
-        @if (canCorrect()) {
-          <mat-card class="correction-card">
-            <h2>提出したあとに誤りが見つかったら</h2>
-            <p class="muted">提出した届出は、訂正届で直すか、取消届で取り消します（承認を受けてから提出します）。</p>
-            @if (correctionKind()) {
-              <mat-form-field appearance="outline" class="wide"><mat-label>{{ correctionKind() === 'correction' ? '訂正の理由' : '取消の理由' }}（必須）</mat-label>
-                <input matInput [(ngModel)]="newReason" name="newReason"></mat-form-field>
-              <div class="action-buttons">
-                <button mat-flat-button color="primary" (click)="createCorrection()" [disabled]="processing() || !newReason.trim()">{{ correctionKind() === 'correction' ? '訂正届を作る' : '取消届を作る' }}</button>
-                <button mat-button (click)="correctionKind.set(null)">やめる</button>
-              </div>
-            } @else {
-              <div class="action-buttons">
-                <button mat-stroked-button (click)="correctionKind.set('correction')">訂正届を作る</button>
-                <button mat-stroked-button (click)="correctionKind.set('cancellation')">取消届を作る</button>
-              </div>
-            }
-          </mat-card>
-        }
-
-        <mat-card class="status-card">
-          <h2>社内承認</h2>
-          <p>{{ workflowLabel(filing()!.workflowStatus) }}</p>
-          @if (filing()!.workflowStatus === 'rejected' && filing()!.lastApproval?.status === 'rejected') {
-            <p class="note">差し戻されました。理由：{{ filing()!.lastApproval.comment || '（理由の記入なし）' }}。内容を直してから、もう一度承認を申請してください。</p>
-          }
-          <div class="action-buttons">
-            @if (filing()!.workflowStatus === 'draft' || filing()!.workflowStatus === 'rejected') {
-              <button mat-flat-button color="primary" (click)="requestApproval()" [disabled]="processing()">
-                <mat-icon>send</mat-icon> 承認申請
-              </button>
-            }
-            <button mat-stroked-button (click)="printPdf()" [disabled]="processing()">
-              <mat-icon>picture_as_pdf</mat-icon> {{ processing() ? '処理中…' : '公式PDFを確認・保存' }}
-            </button>
-          </div>
-        </mat-card>
-
-        <mat-card class="actions-card">
-          <h2>保存原本</h2>
-          @if (!archives().length) { <p class="muted">承認すると、承認した時点の記入内容を保存原本として残します（消せません）。</p> }
-          @else {
-            <ul class="archives">
-              @for (a of archives(); track a.id) {
-                <li>{{ a.approvedAt | date:'yyyy/MM/dd HH:mm' }} {{ a.approvedByName }}が承認（版 {{ a.filingVersion }}・様式 {{ a.form?.checkedOn ?? '—' }}取得）
-                  <button mat-button type="button" (click)="archivePdf(a.id)" [disabled]="processing()">このときのPDF</button></li>
-              }
-            </ul>
-          }
-        </mat-card>
-
-        <mat-card class="actions-card">
-          <h2>添付書類</h2>
-          <app-filing-attachments [target]="{ source: 'employee', parentId: employeeId, filingId: filingId }" />
-        </mat-card>
-
-        <mat-card class="actions-card">
-          <h2>提出</h2>
-          <app-filing-submission [target]="{ source: 'employee', parentId: employeeId, filingId: filingId }" (changed)="loadFiling(true)" />
-        </mat-card>
-
-        @if (filing()!.formData && objectKeys(filing()!.formData).length > 0) {
-          <mat-card class="data-card">
-            <h2>届出データ</h2>
-            <div class="data-grid">
-              @for (key of objectKeys(filing()!.formData); track key) {
-                @if (!isArrayValue(filing()!.formData[key])) {
-                  <div class="data-item">
-                    <label>{{ key }}</label>
-                    <span>{{ formatValue(filing()!.formData[key]) }}</span>
-                  </div>
+        <section class="panel">
+          @if (isCorrection()) {
+            <div class="section" id="sec-correction">
+              <h3>{{ f.filingType === 'correction' ? '訂正届' : '取消届' }}</h3>
+              <p>元の届出：<a [routerLink]="['/filings', f.originalFilingId]" [queryParams]="{ employeeId: employeeId }">{{ filingTypeLabel(f.originalFilingType) }}</a>・理由：{{ f.reason }}</p>
+              @if (f.filingType === 'correction') {
+                @if (!f.corrections.length) { <p class="muted">まだ直した項目はありません。下の記入内容を直して保存してください。</p> }
+                @else {
+                  <table class="diff">
+                    <thead><tr><th>項目</th><th>訂正前</th><th>訂正後</th></tr></thead>
+                    <tbody>@for (c of f.corrections; track c.field) { <tr><th>{{ c.field }}</th><td class="before">{{ c.before || '（空欄）' }}</td><td class="after">{{ c.after || '（空欄）' }}</td></tr> }</tbody>
+                  </table>
                 }
               }
+              <p class="note">台帳・等級・被扶養者などの登録は自動では直りません。必要なら<a [routerLink]="['/employees', employeeId]">従業員の画面</a>で直してください。</p>
+              @if (editable()) {
+                @if (f.filingType === 'correction') {
+                  <div class="edit-grid">
+                    @for (key of editableKeys(); track key) {
+                      <mat-form-field appearance="outline"><mat-label>{{ key }}</mat-label>
+                        <input matInput [(ngModel)]="edits[key]" [name]="key"></mat-form-field>
+                    }
+                  </div>
+                }
+                <mat-form-field appearance="outline" class="wide"><mat-label>理由</mat-label><input matInput [(ngModel)]="editReason" name="editReason"></mat-form-field>
+                <div class="row-actions">
+                  <button mat-stroked-button type="button" (click)="saveCorrection()" [disabled]="processing()">保存する</button>
+                  <button mat-button type="button" (click)="discardCorrection()" [disabled]="processing()">取り下げる</button>
+                </div>
+              }
             </div>
-          </mat-card>
-        }
+          }
 
+          @if (f.cancelledByFilingId || f.correctedByFilingIds.length) {
+            <div class="section">
+              @if (f.cancelledByFilingId) { <p class="note">この届出は<a [routerLink]="['/filings', f.cancelledByFilingId]" [queryParams]="{ employeeId: employeeId }">取消届</a>で取り消しました。</p> }
+              @for (id of f.correctedByFilingIds; track id) { <p class="note">この届出には<a [routerLink]="['/filings', id]" [queryParams]="{ employeeId: employeeId }">訂正届</a>を出しています。</p> }
+            </div>
+          }
+
+          <div class="section" id="sec-approval">
+            <h3>社内承認</h3>
+            <p><app-status-badge [tone]="approvalTone(f.workflowStatus)" [label]="workflowLabel(f.workflowStatus)" /></p>
+            @if (f.workflowStatus === 'rejected' && f.lastApproval?.status === 'rejected') {
+              <p class="attention">差し戻されました。理由：{{ f.lastApproval.comment || '（理由の記入なし）' }}。内容を直してから、もう一度承認を依頼してください。</p>
+            }
+            @if (f.workflowStatus === 'pending') { <p class="muted">別の担当者（管理者・承認者）の承認を待っています。承認は<a routerLink="/approvals">承認</a>の画面で行います。</p> }
+          </div>
+
+          <div class="section" id="sec-submit">
+            <h3>提出</h3>
+            <app-filing-submission [target]="{ source: 'employee', parentId: employeeId, filingId: filingId }" (changed)="loadFiling(true)" />
+          </div>
+
+          <div class="section">
+            <h3>添付書類</h3>
+            <app-filing-attachments [target]="{ source: 'employee', parentId: employeeId, filingId: filingId }" />
+          </div>
+
+          <div class="section">
+            <h3>保存原本</h3>
+            @if (!archives().length) { <p class="muted">承認すると、承認した時点の記入内容を保存原本として残します（消せません）。</p> }
+            @else {
+              <ul class="archives">
+                @for (a of archives(); track a.id) {
+                  <li>{{ a.approvedAt | date:'yyyy/MM/dd HH:mm' }} {{ a.approvedByName }}が承認（版 {{ a.filingVersion }}・様式 {{ a.form?.checkedOn ?? '—' }}取得）
+                    <button mat-button type="button" (click)="archivePdf(a.id)" [disabled]="processing()">このときのPDF</button></li>
+                }
+              </ul>
+            }
+          </div>
+
+          @if (f.formData && objectKeys(f.formData).length > 0) {
+            <div class="section">
+              <details>
+                <summary>記入内容を見る</summary>
+                <dl class="data-grid">
+                  @for (key of objectKeys(f.formData); track key) {
+                    @if (!isArrayValue(f.formData[key])) { <div><dt>{{ key }}</dt><dd>{{ formatValue(f.formData[key]) }}</dd></div> }
+                  }
+                </dl>
+              </details>
+            </div>
+          }
+
+          @if (canCorrect()) {
+            <div class="section">
+              <h3>提出したあとに誤りが見つかったら</h3>
+              <p class="muted">提出した届出は、訂正届で直すか、取消届で取り消します（承認を受けてから提出します）。</p>
+              @if (correctionKind()) {
+                <mat-form-field appearance="outline" class="wide"><mat-label>{{ correctionKind() === 'correction' ? '訂正の理由' : '取消の理由' }}（必須）</mat-label>
+                  <input matInput [(ngModel)]="newReason" name="newReason"></mat-form-field>
+                <div class="row-actions">
+                  <button mat-stroked-button type="button" (click)="createCorrection()" [disabled]="processing() || !newReason.trim()">{{ correctionKind() === 'correction' ? '訂正届を作る' : '取消届を作る' }}</button>
+                  <button mat-button type="button" (click)="correctionKind.set(null)">やめる</button>
+                </div>
+              } @else {
+                <div class="row-actions">
+                  <button mat-stroked-button type="button" (click)="correctionKind.set('correction')">訂正届を作る</button>
+                  <button mat-stroked-button type="button" (click)="correctionKind.set('cancellation')">取消届を作る</button>
+                </div>
+              }
+            </div>
+          }
+
+          @if (f.workflowStatus === 'draft' || f.workflowStatus === 'rejected') {
+            <app-action-bar [info]="f.workflowStatus === 'rejected' ? '差し戻された内容を直したら、もう一度依頼します。' : ''" notice="依頼中は届出を直せません。直すときは差し戻してもらいます。">
+              <button mat-flat-button type="button" (click)="requestApproval()" [disabled]="processing()">承認を依頼する<mat-icon iconPositionEnd>arrow_forward</mat-icon></button>
+            </app-action-bar>
+          }
+        </section>
+      } @else {
+        <app-error-state message="届出を読み込めませんでした" (retry)="loadFiling()" />
       }
     </div>
   `,
   styles: [`
-    .page-container { padding: 24px; }
-    .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-    .page-header h1 { margin: 0; font-size: 24px; font-weight: 500; }
-    .loading-container { display: flex; justify-content: center; padding: 48px; }
-    mat-card { padding: 24px; margin-bottom: 16px; }
-    h2 { font-size: 16px; font-weight: 500; margin: 0 0 16px; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .info-item { display: flex; flex-direction: column; gap: 4px; }
-    .info-item label { font-size: 12px; color: #666; }
-    .info-item span { font-size: 14px; font-weight: 500; }
-    .status-steps { display: flex; align-items: center; gap: 8px; }
-    .status-step { display: flex; align-items: center; gap: 8px; }
-    .step-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #e0e0e0; }
-    .step-icon mat-icon { color: #fff; }
-    .ws-approved .step-icon, .step-icon.ws-approved { background: #4caf50; }
-    .ws-pending .step-icon, .step-icon.ws-pending { background: #ff9800; }
-    .ws-rejected .step-icon, .step-icon.ws-rejected { background: #f44336; }
-    .ws-draft .step-icon, .step-icon.ws-draft { background: #9e9e9e; }
-    .ms-completed .step-icon, .step-icon.ms-completed { background: #4caf50; }
-    .ms-processing .step-icon, .step-icon.ms-processing { background: #2196f3; }
-    .ms-failed .step-icon, .step-icon.ms-failed { background: #f44336; }
-    .ms-notStarted .step-icon, .step-icon.ms-notStarted { background: #9e9e9e; }
-    .ss-accepted .step-icon, .step-icon.ss-accepted { background: #4caf50; }
-    .ss-submitted .step-icon, .step-icon.ss-submitted { background: #2196f3; }
-    .ss-returned .step-icon, .step-icon.ss-returned { background: #f44336; }
-    .ss-notSubmitted .step-icon, .step-icon.ss-notSubmitted { background: #9e9e9e; }
-    .step-content { display: flex; flex-direction: column; }
-    .step-label { font-size: 11px; color: #666; }
-    .step-value { font-size: 13px; font-weight: 500; }
-    .step-connector { flex: 1; height: 2px; background: #e0e0e0; min-width: 24px; }
-    .action-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
-    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .data-item { display: flex; flex-direction: column; gap: 2px; }
-    .data-item label { font-size: 12px; color: #666; }
-    .data-item span { font-size: 14px; }
-    .result-card p { margin: 0; }
-    .error-card { border-left: 4px solid #f44336; }
-    .error-list { margin: 0; padding-left: 20px; color: #c62828; }
-    .error-list li { margin-bottom: 4px; }
-    .correction-card h3 { font-size: 14px; margin: 12px 0 6px; }
-    .diff { border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
+    .panel { padding: 0 var(--app-space-5) var(--app-space-5); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); background: var(--app-color-surface); }
+    .section { padding: var(--app-space-4) 0; border-bottom: 1px solid var(--app-color-border); }
+    .section:last-of-type { border-bottom: 0; }
+    h3 { margin: 0 0 var(--app-space-2); font-size: var(--app-font-xs); font-weight: 700; color: var(--app-color-text-sub); letter-spacing: .04em; }
+    p { margin: 0 0 var(--app-space-2); line-height: 1.7; }
+    a { color: var(--app-color-link); }
+    a[mat-stroked-button] { color: inherit; }
+    .muted { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
+    .note { padding: var(--app-space-2) var(--app-space-3); border-radius: var(--app-radius); background: var(--app-status-yours-bg); font-size: var(--app-font-sm); }
+    .attention { padding: var(--app-space-2) var(--app-space-3); border-radius: var(--app-radius); background: var(--app-status-attention-bg); color: var(--app-status-attention-fg); font-size: var(--app-font-sm); }
+    .row-actions { display: flex; gap: var(--app-space-2); flex-wrap: wrap; }
+    .diff { border-collapse: collapse; font-size: var(--app-font-sm); margin-bottom: var(--app-space-2); }
     .diff th, .diff td { padding: 4px 10px; border-bottom: 1px solid var(--app-color-border); text-align: left; }
     .diff td.before { color: var(--app-color-text-sub); text-decoration: line-through; }
-    .diff td.after { background: #fff59d; font-weight: 500; }
+    .diff td.after { background: var(--app-status-attention-bg); font-weight: 600; }
     .edit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 12px; }
     .wide { width: min(100%, 480px); }
-    .muted { color: var(--app-color-text-sub); }
-    .archives { margin: 0; padding-left: 20px; }
-    .note { padding: 8px 12px; border-radius: 8px; background: var(--app-status-yours-bg); }
+    .archives { margin: 0; padding-left: 20px; font-size: var(--app-font-sm); }
+    summary { cursor: pointer; color: var(--app-color-link); }
+    .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px var(--app-space-4); margin: var(--app-space-3) 0 0; font-size: var(--app-font-sm); }
+    .data-grid dt { color: var(--app-color-text-sub); font-size: var(--app-font-xs); }
+    .data-grid dd { margin: 0; word-break: break-all; }
   `],
+
 })
 export class FilingDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
@@ -265,6 +219,7 @@ export class FilingDetailComponent implements OnInit {
   private snackBar = inject(MatSnackBar);
   private auth = inject(AuthService);
   private dialog = inject(MatDialog);
+  private confirm = inject(ConfirmService);
 
   filing = signal<any>(null);
   loading = signal(false);
@@ -370,9 +325,33 @@ export class FilingDetailComponent implements OnInit {
   }
 
   filingTypeLabel(type: string): string { return FILING_TYPE_LABELS[type] ?? type; }
+
+  /** 作成 → 社内承認 → 提出。押すとその欄へ移る */
+  stepItems = computed<StepperItem[]>(() => {
+    const f = this.filing();
+    if (!f) return [];
+    const ws = f.workflowStatus as string;
+    return [
+      { key: 'correction', label: '作成', state: ws === 'rejected' ? 'attention' : ws === 'draft' ? 'todo' : 'done', note: ws === 'rejected' ? '差し戻し' : ws === 'draft' ? '下書き' : '完了' },
+      { key: 'approval', label: '社内承認', state: ws === 'approved' ? 'done' : ws === 'pending' ? 'waiting' : 'todo', note: ws === 'approved' ? '承認済み' : ws === 'pending' ? '承認者待ち' : '—' },
+      { key: 'submit', label: '提出', state: f.submitted ? 'done' : 'todo', note: f.submitted ? '提出済み' : ws === 'approved' ? 'あなたの番' : '—' },
+    ];
+  });
+  currentStep = computed(() => this.stepItems().find(s => s.state !== 'done')?.key ?? 'submit');
+  approvalTone(ws: string): StatusTone {
+    return ws === 'approved' ? 'done' : ws === 'pending' ? 'waiting' : ws === 'rejected' ? 'attention' : 'yours';
+  }
+  scrollTo(key: string) {
+    document.getElementById(key === 'correction' ? (this.isCorrection() ? 'sec-correction' : 'sec-approval') : `sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
   workflowLabel(s: string): string { return WORKFLOW_STATUS_LABELS[s] ?? s; }
 
   async requestApproval() {
+    const ok = await this.confirm.ask({
+      title: `${this.filingTypeLabel(this.filing()?.filingType)}の承認を依頼する`, message: `${this.filing()?.employeeName ?? ''}さんの届出の承認を、別の担当者（管理者・承認者）に依頼します。`,
+      notice: '依頼中は届出を直せません。直すときは差し戻してもらいます。', confirmLabel: '承認を依頼する',
+    });
+    if (!ok) return;
     this.processing.set(true);
     try {
       const fn = httpsCallable(this.functions, 'approvalRequestCreate');
@@ -384,7 +363,7 @@ export class FilingDetailComponent implements OnInit {
         requestType: 'filing',
         comment: '',
       });
-      this.snackBar.open('承認申請しました', '閉じる', { duration: 3000 });
+      this.snackBar.open('承認を依頼しました', '閉じる', { duration: 3000 });
       this.loadFiling();
     } catch (e: any) {
       this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });
