@@ -299,6 +299,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'calendar',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '手続きカレンダー' },
+        loadComponent: () =>
+          import('./features/dashboard/calendar').then((m) => m.CalendarComponent),
+      },
+      {
         path: 'portal-requests',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '本人からの申請' },

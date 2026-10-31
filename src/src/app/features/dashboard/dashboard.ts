@@ -47,6 +47,7 @@ type Group = { key: string; label: string; items: HomeTodo[] };
         <ng-container meta><span>{{ todayLabel() }}・{{ office.label() }}</span></ng-container>
         @if (isOperator()) {
           <ng-container actions>
+            <a mat-stroked-button routerLink="/calendar"><mat-icon>calendar_month</mat-icon>カレンダー</a>
             <a mat-flat-button routerLink="/procedures/new"><mat-icon>add</mat-icon>手続きを始める</a>
           </ng-container>
         }
