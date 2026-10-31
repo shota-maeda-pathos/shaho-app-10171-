@@ -154,6 +154,7 @@ const ROLE_LABELS: Record<string, string> = {
                     権限を変更
                   </button>
                 }
+                <button mat-button (click)="unlock(row)" [attr.aria-label]="row.displayName + 'のログインのロックを解除'">ロック解除</button>
               </td>
             </ng-container>
 
@@ -190,12 +191,23 @@ const ROLE_LABELS: Record<string, string> = {
 
             <ng-container matColumnDef="status">
               <th mat-header-cell *matHeaderCellDef>状態</th>
-              <td mat-cell *matCellDef="let row">{{ row.status === 'pending' ? '招待中' : row.status }}</td>
+              <td mat-cell *matCellDef="let row">{{ isExpired(row) ? '期限切れ' : row.status === 'pending' ? '招待中' : row.status }}</td>
             </ng-container>
 
             <ng-container matColumnDef="expiresAt">
               <th mat-header-cell *matHeaderCellDef>有効期限</th>
-              <td mat-cell *matCellDef="let row">{{ row.expiresAt }}</td>
+              <td mat-cell *matCellDef="let row">{{ row.expiresAt | date: 'yyyy/M/d H:mm' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="inviteActions">
+              <th mat-header-cell *matHeaderCellDef>操作</th>
+              <td mat-cell *matCellDef="let row">
+                @if (isExpired(row)) {
+                  <button mat-stroked-button (click)="reissue(row)">再発行</button>
+                } @else {
+                  <button mat-stroked-button (click)="copyLink(row)">招待のリンクをコピー</button>
+                }
+              </td>
             </ng-container>
 
             <tr mat-header-row *matHeaderRowDef="invitationColumns"></tr>
@@ -248,7 +260,7 @@ export class UserManagementComponent implements OnInit {
   inviteRoles: string[] = [];
 
   userColumns = ['displayName', 'email', 'roles', 'offices', 'status', 'actions'];
-  invitationColumns = ['email', 'roles', 'status', 'expiresAt'];
+  invitationColumns = ['email', 'roles', 'status', 'expiresAt', 'inviteActions'];
 
   ngOnInit() {
     this.loadUsers();
@@ -256,6 +268,38 @@ export class UserManagementComponent implements OnInit {
   }
 
   roleLabel(role: string): string { return ROLE_LABELS[role] ?? role; }
+  isExpired(row: InvitationRow) { return !!row.expiresAt && new Date(row.expiresAt).getTime() < Date.now(); }
+
+  /** 招待はメールで送らないので、リンクを本人に渡す */
+  async copyLink(row: InvitationRow) {
+    const url = `${location.origin}/invite/${row.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      this.snackBar.open(`${row.email} あての招待のリンクをコピーしました`, '閉じる', { duration: 4000 });
+    } catch {
+      this.snackBar.open(`招待のリンク：${url}`, '閉じる', { duration: 15000 });
+    }
+  }
+
+  async reissue(row: InvitationRow) {
+    try {
+      await httpsCallable(this.functions, 'authInvitationReissue')({ companyId: this.auth.companyId, invitationId: row.id });
+      this.snackBar.open(`${row.email} への招待を7日間の期限で出し直しました`, '閉じる', { duration: 4000 });
+      await this.loadUsers();
+    } catch (e: any) {
+      this.snackBar.open(`再発行できませんでした：${e?.message ?? ''}`, '閉じる', { duration: 6000 });
+    }
+  }
+
+  /** 5回続けて失敗してロックされた人を、30分を待たずに解除する */
+  async unlock(user: UserRow) {
+    try {
+      const { data } = await httpsCallable<object, { wasLocked: boolean }>(this.functions, 'authUnlock')({ companyId: this.auth.companyId, email: user.email });
+      this.snackBar.open(data.wasLocked ? `${user.displayName}さんのロックを解除しました` : `${user.displayName}さんはロックされていません`, '閉じる', { duration: 4000 });
+    } catch (e: any) {
+      this.snackBar.open(`解除できませんでした：${e?.message ?? ''}`, '閉じる', { duration: 6000 });
+    }
+  }
   isOfficeRole = (role: string) => ['operator', 'approver', 'viewer'].includes(role);
 
   officeName(id: string): string {

@@ -479,7 +479,7 @@ export async function authOf(companyId: string, uid: string): Promise<AuthContex
   const user = await db.doc(`companies/${companyId}/users/${uid}`).get();
   const d = user.data();
   if (!d || d.isSuspended || d.isLoginDisabled) throw invalidArg('処理を登録した利用者の権限を確認できません');
-  return { uid, companyId, roles: (d.roles ?? []) as Role[], officeIds: d.officeIds ?? [], employeeId: d.employeeId ?? null, isSuspended: false, isLoginDisabled: false };
+  return { uid, companyId, roles: (d.roles ?? []) as Role[], officeIds: d.officeIds ?? [], employeeId: d.employeeId ?? null, isSuspended: false, isLoginDisabled: false, sessionId: 'trigger' };
 }
 
 /** 1人分の処理。成功ならメッセージ、失敗なら例外 */

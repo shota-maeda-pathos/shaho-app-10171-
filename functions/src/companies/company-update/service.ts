@@ -33,7 +33,7 @@ export async function updateCompany(
       'name', 'corporateNumber', 'representativeName',
       'address', 'phone', 'email',
       'healthInsurerId', 'pensionCode',
-      'postalCode', 'specificApplicableOffice', 'laborConsultant',
+      'postalCode', 'specificApplicableOffice', 'laborConsultant', 'allowedGoogleDomains',
     ] as const;
 
     for (const f of fields) {

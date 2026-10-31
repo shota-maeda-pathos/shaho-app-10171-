@@ -22,6 +22,7 @@ export function makeAuth(overrides: Partial<AuthContext> = {}): AuthContext {
     officeIds: ['office-001'],
     isSuspended: false,
     isLoginDisabled: false,
+    sessionId: 'session-001',
     ...overrides,
   };
 }

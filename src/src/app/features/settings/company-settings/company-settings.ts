@@ -19,6 +19,8 @@ interface CompanyInfo {
   email: string;
   healthInsurerId: string;
   pensionCode: string;
+  /** Google ログインを許可するドメイン（画面ではカンマ区切り） */
+  allowedGoogleDomains: string;
 }
 
 @Component({
@@ -81,6 +83,11 @@ interface CompanyInfo {
               <input matInput [(ngModel)]="company.pensionCode" [readonly]="!editing()">
             </mat-form-field>
           </div>
+          <mat-form-field appearance="outline" class="domains">
+            <mat-label>Google ログインを許可するドメイン</mat-label>
+            <input matInput [(ngModel)]="company.allowedGoogleDomains" [readonly]="!editing()" placeholder="example.com, example.co.jp">
+            <mat-hint>カンマで区切る。空欄なら、招待された人はどの Google アカウントでもログインできます</mat-hint>
+          </mat-form-field>
           <div class="actions">
             @if (editing()) {
               <button mat-flat-button color="primary" (click)="onSave()" [disabled]="saving()">
@@ -103,6 +110,7 @@ interface CompanyInfo {
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
     .loading { display: flex; justify-content: center; padding: 48px; }
     .actions { display: flex; gap: 12px; margin-top: 16px; }
+    .domains { width: 100%; margin-top: 8px; }
     .setup-card { padding: 48px; text-align: center; }
     .setup-icon { font-size: 64px; width: 64px; height: 64px; color: var(--app-brand-strong); }
     .setup-card h2 { margin: 16px 0 8px; }
@@ -124,7 +132,7 @@ export class CompanySettingsComponent implements OnInit {
   company: CompanyInfo = {
     name: '', corporateNumber: '', representativeName: '',
     address: '', phone: '', email: '',
-    healthInsurerId: '', pensionCode: '',
+    healthInsurerId: '', pensionCode: '', allowedGoogleDomains: '',
   };
 
   async ngOnInit() {
@@ -146,6 +154,7 @@ export class CompanySettingsComponent implements OnInit {
         email: data.email ?? '',
         healthInsurerId: data.healthInsurerId ?? '',
         pensionCode: data.pensionCode ?? '',
+        allowedGoogleDomains: (data.allowedGoogleDomains ?? []).join(', '),
       };
     } catch {
       this.snackBar.open('会社情報の取得に失敗しました', '閉じる', { duration: 3000 });
@@ -186,12 +195,13 @@ export class CompanySettingsComponent implements OnInit {
         companyId: this.auth.companyId,
         expectedVersion: this.version,
         ...this.company,
+        allowedGoogleDomains: this.company.allowedGoogleDomains.split(/[,、\s]+/).map(d => d.trim()).filter(Boolean),
       });
       this.version++;
       this.editing.set(false);
       this.snackBar.open('会社情報を更新しました', '閉じる', { duration: 3000 });
-    } catch {
-      this.snackBar.open('保存に失敗しました', '閉じる', { duration: 3000 });
+    } catch (e: any) {
+      this.snackBar.open(`保存に失敗しました：${e?.message ?? ''}`, '閉じる', { duration: 6000 });
     } finally {
       this.saving.set(false);
     }

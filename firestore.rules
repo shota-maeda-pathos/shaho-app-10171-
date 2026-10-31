@@ -20,17 +20,23 @@ service cloud.firestore {
       return hasRole(companyId, 'admin');
     }
 
+    // 社会保険管理のログインは関数（authLogin など）を通し、トークンにセッション番号（sid）が付く。
+    // Firebase に直接ログインしたトークン（ロック・セッションの期限を飛ばしたもの）は読み書きさせない
+    function hasSession() {
+      return request.auth.token.sid is string;
+    }
+
     function isLoginEnabled(companyId) {
-      return getUserData(companyId).isLoginDisabled != true;
+      return hasSession() && getUserData(companyId).isLoginDisabled != true;
     }
 
     function isNotSuspended(companyId) {
-      return getUserData(companyId).isSuspended != true;
+      return hasSession() && getUserData(companyId).isSuspended != true;
     }
 
     function isActiveUser(companyId) {
       let user = getUserData(companyId);
-      return user.isSuspended != true && user.isLoginDisabled != true;
+      return hasSession() && user.isSuspended != true && user.isLoginDisabled != true;
     }
 
     function isAdminRole(companyId) {
@@ -385,6 +391,15 @@ service cloud.firestore {
               .affectedKeys().hasAny(['roles']);
         allow delete: if false;
       }
+
+      // ── sessions（ログイン中の端末。本人が自分のものだけ読める。書くのは関数だけ）──
+
+      match /sessions/{sessionId} {
+        allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+        allow write: if false;
+      }
+
+      // loginGuards・userSecrets・myNumberAccessLogs は関数だけが扱う（ここに match がないので読み書きできない）
 
       // ── invitations ───────────────────────────────
 

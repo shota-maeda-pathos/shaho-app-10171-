@@ -16,6 +16,12 @@ export const routes: Routes = [
       import('./features/onboard/onboard-form').then((m) => m.OnboardFormComponent),
   },
   {
+    path: 'invite/:id',
+    data: { title: '招待を受ける' },
+    loadComponent: () =>
+      import('./features/invite/invite').then((m) => m.InviteComponent),
+  },
+  {
     path: 'login',
     data: { title: 'ログイン' },
     loadComponent: () =>
@@ -291,6 +297,12 @@ export const routes: Routes = [
           import('./features/settings/settings').then(
             (m) => m.SettingsComponent,
           ),
+      },
+      {
+        path: 'account',
+        data: { title: '自分のアカウント' },
+        loadComponent: () =>
+          import('./features/account/account').then((m) => m.AccountComponent),
       },
       {
         path: 'glossary',

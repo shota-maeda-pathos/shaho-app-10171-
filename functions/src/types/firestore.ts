@@ -334,7 +334,7 @@ export interface InvitationDoc {
   roles: ('admin' | 'approver' | 'operator' | 'viewer' | 'employee')[];
   officeIds: string[];
   employeeId: string | null;
-  status: 'pending' | 'accepted' | 'expired';
+  status: 'pending' | 'accepted' | 'expired' | 'reissued';
   invitedBy: string;
   expiresAt: Timestamp;
   createdAt: Timestamp;

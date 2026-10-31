@@ -27,8 +27,8 @@ import { LogoComponent } from '../../shared/ui';
         </div>
         <h1 class="heading">ログイン</h1>
         <mat-card-content>
-          @if (timeoutMessage()) {
-            <p class="timeout-msg">セッションがタイムアウトしました。再度ログインしてください。</p>
+          @if (endedReason()) {
+            <p class="timeout-msg">{{ endedReason() }}</p>
           }
           <form (ngSubmit)="onLogin()">
             <mat-form-field appearance="outline" class="full-width">
@@ -53,6 +53,11 @@ import { LogoComponent } from '../../shared/ui';
               }
             </button>
           </form>
+          <div class="or"><span>または</span></div>
+          <button mat-stroked-button type="button" class="full-width login-btn" (click)="onGoogle()" [disabled]="submitting()">
+            Google でログイン
+          </button>
+          <p class="note">パスワードを忘れたときは管理者に連絡してください。</p>
         </mat-card-content>
       </mat-card>
     </div>
@@ -82,6 +87,9 @@ import { LogoComponent } from '../../shared/ui';
     mat-card-content { padding: var(--app-space-5) 0 0; }
     .full-width { width: 100%; }
     .login-btn { height: 48px; margin-top: var(--app-space-2); }
+    .or { display: flex; align-items: center; gap: var(--app-space-2); margin: var(--app-space-4) 0 var(--app-space-2); color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
+    .or::before, .or::after { content: ''; flex: 1; border-top: 1px solid var(--app-color-border); }
+    .note { margin: var(--app-space-3) 0 0; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
     .error { color: var(--app-status-action-fg); font-size: var(--app-font-md); margin: var(--app-space-2) 0; }
     .timeout-msg { color: var(--app-color-text); font-size: var(--app-font-md); margin: 0 0 var(--app-space-4); padding: var(--app-space-2) var(--app-space-3); background: var(--app-status-action-bg); border-radius: var(--app-radius); }
   `],
@@ -95,20 +103,32 @@ export class LoginComponent implements OnInit {
   password = '';
   error = signal('');
   submitting = signal(false);
-  timeoutMessage = signal(false);
+  endedReason = signal<string | null>(null);
 
   ngOnInit() {
-    this.timeoutMessage.set(this.route.snapshot.queryParams['reason'] === 'timeout');
+    const legacy = this.route.snapshot.queryParams['reason'] === 'timeout' ? 'セッションがタイムアウトしました。再度ログインしてください。' : null;
+    this.endedReason.set(this.auth.endedReason() ?? legacy);
   }
 
   async onLogin() {
+    await this.run(() => this.auth.login(this.email, this.password));
+  }
+
+  async onGoogle() {
+    await this.run(() => this.auth.loginWithGoogle());
+  }
+
+  /** ロック・許可ドメインなどの理由はサーバーの言葉のまま出す */
+  private async run(signIn: () => Promise<void>) {
     this.error.set('');
+    this.endedReason.set(null);
     this.submitting.set(true);
     try {
-      await this.auth.login(this.email, this.password);
-      this.router.navigate(['/dashboard']);
-    } catch {
-      this.error.set('メールアドレスまたはパスワードが正しくありません');
+      await signIn();
+      this.router.navigate(this.auth.mustChangePassword() ? ['/account'] : ['/dashboard']);
+    } catch (e: any) {
+      if (e?.code === 'auth/popup-closed-by-user' || e?.code === 'auth/cancelled-popup-request') return;
+      this.error.set(e?.message && !String(e.message).startsWith('Firebase') ? e.message : 'ログインできませんでした。もう一度お試しください');
     } finally {
       this.submitting.set(false);
     }

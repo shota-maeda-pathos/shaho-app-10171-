@@ -14,6 +14,8 @@ export const CompanyUpdateSchema = z.object({
   /** 特定適用事業所（厚生年金の被保険者数が基準以上の法人）か。未設定の間は短時間労働者の適用を担当者判断とする */
   specificApplicableOffice: z.boolean().nullable().optional(),
   laborConsultant: z.object({ name: z.string().min(1).max(100), registrationNumber: z.string().min(1).max(20) }).nullable().optional(),
+  /** Google ログインを許可するドメイン（例：example.com）。空なら招待された人はどの Google アカウントでも可 */
+  allowedGoogleDomains: z.array(z.string().trim().toLowerCase().regex(/^@?[a-z0-9.-]+\.[a-z]{2,}$/, 'ドメインの形式が違います')).max(20).optional(),
   expectedVersion: z.number().int().min(1),
 });
 

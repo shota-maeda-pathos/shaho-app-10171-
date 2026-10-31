@@ -29,6 +29,7 @@ lazy(() => require('./employees/employee-delete/functions'), ['employeeDelete'])
 lazy(() => require('./employees/employee-transfer/functions'), ['employeeTransfer']);
 lazy(() => require('./employees/employee-resign/functions'), ['employeeResign']);
 lazy(() => require('./employees/employee-secrets/functions'), ['employeeSecretsGet', 'employeeSecretsUpdate', 'employeeSecretsReveal']);
+lazy(() => require('./auth-session/functions'), ['authLogin', 'authGoogleLogin', 'authInvitationGet', 'authInvitationAccept', 'authLogout', 'authSessionList', 'authSessionRevoke', 'authChangePassword', 'authUnlock', 'authInvitationReissue', 'authPing']);
 
 // 組織マスタAPI
 lazy(() => require('./offices/office-list/functions'), ['officeList']);

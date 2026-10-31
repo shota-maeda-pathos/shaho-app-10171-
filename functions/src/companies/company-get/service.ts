@@ -11,6 +11,7 @@ export interface CompanyResponse {
   email: string;
   healthInsurerId: string;
   pensionCode: string;
+  allowedGoogleDomains: string[];
   version: number;
 }
 
@@ -30,6 +31,7 @@ export async function getCompany(
     email: d.email ?? '',
     healthInsurerId: d.healthInsurerId ?? '',
     pensionCode: d.pensionCode ?? '',
+    allowedGoogleDomains: d.allowedGoogleDomains ?? [],
     version: d.version ?? 1,
   };
 }
