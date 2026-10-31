@@ -10,6 +10,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { ConfirmService } from '../../shared/confirm-dialog/confirm-dialog';
+import { wizardRoute } from './wizard-route';
 
 interface StepInfo {
   id: string;
@@ -277,6 +279,7 @@ export class ProcedureDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private snackBar = inject(MatSnackBar);
+  private confirm = inject(ConfirmService);
   auth = inject(AuthService);
 
   procedure = signal<ProcedureDetail | null>(null);
@@ -343,7 +346,9 @@ export class ProcedureDetailComponent implements OnInit {
 
   async cancelProcedure() {
     const proc = this.procedure();
-    if (!proc || !confirm('この手続きを取消しますか？')) return;
+    if (!proc) return;
+    const ok = await this.confirm.ask({ title: 'この手続きを取り消す', message: `「${proc.title}」を取り消します。`, notice: '取り消した手続きは、やることや一覧に出なくなります。', confirmLabel: '取り消す', warn: true });
+    if (!ok) return;
 
     try {
       const fn = httpsCallable(this.functions, 'procedureCancel');
@@ -369,9 +374,10 @@ export class ProcedureDetailComponent implements OnInit {
         companyId: this.auth.companyId,
         procedureId: this.procedureId,
       });
-      // 入社手続き（ウィザード方式）は専用の画面で進める
-      if (data.steps.some(s => s.id === 'invite')) {
-        void this.router.navigate(['/onboarding', this.procedureId], { replaceUrl: true });
+      // ウィザード方式の手続きは、それぞれの画面で進める（旧方式の手続きだけこの画面で見る）
+      const route = wizardRoute(data.procedureType, data.steps.map(s => s.id));
+      if (route) {
+        void this.router.navigate([route, this.procedureId], { replaceUrl: true });
         return;
       }
       this.procedure.set(data);
