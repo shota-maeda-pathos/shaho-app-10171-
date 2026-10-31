@@ -254,6 +254,15 @@
    - A「段階9の画面確認」（この作業フォルダーで、コードは変えずに確認とチェックリストの記入）：試算の新規採用・年間・賞与、帳票のほか4種、本人ポータルの扶養・休業の取り込み・添付・公開範囲のオフ・等級変更のお知らせ、閲覧者に試算が出ないこと、毎朝6時の期限のお知らせ。
    - B「従業員の名前検索の修正」（自分のワークツリー）：`employeeList` に `keyword` を付けると複合索引がなく INTERNAL になる。
    - C「料率改定の切替と遡及・#10 の残りの方針案」（自分のワークツリー。まず方針案を作ってユーザーの合意を取る）。
+     **2026-10-31：方針 `docs/stage9-remaining-plan.md` をユーザーが承認（「案のとおり進めて」）。1〜7 を作ってブランチ `claude/stage9-remaining-6ee896` にコミット済み（007297c・c352d62・3d76947・8450409・0fda2e1・6c74838）。8（様式のバージョン管理）は段階10。未デプロイ・画面未確認（チェックリストは 🔵）。push・マージはユーザー。**
+     - 1 料率改定の切替：取り込みの確認画面に切替月以降の計算済みの保険料、確定後に料率・等級が変わった月は毎月の処理で「訂正が必要」（等級は新しいトリガー `gradeOutdatedMark` が `monthlyInsurance` に `gradeOutdated` を付ける。料率は値で比べる）。賞与の保険料にも `rateFingerprint`。
+     - 2 等級の遡及訂正（修正等級）：`/grade-corrections/:id`、関数 `gradeCorrectionStart/Get/Preview/Update`。手続きの種類 `grade_correction`。毎月の保険料の計算に試し計算（`dryRun`・等級の指定）、訂正の処理は `reopenPremium` にまとめた。
+     - 3 本人あてのお知らせ：等級の変化（トリガーから）と、訂正した保険料の承認し直し（`approveApprovalRequest` から）。ポータルの明細に「訂正済み」。
+     - 4 組合健保：事業所の `healthInsuranceType`、`rateUnionAdd`。6 事業所ライフサイクル：`offices/lifecycle.ts`（配属の前に確認）、`officeAbolish`。**本番の事業所に管轄年金事務所が入っていないと、入社・従業員の登録・異動が止まる。デプロイの前に本番の事業所の項目を読み取りで調べ、ユーザーに報告する。**
+     - 5 部署：`departmentSave`、設定→「部署」、従業員の所属部署、分析・帳票。7 社労士：会社情報の入力欄、6様式の社労士欄。
+     - デプロイの候補（未実施・要承認）：新規 `gradeOutdatedMark`（Firestore トリガー）・`gradeCorrectionStart`・`gradeCorrectionGet`・`gradeCorrectionPreview`・`gradeCorrectionUpdate`・`rateUnionAdd`・`officeAbolish`・`departmentSave`。更新 `rateImportPreview`・`rateImportApply`・`monthlyRunOverview`・`monthlyJobChunk`・`monthlyInsuranceCalculate`・`bonusInsuranceCalculate`・`bonusRunOverview`・`bonusJobChunk`・`bonusFilingCreate`・`santeiFilingCreate`・`homeTodos`・`homeBulkTodo`・`approvalRequestApprove`・`approvalBulkApprove`・`portalDetails`・`officeList`・`officeUpdate`・`officeCreate`・`employeeCreate`・`employeeUpdate`・`employeeTransfer`・`onboardingStart`・`onboardingUpdate`・`transferUpdate`・`departmentList`・`costAnalysis`・`reportData`・`companyGet`・`employeeResign`・`resignationGet`・`resignationPreview`・`resignationUpdate`・`simulationRaise`・`simulationHire`・`simulationAnnual`・`simulationRateChange`・`simulationBonus`・`premiumSimulate`・`santeiFilingUpdate`・`bonusFilingUpdate`・`filingArchiveGet`・`filingArchiveBatch`。Hosting は未公開のまま（画面はローカルの開発サーバーで確認）。
+     - 画面確認に要るテストデータ（作る前に確認）：料率の取り込み（テスト用の保険者IDで）、遡及（サンプル改定テスト事業所）、組合健保（テスト用の事業所）。
+     - テスト：694件中685件成功（失敗9件は以前から）。`ng build` 成功。
    - このセッション（または後で）：段階8の残りの確認（端末の切断・パスワードの変更。ユーザー操作）、10月分の差額3,335円の徴収の記録（11月の給与のあと）、push（ユーザー）、段階10。
    **段階9（周辺機能）を進めている**：方針 `docs/stage9-plan.md`（2026-10-31 ユーザー承認）。
    - 済み（本番に出して画面で確認、2026-10-31）：本人ポータルの詳しい情報（`portalDetails`）・公開範囲（`portalSettings*`）・本人からの申請（`portalRequest*`、担当者の受付 `/portal-requests`）、ホームの「全体の状況」のカード（`dashboardSummary*`、毎朝6時に集計）、手続きカレンダー `/calendar`（`calendarGet`・`checklist*`・`reminderSettingsUpdate`）。確認の結果は 11・12章のチェックリスト。テストデータ：中野 拓夢（test7）の住所を申請→反映で「兵庫県西宮市甲子園町1-82（テスト）」にした。
