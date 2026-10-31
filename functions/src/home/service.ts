@@ -1,4 +1,4 @@
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldPath, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
 import { OfficeDoc, ProcedureDoc, ProcedureStep } from '../types/firestore';
@@ -360,10 +360,17 @@ function procedureTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, offi
 }
 
 async function procedureTodos(auth: AuthContext, inScope: (officeId: string) => boolean, officeName: (id: string) => string) {
-  // 等価条件だけにして複合索引に頼らない
-  const snap = await db.collection(`companies/${auth.companyId}/procedures`)
-    .where('status', '==', 'in_progress').where('deletedAt', '==', null).limit(1000).get();
-  const procs = snap.docs.map(d => ({ id: d.id, ...(d.data() as ProcedureDoc) }))
+  // 等価条件だけにして複合索引に頼らない。旧方式の手続きで件数の上限が埋まらないよう、1000件ずつ最後まで読む
+  const query = db.collection(`companies/${auth.companyId}/procedures`).where('status', '==', 'in_progress').where('deletedAt', '==', null);
+  const docs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  for (let page = 0; page < 20; page++) {
+    let q = query.orderBy(FieldPath.documentId()).limit(1000);
+    if (docs.length) q = q.startAfter(docs[docs.length - 1].id);
+    const snap = await q.get();
+    docs.push(...snap.docs);
+    if (snap.size < 1000) break;
+  }
+  const procs = docs.map(d => ({ id: d.id, ...(d.data() as ProcedureDoc) }))
     .filter(p => inScope(p.officeId) && (!p.targetOfficeId || inScope(p.targetOfficeId)));
   const todos = await mapConcurrent(procs, 10, p => p.onboarding ? onboardingTodo(p, auth, officeName(p.officeId))
     : p.resignation ? resignationTodo(p, auth, officeName(p.officeId))
@@ -377,135 +384,149 @@ async function procedureTodos(auth: AuthContext, inScope: (officeId: string) => 
   return todos.filter((t): t is HomeTodo => t !== null);
 }
 
-// ── 毎月の処理 ─────────────────────────────────────────
+// ── 毎月の処理・算定基礎届・賞与（まとめて進める手続き） ─────────────────
 
 function monthLabel(ym: string) { const [y, m] = ym.split('-'); return `${y}年${Number(m)}月`; }
 
 /**
- * 事業所ごとの毎月の処理。当月分は必ず、前後の月は始めていて終わっていないものだけ出す。
- * 次にやることは、毎月の処理の画面と同じ判定で全員分の状況から決める（最後の一括処理からの推測はしない）
+ * ホームに出す一括型の手続き（事業所×月）。どれを出すかは軽く決め、次にやることは1件ずつ bulkTodo で計算する。
+ * 次にやることは各画面と同じ判定で全員分の状況から決めるため1件に数秒かかる。ホームは1件ずつ別の呼び出しで並べて読む。
  */
-async function monthlyTodos(auth: AuthContext, offices: { id: string; data: OfficeDoc }[]) {
+export interface BulkTarget {
+  kind: 'monthly' | 'santei' | 'bonus';
+  officeId: string;
+  /** 毎月の処理・賞与は支給月（YYYY-MM）、算定基礎届は年（YYYY） */
+  period: string;
+}
+
+/** 毎月の処理：当月分は必ず、前後の月は始めていて終わっていないものだけ */
+async function monthlyTargets(auth: AuthContext, offices: { id: string; data: OfficeDoc }[]): Promise<BulkTarget[]> {
+  if (!offices.length) return [];
   const base = `companies/${auth.companyId}`;
   const current = currentMonthJst();
   const months = [addMonths(current, -1), current, addMonths(current, 1)];
   const runs = await db.getAll(...offices.flatMap(o => months.map(m => db.doc(`${base}/monthlyRuns/${runId(o.id, m)}`))));
-  const targets = offices.flatMap((office, i) => months
+  return offices.flatMap((office, i) => months
     .filter((m, j) => m === current || runs[i * months.length + j].data()?.latestJobId)
-    .map(payMonth => ({ office, payMonth })));
-
-  const todos = await mapConcurrent(targets, 6, async ({ office, payMonth }): Promise<HomeTodo | null> => {
-    const todo = {
-      id: `monthly-${office.id}-${payMonth}`, kind: 'monthly' as const, title: `毎月の処理（${monthLabel(payMonth)}支給）`,
-      officeName: office.data.name, deadline: payDateOf(payMonth, office.data.paymentDay),
-      route: '/monthly', queryParams: { officeId: office.id, payMonth },
-    };
-    let overview: Awaited<ReturnType<typeof monthlyOverview>>;
-    try {
-      overview = await monthlyOverview({ companyId: auth.companyId, officeId: office.id, payMonth }, auth);
-    } catch (e) {
-      // 1つの事業所が読めなくても、ほかのやることは出す
-      return { ...todo, next: '状況を読み込めませんでした', detail: (e as Error).message || null, tone: 'action', updatedAt: null };
-    }
-    const job = overview.job;
-    if (job?.status === 'stalled') return { ...todo, updatedAt: job.createdAt, next: `${job.label}が途中で止まりました`, detail: '毎月の処理の画面で、もう一度実行してください', tone: 'action' };
-    if (job?.status === 'running') return { ...todo, updatedAt: job.createdAt, next: `${job.label}を処理しています（${job.processed}/${job.total}名）`, detail: null, tone: 'waiting' };
-    const progress = monthlyProgress({ rows: overview.rows, reviews: overview.reviews, canApprove: overview.me.canApprove });
-    if (!progress) return null;
-    const failed = job && job.failed > 0 ? `直前の${job.label}で${job.failed}名が失敗しました` : null;
-    return { ...todo, updatedAt: job?.createdAt ?? null, ...progress, detail: [failed, progress.detail].filter(Boolean).join('／') || null };
-  });
-  return todos.filter((t): t is HomeTodo => t !== null);
+    .map(period => ({ kind: 'monthly' as const, officeId: office.id, period })));
 }
 
-// ── 算定基礎届 ───────────────────────────────────────
-
-/**
- * 事業所ごとの今年の算定基礎届。準備期間（6月1日〜7月10日）は始めていなくても出し、それ以外は始めていて終わっていないものだけ出す。
- * 次にやることは、算定基礎届の画面と同じ判定（santei/progress.ts）で全員分の状況から決める
- */
-async function santeiTodos(auth: AuthContext, offices: { id: string; data: OfficeDoc }[]) {
+/** 算定基礎届：準備期間（6月1日〜7月10日）は始めていなくても、それ以外は始めた年だけ */
+async function santeiTargets(auth: AuthContext, offices: { id: string; data: OfficeDoc }[]): Promise<BulkTarget[]> {
   if (!offices.length) return [];
   const base = `companies/${auth.companyId}`;
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
   const year = Number(today.slice(0, 4));
   const inPeriod = today >= `${year}-06-01` && today <= `${year}-07-10`;
   const runs = await db.getAll(...offices.map(o => db.doc(`${base}/santeiRuns/${santeiRunId(o.id, year)}`)));
-  const targets = offices.filter((_, i) => inPeriod || runs[i].exists);
-  const todos = await mapConcurrent(targets, 4, async (office): Promise<HomeTodo | null> => {
-    const todo = {
-      id: `santei-${office.id}-${year}`, kind: 'santei' as const, title: `算定基礎届（${year}年）`,
-      officeName: office.data.name, deadline: `${year}-07-10`, route: '/santei', queryParams: { officeId: office.id, year: String(year) },
-    };
-    let overview: Awaited<ReturnType<typeof santeiOverview>>;
-    try {
-      overview = await santeiOverview({ companyId: auth.companyId, officeId: office.id, year }, auth);
-    } catch (e) {
-      return { ...todo, next: '状況を読み込めませんでした', detail: (e as Error).message || null, tone: 'action', updatedAt: null };
-    }
-    const job = overview.job;
-    if (job?.status === 'stalled') return { ...todo, updatedAt: job.createdAt, next: `${job.label}が途中で止まりました`, detail: '算定基礎届の画面で、もう一度実行してください', tone: 'action' };
-    if (job?.status === 'running') return { ...todo, updatedAt: job.createdAt, next: `${job.label}を処理しています（${job.processed}/${job.total}名）`, detail: null, tone: 'waiting' };
-    const progress = santeiProgress({ rows: overview.rows, filings: overview.filings, canApprove: overview.me.canApprove, uid: auth.uid });
-    if (!progress) return null;
-    const failed = job && job.failed > 0 ? `直前の${job.label}で${job.failed}名が失敗しました` : null;
-    return { ...todo, updatedAt: job?.createdAt ?? null, ...progress, detail: [failed, progress.detail].filter(Boolean).join('／') || null };
-  });
-  return todos.filter((t): t is HomeTodo => t !== null);
+  return offices.filter((_, i) => inPeriod || runs[i].exists).map(o => ({ kind: 'santei' as const, officeId: o.id, period: String(year) }));
 }
 
-// ── 賞与 ─────────────────────────────────────────────
-
-/**
- * 事業所ごとの賞与。始めた支給月（半年以内）のうち終わっていないものと、支給予定月が終わったのに賞与が登録されていない月（3か月以内）を出す。
- * 次にやることは、賞与の画面と同じ判定（bonus/progress.ts）で全員分の状況から決める
- */
-async function bonusTodos(auth: AuthContext, offices: { id: string; data: OfficeDoc }[]) {
+/** 賞与：始めた支給月（半年以内）と、支給予定月が終わったのに賞与が登録されていない月（3か月以内） */
+async function bonusTargets(auth: AuthContext, offices: { id: string; data: OfficeDoc }[]): Promise<BulkTarget[]> {
   if (!offices.length) return [];
   const base = `companies/${auth.companyId}`;
   const current = currentMonthJst();
-  const targets = (await mapConcurrent(offices, 4, async office => {
+  return (await mapConcurrent(offices, 4, async office => {
     const runs = await db.collection(`${base}/bonusRuns`).where('officeId', '==', office.id).get();
     const months = new Set(runs.docs.map(d => d.data().payMonth as string).filter(m => m && m >= addMonths(current, -6)));
     for (let i = 1; i <= 3; i++) {
       const m = addMonths(current, -i);
       if (isScheduledMonth(office.data.bonusMonths, m) && !months.has(m)) months.add(m);
     }
-    return [...months].map(payMonth => ({ office, payMonth }));
+    return [...months].map(period => ({ kind: 'bonus' as const, officeId: office.id, period }));
   })).flat();
-  const todos = await mapConcurrent(targets, 4, async ({ office, payMonth }): Promise<HomeTodo | null> => {
-    const todo = {
-      id: `bonus-${bonusRunId(office.id, payMonth)}`, kind: 'bonus' as const, title: `賞与（${payMonth.slice(0, 4)}年${Number(payMonth.slice(5, 7))}月支給）`,
-      officeName: office.data.name, route: '/bonus', queryParams: { officeId: office.id, month: payMonth },
-    };
-    let overview: Awaited<ReturnType<typeof bonusOverview>>;
-    try {
-      overview = await bonusOverview({ companyId: auth.companyId, officeId: office.id, payMonth }, auth);
-    } catch (e) {
-      return { ...todo, deadline: null, next: '状況を読み込めませんでした', detail: (e as Error).message || null, tone: 'action', updatedAt: null };
-    }
-    const deadline = overview.deadline;
-    const job = overview.job;
-    if (job?.status === 'stalled') return { ...todo, deadline, updatedAt: job.createdAt, next: `${job.label}が途中で止まりました`, detail: '賞与の画面で、もう一度実行してください', tone: 'action' };
-    if (job?.status === 'running') return { ...todo, deadline, updatedAt: job.createdAt, next: `${job.label}を処理しています（${job.processed}/${job.total}名）`, detail: null, tone: 'waiting' };
-    const progress = bonusProgress({
-      rows: overview.rows, filings: overview.filings, canApprove: overview.me.canApprove, uid: auth.uid, reviews: overview.reviews,
-      scheduled: overview.scheduled, monthEnded: overview.monthEnded, nonPayment: overview.nonPayment,
-    });
-    if (!progress) return null;
-    const failed = job && job.failed > 0 ? `直前の${job.label}で${job.failed}名が失敗しました` : null;
-    return { ...todo, deadline, updatedAt: job?.createdAt ?? null, ...progress, detail: [failed, progress.detail].filter(Boolean).join('／') || null };
+}
+
+/** 一括型の手続き1件の「次にやること」。終わっていれば null。承認者だけの人には、自分の番のものだけ返す */
+export async function bulkTodo(auth: AuthContext, target: BulkTarget): Promise<HomeTodo | null> {
+  requireOffice(auth, target.officeId);
+  const officeSnap = await db.doc(`companies/${auth.companyId}/offices/${target.officeId}`).get();
+  if (!officeSnap.exists) return null;
+  const office = { id: officeSnap.id, data: officeSnap.data() as OfficeDoc };
+  const todo = target.kind === 'monthly' ? await monthlyTodo(auth, office, target.period)
+    : target.kind === 'santei' ? await santeiTodo(auth, office, Number(target.period))
+    : await bonusTodo(auth, office, target.period);
+  return todo && (isOperator(auth) || todo.tone === 'yours') ? todo : null;
+}
+
+/** 毎月の処理の1件。毎月の処理の画面と同じ判定で全員分の状況から決める（最後の一括処理からの推測はしない） */
+async function monthlyTodo(auth: AuthContext, office: { id: string; data: OfficeDoc }, payMonth: string): Promise<HomeTodo | null> {
+  const todo = {
+    id: `monthly-${office.id}-${payMonth}`, kind: 'monthly' as const, title: `毎月の処理（${monthLabel(payMonth)}支給）`,
+    officeName: office.data.name, deadline: payDateOf(payMonth, office.data.paymentDay),
+    route: '/monthly', queryParams: { officeId: office.id, payMonth },
+  };
+  let overview: Awaited<ReturnType<typeof monthlyOverview>>;
+  try {
+    overview = await monthlyOverview({ companyId: auth.companyId, officeId: office.id, payMonth }, auth);
+  } catch (e) {
+    // 1つの事業所が読めなくても、ほかのやることは出す
+    return { ...todo, next: '状況を読み込めませんでした', detail: (e as Error).message || null, tone: 'action', updatedAt: null };
+  }
+  const job = overview.job;
+  if (job?.status === 'stalled') return { ...todo, updatedAt: job.createdAt, next: `${job.label}が途中で止まりました`, detail: '毎月の処理の画面で、もう一度実行してください', tone: 'action' };
+  if (job?.status === 'running') return { ...todo, updatedAt: job.createdAt, next: `${job.label}を処理しています（${job.processed}/${job.total}名）`, detail: null, tone: 'waiting' };
+  const progress = monthlyProgress({ rows: overview.rows, reviews: overview.reviews, canApprove: overview.me.canApprove });
+  if (!progress) return null;
+  const failed = job && job.failed > 0 ? `直前の${job.label}で${job.failed}名が失敗しました` : null;
+  return { ...todo, updatedAt: job?.createdAt ?? null, ...progress, detail: [failed, progress.detail].filter(Boolean).join('／') || null };
+}
+
+/** 算定基礎届の1件。算定基礎届の画面と同じ判定（santei/progress.ts） */
+async function santeiTodo(auth: AuthContext, office: { id: string; data: OfficeDoc }, year: number): Promise<HomeTodo | null> {
+  const todo = {
+    id: `santei-${office.id}-${year}`, kind: 'santei' as const, title: `算定基礎届（${year}年）`,
+    officeName: office.data.name, deadline: `${year}-07-10`, route: '/santei', queryParams: { officeId: office.id, year: String(year) },
+  };
+  let overview: Awaited<ReturnType<typeof santeiOverview>>;
+  try {
+    overview = await santeiOverview({ companyId: auth.companyId, officeId: office.id, year }, auth);
+  } catch (e) {
+    return { ...todo, next: '状況を読み込めませんでした', detail: (e as Error).message || null, tone: 'action', updatedAt: null };
+  }
+  const job = overview.job;
+  if (job?.status === 'stalled') return { ...todo, updatedAt: job.createdAt, next: `${job.label}が途中で止まりました`, detail: '算定基礎届の画面で、もう一度実行してください', tone: 'action' };
+  if (job?.status === 'running') return { ...todo, updatedAt: job.createdAt, next: `${job.label}を処理しています（${job.processed}/${job.total}名）`, detail: null, tone: 'waiting' };
+  const progress = santeiProgress({ rows: overview.rows, filings: overview.filings, canApprove: overview.me.canApprove, uid: auth.uid });
+  if (!progress) return null;
+  const failed = job && job.failed > 0 ? `直前の${job.label}で${job.failed}名が失敗しました` : null;
+  return { ...todo, updatedAt: job?.createdAt ?? null, ...progress, detail: [failed, progress.detail].filter(Boolean).join('／') || null };
+}
+
+/** 賞与の1件。賞与の画面と同じ判定（bonus/progress.ts） */
+async function bonusTodo(auth: AuthContext, office: { id: string; data: OfficeDoc }, payMonth: string): Promise<HomeTodo | null> {
+  const todo = {
+    id: `bonus-${bonusRunId(office.id, payMonth)}`, kind: 'bonus' as const, title: `賞与（${payMonth.slice(0, 4)}年${Number(payMonth.slice(5, 7))}月支給）`,
+    officeName: office.data.name, route: '/bonus', queryParams: { officeId: office.id, month: payMonth },
+  };
+  let overview: Awaited<ReturnType<typeof bonusOverview>>;
+  try {
+    overview = await bonusOverview({ companyId: auth.companyId, officeId: office.id, payMonth }, auth);
+  } catch (e) {
+    return { ...todo, deadline: null, next: '状況を読み込めませんでした', detail: (e as Error).message || null, tone: 'action', updatedAt: null };
+  }
+  const deadline = overview.deadline;
+  const job = overview.job;
+  if (job?.status === 'stalled') return { ...todo, deadline, updatedAt: job.createdAt, next: `${job.label}が途中で止まりました`, detail: '賞与の画面で、もう一度実行してください', tone: 'action' };
+  if (job?.status === 'running') return { ...todo, deadline, updatedAt: job.createdAt, next: `${job.label}を処理しています（${job.processed}/${job.total}名）`, detail: null, tone: 'waiting' };
+  const progress = bonusProgress({
+    rows: overview.rows, filings: overview.filings, canApprove: overview.me.canApprove, uid: auth.uid, reviews: overview.reviews,
+    scheduled: overview.scheduled, monthEnded: overview.monthEnded, nonPayment: overview.nonPayment,
   });
-  return todos.filter((t): t is HomeTodo => t !== null);
+  if (!progress) return null;
+  const failed = job && job.failed > 0 ? `直前の${job.label}で${job.failed}名が失敗しました` : null;
+  return { ...todo, deadline, updatedAt: job?.createdAt ?? null, ...progress, detail: [failed, progress.detail].filter(Boolean).join('／') || null };
 }
 
 // ── まとめ ───────────────────────────────────────────
 
 /**
- * ホームのやることリスト。進行中の手続き（入社など）と、事業所ごとの毎月の処理を、次にやることと期限つきで返す。
+ * ホームのやることリスト。進行中の手続き（入社など）は次にやることと期限つきで返す。
+ * 毎月の処理・算定基礎届・賞与は、deferBulk のときは対象（bulk）だけ返し、画面が1件ずつ bulkTodo で読む（全部を1回で計算すると20秒かかるため）。
  * 承認者だけの人には、承認を頼まれているものだけを返す。
  */
-export async function listHomeTodos(auth: AuthContext, officeId?: string) {
+export async function listHomeTodos(auth: AuthContext, officeId?: string, deferBulk = false) {
   if (officeId) requireOffice(auth, officeId);
   const officeSnap = await db.collection(`companies/${auth.companyId}/offices`).where('isActive', '==', true).get();
   const offices = officeSnap.docs
@@ -514,15 +535,20 @@ export async function listHomeTodos(auth: AuthContext, officeId?: string) {
   const names = new Map(offices.map(o => [o.id, o.data.name]));
   const inScope = (id: string) => names.has(id);
 
-  const [procedures, monthly, santei, bonus, ages] = await Promise.all([
+  const [procedures, ages, monthly, santei, bonus] = await Promise.all([
     procedureTodos(auth, inScope, id => names.get(id) ?? ''),
-    monthlyTodos(auth, offices),
-    santeiTodos(auth, offices),
-    bonusTodos(auth, offices),
     ageNoticeTodos(auth, inScope, id => names.get(id) ?? ''),
+    monthlyTargets(auth, offices),
+    santeiTargets(auth, offices),
+    bonusTargets(auth, offices),
   ]);
-  let items = [...procedures, ...monthly, ...santei, ...bonus, ...ages];
+  const bulk = [...monthly, ...santei, ...bonus];
+  let items = [...procedures, ...ages];
+  if (!deferBulk) {
+    const bulkItems = await mapConcurrent(bulk, 6, t => bulkTodo(auth, t));
+    items = [...items, ...bulkItems.filter((t): t is HomeTodo => t !== null)];
+  }
   if (!isOperator(auth)) items = items.filter(t => t.tone === 'yours');
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
-  return { today, items: sortTodos(items) };
+  return { today, items: sortTodos(items), bulk: deferBulk ? bulk.map(t => ({ ...t, officeName: names.get(t.officeId) ?? '' })) : [] };
 }

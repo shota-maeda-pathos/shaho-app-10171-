@@ -170,7 +170,7 @@ lazy(() => require('./migrations/rate-repair'), ['migrateInsuranceRates']);
 lazy(() => require('./onboarding/functions'), [
   'onboardingStart', 'onboardingGet', 'onboardingList', 'onboardingPreview', 'onboardingUpdate', 'onboardInviteGet', 'onboardInviteSubmit',
 ]);
-lazy(() => require('./home/functions'), ['homeTodos']);
+lazy(() => require('./home/functions'), ['homeTodos', 'homeBulkTodo']);
 lazy(() => require('./resignation/functions'), ['resignationStart', 'resignationGet', 'resignationPreview', 'resignationUpdate']);
 lazy(() => require('./dependent-change/functions'), [
   'dependentChangeStart', 'dependentChangeGet', 'dependentChangePreview', 'dependentChangeUpdate',
