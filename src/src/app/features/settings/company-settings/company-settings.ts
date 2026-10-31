@@ -104,7 +104,7 @@ interface CompanyInfo {
     .loading { display: flex; justify-content: center; padding: 48px; }
     .actions { display: flex; gap: 12px; margin-top: 16px; }
     .setup-card { padding: 48px; text-align: center; }
-    .setup-icon { font-size: 64px; width: 64px; height: 64px; color: #1976d2; }
+    .setup-icon { font-size: 64px; width: 64px; height: 64px; color: var(--app-brand-strong); }
     .setup-card h2 { margin: 16px 0 8px; }
     .setup-card p { color: #666; margin-bottom: 24px; }
   `],

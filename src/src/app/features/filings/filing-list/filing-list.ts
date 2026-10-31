@@ -57,7 +57,7 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
   ],
   template: `
     <div class="app-page">
-      <app-page-head heading="届出一覧" kicker="届出">
+      <app-page-head heading="届出">
         @if (summary(); as s) {
           <ng-container meta>
             <span>未提出 <b>{{ s.open }}件</b></span>

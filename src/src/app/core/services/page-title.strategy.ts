@@ -2,9 +2,9 @@ import { Injectable, inject } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
 
-const APP_NAME = '社会保険管理システム';
+const APP_NAME = 'Ordia';
 
-/** ブラウザーのタブ名を「画面名｜社会保険管理システム」にする。画面名はルートの data.title（いちばん深いもの） */
+/** ブラウザーのタブ名を「画面名｜Ordia」にする。画面名はルートの data.title（いちばん深いもの） */
 @Injectable()
 export class PageTitleStrategy extends TitleStrategy {
   private title = inject(Title);

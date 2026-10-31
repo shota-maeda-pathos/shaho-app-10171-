@@ -31,7 +31,7 @@ import { MatIconModule } from '@angular/material/icon';
   styles: [`
     .page-head { display: flex; align-items: flex-start; gap: var(--app-space-4); margin-bottom: var(--app-space-4); flex-wrap: wrap; }
     .head-main { min-width: 0; flex: 1; }
-    h1 { margin: 0; font-size: 22px; font-weight: 600; }
+    h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: .01em; }
     .kicker { display: flex; align-items: center; gap: var(--app-space-2); margin-bottom: 2px; font-size: var(--app-font-xs); color: var(--app-color-text-sub); }
     .tag { padding: 1px 7px; border-radius: 4px; background: var(--app-status-waiting-bg); color: var(--app-color-text-sub); font-weight: 600; }
     .back { display: inline-flex; align-items: center; gap: 2px; color: var(--app-color-link); text-decoration: none; }

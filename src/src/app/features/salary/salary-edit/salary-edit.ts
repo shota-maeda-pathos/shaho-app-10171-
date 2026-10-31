@@ -173,7 +173,7 @@ interface AllowanceEntry {
     .page-container { padding: 24px; }
     .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
     .page-header h1 { margin: 0; font-size: 24px; font-weight: 500; flex: 1; }
-    .month-badge { padding: 4px 12px; border-radius: 16px; background: #e3f2fd; color: #1565c0; font-size: 14px; }
+    .month-badge { padding: 4px 12px; border-radius: 16px; background: var(--app-brand-tint); color: var(--app-brand-strong); font-size: 14px; }
     .form-card { padding: 24px; }
     .form-card h2 { font-size: 16px; font-weight: 500; margin: 16px 0 12px; }
     .form-row { display: flex; gap: 16px; }
@@ -183,7 +183,7 @@ interface AllowanceEntry {
     .allowance-row mat-form-field { flex: 1; }
     .summary-section { margin: 24px 0; }
     .summary-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
-    .summary-row.total { font-size: 18px; font-weight: 600; border-top: 2px solid #1976d2; padding-top: 12px; }
+    .summary-row.total { font-size: 18px; font-weight: 600; border-top: 2px solid var(--app-brand-strong); padding-top: 12px; }
     .amount { font-family: 'Roboto Mono', monospace; }
     .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
     .loading-container { display: flex; justify-content: center; padding: 48px; }

@@ -175,8 +175,8 @@ const HEADER_MAP: Record<string, keyof CsvRow> = {
       border: 2px dashed #ccc; border-radius: 12px; padding: 48px;
       text-align: center; cursor: pointer; transition: border-color 0.2s;
     }
-    .upload-area:hover { border-color: #1976d2; }
-    .upload-area mat-icon { font-size: 48px; width: 48px; height: 48px; color: #1976d2; }
+    .upload-area:hover { border-color: var(--app-brand-strong); }
+    .upload-area mat-icon { font-size: 48px; width: 48px; height: 48px; color: var(--app-brand-strong); }
     .upload-area p { margin: 8px 0; color: #666; }
     .upload-area .hint { font-size: 12px; color: #999; }
     .template-link { text-align: center; margin-top: 16px; }

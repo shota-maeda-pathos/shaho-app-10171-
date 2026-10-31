@@ -91,7 +91,7 @@ import { AuthService } from '../../core/services/auth.service';
     .portal-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 16px; }
     .profile-card { padding: 24px; }
     .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
-    .profile-icon { font-size: 56px; width: 56px; height: 56px; color: #1976d2; }
+    .profile-icon { font-size: 56px; width: 56px; height: 56px; color: var(--app-brand-strong); }
     .profile-header h2 { margin: 0; font-size: 20px; }
     .subtitle { margin: 4px 0 0; color: #666; font-size: 14px; }
     .profile-details { padding-top: 16px; }
@@ -106,7 +106,7 @@ import { AuthService } from '../../core/services/auth.service';
     .info-cards { display: flex; gap: 16px; }
     .info-card { flex: 1; padding: 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: box-shadow 0.2s; }
     .info-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    .info-card mat-icon { color: #1976d2; }
+    .info-card mat-icon { color: var(--app-brand-strong); }
     .info-card span { flex: 1; font-size: 14px; font-weight: 500; }
     .chevron { color: #999; }
     mat-divider { margin: 0 -24px; }
@@ -119,7 +119,7 @@ import { AuthService } from '../../core/services/auth.service';
     .notification-item.unread { background: rgba(25,118,210,0.06); }
     .notif-icon { margin-top: 2px; }
     .notif-icon.cat-warning { color: #ed6c02; }
-    .notif-icon.cat-action { color: #1976d2; }
+    .notif-icon.cat-action { color: var(--app-brand-strong); }
     .notif-icon.cat-info { color: #2e7d32; }
     .notif-icon.cat-system { color: #666; }
     .notif-content { flex: 1; min-width: 0; }

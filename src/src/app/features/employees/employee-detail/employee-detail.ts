@@ -253,12 +253,12 @@ interface OnboardResult {
                 <div matListItemLine>{{ onboardResult()!.summary.employee }}</div>
               </mat-list-item>
               <mat-list-item>
-                <mat-icon matListItemIcon style="color:#1976d2">work</mat-icon>
+                <mat-icon matListItemIcon style="color:var(--app-brand-strong)">work</mat-icon>
                 <div matListItemTitle>雇用条件</div>
                 <div matListItemLine>{{ onboardResult()!.summary.employment }}</div>
               </mat-list-item>
               <mat-list-item>
-                <mat-icon matListItemIcon style="color:#1976d2">payments</mat-icon>
+                <mat-icon matListItemIcon style="color:var(--app-brand-strong)">payments</mat-icon>
                 <div matListItemTitle>給与データ</div>
                 <div matListItemLine>{{ onboardResult()!.summary.salary }}</div>
               </mat-list-item>
@@ -807,7 +807,7 @@ interface OnboardResult {
     }
     table { width: 100%; }
     .spacer { flex: 1; }
-    .action-panel { margin-bottom: 16px; border-left: 4px solid #1976d2; }
+    .action-panel { margin-bottom: 16px; border-left: 4px solid var(--app-brand-strong); }
     .notice-banner { display: flex; align-items: center; gap: var(--app-space-3); flex-wrap: wrap; margin-bottom: var(--app-space-3); padding: var(--app-space-3) var(--app-space-4); border-radius: var(--app-radius); background: var(--app-status-yours-bg); }
     .notice-banner.warn { background: var(--app-status-action-bg); }
     .notice-text { flex: 1; min-width: 240px; line-height: 1.7; }

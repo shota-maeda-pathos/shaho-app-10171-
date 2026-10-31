@@ -170,7 +170,7 @@ interface CollectionRow {
     .status-chip.collected { background: #e8f5e9; color: #2e7d32; }
     .status-chip.uncollected { background: #ffebee; color: #c62828; }
     .status-chip.partial { background: #fff3e0; color: #e65100; }
-    .status-chip.overpaid { background: #e3f2fd; color: #1565c0; }
+    .status-chip.overpaid { background: var(--app-brand-tint); color: var(--app-brand-strong); }
   `],
 })
 export class PremiumCollectionComponent implements OnInit {

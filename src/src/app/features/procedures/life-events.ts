@@ -13,6 +13,8 @@ export interface LifeEvent {
   icon: string;
   label: string;
   hint: string;
+  /** ホームの短い一覧に出す名前 */
+  short: string;
   route?: string;
 }
 
@@ -20,26 +22,26 @@ export const LIFE_EVENT_GROUPS: { label: string; events: LifeEvent[] }[] = [
   {
     label: '入社・退職',
     events: [
-      { type: 'acquisition', icon: 'person_add', label: '人が入社する', hint: '本人の入力から資格取得届の提出まで', route: '/onboarding/new' },
-      { type: 'loss', icon: 'person_remove', label: '人が退職する', hint: '退職日の登録、資格喪失届、最後の保険料' },
+      { type: 'acquisition', short: '入社', icon: 'person_add', label: '人が入社する', hint: '本人の入力から資格取得届の提出まで', route: '/onboarding/new' },
+      { type: 'loss', short: '退職', icon: 'person_remove', label: '人が退職する', hint: '退職日の登録、資格喪失届、最後の保険料' },
     ],
   },
   {
     label: '在籍中の変化',
     events: [
-      { type: 'dependent_change', icon: 'family_restroom', label: '家族が増えた・減った', hint: '被扶養者（異動）届' },
-      { type: 'leave', icon: 'child_friendly', label: '産休・育休に入る／戻る', hint: '申出書・保険料の免除・変更届・終了届' },
-      { type: 'monthly_change', icon: 'swap_vert', label: '給料が大きく変わった', hint: '随時改定（月額変更届）' },
-      { type: 'transfer', icon: 'apartment', label: '別の事業所へ異動する', hint: '事業所間の異動' },
-      { type: 'age_event', icon: 'elderly', label: '70歳・75歳になる', hint: '厚生年金・健康保険の資格喪失' },
+      { type: 'dependent_change', short: '扶養の変更', icon: 'family_restroom', label: '家族が増えた・減った', hint: '被扶養者（異動）届' },
+      { type: 'leave', short: '産休・育休', icon: 'child_friendly', label: '産休・育休に入る／戻る', hint: '申出書・保険料の免除・変更届・終了届' },
+      { type: 'monthly_change', short: '随時改定', icon: 'swap_vert', label: '給料が大きく変わった', hint: '随時改定（月額変更届）' },
+      { type: 'transfer', short: '異動', icon: 'apartment', label: '別の事業所へ異動する', hint: '事業所間の異動' },
+      { type: 'age_event', short: '70歳・75歳', icon: 'elderly', label: '70歳・75歳になる', hint: '厚生年金・健康保険の資格喪失' },
     ],
   },
   {
     label: '毎月・毎年の処理',
     events: [
-      { type: 'monthly', icon: 'event_repeat', label: '毎月の保険料処理', hint: '給与の取り込みから明細の公開・徴収まで', route: '/monthly' },
-      { type: 'bonus_payment', icon: 'card_giftcard', label: '賞与を払った', hint: '賞与の保険料と賞与支払届', route: '/bonus' },
-      { type: 'annual_review', icon: 'assessment', label: '年1回の算定基礎届（7月）', hint: '4〜6月の給与から標準報酬月額を決め直す', route: '/santei' },
+      { type: 'monthly', short: '毎月の処理', icon: 'event_repeat', label: '毎月の保険料処理', hint: '給与の取り込みから明細の公開・徴収まで', route: '/monthly' },
+      { type: 'bonus_payment', short: '賞与', icon: 'card_giftcard', label: '賞与を払った', hint: '賞与の保険料と賞与支払届', route: '/bonus' },
+      { type: 'annual_review', short: '算定基礎', icon: 'assessment', label: '年1回の算定基礎届（7月）', hint: '4〜6月の給与から標準報酬月額を決め直す', route: '/santei' },
     ],
   },
 ];
@@ -51,6 +53,14 @@ export const LIFE_EVENTS = LIFE_EVENT_GROUPS.flatMap(g => g.events);
   standalone: true,
   imports: [MatIconModule],
   template: `
+    @if (compact()) {
+      <!-- ホームの右側に置く短い一覧 -->
+      <div class="start-list">
+        @for (event of events; track event.type) {
+          <button type="button" (click)="open(event)" [title]="event.hint">{{ event.short }}</button>
+        }
+      </div>
+    } @else {
     @for (group of groups; track group.label) {
       <section class="group" [attr.aria-label]="group.label">
         <h3>{{ group.label }}</h3>
@@ -64,6 +74,7 @@ export const LIFE_EVENTS = LIFE_EVENT_GROUPS.flatMap(g => g.events);
           }
         </div>
       </section>
+    }
     }
   `,
   styles: [`
@@ -81,12 +92,22 @@ export const LIFE_EVENTS = LIFE_EVENT_GROUPS.flatMap(g => g.events);
     .card mat-icon { grid-row: 1 / span 2; color: var(--app-color-link); font-size: 28px; width: 28px; height: 28px; }
     .label { font-size: var(--app-font-lg); font-weight: 600; }
     .hint { font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
+    .start-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .start-list button {
+      padding: 9px 12px; border: 1px solid var(--app-color-border); border-radius: 8px; background: var(--app-color-surface);
+      color: var(--app-color-text); font: inherit; font-size: var(--app-font-sm); font-weight: 600; text-align: left; cursor: pointer;
+    }
+    .start-list button:hover { background: var(--app-brand-tint); border-color: var(--app-brand-tint-2); color: var(--app-brand-strong); }
+    .start-list button:focus-visible { outline: 2px solid var(--app-brand); outline-offset: 1px; }
   `],
 })
 export class LifeEventCardsComponent {
   private router = inject(Router);
   private office = inject(OfficeContextService);
   groups = LIFE_EVENT_GROUPS;
+  events = LIFE_EVENTS;
+  /** 短い名前のボタンだけを2列に並べる（ホームの右側） */
+  compact = input(false);
   /** 選んでいる業務（手続きを始める画面で、従業員を選んでいる間） */
   selected = input<string>('');
   /** 従業員を選ぶ業務を選んだとき。受け取らない画面では「手続きを始める」へ移動する */

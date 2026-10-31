@@ -54,7 +54,7 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
   ],
   template: `
     <div class="app-page wide">
-      <app-page-head heading="承認" kicker="承認">
+      <app-page-head heading="承認">
         @if (summary(); as s) {
           <ng-container meta>
             @if (canApproveRole) { <span>あなたが承認できる <b>{{ s.forMe }}件</b></span> }

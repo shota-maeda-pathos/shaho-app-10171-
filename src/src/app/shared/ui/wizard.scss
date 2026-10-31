@@ -2,7 +2,7 @@
 
 .step-panel {
   padding: var(--app-space-4) var(--app-space-5) var(--app-space-5); border: 1px solid var(--app-color-border); border-radius: var(--app-radius);
-  background: var(--app-color-surface);
+  background: var(--app-color-surface); box-shadow: var(--app-shadow);
 }
 
 .waiting {

@@ -1,82 +1,70 @@
 <div class="app-layout">
   <nav class="sidebar">
-    <div class="sidebar-header">
-      <span class="logo">社保管理</span>
-    </div>
-    <mat-nav-list aria-label="メインメニュー">
+    <a class="logo" routerLink="/home" [queryParams]="office.queryParams()" aria-label="Ordia ホーム"><app-logo [size]="30" /></a>
+
+    <label class="office-switch">
+      <span class="visually-hidden">表示する事業所</span>
+      <select [value]="office.selected()" (change)="changeOffice($event)" [disabled]="!office.ready() || office.busy()">
+        <!-- 選択肢は事業所を読み込んでから作られるので、選んでいる事業所は選択肢の側で示す（select の value だけだと先頭のままになる） -->
+        <option value="" [selected]="!office.selected()">{{auth.hasRole('admin') ? '全事業所' : '担当事業所すべて'}}</option>
+        @for (item of office.offices(); track item.id) { <option [value]="item.id" [selected]="item.id === office.selected()">{{item.name}}</option> }
+      </select>
+      <mat-icon aria-hidden="true">expand_more</mat-icon>
+    </label>
+
+    <div class="nav" role="list" aria-label="メインメニュー">
       @for (item of visibleNavItems(); track item.route) {
-        <a mat-list-item
-           [routerLink]="item.route"
-           [queryParams]="office.queryParams()"
-           [class.active]="activeRoute() === item.route"
-           [attr.aria-current]="activeRoute() === item.route ? 'page' : null">
-          <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-          <span matListItemTitle>{{ item.label }}
-            @if (item.route === '/approvals' && approvalBadge.count()) {
-              <span class="nav-badge" [attr.aria-label]="'あなたが承認できる件数 ' + approvalBadge.count() + '件'">{{ approvalBadge.count() }}</span>
-            }
-          </span>
-        </a>
+        <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
       }
       @if (visibleMoreItems().length) {
-        <button type="button" class="more-toggle" (click)="moreOpen.set(!moreShown())" [attr.aria-expanded]="moreShown()">
-          <mat-icon aria-hidden="true">{{ moreShown() ? 'expand_less' : 'expand_more' }}</mat-icon>
-          <span>その他</span>
-        </button>
-        @if (moreShown()) {
-          @for (item of visibleMoreItems(); track item.route) {
-            <a mat-list-item class="more-item"
-               [routerLink]="item.route"
-               [queryParams]="office.queryParams()"
-               [class.active]="activeRoute() === item.route"
-               [attr.aria-current]="activeRoute() === item.route ? 'page' : null">
-              <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-              <span matListItemTitle>{{ item.label }}</span>
-            </a>
-          }
+        <div class="nav-label">管理</div>
+        @for (item of visibleMoreItems(); track item.route) {
+          <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
         }
       }
-    </mat-nav-list>
-    <div class="sidebar-footer">
-      <mat-nav-list>
-        <a mat-list-item (click)="logout()">
-          <mat-icon matListItemIcon>logout</mat-icon>
-          <span matListItemTitle>ログアウト</span>
-        </a>
-      </mat-nav-list>
     </div>
+
+    <ng-template #navLink let-item>
+      <a role="listitem" [attr.aria-label]="item.label" [attr.title]="item.label"
+         [routerLink]="item.route"
+         [queryParams]="office.queryParams()"
+         [class.on]="activeRoute() === item.route"
+         [attr.aria-current]="activeRoute() === item.route ? 'page' : null">
+        <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+        <span>{{ item.label }}</span>
+        @if (item.route === '/approvals' && approvalBadge.count()) {
+          <span class="badge" [attr.aria-label]="'あなたが承認できる件数 ' + approvalBadge.count() + '件'">{{ approvalBadge.count() }}</span>
+        }
+      </a>
+    </ng-template>
+
+    <button type="button" class="side-foot" [matMenuTriggerFor]="userMenu" aria-label="アカウントのメニュー">
+      <span class="avatar" aria-hidden="true">{{ initial() }}</span>
+      <span class="who"><b>{{ auth.profile()?.displayName }}</b><span>{{ roleLabel() }}</span></span>
+      <mat-icon aria-hidden="true">more_vert</mat-icon>
+    </button>
+    <mat-menu #userMenu="matMenu" yPosition="above">
+      @if (auth.profile()?.employeeId) { <a mat-menu-item routerLink="/portal"><mat-icon>account_circle</mat-icon>マイポータルへ</a> }
+      <a mat-menu-item routerLink="/account"><mat-icon>manage_accounts</mat-icon>自分のアカウント</a>
+      <button mat-menu-item (click)="logout()"><mat-icon>logout</mat-icon>ログアウト</button>
+    </mat-menu>
   </nav>
 
   <div class="main-area">
-    <mat-toolbar class="top-bar">
-      <span class="page-title">{{ pageTitle() }}</span>
-      <span class="spacer"></span>
-      <label style="font-size:14px;margin-right:24px">事業所
-        <select aria-label="表示する事業所" [value]="office.selected()" (change)="changeOffice($event)" [disabled]="!office.ready() || office.busy()" style="margin-left:8px;padding:8px;max-width:220px">
-          <!-- 選択肢は事業所を読み込んでから作られるので、選んでいる事業所は選択肢の側で示す（select の value だけだと先頭のままになる） -->
-          <option value="" [selected]="!office.selected()">{{auth.hasRole('admin') ? '全事業所' : '担当事業所すべて'}}</option>
-          @for (item of office.offices(); track item.id) { <option [value]="item.id" [selected]="item.id === office.selected()">{{item.name}}</option> }
-        </select>
-      </label>
-      <button mat-icon-button [matMenuTriggerFor]="userMenu">
-        <mat-icon>account_circle</mat-icon>
-      </button>
-      <mat-menu #userMenu="matMenu">
-        <div class="user-info" mat-menu-item disabled>
-          {{ auth.profile()?.displayName }}
-        </div>
-        @if (auth.profile()?.employeeId) { <a mat-menu-item routerLink="/portal">マイポータルへ</a> }
-        <button mat-menu-item (click)="logout()">
-          <mat-icon>logout</mat-icon>
-          ログアウト
-        </button>
-      </mat-menu>
-    </mat-toolbar>
+    <header class="topbar">
+      <app-breadcrumb />
+      @if (canSearch()) {
+        <form class="search" role="search" (submit)="search($event, q)">
+          <mat-icon aria-hidden="true">search</mat-icon>
+          <input #q type="search" placeholder="氏名・手続きを探す" aria-label="氏名・手続きの名前で進行中の手続きを探す（Ctrl+K）" (keydown.escape)="q.blur()">
+          <kbd aria-hidden="true">Ctrl+K</kbd>
+        </form>
+      }
+    </header>
 
-    <app-breadcrumb />
     <main class="content">
       @if(office.error()) { <p role="alert">{{office.error()}}</p><button mat-stroked-button (click)="office.load()">事業所を再読み込み</button> }
-      @if(office.ready()) { <router-outlet /> } @else if(!office.error()) { <p>事業所情報を読み込んでいます…</p> }
+      @if(office.ready()) { <router-outlet /> } @else if(!office.error()) { <p class="loading-office">事業所情報を読み込んでいます…</p> }
     </main>
   </div>
 </div>

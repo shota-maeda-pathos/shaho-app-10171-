@@ -219,7 +219,7 @@ const ROLE_LABELS: Record<string, string> = {
     .loading-container { display: flex; justify-content: center; padding: 48px; }
     .empty-state { text-align: center; padding: 48px; color: #666; }
     .empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; color: #ccc; }
-    .role-chip { padding: 2px 8px; border-radius: 12px; font-size: 11px; background: #e3f2fd; color: #1565c0; margin-right: 4px; }
+    .role-chip { padding: 2px 8px; border-radius: 12px; font-size: 11px; background: var(--app-brand-tint); color: var(--app-brand-strong); margin-right: 4px; }
     .status-chip { padding: 4px 12px; border-radius: 16px; font-size: 12px; background: #e8f5e9; color: #2e7d32; }
     .status-chip.suspended { background: #ffebee; color: #c62828; }
     .error { color: #b3261e; }

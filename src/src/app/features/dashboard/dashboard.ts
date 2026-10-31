@@ -42,10 +42,11 @@ type Group = { key: string; label: string; items: HomeTodo[] };
   imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, StatusBadgeComponent, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent, LifeEventCardsComponent, PageHeadComponent],
   template: `
     <div class="app-page">
-      <app-page-head [heading]="greeting() + '、' + (auth.profile()?.displayName ?? 'ユーザー') + 'さん'" [kicker]="todayLabel() + '・' + office.label()">
+      <app-page-head [heading]="greeting() + '、' + (auth.profile()?.displayName ?? 'ユーザー') + 'さん'">
+        <ng-container meta><span>{{ todayLabel() }}・{{ office.label() }}</span></ng-container>
         @if (isOperator()) {
           <ng-container actions>
-            <a mat-stroked-button routerLink="/procedures/new"><mat-icon>add</mat-icon>手続きを始める</a>
+            <a mat-flat-button routerLink="/procedures/new"><mat-icon>add</mat-icon>手続きを始める</a>
           </ng-container>
         }
       </app-page-head>
@@ -63,9 +64,11 @@ type Group = { key: string; label: string; items: HomeTodo[] };
           <a routerLink="/procedures" [queryParams]="office.queryParams()"><span class="n">{{ waiting().length }}<small>件</small></span><span class="l">ほかの人の作業待ち</span></a>
         </nav>
 
+        <div class="split" [class.solo]="!isOperator()">
         <section class="card" aria-labelledby="todo-heading">
           <div class="card-head">
             <h2 id="todo-heading">やること</h2>
+            @if (todos()) { <span class="count">{{ mine().length }}</span> }
             @if (bulkPending()) {
               <span class="pending"><mat-spinner diameter="14"></mat-spinner>毎月の処理・賞与・算定を確かめています（残り {{ bulkPending() }}件）</span>
             }
@@ -100,14 +103,26 @@ type Group = { key: string; label: string; items: HomeTodo[] };
             <a routerLink="/procedures" [queryParams]="office.queryParams()">待ちも含めて、進行中の手続きをすべて見る</a>
           </div>
         </section>
-      }
 
-      @if (isOperator()) {
-        <section class="start" aria-labelledby="start-heading">
-          <h2 id="start-heading">新しく始める</h2>
-          <p class="caption">何が起きたかを選んでください。</p>
-          <app-life-event-cards />
-        </section>
+        @if (isOperator()) {
+          <div class="rail">
+            <section class="card" aria-labelledby="start-heading">
+              <div class="card-head"><h2 id="start-heading">新しく始める</h2></div>
+              <div class="card-body"><app-life-event-cards [compact]="true" /></div>
+            </section>
+            @if (upcoming().length) {
+              <section class="card" aria-labelledby="due-heading">
+                <div class="card-head"><h2 id="due-heading">今後の期限</h2><a class="right" routerLink="/filings">届出を見る</a></div>
+                <ul class="card-body cal">
+                  @for (todo of upcoming(); track todo.id) {
+                    <li><span class="d" [class.over]="overdue(todo)">{{ slashDate(todo.deadline!) }}</span><span>{{ todo.title }}</span></li>
+                  }
+                </ul>
+              </section>
+            }
+          </div>
+        }
+        </div>
       }
 
       @if (auth.hasRole('viewer') && !canSeeTodos()) {
@@ -128,28 +143,43 @@ type Group = { key: string; label: string; items: HomeTodo[] };
     </div>
   `,
   styles: [`
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--app-space-3); margin-bottom: var(--app-space-4); }
-    @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
-    .stats a {
-      display: flex; flex-direction: column; gap: 2px; padding: var(--app-space-3) var(--app-space-4); text-decoration: none; color: inherit;
-      background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius);
+    /* 数字は1枚の帯に4つ並べる（ui-proposals/home.html） */
+    .stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); margin-bottom: var(--app-space-4);
+      background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); box-shadow: var(--app-shadow); overflow: hidden;
     }
-    .stats a:hover { background: var(--app-color-surface-sub); }
+    @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    .stats a { display: flex; flex-direction: column; gap: 2px; padding: var(--app-space-3) 18px; text-decoration: none; color: inherit; }
+    .stats a + a { border-left: 1px solid var(--app-color-border-sub); }
+    .stats a:hover { background: var(--app-color-bg); }
     .stats .n { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .stats .n small { font-size: var(--app-font-sm); font-weight: 500; margin-left: 2px; color: var(--app-color-text-sub); }
-    .stats .l { font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
+    .stats .n small { font-size: var(--app-font-xs); font-weight: 600; margin-left: 3px; color: var(--app-color-muted); }
+    .stats .l { font-size: var(--app-font-xs); color: var(--app-color-muted); }
     .stats a.warn .n { color: var(--app-status-attention-fg); }
 
-    .card { background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); margin-bottom: var(--app-space-6); }
-    .card-head { display: flex; align-items: center; gap: var(--app-space-3); flex-wrap: wrap; padding: var(--app-space-3) var(--app-space-5); border-bottom: 1px solid var(--app-color-border); }
-    .card-head h2 { margin: 0; font-size: var(--app-font-lg); font-weight: 600; }
+    .split { display: grid; grid-template-columns: 1fr 300px; gap: var(--app-space-4); align-items: start; }
+    .split.solo { grid-template-columns: 1fr; }
+    @media (max-width: 1100px) { .split { grid-template-columns: 1fr; } }
+    .rail { display: flex; flex-direction: column; gap: var(--app-space-4); }
+    .card { background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); box-shadow: var(--app-shadow); }
+    .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--app-color-border-sub); }
+    .card-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
+    .card-head .right { margin-left: auto; font-size: var(--app-font-xs); }
+    .card-body { padding: var(--app-space-4) 18px; }
+    .count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 10px; background: var(--app-color-border-sub); color: var(--app-color-text-sub); font-size: 11px; font-weight: 700; }
+    .cal { list-style: none; margin: 0; }
+    .cal li { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--app-color-border); font-size: var(--app-font-sm); }
+    .cal li:last-child { border: 0; }
+    .cal .d { width: 44px; flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .cal .d.over { color: var(--app-status-error-fg); }
     .pending { display: inline-flex; align-items: center; gap: var(--app-space-2); font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
     .refresh { margin-left: auto; }
-    .group { padding: var(--app-space-2) var(--app-space-5); font-size: var(--app-font-xs); font-weight: 700; color: var(--app-color-text-sub); background: var(--app-color-surface-sub); border-bottom: 1px solid var(--app-color-border); }
+    .group { padding: 6px 18px 2px; font-size: 11px; font-weight: 700; letter-spacing: .05em; color: var(--app-color-muted); background: var(--app-color-surface-sub); border-bottom: 1px solid var(--app-color-border-sub); }
     .todo {
-      display: grid; grid-template-columns: 96px 1fr auto auto; gap: var(--app-space-4); align-items: center;
-      padding: var(--app-space-3) var(--app-space-5); border-bottom: 1px solid var(--app-color-border);
+      display: grid; grid-template-columns: 92px 1fr auto auto; gap: 14px; align-items: center;
+      padding: var(--app-space-3) 18px; border-bottom: 1px solid var(--app-color-border-sub);
     }
+    .todo:hover { background: #fafbfd; }
     @media (max-width: 720px) { .todo { grid-template-columns: 1fr; gap: var(--app-space-2); } }
     .due { display: flex; flex-direction: column; font-size: var(--app-font-sm); font-variant-numeric: tabular-nums; }
     .due small { font-size: 11px; color: var(--app-color-text-sub); }
@@ -157,10 +187,8 @@ type Group = { key: string; label: string; items: HomeTodo[] };
     .due.over, .due.over small { color: var(--app-status-error-fg); font-weight: 700; }
     .title b { font-weight: 600; }
     .sub { margin-top: 2px; font-size: var(--app-font-xs); color: var(--app-color-text-sub); }
-    .card-foot { padding: var(--app-space-3) var(--app-space-5); font-size: var(--app-font-sm); }
+    .card-foot { padding: var(--app-space-3) 18px; font-size: var(--app-font-sm); }
     .card-foot a { color: var(--app-color-link); }
-    .start h2 { margin: 0; font-size: var(--app-font-lg); font-weight: 600; }
-    .caption { margin: var(--app-space-1) 0 var(--app-space-3); color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
     .portal-banner { display: flex; align-items: center; gap: var(--app-space-4); padding: var(--app-space-5); background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); color: inherit; text-decoration: none; }
     .portal-banner mat-icon:first-child { font-size: 40px; width: 40px; height: 40px; color: var(--app-color-link); }
     .portal-banner .chevron { margin-left: auto; color: var(--app-color-text-sub); }
@@ -196,6 +224,8 @@ export class DashboardComponent {
     ];
     return groups.filter(g => g.items.length);
   });
+  /** 右の「今後の期限」：期限のあるものを近い順に5件 */
+  upcoming = computed(() => (this.todos() ?? []).filter(t => t.deadline).sort((a, b) => a.deadline!.localeCompare(b.deadline!)).slice(0, 5));
   /** 事業所を1つに絞っていなければ、各行に事業所名を出す */
   showOffice = computed(() => !this.office.selected() && this.office.offices().length > 1);
   todayLabel = computed(() => {
@@ -272,6 +302,7 @@ export class DashboardComponent {
   overdue(todo: HomeTodo) { return !!todo.deadline && this.days(todo.deadline) < 0; }
   /** 期限まで7日以内 */
   soon(todo: HomeTodo) { return !!todo.deadline && this.days(todo.deadline) >= 0 && this.days(todo.deadline) <= 7; }
+  slashDate(d: string) { const [, m, day] = d.split('-'); return `${Number(m)}/${Number(day)}`; }
   shortDate(d: string) { const [, m, day] = d.split('-'); return `${Number(m)}月${Number(day)}日`; }
   daysLabel(d: string) {
     const n = this.days(d);

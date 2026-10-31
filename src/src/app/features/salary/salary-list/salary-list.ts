@@ -126,7 +126,7 @@ interface SalaryRow {
     .empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; color: #ccc; }
     .status-chip { padding: 4px 12px; border-radius: 16px; font-size: 12px; background: #f5f5f5; }
     .status-chip.confirmed { background: #e8f5e9; color: #2e7d32; }
-    .link { color: #1976d2; cursor: pointer; text-decoration: none; }
+    .link { color: var(--app-brand-strong); cursor: pointer; text-decoration: none; }
     .link:hover { text-decoration: underline; }
   `],
 })

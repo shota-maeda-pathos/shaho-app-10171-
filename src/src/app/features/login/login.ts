@@ -8,6 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../core/services/auth.service';
+import { LogoComponent } from '../../shared/ui';
 
 @Component({
   selector: 'app-login',
@@ -15,15 +16,16 @@ import { AuthService } from '../../core/services/auth.service';
   imports: [
     FormsModule, MatCardModule, MatFormFieldModule,
     MatInputModule, MatButtonModule, MatIconModule,
-    MatProgressSpinnerModule,
+    MatProgressSpinnerModule, LogoComponent,
   ],
   template: `
     <div class="login-container">
       <mat-card class="login-card">
-        <mat-card-header>
-          <mat-card-title>社会保険管理システム</mat-card-title>
-          <mat-card-subtitle>ログイン</mat-card-subtitle>
-        </mat-card-header>
+        <div class="brand">
+          <app-logo [size]="36" />
+          <p class="tagline">社会保険の手続きと保険料の管理</p>
+        </div>
+        <h1 class="heading">ログイン</h1>
         <mat-card-content>
           @if (timeoutMessage()) {
             <p class="timeout-msg">セッションがタイムアウトしました。再度ログインしてください。</p>
@@ -63,7 +65,7 @@ import { AuthService } from '../../core/services/auth.service';
       min-height: 100vh;
       padding: var(--app-space-4);
       box-sizing: border-box;
-      background: var(--app-color-surface-sub);
+      background: var(--app-color-bg);
     }
     .login-card {
       width: 100%;
@@ -71,8 +73,11 @@ import { AuthService } from '../../core/services/auth.service';
       padding: var(--app-space-5);
       box-sizing: border-box;
     }
-    mat-card-header { padding: 0; }
-    mat-card-subtitle { margin-top: var(--app-space-1); }
+    .login-card { border: 1px solid var(--app-color-border); box-shadow: var(--app-shadow); border-radius: var(--app-radius); }
+    .brand { display: flex; flex-direction: column; gap: var(--app-space-2); }
+    .brand app-logo ::ng-deep .word { font-size: 28px; }
+    .tagline { margin: 0; font-size: var(--app-font-sm); color: var(--app-color-muted); }
+    .heading { margin: var(--app-space-5) 0 0; font-size: var(--app-font-lg); font-weight: 700; }
     /* 浮き上がったラベルが見出しと重ならないよう、フォームとの間を空ける */
     mat-card-content { padding: var(--app-space-5) 0 0; }
     .full-width { width: 100%; }

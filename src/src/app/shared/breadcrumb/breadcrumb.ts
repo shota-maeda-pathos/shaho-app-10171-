@@ -26,21 +26,11 @@ export interface Breadcrumb {
     </nav>
   `,
   styles: `
-    .breadcrumb {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      font-size: 13px;
-      padding: 8px 24px 0;
-      color: #666;
-    }
-    .crumb-link {
-      color: #1976d2;
-      text-decoration: none;
-      &:hover { text-decoration: underline; }
-    }
-    .crumb-current { color: #333; font-weight: 500; }
-    .separator { font-size: 16px; width: 16px; height: 16px; color: #999; }
+    :host { min-width: 0; }
+    .breadcrumb { display: flex; align-items: center; gap: 2px; font-size: 13px; color: var(--app-color-muted); white-space: nowrap; overflow: hidden; }
+    .crumb-link { color: var(--app-color-muted); text-decoration: none; &:hover { color: var(--app-color-link); text-decoration: underline; } }
+    .crumb-current { color: var(--app-color-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+    .separator { font-size: 16px; width: 16px; height: 16px; color: var(--app-color-muted); flex: none; }
   `,
 })
 export class BreadcrumbComponent {
@@ -63,7 +53,8 @@ export class BreadcrumbComponent {
         url += '/' + segments.join('/');
       }
       const title = child.snapshot.data['title'];
-      if (title) {
+      // 空のパスの子は親の title を受け継ぐので、同じ場所を2回並べない
+      if (title && crumbs.at(-1)?.url !== url) {
         crumbs.push({ label: title, url });
       }
       return this.buildBreadcrumbs(child, url, crumbs);

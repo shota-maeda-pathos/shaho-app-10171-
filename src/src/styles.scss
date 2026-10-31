@@ -13,8 +13,32 @@ html {
         primary: mat.$azure-palette,
         tertiary: mat.$blue-palette,
       ),
-      typography: Roboto,
+      typography: (
+        plain-family: var(--app-font-family),
+        brand-family: var(--app-font-family),
+      ),
       density: 0,
+    )
+  );
+  // ブランド色（Ordia・Slate blue。2026-10-31 ユーザー決定）。Material の部品の色もこれに合わせる
+  @include mat.theme-overrides(
+    (
+      primary: #3d5f86,
+      on-primary: #ffffff,
+      primary-container: #dde7f1,
+      on-primary-container: #273447,
+      secondary-container: #eef3f8,
+      on-secondary-container: #273447,
+      surface: #ffffff,
+      surface-container-lowest: #ffffff,
+      surface-container-low: #ffffff,
+      surface-container: #ffffff,
+      surface-container-high: #ffffff,
+      surface-container-highest: #f6f7f9,
+      on-surface: #1f2933,
+      on-surface-variant: #4b5662,
+      outline: #c3c9d1,
+      outline-variant: #e4e7eb,
     )
   );
 }
@@ -28,9 +52,10 @@ body {
   // Set a default background, font and text colors for the application using
   // Angular Material's system-level CSS variables. Learn more about these
   // variables at https://material.angular.dev/guide/system-variables
-  background-color: var(--mat-sys-surface);
-  color: var(--mat-sys-on-surface);
-  font: var(--mat-sys-body-medium);
+  background-color: var(--app-color-bg);
+  color: var(--app-color-text);
+  font: 14px/1.6 var(--app-font-family);
+  -webkit-font-smoothing: antialiased;
 
   // Reset the user agent margin.
   margin: 0;
@@ -38,27 +63,39 @@ body {
 }
 // デザイントークン。色・余白・文字サイズは画面ごとに直書きせず、ここの変数を使う。
 :root {
-  // 状態色5種（docs/ui-unification-design.md）：あなたの番＝青／要確認＝橙／待ち＝灰／完了＝緑／エラー・期限切れ＝赤
-  --app-status-yours-fg: #1565c0;
-  --app-status-yours-bg: #e3f2fd;
+  // ブランド色（Ordia・Slate blue）。ui-proposals/assets/style.css と同じ値
+  --app-brand: #53749b;
+  --app-brand-strong: #3d5f86;
+  --app-brand-ink: #273447;
+  --app-brand-tint: #eef3f8;
+  --app-brand-tint-2: #dde7f1;
+  --app-font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+
+  // 状態色5種（docs/ui-unification-design.md）：あなたの番＝ブランド色／要確認＝橙／待ち＝灰／完了＝緑／エラー・期限切れ＝赤
+  --app-status-yours-fg: var(--app-brand-strong);
+  --app-status-yours-bg: var(--app-brand-tint);
   --app-status-attention-fg: #9a5b12;
   --app-status-attention-bg: #fdf3e3;
-  --app-status-waiting-fg: #5f6368;
-  --app-status-waiting-bg: #f1f3f4;
-  --app-status-done-fg: #2e7d32;
-  --app-status-done-bg: #e8f5e9;
-  --app-status-error-fg: #c62828;
-  --app-status-error-bg: #ffebee;
+  --app-status-waiting-fg: #7a8591;
+  --app-status-waiting-bg: #eef0f3;
+  --app-status-done-fg: #2f7d4f;
+  --app-status-done-bg: #e9f5ee;
+  --app-status-error-fg: #b3412f;
+  --app-status-error-bg: #fbecea;
   // 旧い「要対応」。画面を作り直すまでの間だけ残す（エラーと同じ色）
   --app-status-action-fg: var(--app-status-error-fg);
   --app-status-action-bg: var(--app-status-error-bg);
 
-  --app-color-text: #1f1f1f;
-  --app-color-text-sub: #5f6368;
-  --app-color-border: #dadce0;
+  --app-color-text: #1f2933;
+  --app-color-text-sub: #4b5662;
+  --app-color-muted: #7a8591;
+  --app-color-border: #e4e7eb;
+  --app-color-border-sub: #eef0f3;
+  --app-color-bg: #f6f7f9;
   --app-color-surface: #ffffff;
-  --app-color-surface-sub: #f8f9fa;
-  --app-color-link: #1565c0;
+  --app-color-surface-sub: #fafbfc;
+  --app-color-link: var(--app-brand-strong);
+  --app-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
 
   --app-space-1: 4px;
   --app-space-2: 8px;
@@ -74,11 +111,11 @@ body {
   --app-font-xl: 20px;
   --app-font-title: 24px;
 
-  --app-radius: 8px;
+  --app-radius: 10px;
   --app-radius-pill: 999px;
 
   // 左のサイドバーの幅（下に固定の操作バーを本文の幅に合わせるのに使う）
-  --app-sidebar-width: 240px;
+  --app-sidebar-width: 216px;
 }
 
 // 状態の表示（app-status-badge と同じ見た目。表の中などで部品を使えない場合に使う）
@@ -98,12 +135,18 @@ body {
   &[data-tone='error'] { color: var(--app-status-error-fg); background: var(--app-status-error-bg); }
 }
 
-// 手続きの画面は見出しに戻るリンクを持つので、上の道順表示は出さない
-.main-area:has(app-page-head) app-breadcrumb { display: none; }
+// 枠の中の画面の余白と幅（ui-proposals の .content と同じ）。画面ごとに余白を持たせない
+.main-area > .content > router-outlet + * {
+  display: block; box-sizing: border-box; width: 100%; max-width: 1280px; margin: 0 auto; padding: var(--app-space-5) 28px var(--app-space-6);
+}
+.main-area > .content .app-page { padding: 0; max-width: none; }
+@media (max-width: 960px) {
+  .main-area > .content > router-outlet + * { padding: var(--app-space-4) var(--app-space-4) var(--app-space-6); }
+}
 
 // 画面の共通の枠
 .app-page {
-  padding: var(--app-space-5); max-width: 1280px;
+  padding: var(--app-space-5) 28px var(--app-space-6); max-width: 1280px; margin: 0 auto;
   // 本文の入力欄・選択肢・ボタンは、画面の文字（14px）に合わせて詰める（Material の既定は1段大きい）
   @include mat.theme((density: -3));
   @include mat.form-field-overrides((
@@ -112,8 +155,35 @@ body {
     container-vertical-padding: 10px,
   ));
 }
-.app-page-title { margin: 0 0 var(--app-space-2); font-size: var(--app-font-title); font-weight: 500; }
+.app-page-title { margin: 0 0 var(--app-space-2); font-size: 22px; font-weight: 700; letter-spacing: .01em; }
 .app-page-guide { margin: 0 0 var(--app-space-4); color: var(--app-color-text-sub); line-height: 1.7; max-width: 900px; }
+
+// カードの影・角を提案（ui-proposals）にそろえる
+.mat-mdc-card { --mat-card-elevated-container-elevation: var(--app-shadow); --mat-card-outlined-outline-color: var(--app-color-border); }
+.num, .tabular { font-variant-numeric: tabular-nums; }
+a { color: var(--app-color-link); }
+
+// まだ app-page-head を使っていない画面の見出しも、同じ大きさにそろえる
+.main-area > .content h1 { font-size: 22px; font-weight: 700; letter-spacing: .01em; }
+
+// 表（mat-table）を提案の表（ui-proposals の table.list）にそろえる：白いカード・灰色の小さな見出し・薄い区切り線
+html {
+  @include mat.table-overrides((
+    background-color: var(--app-color-surface),
+    header-headline-color: var(--app-color-muted),
+    header-headline-size: var(--app-font-xs),
+    header-headline-weight: 600,
+    header-container-height: 40px,
+    row-item-outline-color: var(--app-color-border-sub),
+    row-item-label-text-size: var(--app-font-md),
+  ));
+}
+.mat-mdc-table {
+  border: 1px solid var(--app-color-border); border-radius: var(--app-radius); box-shadow: var(--app-shadow);
+  border-collapse: separate; border-spacing: 0; overflow: hidden;
+}
+.mat-mdc-header-row { background: var(--app-color-surface-sub); }
+.mat-mdc-row:last-child .mat-mdc-cell { border-bottom: 0; }
 
 /* Snackbar notification styles */
 .snack-success .mdc-snackbar__surface {

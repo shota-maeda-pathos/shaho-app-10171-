@@ -1,4 +1,5 @@
 export * from './status-badge';
+export * from './logo';
 export * from './page-state';
 export * from './glossary';
 export * from './term';

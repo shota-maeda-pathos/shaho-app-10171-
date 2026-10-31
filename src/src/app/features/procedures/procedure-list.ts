@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -41,14 +42,14 @@ type Who = 'all' | 'mine' | 'waiting';
   imports: [FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, PageHeadComponent, StatusBadgeComponent, EmptyStateComponent, ErrorStateComponent, LoadingStateComponent],
   template: `
     <div class="app-page">
-      <app-page-head heading="手続き一覧" kicker="手続き">
+      <app-page-head heading="手続き">
         <ng-container meta>
           <span>進行中 <b>{{ active().length }}件</b></span>
           <span>あなたの番 <b>{{ mineCount() }}件</b></span>
           <span>{{ office.label() }}</span>
         </ng-container>
         @if (auth.hasAnyRole('admin', 'operator')) {
-          <ng-container actions><a mat-stroked-button routerLink="/procedures/new"><mat-icon>add</mat-icon>手続きを始める</a></ng-container>
+          <ng-container actions><a mat-flat-button routerLink="/procedures/new"><mat-icon>add</mat-icon>手続きを始める</a></ng-container>
         }
       </app-page-head>
 
@@ -158,10 +159,14 @@ export class ProcedureListComponent {
   auth = inject(AuthService);
   private functions = inject(Functions);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   tab = signal<Tab>('active');
   who = signal<Who>('all');
   query = signal('');
+  /** 上部バーの検索（?q=）から来たら、その言葉で絞り込む */
+  private queryParam = toSignal(this.route.queryParamMap);
+  private syncQuery = effect(() => { const q = this.queryParam()?.get('q'); if (q != null) untracked(() => this.query.set(q)); });
   todos = signal<Todo[] | null>(null);
   today = signal(new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }));
   loading = signal(false);

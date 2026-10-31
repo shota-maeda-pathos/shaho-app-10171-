@@ -12,6 +12,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import { OfficeContextService } from '../../../core/services/office-context.service';
+import { PageHeadComponent } from '../../../shared/ui';
 import { CsvImportDialogComponent } from '../csv-import-dialog/csv-import-dialog';
 
 interface Employee {
@@ -32,12 +33,12 @@ interface Employee {
   imports: [
     MatTableModule, MatButtonModule, MatIconModule,
     MatFormFieldModule, MatInputModule, MatProgressSpinnerModule,
-    MatChipsModule, MatSnackBarModule,
+    MatChipsModule, MatSnackBarModule, PageHeadComponent,
   ],
   template: `
-    <div class="page-header">
-      <h1>従業員一覧</h1>
-      <div class="header-actions">
+    <app-page-head heading="従業員">
+      <ng-container meta><span>{{ office.label() }}</span></ng-container>
+      <ng-container actions>
         <button mat-stroked-button (click)="exportCsv()" [disabled]="exporting()">
           <mat-icon>download</mat-icon>
           {{ exporting() ? '出力中...' : '在籍者CSV出力' }}
@@ -50,8 +51,8 @@ interface Employee {
           <mat-icon>add</mat-icon>
           新規登録
         </button>
-      </div>
-    </div>
+      </ng-container>
+    </app-page-head>
 
     @if (loading()) {
       <div class="loading">
@@ -120,17 +121,9 @@ interface Employee {
     }
   `,
   styles: [`
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-    }
-    h1 { margin: 0; font-size: 24px; }
-    .header-actions { display: flex; gap: 8px; }
     .employee-table { width: 100%; }
     .clickable-row { cursor: pointer; }
-    .clickable-row:hover { background: rgba(0, 0, 0, 0.04); }
+    .clickable-row:hover { background: #fafbfd; }
     .loading { display: flex; justify-content: center; padding: 48px; }
     .empty-state {
       text-align: center;

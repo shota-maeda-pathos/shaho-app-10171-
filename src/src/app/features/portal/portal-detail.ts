@@ -72,7 +72,7 @@ import { AuthService } from '../../core/services/auth.service';
     .section h3 { margin: 0 0 12px; font-size: 14px; font-weight: 500; color: #666; text-transform: uppercase; letter-spacing: 1px; }
     .line-item { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
     .line-item.total { border-top: 1px solid #e0e0e0; padding-top: 12px; margin-top: 8px; font-weight: 600; }
-    .line-item.grand-total { font-size: 20px; font-weight: 700; color: #1976d2; }
+    .line-item.grand-total { font-size: 20px; font-weight: 700; color: var(--app-brand-strong); }
     .amount { font-family: 'Roboto Mono', monospace; }
     .empty-card { padding: 32px; }
     .empty-state { text-align: center; padding: 32px; color: #666; }

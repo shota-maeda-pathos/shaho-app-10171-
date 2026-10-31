@@ -227,7 +227,7 @@ const STEP_STATUS_ICONS: Record<string, string> = {
     .subtitle { font-size: 14px; color: #666; }
     .header-right { display: flex; align-items: center; gap: 12px; }
     .status-chip { padding: 6px 16px; border-radius: 16px; font-size: 13px; font-weight: 500; background: #f5f5f5; }
-    .status-chip[data-status="in_progress"] { background: #e3f2fd; color: #1565c0; }
+    .status-chip[data-status="in_progress"] { background: var(--app-brand-tint); color: var(--app-brand-strong); }
     .status-chip[data-status="completed"] { background: #e8f5e9; color: #2e7d32; }
     .status-chip[data-status="cancelled"] { background: #f5f5f5; color: #757575; }
 
@@ -242,7 +242,7 @@ const STEP_STATUS_ICONS: Record<string, string> = {
     .priority-chip[data-priority="high"] { color: #c62828; font-weight: 500; }
     .priority-chip[data-priority="low"] { color: #757575; }
 
-    .link { color: #1976d2; cursor: pointer; text-decoration: none; }
+    .link { color: var(--app-brand-strong); cursor: pointer; text-decoration: none; }
     .link:hover { text-decoration: underline; }
 
     .steps-card mat-card-content { padding-top: 16px; }
@@ -251,7 +251,7 @@ const STEP_STATUS_ICONS: Record<string, string> = {
     .step-item:last-child { border-bottom: none; }
     .step-icon { flex-shrink: 0; padding-top: 2px; }
     .step-icon-blocked { color: #bdbdbd; }
-    .step-icon-available { color: #1976d2; }
+    .step-icon-available { color: var(--app-brand-strong); }
     .step-icon-in_progress { color: #f57c00; }
     .step-icon-completed { color: #2e7d32; }
     .step-icon-skipped { color: #9e9e9e; }
@@ -261,7 +261,7 @@ const STEP_STATUS_ICONS: Record<string, string> = {
     .step-header { display: flex; align-items: center; gap: 8px; }
     .step-label { font-size: 14px; font-weight: 500; }
     .step-status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f5f5f5; }
-    .step-status-badge[data-status="available"] { background: #e3f2fd; color: #1565c0; }
+    .step-status-badge[data-status="available"] { background: var(--app-brand-tint); color: var(--app-brand-strong); }
     .step-status-badge[data-status="in_progress"] { background: #fff3e0; color: #e65100; }
     .step-status-badge[data-status="completed"] { background: #e8f5e9; color: #2e7d32; }
     .step-status-badge[data-status="returned"] { background: #ffebee; color: #c62828; }
