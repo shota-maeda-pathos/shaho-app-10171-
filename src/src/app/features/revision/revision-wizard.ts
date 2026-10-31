@@ -13,7 +13,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import {
-  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
+  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep, createDraftAutosave,
 } from '../../shared/ui';
 import { errorMessage } from '../onboarding/onboarding.types';
 import { addMonth, ChangeForm, Evaluation, monthLabel, RevisionKey, RevisionView } from './revision.types';
@@ -164,6 +164,26 @@ export class RevisionWizardComponent implements OnInit, OnDestroy {
     return next.toISOString().slice(0, 7);
   }
 
+  /** 入力の自動下書き保存（「変動の確認」のステップ。入力を変えてから確定するまで。閉じても次に開くと戻る） */
+  autosave = createDraftAutosave({
+    procedureId: () => this.procedureId,
+    baseline: false,
+    step: () => 'change',
+    read: () => this.key() === 'change' && this.dirty() && !this.busy() ? { form: this.form } : null,
+  });
+
+  /** 前回の下書きを戻す（「変動の確認」がまだ確定していないときだけ） */
+  private async restoreDraft() {
+    const d = (await this.autosave.load())['change'];
+    if (!d || this.view()?.current !== 'change') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const x = d.data as any;
+    this.form = { ...this.form, ...x.form };
+    this.dirty.set(true);
+    this.autosave.restored('change', { form: this.form }, d.savedAt);
+    void this.changed();
+  }
+
   async ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id') ?? '';
     if (id === 'new') {
@@ -172,6 +192,7 @@ export class RevisionWizardComponent implements OnInit, OnDestroy {
     }
     this.procedureId = id;
     await this.load(true);
+    await this.restoreDraft();
   }
 
   ngOnDestroy() {
@@ -265,6 +286,7 @@ export class RevisionWizardComponent implements OnInit, OnDestroy {
         companyId: this.auth.companyId, procedureId: this.procedureId, expectedVersion: v.procedure.version, step, ...payload,
       });
       after?.();
+      if (step === 'change') void this.autosave.clear('change');
       this.snackBar.open(done, '閉じる', { duration: 5000 });
       await this.load(true);
     } catch (e) {

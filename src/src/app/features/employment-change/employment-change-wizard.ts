@@ -14,7 +14,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import {
-  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
+  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep, createDraftAutosave,
 } from '../../shared/ui';
 import { ContractForm, EMPLOYMENT_TYPES, errorMessage } from '../onboarding/onboarding.types';
 import { ChangeJudgement, ChangeKey, ChangeView } from './employment-change.types';
@@ -150,6 +150,26 @@ export class EmploymentChangeWizardComponent implements OnInit, OnDestroy {
     return false;
   }
 
+  /** 入力の自動下書き保存（「新しい条件」のステップ。入力を変えてから確定するまで。閉じても次に開くと戻る） */
+  autosave = createDraftAutosave({
+    procedureId: () => this.procedureId,
+    baseline: false,
+    step: () => 'entry',
+    read: () => this.key() === 'entry' && this.dirty() && !this.busy() ? { effectiveDate: this.effectiveDate, note: this.note, form: this.form, overrideReason: this.overrideReason } : null,
+  });
+
+  /** 前回の下書きを戻す（「新しい条件」がまだ確定していないときだけ） */
+  private async restoreDraft() {
+    const d = (await this.autosave.load())['entry'];
+    if (!d || this.view()?.current !== 'entry') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const x = d.data as any;
+    this.effectiveDate = x.effectiveDate ?? ''; this.note = x.note ?? ''; this.form = { ...this.form, ...x.form }; this.overrideReason = x.overrideReason ?? '';
+    this.dirty.set(true);
+    this.autosave.restored('entry', { effectiveDate: this.effectiveDate, note: this.note, form: this.form, overrideReason: this.overrideReason }, d.savedAt);
+    void this.changed();
+  }
+
   async ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id') ?? '';
     if (id === 'new') {
@@ -158,6 +178,7 @@ export class EmploymentChangeWizardComponent implements OnInit, OnDestroy {
     }
     this.procedureId = id;
     await this.load(true);
+    await this.restoreDraft();
   }
 
   ngOnDestroy() {
@@ -274,6 +295,7 @@ export class EmploymentChangeWizardComponent implements OnInit, OnDestroy {
         companyId: this.auth.companyId, procedureId: this.procedureId, expectedVersion: v.procedure.version, step, ...payload,
       });
       after?.();
+      if (step === 'entry') void this.autosave.clear('entry');
       this.snackBar.open(done, '閉じる', { duration: 5000 });
       await this.load(true);
     } catch (e) {

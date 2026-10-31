@@ -14,7 +14,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import {
-  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
+  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep, createDraftAutosave,
 } from '../../shared/ui';
 import { errorMessage } from '../onboarding/onboarding.types';
 import {
@@ -146,9 +146,30 @@ export class DependentChangeWizardComponent implements OnInit, OnDestroy {
     return `${m}月${d}日`;
   }
 
+  /** 入力の自動下書き保存（「変わった内容」のステップ。入力を変えてから確定するまで。閉じても次に開くと戻る） */
+  autosave = createDraftAutosave({
+    procedureId: () => this.procedureId,
+    baseline: false,
+    step: () => 'change',
+    read: () => this.key() === 'change' && this.dirty() && !this.busy() ? { items: this.items } : null,
+  });
+
+  /** 前回の下書きを戻す（「変わった内容」がまだ確定していないときだけ） */
+  private async restoreDraft() {
+    const d = (await this.autosave.load())['change'];
+    if (!d || this.view()?.current !== 'change') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const x = d.data as any;
+    if (Array.isArray(x.items)) this.items = x.items;
+    this.dirty.set(true);
+    this.autosave.restored('change', { items: this.items }, d.savedAt);
+    void this.changed();
+  }
+
   async ngOnInit() {
     this.procedureId = this.route.snapshot.paramMap.get('id') ?? '';
     await this.load(true);
+    await this.restoreDraft();
   }
 
   ngOnDestroy() {
@@ -273,6 +294,7 @@ export class DependentChangeWizardComponent implements OnInit, OnDestroy {
         companyId: this.auth.companyId, procedureId: this.procedureId, expectedVersion: v.procedure.version, step, ...payload,
       });
       after?.();
+      if (step === 'change') void this.autosave.clear('change');
       this.snackBar.open(done, '閉じる', { duration: 4000 });
       await this.load(true);
     } catch (e) {

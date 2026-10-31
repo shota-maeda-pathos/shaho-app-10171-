@@ -9,7 +9,7 @@
                 [heading]="v.procedure.title" [personName]="v.procedure.employeeName"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.period ? '・' + (v.period.startDate | date:'M月d日') + '〜' + ((v.period.actualEndDate ?? v.period.plannedEnd) | date:'M月d日') : '')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
-                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()" [info]="autosave.state()"
                 (advance)="advance()">
 
       @switch (key()) {

@@ -13,7 +13,7 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import { GroupNavComponent, groupBackLabel } from '../procedures/procedure-groups';
 import {
-  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
+  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep, createDraftAutosave,
 } from '../../shared/ui';
 import { errorMessage } from '../onboarding/onboarding.types';
 import { DUE_SOURCE_LABEL, LossReason, monthLabel, ResignationFacts, ResignationKey, ResignationView, Settlement } from './resignation.types';
@@ -164,9 +164,30 @@ export class ResignationWizardComponent implements OnInit, OnDestroy {
     return `${m}月${d}日`;
   }
 
+  /** 入力の自動下書き保存（「退職日と理由」のステップ。入力を変えてから確定するまで。閉じても次に開くと戻る） */
+  autosave = createDraftAutosave({
+    procedureId: () => this.procedureId,
+    baseline: false,
+    step: () => 'entry',
+    read: () => this.key() === 'entry' && this.entryDirty() && !this.busy() ? { resignationDate: this.resignationDate, reason: this.reason, note: this.note } : null,
+  });
+
+  /** 前回の下書きを戻す（「退職日と理由」がまだ確定していないときだけ） */
+  private async restoreDraft() {
+    const d = (await this.autosave.load())['entry'];
+    if (!d || this.view()?.current !== 'entry') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const x = d.data as any;
+    this.resignationDate = x.resignationDate ?? ''; this.reason = x.reason ?? 'resignation'; this.note = x.note ?? '';
+    this.entryDirty.set(true);
+    this.autosave.restored('entry', { resignationDate: this.resignationDate, reason: this.reason, note: this.note }, d.savedAt);
+    void this.entryChanged();
+  }
+
   async ngOnInit() {
     this.procedureId = this.route.snapshot.paramMap.get('id') ?? '';
     await this.load(true);
+    await this.restoreDraft();
   }
 
   ngOnDestroy() {
@@ -236,6 +257,7 @@ export class ResignationWizardComponent implements OnInit, OnDestroy {
         companyId: this.auth.companyId, procedureId: this.procedureId, expectedVersion: v.procedure.version, step, ...payload,
       });
       after?.();
+      if (step === 'entry') void this.autosave.clear('entry');
       this.snackBar.open(done, '閉じる', { duration: 4000 });
       await this.load(true);
     } catch (e) {

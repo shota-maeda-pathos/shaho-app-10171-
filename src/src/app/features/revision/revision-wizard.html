@@ -9,7 +9,7 @@
                 [heading]="v.procedure.title" [personName]="v.procedure.employeeName"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.form.startMonth ? '・' + monthLabel(v.form.startMonth) + '〜' + monthLabel(addMonth(v.form.startMonth, 2)) + 'の給与で判定' : '')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
-                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()" [info]="autosave.state()"
                 (advance)="advance()">
       @if (v.employee.otherEmployer) {
         <div class="alert" role="alert">二以上事業所勤務（ほかに「{{ v.employee.otherEmployer }}」）として登録されています。本システムは二以上事業所勤務に対応していないため、届出と保険料は別途確かめてください。</div>

@@ -13,7 +13,7 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import { GroupNavComponent, groupBackLabel } from '../procedures/procedure-groups';
 import {
-  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
+  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep, createDraftAutosave,
 } from '../../shared/ui';
 import { errorMessage } from '../onboarding/onboarding.types';
 import { AgeKey, AgeView, monthLabel, Pension70Result } from './age-event.types';
@@ -138,6 +138,26 @@ export class AgeEventWizardComponent implements OnInit, OnDestroy {
     return false;
   }
 
+  /** 入力の自動下書き保存（「到達日の確認」のステップ。入力を変えてから確定するまで。閉じても次に開くと戻る） */
+  autosave = createDraftAutosave({
+    procedureId: () => this.procedureId,
+    baseline: false,
+    step: () => 'check',
+    read: () => this.key() === 'check' && this.dirty() && !this.busy() ? { remuneration: this.remuneration, inKind: this.inKind, cardsReturned: this.cardsReturned, cardsUnreturnable: this.cardsUnreturnable } : null,
+  });
+
+  /** 前回の下書きを戻す（「到達日の確認」がまだ確定していないときだけ） */
+  private async restoreDraft() {
+    const d = (await this.autosave.load())['check'];
+    if (!d || this.view()?.current !== 'check') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const x = d.data as any;
+    this.remuneration = x.remuneration ?? null; this.inKind = x.inKind ?? 0; this.cardsReturned = x.cardsReturned ?? 0; this.cardsUnreturnable = x.cardsUnreturnable ?? 0;
+    this.dirty.set(true);
+    this.autosave.restored('check', { remuneration: this.remuneration, inKind: this.inKind, cardsReturned: this.cardsReturned, cardsUnreturnable: this.cardsUnreturnable }, d.savedAt);
+    void this.changed();
+  }
+
   async ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id') ?? '';
     if (id === 'new') {
@@ -146,6 +166,7 @@ export class AgeEventWizardComponent implements OnInit, OnDestroy {
     }
     this.procedureId = id;
     await this.load(true);
+    await this.restoreDraft();
   }
 
   ngOnDestroy() {
@@ -240,6 +261,7 @@ export class AgeEventWizardComponent implements OnInit, OnDestroy {
         companyId: this.auth.companyId, procedureId: this.procedureId, expectedVersion: v.procedure.version, step, ...payload,
       });
       after?.();
+      if (step === 'check') void this.autosave.clear('check');
       this.snackBar.open(done, '閉じる', { duration: 5000 });
       await this.load(true);
     } catch (e) {

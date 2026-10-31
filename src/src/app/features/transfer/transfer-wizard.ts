@@ -10,7 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
-import { ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, WizardComponent, WizardStep } from '../../shared/ui';
+import { ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, WizardComponent, WizardStep, createDraftAutosave } from '../../shared/ui';
 import { errorMessage } from '../onboarding/onboarding.types';
 
 type Key = 'entry' | 'apply' | 'filings' | 'confirm' | 'done';
@@ -123,6 +123,26 @@ export class TransferWizardComponent implements OnInit {
     return false;
   }
 
+  /** 入力の自動下書き保存（「異動の内容」のステップ。入力を変えてから確定するまで。閉じても次に開くと戻る） */
+  autosave = createDraftAutosave({
+    procedureId: () => this.procedureId,
+    baseline: false,
+    step: () => 'entry',
+    read: () => this.key() === 'entry' && this.dirty() && !this.busy() ? { toOfficeId: this.toOfficeId, transferDate: this.transferDate, reason: this.reason } : null,
+  });
+
+  /** 前回の下書きを戻す（「異動の内容」がまだ確定していないときだけ） */
+  private async restoreDraft() {
+    const d = (await this.autosave.load())['entry'];
+    if (!d || this.view()?.current !== 'entry') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const x = d.data as any;
+    this.toOfficeId = x.toOfficeId ?? ''; this.transferDate = x.transferDate ?? ''; this.reason = x.reason ?? '';
+    this.dirty.set(true);
+    this.autosave.restored('entry', { toOfficeId: this.toOfficeId, transferDate: this.transferDate, reason: this.reason }, d.savedAt);
+    void this.changed();
+  }
+
   async ngOnInit() {
     void this.loadOffices();
     const id = this.route.snapshot.paramMap.get('id') ?? '';
@@ -142,6 +162,7 @@ export class TransferWizardComponent implements OnInit {
       this.procedureId = id;
     }
     await this.load(true);
+    await this.restoreDraft();
   }
 
   private async loadOffices() {
@@ -208,6 +229,7 @@ export class TransferWizardComponent implements OnInit {
     try {
       await httpsCallable(this.functions, 'transferUpdate')({ companyId: this.auth.companyId, procedureId: this.procedureId, expectedVersion: v.procedure.version, step, ...payload });
       after?.();
+      if (step === 'entry') void this.autosave.clear('entry');
       this.snackBar.open(done, '閉じる', { duration: 5000 });
       await this.load(true);
     } catch (e) {

@@ -9,7 +9,7 @@
                 [heading]="v.procedure.title" [personName]="v.procedure.employeeName"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + '・資格喪失日 ' + (v.facts.lossDate | date:'yyyy年M月d日')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
-                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()" [info]="autosave.state()"
                 (advance)="advance()">
       <app-group-nav headActions type="age_event" [officeId]="v.procedure.officeId" [groupKey]="v.facts.reachDate.slice(0, 7)" [currentId]="v.procedure.id" />
       @if (v.employee.otherEmployer) {

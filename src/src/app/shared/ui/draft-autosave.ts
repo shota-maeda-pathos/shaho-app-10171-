@@ -16,6 +16,10 @@ export function createDraftAutosave(options: {
   step: () => string;
   /** 今の入力。保存しないときは null */
   read: () => unknown | null;
+  /**
+   * 最初に見た入力を「読み込んだ値」として保存しない（既定）。read() が入力を変えたあとだけ値を返す画面は false にして、最初の変更から保存する
+   */
+  baseline?: boolean;
   intervalMs?: number;
 }) {
   const functions = inject(Functions);
@@ -33,7 +37,7 @@ export function createDraftAutosave(options: {
     const json = JSON.stringify(data);
     if (last.get(step) === json) return;
     // 初めて見る入力（読み込んだばかりの値）は、変わったときだけ保存する
-    if (!last.has(step)) { last.set(step, json); return; }
+    if (options.baseline !== false && !last.has(step)) { last.set(step, json); return; }
     saving = true;
     state.set('下書きを保存しています…');
     try {

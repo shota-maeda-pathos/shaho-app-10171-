@@ -9,7 +9,7 @@
                 [heading]="v.procedure.title" [personName]="v.procedure.employeeName"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.entry ? '・退職日 ' + (v.entry.resignationDate | date:'yyyy年M月d日') : '') + (v.facts?.filingDeadline ? '・資格喪失届の期限 ' + (v.facts!.filingDeadline | date:'M月d日') : '')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
-                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()" [info]="autosave.state()"
                 (advance)="advance()">
       <app-group-nav headActions type="loss" [officeId]="v.procedure.officeId" [groupKey]="(v.entry?.resignationDate ?? 'none')" [currentId]="v.procedure.id" />
       @if (v.employee.otherEmployer) {

@@ -9,7 +9,7 @@
                 [heading]="v.procedure.title" [personName]="v.procedure.employeeName"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.effectiveDate ? '・' + (v.effectiveDate | date:'yyyy年M月d日') + 'から' : '')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
-                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()" [info]="autosave.state()"
                 (advance)="advance()">
 
       @if (v.employee.otherEmployer) {

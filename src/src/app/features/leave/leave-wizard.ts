@@ -13,7 +13,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import {
-  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep,
+  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep, createDraftAutosave,
 } from '../../shared/ui';
 import { errorMessage } from '../onboarding/onboarding.types';
 import { EVENT_LABEL, EventResult, LeaveEventType, LeaveKey, LeaveView, monthLabel, monthsText, PlanForm, PlanResult } from './leave.types';
@@ -175,9 +175,30 @@ export class LeaveWizardComponent implements OnInit, OnDestroy {
     return `${m}月${d}日`;
   }
 
+  /** 入力の自動下書き保存（「休業の期間」のステップ。入力を変えてから確定するまで。閉じても次に開くと戻る） */
+  autosave = createDraftAutosave({
+    procedureId: () => this.procedureId,
+    baseline: false,
+    step: () => 'plan',
+    read: () => this.key() === 'plan' && this.dirty() && !this.busy() ? { form: this.form } : null,
+  });
+
+  /** 前回の下書きを戻す（「休業の期間」がまだ確定していないときだけ） */
+  private async restoreDraft() {
+    const d = (await this.autosave.load())['plan'];
+    if (!d || this.view()?.current !== 'plan') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const x = d.data as any;
+    this.form = { ...this.form, ...x.form };
+    this.dirty.set(true);
+    this.autosave.restored('plan', { form: this.form }, d.savedAt);
+    void this.changed();
+  }
+
   async ngOnInit() {
     this.procedureId = this.route.snapshot.paramMap.get('id') ?? '';
     await this.load(true);
+    await this.restoreDraft();
   }
 
   ngOnDestroy() {
@@ -274,6 +295,7 @@ export class LeaveWizardComponent implements OnInit, OnDestroy {
         companyId: this.auth.companyId, procedureId: this.procedureId, expectedVersion: v.procedure.version, step, ...payload,
       });
       after?.();
+      if (step === 'plan') void this.autosave.clear('plan');
       this.snackBar.open(data?.notes?.length ? `${done}。${data.notes.join('。')}` : done, '閉じる', { duration: 6000 });
       await this.load(true);
     } catch (e) {
