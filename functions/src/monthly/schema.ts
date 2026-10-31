@@ -26,7 +26,7 @@ export const CollectionEntrySchema = RunSchema.extend({
 }).strict();
 export type CollectionEntryInput = z.infer<typeof CollectionEntrySchema>;
 
-export const MONTHLY_ACTIONS = ['requestSalaryApproval', 'approveSalary', 'calculate', 'requestPremiumApproval', 'approvePremium', 'publish', 'recordPayroll'] as const;
+export const MONTHLY_ACTIONS = ['requestSalaryApproval', 'approveSalary', 'calculate', 'requestPremiumApproval', 'approvePremium', 'publish', 'recordPayroll', 'correctPremium'] as const;
 export type MonthlyAction = typeof MONTHLY_ACTIONS[number];
 
 export const JobStartSchema = RunSchema.extend({

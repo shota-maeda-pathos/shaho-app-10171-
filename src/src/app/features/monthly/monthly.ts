@@ -42,7 +42,11 @@ const ACTIONS: Record<StepKey, (c: MonthlyComponent) => BulkAction[]> = {
       confirm: { title: `${c.monthLabel(c.payMonth)}支給の給与を承認する`, message: '一覧で内容を確かめた人の給与を承認します。', notice: '承認した給与は、差し戻さないと直せません。' } }] : []),
   ],
   calculate: c => [{ key: 'calculate', label: '保険料を計算する', appliesTo: r => { const x = c.row(r.id); return !!x && x.premiumDue && !x.issues.length && !x.premium?.confirmed && !x.premium?.pending; },
-    caution: '保険料は等級から決まります。給与がない人も、休業の免除がなければかかります。' }],
+    caution: '保険料は等級から決まります。給与がない人も、休業の免除がなければかかります。' },
+    // 承認済みの保険料の訂正（カタログ6章）：選んだ人だけ未確定に戻し、計算し直して承認を取り直す
+    { key: 'correctPremium', label: '選んだ人の保険料を訂正する', selectedOnly: true, appliesTo: r => !!c.row(r.id)?.premium?.confirmed,
+      caution: '承認済みの保険料を未確定に戻します。前の内容は訂正の履歴と監査ログに残ります。このあと計算し直し、確認を依頼して承認を取り直します。',
+      confirm: { title: `${c.monthLabel(c.data()?.premiumMonth ?? c.payMonth)}分の保険料を訂正する`, message: '選んだ人の承認済みの保険料を未確定に戻します。計算し直したあと、別の担当者の承認で確定し直します。', notice: '明細を公開済みの人は、承認し直すまで本人のポータルで保険料が「未確定」になります。', confirmLabel: '訂正する' } }],
   premiumReview: c => [
     { key: 'requestPremiumApproval', label: '確認を依頼する', appliesTo: r => c.row(r.id)?.premium?.confirmed === false && !c.row(r.id)?.premium?.pending,
       caution: '依頼中は計算し直せません。承認されると明細の公開と徴収の記録ができます。',

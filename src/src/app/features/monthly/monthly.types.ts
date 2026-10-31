@@ -2,7 +2,7 @@ import { StatusTone } from '../../shared/ui';
 
 export interface SalaryItem { name: string; kind: 'fixed' | 'variable' }
 
-export type MonthlyAction = 'requestSalaryApproval' | 'approveSalary' | 'calculate' | 'requestPremiumApproval' | 'approvePremium' | 'publish' | 'recordPayroll';
+export type MonthlyAction = 'requestSalaryApproval' | 'approveSalary' | 'calculate' | 'requestPremiumApproval' | 'approvePremium' | 'publish' | 'recordPayroll' | 'correctPremium';
 export type StepKey = 'salary' | 'salaryReview' | 'calculate' | 'premiumReview' | 'publish' | 'collection';
 
 export interface MonthlyRow {
@@ -75,6 +75,7 @@ export interface StepState { tone: StatusTone; label: string; reason?: string }
 export const ACTION_STEP: Record<MonthlyAction, StepKey> = {
   requestSalaryApproval: 'salaryReview', approveSalary: 'salaryReview', calculate: 'calculate',
   requestPremiumApproval: 'premiumReview', approvePremium: 'premiumReview', publish: 'publish', recordPayroll: 'collection',
+  correctPremium: 'calculate',
 };
 
 const yen = (n: number) => `${n.toLocaleString('ja-JP')}円`;

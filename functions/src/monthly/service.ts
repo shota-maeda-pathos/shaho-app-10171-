@@ -208,7 +208,8 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
       healthGrade: p.healthGradeNumber ?? 0, pensionGrade: p.pensionGradeNumber ?? 0, exempted: p.isExempted === true,
       confirmed: p.isConfirmed === true, pending: p.approvalPending === true, version: p.version ?? 0,
     } : null;
-    if (p && premiumMonth >= '2026-04' && !p.childSupportPayment && !p.isConfirmed) issues.push('子ども・子育て支援金を含めて計算し直してください');
+    // 計算の前に止めるものではなく、計算し直しを促す（止めると「計算する」が押せない）
+    if (p && premiumMonth >= '2026-04' && !p.childSupportPayment) warnings.push(p.isConfirmed ? '子ども・子育て支援金が入っていません。保険料を訂正して計算し直してください' : '子ども・子育て支援金を含めて計算し直してください');
 
     const stale = !!p && !p.isConfirmed && !p.approvalPending && typeof p.rateFingerprint === 'string' && currentFingerprint !== null && p.rateFingerprint !== currentFingerprint;
     if (stale) warnings.push('計算した後に料率が変わりました。計算し直してください');
@@ -417,6 +418,7 @@ export async function addCollectionEntry(input: CollectionEntryInput, auth: Auth
 const ACTION_LABEL: Record<MonthlyAction, string> = {
   requestSalaryApproval: '給与の確認の依頼', approveSalary: '給与の承認', calculate: '保険料の計算',
   requestPremiumApproval: '保険料の確認の依頼', approvePremium: '保険料の承認', publish: '明細の公開', recordPayroll: '給与からの控除の記録',
+  correctPremium: '保険料の訂正',
 };
 
 /** 一括処理を登録する。実際の処理は chunks の作成をきっかけにバックグラウンドで行う */
@@ -517,6 +519,26 @@ async function processOne(action: MonthlyAction, employeeId: string, job: Fireba
       if (p.isConfirmed || p.approvalPending) return;
       if (premiumMonth >= '2026-04' && !p.childSupportPayment) throw invalidArg('子ども・子育て支援金を含めて計算し直してください');
       await createApprovalRequest({ companyId: auth.companyId, employeeId, requestType: 'monthlyInsurance', targetPath: premiumRef.path, targetVersion: p.version }, auth, { notify: false });
+      return;
+    case 'correctPremium':
+      // 承認済みの保険料の訂正（カタログ6章）：前の内容を訂正の履歴と監査ログに残して未確定に戻す。
+      // このあと「計算する」→「確認を依頼する」→ 別の人が承認、のいつもの流れで確定し直す
+      await db.runTransaction(async tx => {
+        const cur = await tx.get(premiumRef);
+        const d = cur.data();
+        if (!d) throw invalidArg('保険料が計算されていません');
+        if (d.approvalPending) throw invalidArg('確認を依頼中です。差し戻してから訂正してください');
+        if (d.isConfirmed !== true) return;
+        const now = Timestamp.now();
+        const version = (d.version ?? 1) + 1;
+        tx.set(db.collection(`${premiumRef.path}/corrections`).doc(), { before: d, correctedBy: auth.uid, correctedAt: now, reason: '承認済みの保険料の訂正（計算し直し）' });
+        tx.update(premiumRef, { isConfirmed: false, confirmedAt: null, confirmedBy: null, correctedAt: now, correctionCount: (d.correctionCount ?? 0) + 1, version, updatedAt: now });
+        tx.set(db.collection(`${base}/auditLogs`).doc(), {
+          entity: 'monthlyInsurance', entityId: `${employeeId}/${premiumMonth}`, action: 'correctionStart',
+          changes: { isConfirmed: { from: true, to: false }, totalEmployeeAmount: { from: d.totalEmployeeAmount ?? null, to: null }, totalEmployerAmount: { from: d.totalEmployerAmount ?? null, to: null } },
+          employeeId, performedBy: auth.uid, performedAt: now, version,
+        });
+      });
       return;
     case 'approvePremium':
       if (!p?.approvalPending) throw invalidArg(p?.isConfirmed ? '承認済みです' : '確認の依頼がありません');
