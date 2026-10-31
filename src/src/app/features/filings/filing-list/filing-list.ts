@@ -3,13 +3,10 @@ import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
-import { MatInputModule } from '@angular/material/input';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import { OfficeContextService } from '../../../core/services/office-context.service';
-import { EmptyStateComponent, ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent } from '../../../shared/ui';
+import { EmptyStateComponent, ErrorStateComponent, LoadingStateComponent, PageHeadComponent, StatusBadgeComponent } from '../../../shared/ui';
 import {
   FILING_STATUS_LABELS, FILING_TYPE_LABELS, FilingStatus, filingTone, filingTypeLabel, PAPER_STATUS_LABELS, PaperStatus,
 } from '../filing-labels';
@@ -50,157 +47,117 @@ interface SearchResponse {
 
 type View = 'all' | 'open' | 'overdue' | 'dueSoon';
 
-/** 届出の横断一覧。3か所の届出（従業員の下・算定基礎届・賞与支払届）を索引から探す */
+/** 届出の横断一覧。3か所の届出（従業員の下・算定基礎届・賞与支払届）を索引から探す。よく使う絞り込みはタブ、それ以外は「条件を足す」 */
 @Component({
   selector: 'app-filing-list',
   standalone: true,
   imports: [
-    FormsModule, RouterLink, MatButtonModule, MatIconModule, MatFormFieldModule, MatSelectModule, MatInputModule,
-    StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent, EmptyStateComponent,
+    FormsModule, RouterLink, MatButtonModule, MatIconModule,
+    StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent, EmptyStateComponent, PageHeadComponent,
   ],
   template: `
-    <div class="page">
-      <header class="head">
-        <div>
-          <h1>届出</h1>
-          <p class="sub">すべての届出を、期限の近い順に表示します。新しい届出は手続きの中で作ります。</p>
-        </div>
-        <a mat-stroked-button routerLink="/procedures/new"><mat-icon>add</mat-icon> 手続きを始める</a>
-      </header>
-
-      @if (summary(); as s) {
-        <div class="cards" role="group" aria-label="届出の状況">
-          <button type="button" class="card" [class.on]="view === 'open'" (click)="setView('open')">
-            <span class="num">{{ s.open }}</span><span>まだ提出していない</span>
-          </button>
-          <button type="button" class="card warn" [class.on]="view === 'overdue'" (click)="setView('overdue')">
-            <span class="num">{{ s.overdue }}</span><span>期限を過ぎている</span>
-          </button>
-          <button type="button" class="card" [class.on]="view === 'dueSoon'" (click)="setView('dueSoon')">
-            <span class="num">{{ s.dueSoon }}</span><span>今週が期限（7日以内）</span>
-          </button>
-          <button type="button" class="card" [class.on]="status === 'pending'" (click)="setStatus('pending')">
-            <span class="num">{{ s.pending }}</span><span>承認待ち</span>
-          </button>
-        </div>
-      }
-
-      <form class="filters" (ngSubmit)="search()">
-        <mat-form-field appearance="outline">
-          <mat-label>表示</mat-label>
-          <mat-select name="view" [(ngModel)]="view" (selectionChange)="search()">
-            <mat-option value="all">すべて</mat-option>
-            <mat-option value="open">まだ提出していない</mat-option>
-            <mat-option value="overdue">期限を過ぎている</mat-option>
-            <mat-option value="dueSoon">今週が期限</mat-option>
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>届出の種類</mat-label>
-          <mat-select name="type" [(ngModel)]="filingType" (selectionChange)="search()">
-            <mat-option value="">すべて</mat-option>
-            @for (t of types; track t[0]) { <mat-option [value]="t[0]">{{ t[1] }}</mat-option> }
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>状態</mat-label>
-          <mat-select name="status" [(ngModel)]="status" (selectionChange)="search()">
-            <mat-option value="">すべて</mat-option>
-            @for (s of statuses; track s[0]) { <mat-option [value]="s[0]">{{ s[1] }}</mat-option> }
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>紙の提出</mat-label>
-          <mat-select name="paper" [(ngModel)]="paperStatus" (selectionChange)="search()">
-            <mat-option value="">すべて</mat-option>
-            <mat-option value="none">紙では出していない</mat-option>
-            <mat-option value="submitted">紙で提出済み</mat-option>
-            <mat-option value="accepted">紙で受理</mat-option>
-            <mat-option value="returned">紙で返戻</mat-option>
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>氏名・社員番号</mat-label>
-          <input matInput name="keyword" [(ngModel)]="keyword">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>受付番号</mat-label>
-          <input matInput name="acceptance" [(ngModel)]="acceptanceNumber" placeholder="MOCK-…">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>期間の基準</mat-label>
-          <mat-select name="base" [(ngModel)]="periodBase">
-            <mat-option value="created">作成日</mat-option>
-            <mat-option value="submitted">提出日</mat-option>
-            <mat-option value="deadline">期限</mat-option>
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>から</mat-label>
-          <input matInput type="date" name="from" [(ngModel)]="from">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>まで</mat-label>
-          <input matInput type="date" name="to" [(ngModel)]="to">
-        </mat-form-field>
-        <div class="filter-actions">
-          <button mat-flat-button color="primary" type="submit"><mat-icon>search</mat-icon> 探す</button>
-          <button mat-button type="button" (click)="clear()">条件を消す</button>
-        </div>
-      </form>
-
-      <details class="zip" [open]="zipOpen()" (toggle)="zipOpen.set($any($event.target).open)">
-        <summary>PDFをまとめて保存する（ZIP）</summary>
-        <p class="sub">承認した届出の保存原本（承認した時点の内容）から公式様式のPDFを作り、ZIPにまとめます。上の「届出の種類」と事業所の選択も使います。</p>
-        <div class="zip-row">
-          <mat-form-field appearance="outline">
-            <mat-label>期間の基準</mat-label>
-            <mat-select [(ngModel)]="zipBase" name="zipBase">
-              <mat-option value="submitted">提出日</mat-option>
-              <mat-option value="created">作成日</mat-option>
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline"><mat-label>から</mat-label><input matInput type="date" [(ngModel)]="zipFrom" name="zipFrom"></mat-form-field>
-          <mat-form-field appearance="outline"><mat-label>まで</mat-label><input matInput type="date" [(ngModel)]="zipTo" name="zipTo"></mat-form-field>
-          <button mat-flat-button type="button" (click)="makeZip()" [disabled]="zipBusy() || !zipFrom || !zipTo">ZIPを作る</button>
-        </div>
-        @if (zipStatus()) { <p role="status">{{ zipStatus() }}</p> }
-        @if (zipWarnings().length) {
-          <details><summary>確かめてほしいこと（{{ zipWarnings().length }}件）</summary><ul>@for (w of zipWarnings(); track $index) { <li>{{ w }}</li> }</ul></details>
+    <div class="app-page">
+      <app-page-head heading="届出一覧" kicker="届出">
+        @if (summary(); as s) {
+          <ng-container meta>
+            <span>未提出 <b>{{ s.open }}件</b></span>
+            @if (s.overdue) { <span class="due-over">期限超過 {{ s.overdue }}件</span> }
+            @if (s.dueSoon) { <span class="due-soon">7日以内 {{ s.dueSoon }}件</span> }
+            <span>承認待ち {{ s.pending }}件</span>
+          </ng-container>
         }
-        @if (zipUrl(); as z) { <a mat-stroked-button [href]="z.url" [download]="z.name"><mat-icon>download</mat-icon>{{ z.name }} を保存する</a> }
-      </details>
+        <ng-container actions>
+          <button mat-stroked-button type="button" (click)="zipOpen.set(!zipOpen())"><mat-icon>folder_zip</mat-icon>PDFをまとめて保存（ZIP）</button>
+          <a mat-stroked-button routerLink="/procedures/new"><mat-icon>add</mat-icon>手続きを始める</a>
+        </ng-container>
+      </app-page-head>
 
-      @if (employeeId) {
-        <p class="note">従業員を絞り込んでいます。<button mat-button type="button" (click)="clearEmployee()">すべての従業員を表示</button></p>
+      @if (zipOpen()) {
+        <section class="zip">
+          <p class="sub">承認した届出の保存原本（承認した時点の内容）から公式様式のPDFを作り、ZIPにまとめます。下の「届出の種類」と上の事業所の選択も使います。</p>
+          <div class="zip-row">
+            <select [(ngModel)]="zipBase" name="zipBase" aria-label="期間の基準">
+              <option value="submitted">提出日</option>
+              <option value="created">作成日</option>
+            </select>
+            <input type="date" [(ngModel)]="zipFrom" name="zipFrom" aria-label="から"> 〜
+            <input type="date" [(ngModel)]="zipTo" name="zipTo" aria-label="まで">
+            <button mat-flat-button type="button" (click)="makeZip()" [disabled]="zipBusy() || !zipFrom || !zipTo">ZIPを作る</button>
+          </div>
+          @if (zipStatus()) { <p role="status">{{ zipStatus() }}</p> }
+          @if (zipWarnings().length) {
+            <details><summary>確かめてほしいこと（{{ zipWarnings().length }}件）</summary><ul>@for (w of zipWarnings(); track $index) { <li>{{ w }}</li> }</ul></details>
+          }
+          @if (zipUrl(); as z) { <a mat-stroked-button [href]="z.url" [download]="z.name"><mat-icon>download</mat-icon>{{ z.name }} を保存する</a> }
+        </section>
       }
 
-      @if (loading()) {
-        <app-loading-state message="届出を読み込んでいます…" />
-      } @else if (error()) {
-        <app-error-state [message]="error()" (retry)="search()" />
-      } @else if (!rows().length) {
-        <app-empty-state message="条件に合う届出はありません" hint="条件を変えるか、「条件を消す」を押してください" icon="description" />
-      } @else {
-        <p class="count" role="status">
-          {{ total() }}件{{ total() > rows().length ? '（先頭の' + rows().length + '件を表示）' : '' }}
-          @if (truncated()) { <span class="warn-text">件数が多いため一部だけを探しました。条件を絞ってください。</span> }
-        </p>
-        <div class="table-wrap">
+      <section class="panel">
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" [class.on]="view === 'open' && !status" (click)="setView('open')">まだ提出していない <span class="badge">{{ summary()?.open ?? 0 }}</span></button>
+          <button type="button" role="tab" [class.on]="view === 'overdue' && !status" (click)="setView('overdue')">期限超過 <span class="badge warn">{{ summary()?.overdue ?? 0 }}</span></button>
+          <button type="button" role="tab" [class.on]="view === 'dueSoon' && !status" (click)="setView('dueSoon')">7日以内 <span class="badge">{{ summary()?.dueSoon ?? 0 }}</span></button>
+          <button type="button" role="tab" [class.on]="status === 'pending'" (click)="setStatus('pending')">承認待ち <span class="badge">{{ summary()?.pending ?? 0 }}</span></button>
+          <button type="button" role="tab" [class.on]="view === 'all' && !status" (click)="setView('all')">すべて</button>
+        </div>
+
+        <form class="toolbar" (ngSubmit)="search()">
+          <input name="keyword" [(ngModel)]="keyword" placeholder="氏名・社員番号で探す（Enter）" aria-label="氏名・社員番号">
+          <select name="type" [(ngModel)]="filingType" (ngModelChange)="search()" aria-label="届出の種類">
+            <option value="">すべての届出</option>
+            @for (t of types; track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }
+          </select>
+          <button mat-button type="button" (click)="moreFilters.set(!moreFilters())">{{ moreFilters() ? '条件を閉じる' : '条件を足す' }}</button>
+          @if (hasFilters()) { <button mat-button type="button" (click)="clear()">条件を消す</button> }
+          @if (moreFilters()) {
+            <div class="more">
+              <select name="status" [(ngModel)]="status" (ngModelChange)="search()" aria-label="状態">
+                <option value="">すべての状態</option>
+                @for (s of statuses; track s[0]) { <option [value]="s[0]">{{ s[1] }}</option> }
+              </select>
+              <select name="paper" [(ngModel)]="paperStatus" (ngModelChange)="search()" aria-label="紙の提出">
+                <option value="">紙の提出：すべて</option>
+                <option value="none">紙では出していない</option>
+                <option value="submitted">紙で提出済み</option>
+                <option value="accepted">紙で受理</option>
+                <option value="returned">紙で返戻</option>
+              </select>
+              <input name="acceptance" [(ngModel)]="acceptanceNumber" placeholder="受付番号（MOCK-…）" aria-label="受付番号">
+              <select name="base" [(ngModel)]="periodBase" aria-label="期間の基準">
+                <option value="created">作成日</option>
+                <option value="submitted">提出日</option>
+                <option value="deadline">期限</option>
+              </select>
+              <input type="date" name="from" [(ngModel)]="from" aria-label="から"> 〜
+              <input type="date" name="to" [(ngModel)]="to" aria-label="まで">
+              <button mat-stroked-button type="submit"><mat-icon>search</mat-icon>探す</button>
+            </div>
+          }
+        </form>
+
+        @if (employeeId) {
+          <p class="note">従業員を絞り込んでいます。<button mat-button type="button" (click)="clearEmployee()">すべての従業員を表示</button></p>
+        }
+
+        @if (loading()) {
+          <app-loading-state message="届出を読み込んでいます…" />
+        } @else if (error()) {
+          <app-error-state [message]="error()" (retry)="search()" />
+        } @else if (!rows().length) {
+          <app-empty-state message="条件に合う届出はありません" hint="タブや条件を変えてください" icon="description" />
+        } @else {
           <table class="list">
             <thead>
               <tr><th>期限</th><th>届出</th><th>対象</th><th>事業所</th><th>状態</th><th>紙の提出</th><th>受付番号</th><th>作成日</th></tr>
             </thead>
             <tbody>
               @for (r of rows(); track r.id) {
-                <tr [class.overdue]="r.overdue" (click)="open(r)" tabindex="0" (keydown.enter)="open(r)">
+                <tr (click)="open(r)" tabindex="0" (keydown.enter)="open(r)">
                   <td class="nowrap">
-                    @if (r.deadline) {
-                      {{ r.deadline }}
-                      @if (r.overdue) { <span class="badge-overdue">期限超過</span> }
-                    } @else { <span class="muted">{{ r.deadlineNote ?? '—' }}</span> }
+                    @if (r.deadline) { <span [class.due-over]="r.overdue">{{ r.deadline }}</span> }
+                    @else { <span class="muted">{{ r.deadlineNote ?? '—' }}</span> }
                   </td>
-                  <td><a class="link">{{ typeLabel(r.filingType) }}</a>@if (r.number) { <span class="muted">（{{ r.number }}件目）</span> }</td>
+                  <td><b>{{ typeLabel(r.filingType) }}</b>@if (r.number) { <span class="muted">（{{ r.number }}件目）</span> }</td>
                   <td>
                     @if (r.source === 'employee') { {{ r.employeeName }} <span class="muted">{{ r.employeeNumber }}</span> }
                     @else if (r.filingType === 'bonusNonPayment') { 事業所の報告 <span class="muted">{{ r.payMonth }}分</span> }
@@ -215,48 +172,45 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
               }
             </tbody>
           </table>
-        </div>
-      }
+          <p class="foot">
+            {{ total() }}件{{ total() > rows().length ? '（先頭の' + rows().length + '件を表示）' : '' }}
+            @if (truncated()) { <span class="due-over">件数が多いため一部だけを探しました。条件を絞ってください。</span> }
+            ・新しい届出は手続きの中で作ります。
+          </p>
+        }
+      </section>
     </div>
   `,
   styles: [`
-    .page { padding: var(--app-space-5); max-width: 1280px; }
-    .head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--app-space-4); flex-wrap: wrap; margin-bottom: var(--app-space-4); }
-    h1 { margin: 0; font-size: 24px; font-weight: 500; }
-    .sub { margin: var(--app-space-1) 0 0; color: var(--app-color-text-sub); }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--app-space-3); margin: var(--app-space-5) 0 var(--app-space-4); }
-    .card { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--app-space-3) var(--app-space-4); border: 1px solid var(--app-color-border);
-      border-radius: 8px; background: var(--app-color-surface); cursor: pointer; font: inherit; color: var(--app-color-text); text-align: left; }
-    .card .num { font-size: 24px; font-weight: 600; }
-    .card.warn .num { color: var(--app-status-action-fg); }
-    .card.on { border-color: var(--app-color-link); box-shadow: 0 0 0 1px var(--app-color-link) inset; }
-    .filters { display: flex; flex-wrap: wrap; gap: 0 var(--app-space-3); align-items: center; }
-    .filters mat-form-field { width: 180px; }
-    .filter-actions { display: flex; gap: var(--app-space-2); margin-bottom: 20px; }
-    .note { color: var(--app-color-text-sub); }
-    .zip { margin: 0 0 var(--app-space-4); padding: var(--app-space-2) var(--app-space-3); border: 1px solid var(--app-color-border); border-radius: 8px; background: var(--app-color-surface); }
-    .zip summary { cursor: pointer; color: var(--app-color-link); }
-    .zip-row { display: flex; flex-wrap: wrap; gap: 0 var(--app-space-3); align-items: center; }
-    .zip-row mat-form-field { width: 180px; }
-    .count { color: var(--app-color-text-sub); margin: 0 0 var(--app-space-2); }
-    .warn-text { color: var(--app-status-action-fg); margin-left: var(--app-space-2); }
-    .table-wrap { overflow-x: auto; border: 1px solid var(--app-color-border); border-radius: 8px; background: var(--app-color-surface); }
-    .list { width: 100%; border-collapse: collapse; font-size: 14px; }
-    .list th { text-align: left; font-weight: 500; color: var(--app-color-text-sub); background: var(--app-color-surface-sub); }
+    .due-over { color: var(--app-status-error-fg); font-weight: 700; }
+    .due-soon { color: var(--app-status-attention-fg); font-weight: 700; }
+    .zip { margin-bottom: var(--app-space-4); padding: var(--app-space-3) var(--app-space-4); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); background: var(--app-color-surface); font-size: var(--app-font-sm); }
+    .zip-row { display: flex; flex-wrap: wrap; gap: var(--app-space-2); align-items: center; margin: var(--app-space-2) 0; }
+    .panel { border: 1px solid var(--app-color-border); border-radius: var(--app-radius); background: var(--app-color-surface); }
+    .tabs { display: flex; gap: var(--app-space-5); padding: 0 var(--app-space-5); border-bottom: 1px solid var(--app-color-border); flex-wrap: wrap; }
+    .tabs button { border: 0; background: none; padding: 12px 0 10px; margin-bottom: -1px; font: inherit; font-weight: 600; color: var(--app-color-text-sub); border-bottom: 2px solid transparent; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+    .tabs button.on { color: var(--app-color-text); border-bottom-color: var(--app-status-yours-fg); }
+    .badge { font-size: 11px; padding: 0 6px; border-radius: 10px; background: var(--app-status-waiting-bg); }
+    .badge.warn { color: var(--app-status-error-fg); background: var(--app-status-error-bg); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: var(--app-space-2); align-items: center; padding: var(--app-space-3) var(--app-space-5); border-bottom: 1px solid var(--app-color-border); }
+    .toolbar input, .toolbar select, .zip-row input, .zip-row select { padding: 7px 10px; border: 1px solid var(--app-color-border); border-radius: var(--app-radius); font: inherit; font-size: var(--app-font-sm); background: var(--app-color-surface); }
+    .toolbar > input { min-width: 220px; }
+    .more { display: flex; flex-wrap: wrap; gap: var(--app-space-2); align-items: center; width: 100%; }
+    .note { margin: 0; padding: var(--app-space-2) var(--app-space-5); color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
+    .sub { margin: 0; color: var(--app-color-text-sub); }
+    .list { width: 100%; border-collapse: collapse; font-size: var(--app-font-md); }
+    .list th { text-align: left; font-size: var(--app-font-xs); font-weight: 600; color: var(--app-color-text-sub); background: var(--app-color-surface-sub); white-space: nowrap; }
     .list th, .list td { padding: var(--app-space-2) var(--app-space-3); border-bottom: 1px solid var(--app-color-border); }
+    .list th:first-child, .list td:first-child { padding-left: var(--app-space-5); }
+    .list b { font-weight: 600; }
     .list tbody tr { cursor: pointer; }
-    .list tbody tr:hover, .list tbody tr:focus { background: var(--app-color-surface-sub); outline: none; }
-    .list tr.overdue td:first-child { color: var(--app-status-action-fg); font-weight: 500; }
-    .badge-overdue { display: inline-block; margin-left: var(--app-space-1); padding: 0 6px; border-radius: 10px; font-size: 12px;
-      color: var(--app-status-action-fg); background: var(--app-status-action-bg); }
+    .list tbody tr:hover td { background: #fafbfd; }
+    .list tbody tr:focus-visible { outline: 2px solid var(--app-color-link); outline-offset: -2px; }
     .nowrap { white-space: nowrap; }
-    .muted { color: var(--app-color-text-sub); font-size: 12px; }
-    .link { color: var(--app-color-link); }
-    @media (max-width: 600px) {
-      .page { padding: var(--app-space-4); }
-      .filters mat-form-field { width: 100%; }
-    }
+    .muted { color: var(--app-color-text-sub); font-size: var(--app-font-xs); }
+    .foot { margin: 0; padding: var(--app-space-3) var(--app-space-5); font-size: var(--app-font-xs); color: var(--app-color-text-sub); }
   `],
+
 })
 export class FilingListComponent implements OnInit {
   private office = inject(OfficeContextService);
@@ -285,6 +239,10 @@ export class FilingListComponent implements OnInit {
   from = '';
   to = '';
   employeeId = '';
+
+  /** 「条件を足す」を開いているか */
+  moreFilters = signal(false);
+  hasFilters() { return !!(this.filingType || this.status || this.paperStatus || this.keyword || this.acceptanceNumber || this.from || this.to); }
 
   // ---- ZIP でまとめて保存 ----
   zipOpen = signal(false);
@@ -356,19 +314,19 @@ export class FilingListComponent implements OnInit {
   }
 
   setView(view: View) {
-    this.view = this.view === view ? 'all' : view;
+    this.view = view;
     this.status = '';
     this.search();
   }
 
   setStatus(status: string) {
-    this.status = this.status === status ? '' : status;
+    this.status = status;
     this.view = 'all';
     this.search();
   }
 
+  /** タブはそのままにして、条件だけ消す */
   clear() {
-    this.view = 'all';
     this.filingType = this.status = this.paperStatus = this.keyword = this.acceptanceNumber = this.from = this.to = '';
     this.search();
   }

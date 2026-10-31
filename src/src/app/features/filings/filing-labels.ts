@@ -41,7 +41,9 @@ export function filingTone(status: FilingStatus, paper: PaperStatus): StatusTone
   if (status === 'cancelled' || status === 'completed' || paper === 'accepted') return 'done';
   if (paper === 'submitted') return 'waiting';
   if (status === 'pending' || status === 'sent' || status === 'received' || status === 'processing') return 'waiting';
-  return 'action';
+  // 差戻し・送信エラー・返戻は要確認、下書き・承認済み（提出前）は自分が進める
+  if (status === 'rejected' || status === 'mockFailed' || status === 'returned' || paper === 'returned') return 'attention';
+  return 'yours';
 }
 
 export const filingTypeLabel = (type: string) => FILING_TYPE_LABELS[type] ?? type;
