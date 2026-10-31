@@ -1,0 +1,142 @@
+<div class="app-page">
+
+  @if (loading()) {
+    <app-loading-state />
+  } @else if (loadError()) {
+    <app-error-state [message]="loadError()" (retry)="load(true)" />
+  } @else if (view(); as v) {
+    <app-wizard kicker="等級の遡及訂正" backLink="/procedures" backLabel="進行中の手続き"
+                [heading]="v.procedure.title" [personName]="v.procedure.employeeName"
+                [subtitle]="'社員番号 ' + v.employee.employeeNumber"
+                [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
+                [busy]="busy()" [nextLabel]="nextLabel()" [nextDisabled]="nextDisabled()" [hideNext]="hideNext()"
+                (advance)="advance()">
+
+      @switch (key()) {
+        @case ('entry') {
+          @if (rejected()) { <div class="alert" role="alert">等級の承認が差し戻されました（{{ v.approval?.comment }}）。直してから、もう一度承認を依頼してください。</div> }
+          <fieldset class="form-grid" [disabled]="index() < currentIndex()">
+            <mat-form-field appearance="outline"><mat-label>直す等級の適用月（YYYY-MM）</mat-label>
+              <input matInput [(ngModel)]="effectiveMonth" (ngModelChange)="changed()" name="effectiveMonth" placeholder="2026-09" maxlength="7"></mat-form-field>
+            <span></span>
+            <mat-form-field appearance="outline"><mat-label>健康保険の等級</mat-label>
+              <input matInput type="number" [(ngModel)]="healthGradeNumber" (ngModelChange)="changed()" name="health" min="1" max="50"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>厚生年金の等級</mat-label>
+              <input matInput type="number" [(ngModel)]="pensionGradeNumber" (ngModelChange)="changed()" name="pension" min="1" max="32"></mat-form-field>
+            <div class="wide radios">
+              <mat-radio-group [(ngModel)]="reasonType" name="reasonType">
+                <mat-radio-button value="pensionOffice">年金事務所からの修正の指示</mat-radio-button>
+                <mat-radio-button value="error">誤りの訂正（社内で気づいた）</mat-radio-button>
+              </mat-radio-group>
+            </div>
+            <mat-form-field appearance="outline" class="wide"><mat-label>理由（承認者と監査ログに残ります）</mat-label>
+              <input matInput [(ngModel)]="reason" name="reason" maxlength="300" placeholder="例：決定通知書（2026年11月5日付）で健保24等級に修正"></mat-form-field>
+          </fieldset>
+          <section class="result" aria-live="polite">
+            <h3>影響</h3>
+            @if (previewError()) {
+              <p class="error">{{ previewError() }}</p>
+            } @else if (preview(); as p) {
+              <ng-container *ngTemplateOutlet="impactView; context: { $implicit: p, showBefore: true }" />
+            } @else {
+              <p class="sub">適用月と等級を入れると、影響する月と差額を出します。</p>
+            }
+          </section>
+        }
+
+        @case ('grade_approval') {
+          <table class="summary"><tbody>
+            <tr><th>直す等級</th><td>{{ v.entry.effectiveMonth }}から 健保{{ v.entry.healthGradeNumber }}等級・厚年{{ v.entry.pensionGradeNumber }}等級</td></tr>
+            @if (v.entry.before; as b) { <tr><th>直す前</th><td>健保{{ b.healthGradeNumber }}等級（{{ b.healthStandardRemuneration | number }}円）・厚年{{ b.pensionGradeNumber }}等級（{{ b.pensionStandardRemuneration | number }}円）</td></tr> }
+            <tr><th>理由</th><td>{{ v.reasonLabel }}：{{ v.entry.reason }}</td></tr>
+          </tbody></table>
+          @if (v.impact; as p) { <ng-container *ngTemplateOutlet="impactView; context: { $implicit: p, showBefore: false }" /> }
+          <p class="sub">承認は「承認」の画面で、別の担当者が行います。</p>
+          <button mat-stroked-button type="button" (click)="load(true)" [disabled]="busy()"><mat-icon>refresh</mat-icon>最新の状態にする</button>
+        }
+
+        @case ('correct') {
+          @if (v.impact; as p) {
+            @if (p.months.length) {
+              <p>次の月の保険料を、承認された等級で計算し直します。確定済みの月は訂正し（前の内容は履歴に残ります）、確認を依頼します。依頼は「承認」の画面にまとめて出ます。</p>
+              <ng-container *ngTemplateOutlet="impactView; context: { $implicit: p, showBefore: false }" />
+            } @else {
+              <p>この等級が効く月で、計算済みの保険料はありません。「次へ」で精算の記録に進みます。</p>
+            }
+          }
+          @if (failures().length) {
+            <div class="alert" role="alert">直せなかった月があります：
+              <ul class="plain">@for (f of failures(); track f.yearMonth) { <li>{{ f.yearMonth }}：{{ f.message }}</li> }</ul>
+            </div>
+          }
+          @if (v.entry.correctedMonths.length) { <p class="sub">直した月：{{ v.entry.correctedMonths.join('・') }}</p> }
+        }
+
+        @case ('settle') {
+          @if (isDone()) {
+            <div class="complete" role="status"><mat-icon aria-hidden="true">check_circle</mat-icon><div><strong>等級の遡及訂正は完了しました。</strong></div></div>
+          }
+          @if (v.entry.diffs.length) {
+            <table class="months"><thead><tr><th>月</th><th class="num">本人（前→後）</th><th class="num">会社（前→後）</th><th class="num">徴収済み</th></tr></thead><tbody>
+              @for (d of v.entry.diffs; track d.yearMonth) {
+                <tr><td>{{ d.yearMonth }}</td><td class="num">{{ d.beforeEmployee | number }} → {{ d.afterEmployee | number }}</td>
+                  <td class="num">{{ d.beforeEmployer | number }} → {{ d.afterEmployer | number }}</td><td class="num">{{ d.collected === null ? '記録なし' : (d.collected | number) }}</td></tr>
+              }
+            </tbody></table>
+          }
+          <p><strong>{{ settlementText(v.settlementTotal) }}</strong>（本人負担の差 {{ signed(diffTotal(v.entry)) }}）</p>
+          @if (v.entry.settlement; as s) {
+            <table class="summary"><tbody>
+              <tr><th>精算の方法</th><td>{{ s.method === 'nextPayroll' ? s.payMonth + '支給の給与で調整する' : s.method === 'separate' ? '別に精算する' : '差額なし' }}</td></tr>
+              @if (s.note) { <tr><th>メモ</th><td>{{ s.note }}</td></tr> }
+            </tbody></table>
+          } @else {
+            <div class="radios">
+              <mat-radio-group [(ngModel)]="method" name="method">
+                <mat-radio-button value="nextPayroll">次の給与で調整する</mat-radio-button>
+                <mat-radio-button value="separate">別に精算する（振込・現金など）</mat-radio-button>
+                <mat-radio-button value="none" [disabled]="v.settlementTotal !== 0">差額なし</mat-radio-button>
+              </mat-radio-group>
+            </div>
+            <fieldset class="form-grid">
+              @if (method === 'nextPayroll') {
+                <mat-form-field appearance="outline"><mat-label>調整する給与の支給月（YYYY-MM）</mat-label>
+                  <input matInput [(ngModel)]="payMonth" name="payMonth" placeholder="2026-12" maxlength="7"></mat-form-field>
+              }
+              <mat-form-field appearance="outline" class="wide"><mat-label>メモ（任意）</mat-label>
+                <input matInput [(ngModel)]="note" name="note" maxlength="300"></mat-form-field>
+            </fieldset>
+            <p class="sub">控除・入金・返金をしたら、毎月の処理の「徴収の記録」で各月の記録を直してください（訂正した月は差額が「一部未徴収」「過徴収」として出ます）。</p>
+          }
+          <a mat-stroked-button [routerLink]="['/employees', v.employee.id]">従業員の画面を開く</a>
+        }
+      }
+    </app-wizard>
+
+    <ng-template #impactView let-p let-showBefore="showBefore">
+      @if (showBefore && p.before) {
+        <p class="sub">今のその月の等級：健保{{ p.before.healthGradeNumber }}等級（{{ p.before.healthStandardRemuneration | number }}円）・厚年{{ p.before.pensionGradeNumber }}等級（{{ p.before.pensionStandardRemuneration | number }}円）、{{ p.before.effectiveMonth }}から。
+          @if (p.nextGradeMonth) { 直した等級は{{ p.nextGradeMonth }}の等級の前の月まで効きます。 }</p>
+      }
+      @if (p.months.length) {
+        <table class="months"><thead><tr><th>月</th><th>今の状態</th><th class="num">本人（今→直した後）</th><th class="num">会社（今→直した後）</th><th class="num">徴収済み</th><th class="num">本人との精算</th></tr></thead><tbody>
+          @for (m of p.months; track m.yearMonth) {
+            <tr><td>{{ m.yearMonth }}</td><td>{{ stateLabel(m.state) }}</td>
+              @if (m.error) { <td colspan="2" class="error">{{ m.error }}</td> } @else {
+                <td class="num">{{ m.beforeEmployee | number }} → {{ m.afterEmployee | number }}</td>
+                <td class="num">{{ m.beforeEmployer | number }} → {{ m.afterEmployer | number }}</td>
+              }
+              <td class="num">{{ m.collected === null ? '記録なし' : (m.collected | number) }}</td>
+              <td class="num" [class.plus]="m.settlement > 0" [class.minus]="m.settlement < 0">{{ m.settlement ? signed(m.settlement) : '' }}</td></tr>
+          }
+        </tbody></table>
+        <p>合計：本人 {{ signed(p.totals.employeeDiff) }}・会社 {{ signed(p.totals.employerDiff) }}。<strong>{{ settlementText(p.totals.settlement) }}</strong></p>
+      }
+      @for (f of p.filings; track f.id) {
+        <p>{{ f.label }}：<a [routerLink]="['/filings', f.id]" [queryParams]="{ employeeId: v.employee.id }">届出を開く</a>
+          @if (f.status === 'submitted') { （提出済み。届出の画面で「訂正届を作る」から訂正届を出してください） }</p>
+      }
+      <ul class="plain">@for (n of p.notes; track n) { <li>{{ n }}</li> }</ul>
+    </ng-template>
+  }
+</div>

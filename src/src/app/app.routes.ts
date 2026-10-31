@@ -200,6 +200,13 @@ export const routes: Routes = [
           import('./features/leave/leave-wizard').then((m) => m.LeaveWizardComponent),
       },
       {
+        path: 'grade-corrections/:id',
+        canActivate: [roleGuard('admin', 'operator')],
+        data: { title: '等級の遡及訂正' },
+        loadComponent: () =>
+          import('./features/grade-correction/grade-correction-wizard').then((m) => m.GradeCorrectionWizardComponent),
+      },
+      {
         path: 'transfers/:id',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '事業所間異動' },

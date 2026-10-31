@@ -631,6 +631,8 @@ interface OnboardResult {
             <div class="tab-content">
               <div class="page-header">
                 <h2>等級・標準報酬月額履歴</h2>
+                <!-- 年金事務所からの修正の指示や誤りで、過去の等級を直してその月以降の保険料をまとめて直す（カタログ5章・6章） -->
+                <a mat-stroked-button [routerLink]="['/grade-corrections', 'new']" [queryParams]="{ employeeId }">等級を遡って直す</a>
               </div>
 
               @if (grades().length > 0) {

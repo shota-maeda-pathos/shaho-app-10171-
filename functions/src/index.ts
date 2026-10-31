@@ -192,6 +192,7 @@ lazy(() => require('./employment-change/functions'), [
   'employmentChangeStart', 'employmentChangeGet', 'employmentChangePreview', 'employmentChangeUpdate', 'sampleChangeCreate',
 ]);
 lazy(() => require('./transfer/functions'), ['transferStart', 'transferGet', 'transferPreview', 'transferUpdate']);
+lazy(() => require('./grade-correction/functions'), ['gradeCorrectionStart', 'gradeCorrectionGet', 'gradeCorrectionPreview', 'gradeCorrectionUpdate']);
 lazy(() => require('./employees/employee-other-employer/functions'), ['employeeOtherEmployerSet']);
 lazy(() => require('./age-event/functions'), ['ageEventStart', 'ageEventGet', 'ageEventPreview', 'ageEventUpdate', 'sampleAgeCreate']);
 lazy(() => require('./procedures/group-list'), ['procedureGroupList']);

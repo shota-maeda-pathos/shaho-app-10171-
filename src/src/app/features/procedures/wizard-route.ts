@@ -12,6 +12,7 @@ const WIZARDS: Record<string, { step: string; route: string }> = {
   transfer: { step: 'apply', route: '/transfers' },
   employment_change: { step: 'change_approval', route: '/employment-changes' },
   age_event: { step: 'check', route: '/age-events' },
+  grade_correction: { step: 'grade_approval', route: '/grade-corrections' },
 };
 
 export function wizardRoute(procedureType: string, stepIds: string[]): string | null {

@@ -495,6 +495,32 @@ export async function authOf(companyId: string, uid: string): Promise<AuthContex
   return { uid, companyId, roles: (d.roles ?? []) as Role[], officeIds: d.officeIds ?? [], employeeId: d.employeeId ?? null, isSuspended: false, isLoginDisabled: false, sessionId: 'trigger' };
 }
 
+/**
+ * 承認済みの保険料の訂正（カタログ6章）：前の内容を訂正の履歴と監査ログに残して未確定に戻す。未確定なら何もしない。
+ * このあと「計算する」→「確認を依頼する」→ 別の人が承認、のいつもの流れで確定し直す（等級の遡及訂正からも使う）
+ */
+export async function reopenPremium(auth: AuthContext, employeeId: string, premiumMonth: string, reason: string): Promise<boolean> {
+  const base = `companies/${auth.companyId}`;
+  const premiumRef = db.doc(`${base}/employees/${employeeId}/monthlyInsurance/${premiumMonth}`);
+  return db.runTransaction(async tx => {
+    const cur = await tx.get(premiumRef);
+    const d = cur.data();
+    if (!d) throw invalidArg('保険料が計算されていません');
+    if (d.approvalPending) throw invalidArg('確認を依頼中です。差し戻してから訂正してください');
+    if (d.isConfirmed !== true) return false;
+    const now = Timestamp.now();
+    const version = (d.version ?? 1) + 1;
+    tx.set(db.collection(`${premiumRef.path}/corrections`).doc(), { before: d, correctedBy: auth.uid, correctedAt: now, reason });
+    tx.update(premiumRef, { isConfirmed: false, confirmedAt: null, confirmedBy: null, correctedAt: now, correctionCount: (d.correctionCount ?? 0) + 1, correctionReason: reason, version, updatedAt: now });
+    tx.set(db.collection(`${base}/auditLogs`).doc(), {
+      entity: 'monthlyInsurance', entityId: `${employeeId}/${premiumMonth}`, action: 'correctionStart',
+      changes: { isConfirmed: { from: true, to: false }, totalEmployeeAmount: { from: d.totalEmployeeAmount ?? null, to: null }, totalEmployerAmount: { from: d.totalEmployerAmount ?? null, to: null }, reason },
+      employeeId, performedBy: auth.uid, performedAt: now, version,
+    });
+    return true;
+  });
+}
+
 /** 1人分の処理。成功ならメッセージ、失敗なら例外 */
 async function processOne(action: MonthlyAction, employeeId: string, job: FirebaseFirestore.DocumentData, auth: AuthContext): Promise<void> {
   const base = `companies/${auth.companyId}`;
@@ -532,24 +558,7 @@ async function processOne(action: MonthlyAction, employeeId: string, job: Fireba
       await createApprovalRequest({ companyId: auth.companyId, employeeId, requestType: 'monthlyInsurance', targetPath: premiumRef.path, targetVersion: p.version }, auth, { notify: false });
       return;
     case 'correctPremium':
-      // 承認済みの保険料の訂正（カタログ6章）：前の内容を訂正の履歴と監査ログに残して未確定に戻す。
-      // このあと「計算する」→「確認を依頼する」→ 別の人が承認、のいつもの流れで確定し直す
-      await db.runTransaction(async tx => {
-        const cur = await tx.get(premiumRef);
-        const d = cur.data();
-        if (!d) throw invalidArg('保険料が計算されていません');
-        if (d.approvalPending) throw invalidArg('確認を依頼中です。差し戻してから訂正してください');
-        if (d.isConfirmed !== true) return;
-        const now = Timestamp.now();
-        const version = (d.version ?? 1) + 1;
-        tx.set(db.collection(`${premiumRef.path}/corrections`).doc(), { before: d, correctedBy: auth.uid, correctedAt: now, reason: '承認済みの保険料の訂正（計算し直し）' });
-        tx.update(premiumRef, { isConfirmed: false, confirmedAt: null, confirmedBy: null, correctedAt: now, correctionCount: (d.correctionCount ?? 0) + 1, version, updatedAt: now });
-        tx.set(db.collection(`${base}/auditLogs`).doc(), {
-          entity: 'monthlyInsurance', entityId: `${employeeId}/${premiumMonth}`, action: 'correctionStart',
-          changes: { isConfirmed: { from: true, to: false }, totalEmployeeAmount: { from: d.totalEmployeeAmount ?? null, to: null }, totalEmployerAmount: { from: d.totalEmployerAmount ?? null, to: null } },
-          employeeId, performedBy: auth.uid, performedAt: now, version,
-        });
-      });
+      await reopenPremium(auth, employeeId, premiumMonth, '承認済みの保険料の訂正（計算し直し）');
       return;
     case 'approvePremium':
       if (!p?.approvalPending) throw invalidArg(p?.isConfirmed ? '承認済みです' : '確認の依頼がありません');
