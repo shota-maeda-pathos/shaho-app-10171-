@@ -53,6 +53,21 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
         <button mat-flat-button color="primary" type="button" (click)="apply()" [disabled]="busy() || errors().length > 0 || hasDuplicate()">この内容で取り込んで切り替える</button>
       }
 
+      <h3>組合健保の料率を登録する</h3>
+      <p class="sub">組合健保の事業所（設定の「事業所」で区分を組合健保にした事業所）は、ここで登録した保険者番号の料率だけで計算します。本人と会社の負担割合が折半でなければ、本人負担を入れます。</p>
+      <div class="union">
+        <label>保険者番号 <input [(ngModel)]="union.insurerId" name="uInsurer" maxlength="20"></label>
+        <label>適用開始年月 <input [(ngModel)]="union.appliedFrom" name="uFrom" placeholder="2027-03" maxlength="7"></label>
+        <label>健康保険料率（‰） <input type="number" [(ngModel)]="union.healthTotal" name="uHealth" step="0.01"></label>
+        <label>うち本人負担（‰） <input type="number" [(ngModel)]="union.healthEmployee" name="uHealthEmp" step="0.01"></label>
+        <label>介護保険料率（‰、任意） <input type="number" [(ngModel)]="union.careTotal" name="uCare" step="0.01"></label>
+        <label>うち本人負担（‰） <input type="number" [(ngModel)]="union.careEmployee" name="uCareEmp" step="0.01"></label>
+      </div>
+      @if (union.healthTotal && union.healthEmployee !== null) {
+        <p class="sub">会社負担 {{ round(union.healthTotal - (union.healthEmployee ?? 0)) }}‰（本人：会社 ＝ {{ ratio(union.healthEmployee ?? 0, union.healthTotal) }}）</p>
+      }
+      <button mat-stroked-button type="button" (click)="addUnion()" [disabled]="busy() || !union.insurerId || !union.appliedFrom || !union.healthTotal || union.healthEmployee === null">組合健保の料率を登録する</button>
+
       <h3>料率の履歴</h3>
       <table><thead><tr><th>種類</th><th>都道府県</th><th>適用期間</th><th class="num">料率</th><th class="num">本人／会社</th><th>備考</th></tr></thead><tbody>
         @for (h of history(); track $index) {
@@ -72,6 +87,9 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
     .num { text-align: right; } .small { font-size: var(--app-font-xs); color: var(--app-color-text-sub); }
     tr.dup td { background: var(--app-status-error-bg); }
     td.warn { color: var(--app-status-error-fg); font-weight: 600; }
+    .union { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; margin: 8px 0; font-size: var(--app-font-sm); }
+    .union label { display: flex; flex-direction: column; gap: 2px; }
+    .union input { padding: 6px 8px; font: inherit; }
     .errors { color: var(--app-status-error-fg); font-size: var(--app-font-sm); }
     h3 { margin: 24px 0 8px; }
   `],
@@ -90,7 +108,39 @@ export class RateManagementComponent implements OnInit {
   impact = signal<ImpactRow[]>([]);
   history = signal<HistoryItem[]>([]);
 
+  union: { insurerId: string; appliedFrom: string; healthTotal: number | null; healthEmployee: number | null; careTotal: number | null; careEmployee: number | null } = {
+    insurerId: '', appliedFrom: '', healthTotal: null, healthEmployee: null, careTotal: null, careEmployee: null,
+  };
+
   ngOnInit() { void this.loadHistory(); }
+  round(n: number) { return Math.round(n * 1000) / 1000; }
+  ratio(employee: number, total: number) { return total ? `${this.round((employee / total) * 100)}：${this.round(100 - (employee / total) * 100)}` : ''; }
+
+  async addUnion() {
+    const u = this.union;
+    const ok = await this.confirm.ask({
+      title: '組合健保の料率を登録しますか',
+      message: `保険者番号 ${u.insurerId} の料率を ${u.appliedFrom} から使います。同じ保険者番号の前の料率には終わりの月が付きます。`,
+      items: [`健康保険 ${u.healthTotal}‰（本人 ${u.healthEmployee}‰）`, ...(u.careTotal ? [`介護保険 ${u.careTotal}‰（本人 ${u.careEmployee}‰）`] : [])],
+      confirmLabel: '登録する',
+    });
+    if (!ok) return;
+    this.busy.set(true);
+    try {
+      await httpsCallable(this.functions, 'rateUnionAdd')({
+        companyId: this.auth.companyId, insurerId: u.insurerId.trim(), appliedFrom: u.appliedFrom.trim(),
+        healthTotal: Number(u.healthTotal), healthEmployee: Number(u.healthEmployee),
+        careTotal: u.careTotal ? Number(u.careTotal) : null, careEmployee: u.careTotal ? Number(u.careEmployee ?? Number(u.careTotal) / 2) : null, note: '組合健保',
+      });
+      this.snackBar.open('組合健保の料率を登録しました', '閉じる', { duration: 5000 });
+      this.union = { insurerId: '', appliedFrom: '', healthTotal: null, healthEmployee: null, careTotal: null, careEmployee: null };
+      await this.loadHistory();
+    } catch (e: any) {
+      this.snackBar.open(`登録できませんでした：${e?.message ?? ''}`, '閉じる', { duration: 8000 });
+    } finally {
+      this.busy.set(false);
+    }
+  }
   hasDuplicate() { return this.items().some(i => i.duplicate); }
 
   async pick(e: Event) {

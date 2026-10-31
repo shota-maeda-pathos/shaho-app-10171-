@@ -91,6 +91,8 @@ export async function findAllRates(
   yearMonth: string,
   prefectureCode?: string,
   insurerId?: string,
+  /** 事業所の健康保険の区分。組合健保なら、保険者が一致する健保・介護の料率だけを使う（協会けんぽの都道府県の料率で代わりに計算しない） */
+  healthInsuranceType?: 'kyokai' | 'union' | null,
 ): Promise<AllRates> {
   const base = { companyId, yearMonth, prefectureCode, insurerId };
   const [health, pension, childSupport, longTermCare, childSupportPayment] = await Promise.all([
@@ -100,8 +102,9 @@ export async function findAllRates(
     findApplicableRate({ ...base, insuranceType: 'longTermCare' }),
     findApplicableRate({ companyId, yearMonth, insuranceType: 'childSupportPayment' }),
   ]);
+  const own = (r: InsuranceRateDoc | null) => (healthInsuranceType === 'union' && (!r || !insurerId || r.insurerId !== insurerId) ? null : r);
 
-  return { health, pension, childSupport, longTermCare, childSupportPayment };
+  return { health: own(health), pension, childSupport, longTermCare: own(longTermCare), childSupportPayment };
 }
 
 /** 計算に使った料率を表す文字列。計算後に料率マスタが変わったか（計算し直しが要るか）を見分ける */

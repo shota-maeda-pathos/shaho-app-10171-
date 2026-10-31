@@ -21,7 +21,7 @@ async function estimateLastMonthPremium(
   employment: NormalizedEmployment | null,
 ) {
   const rule = normalizeRoundingRule(office.roundingRule);
-  const rates = await findAllRates(companyId, yearMonth, office.prefectureCode, office.insurerId);
+  const rates = await findAllRates(companyId, yearMonth, office.prefectureCode, office.insurerId, office.healthInsuranceType);
   const healthOn = (employment?.healthInsuranceEnrolled ?? true) && !isHealthExcluded(employee.birthDate, yearMonth) && rates.health;
   const pensionOn = (employment?.pensionEnrolled ?? true) && !isPensionExcluded(employee.birthDate, yearMonth) && rates.pension;
   const zero = { employeeAmount: 0, employerAmount: 0 };

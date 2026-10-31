@@ -163,9 +163,11 @@ export async function monthlyOverview(input: RunInput, auth: AuthContext) {
   let currentFingerprint: string | null = null;
   let rateIssue = '';
   try {
-    const rates = await findAllRates(auth.companyId, premiumMonth, office.prefectureCode, office.insurerId);
+    const rates = await findAllRates(auth.companyId, premiumMonth, office.prefectureCode, office.insurerId, office.healthInsuranceType);
     currentFingerprint = rateFingerprint(rates);
-    if (!rates.health) rateIssue = `${premiumMonth}に使える健康保険料率が登録されていません（設定の料率マスタを確認してください）`;
+    if (!rates.health) rateIssue = office.healthInsuranceType === 'union'
+      ? `${premiumMonth}に使える組合健保（保険者番号 ${office.insurerId || '未入力'}）の健康保険料率が登録されていません（設定の「料率」で登録してください）`
+      : `${premiumMonth}に使える健康保険料率が登録されていません（設定の料率マスタを確認してください）`;
     else if (!rates.pension) rateIssue = `${premiumMonth}に使える厚生年金保険料率が登録されていません`;
   } catch (e) {
     rateIssue = (e as Error).message;

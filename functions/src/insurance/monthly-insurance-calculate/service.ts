@@ -101,6 +101,7 @@ export async function calculateMonthlyInsurance(
       input.yearMonth,
       office.prefectureCode,
       office.insurerId,
+      office.healthInsuranceType,
     );
 
     if (!healthExcluded && !rates.health) {

@@ -4,8 +4,9 @@ import type { OfficeDoc } from '../../types/firestore';
 import type { OfficeResponse } from '../../types/response';
 import { toISOString } from '../../utils/firestore';
 import type { OfficeListInput } from './schema';
+import { fieldIssues, officeSetupIssues } from '../lifecycle';
 
-function toOfficeResponse(id: string, data: OfficeDoc): OfficeResponse {
+function toOfficeResponse(id: string, data: OfficeDoc, setupIssues: string[]): OfficeResponse {
   return {
     id,
     name: data.name,
@@ -21,6 +22,11 @@ function toOfficeResponse(id: string, data: OfficeDoc): OfficeResponse {
     roundingRule: data.roundingRule,
     bonusMonths: data.bonusMonths ?? [],
     isActive: data.isActive,
+    healthInsuranceType: data.healthInsuranceType === 'union' ? 'union' : 'kyokai',
+    pensionOfficeName: data.pensionOfficeName ?? null,
+    officeCode: data.officeCode ?? null,
+    abolishedOn: data.abolishedOn ?? null,
+    setupIssues,
     version: data.version ?? 1,
     createdAt: toISOString(data.createdAt),
     updatedAt: toISOString(data.updatedAt),
@@ -48,8 +54,10 @@ export async function listOffices(
   }
 
   const snap = await query.get();
-  const items = snap.docs
-    .map((d) => toOfficeResponse(d.id, d.data() as OfficeDoc))
+  const items = (await Promise.all(snap.docs.map(async d => {
+    const o = d.data() as OfficeDoc;
+    return toOfficeResponse(d.id, o, input.withSetup ? await officeSetupIssues(auth.companyId, o) : (o.abolishedOn ? ['廃止済み'] : fieldIssues(o)));
+  })))
     .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 
   return { items };

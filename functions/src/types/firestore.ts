@@ -103,6 +103,10 @@ export interface OfficeDoc {
   fullTimeWeeklyHours?: number | null;
   /** 通常の労働者の月所定労働日数（適用判定の3/4基準）。未設定は21日 */
   fullTimeMonthlyDays?: number | null;
+  /** 健康保険の区分（カタログ1章）。未設定は協会けんぽ。組合健保なら保険者番号（insurerId）の料率だけを使う */
+  healthInsuranceType?: 'kyokai' | 'union' | null;
+  /** 事業所の廃止（カタログ1章 事業所ライフサイクル）。廃止した事業所は消さずに残す */
+  abolishedOn?: string | null;
 }
 
 export interface DepartmentDoc {

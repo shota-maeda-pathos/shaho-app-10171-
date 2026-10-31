@@ -7,7 +7,20 @@ jest.mock('../config', () => ({
   },
 }));
 
-import { findApplicableRate, rateMatchScore, rateValuesChanged } from './insurance-rate';
+import { findAllRates, findApplicableRate, rateMatchScore, rateValuesChanged } from './insurance-rate';
+
+describe('組合健保の事業所の料率', () => {
+  it('保険者番号の料率だけを使い、協会けんぽの都道府県の料率で代わりに計算しない', async () => {
+    put('h13', { insuranceType: 'health', prefectureCode: '13', insurerId: 'kyokai', appliedFrom: '2026-03', totalRate: 98.5 });
+    put('p', { insuranceType: 'pension', prefectureCode: '', insurerId: '', appliedFrom: '2020-09', totalRate: 183 });
+    expect((await findAllRates('c1', '2026-10', '13', '06139999', 'union')).health).toBeNull();
+    expect((await findAllRates('c1', '2026-10', '13', '06139999', 'kyokai')).health?.totalRate).toBe(98.5);
+    put('u', { insuranceType: 'health', prefectureCode: '', insurerId: '06139999', appliedFrom: '2026-03', totalRate: 90, employeeRate: 40, employerRate: 50 });
+    const r = await findAllRates('c1', '2026-10', '13', '06139999', 'union');
+    expect(r.health?.employeeRate).toBe(40);
+    expect(r.pension?.totalRate).toBe(183);
+  });
+});
 
 describe('料率の変化（rateValuesChanged）', () => {
   const fp = (cs: string) => `health:2026-03:49.25/49.25/98.5|pension:2020-09:91.5/91.5/183|longTermCare:2026-03:7.95/7.95/15.9|childSupport:2026-04:0/3.6/3.6|childSupportPayment:${cs}`;

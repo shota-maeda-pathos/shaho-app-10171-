@@ -89,6 +89,7 @@ export async function calculateBonusInsurance(
       input.yearMonth,
       office.prefectureCode,
       office.insurerId,
+      office.healthInsuranceType,
     );
 
     if (!healthExcl && !notCharged && !rates.health) throw invalidArg('健康保険料率が設定されていません');

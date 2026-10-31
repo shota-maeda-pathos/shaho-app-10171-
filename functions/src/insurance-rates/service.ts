@@ -119,6 +119,24 @@ export async function applyRates(auth: AuthContext, csv: string) {
   return { added: rows.length, closedPrevious: closed };
 }
 
+/**
+ * 組合健保の料率を画面から登録する（カタログ1章 組合健保の設定）。本人と会社の負担割合が折半でなくてもよい。
+ * CSV の取り込みと同じ確かめ方（単位・合計・重複）と切替（前の料率に終わりの月を付ける）を使う
+ */
+export async function addUnionRates(auth: AuthContext, input: {
+  insurerId: string; appliedFrom: string; healthTotal: number; healthEmployee: number; careTotal: number | null; careEmployee: number | null; note: string;
+}) {
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  const line = (type: string, total: number, employee: number) => `${type},,${input.insurerId},${input.appliedFrom},${total},${employee},${round(total - employee)},${input.note.replace(/[,\r\n]/g, ' ') || '組合健保'}`;
+  if (input.healthEmployee > input.healthTotal) throw invalidArg('本人負担が料率を超えています');
+  const lines = [line('健康保険', input.healthTotal, input.healthEmployee)];
+  if (input.careTotal !== null) {
+    if (input.careEmployee === null || input.careEmployee > input.careTotal) throw invalidArg('介護保険の本人負担を確かめてください');
+    lines.push(line('介護保険', input.careTotal, input.careEmployee));
+  }
+  return applyRates(auth, lines.join('\n'));
+}
+
 /** 料率の履歴（新しい順） */
 export async function rateHistory(auth: AuthContext) {
   const snap = await db.collection(`companies/${auth.companyId}/insuranceRates`).get();

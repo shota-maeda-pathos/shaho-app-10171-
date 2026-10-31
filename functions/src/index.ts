@@ -37,6 +37,7 @@ lazy(() => require('./offices/department-list/functions'), ['departmentList']);
 lazy(() => require('./offices/insurance-rate-list/functions'), ['insuranceRateList']);
 lazy(() => require('./offices/office-update/functions'), ['officeUpdate']);
 lazy(() => require('./offices/office-create/functions'), ['officeCreate']);
+lazy(() => require('./offices/office-abolish/functions'), ['officeAbolish']);
 
 // 雇用API
 lazy(() => require('./employments/employment-create/functions'), ['employmentCreate']);
@@ -100,7 +101,7 @@ lazy(() => require('./dashboard/calendar/functions'), ['calendarGet', 'checklist
 lazy(() => require('./dashboard/cost-analysis/functions'), ['costAnalysis']);
 lazy(() => require('./simulation/functions'), ['simulationRaise', 'simulationHire', 'simulationAnnual', 'simulationRateChange', 'simulationBonus']);
 lazy(() => require('./reports/functions'), ['reportData']);
-lazy(() => require('./insurance-rates/functions'), ['rateImportPreview', 'rateImportApply', 'rateHistoryList', 'gradeTableGet']);
+lazy(() => require('./insurance-rates/functions'), ['rateImportPreview', 'rateImportApply', 'rateUnionAdd', 'rateHistoryList', 'gradeTableGet']);
 
 // エクスポートAPI
 lazy(() => require('./exports/employee-export/functions'), ['employeeExport']);

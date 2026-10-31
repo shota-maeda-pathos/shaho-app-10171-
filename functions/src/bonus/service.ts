@@ -224,7 +224,7 @@ export async function bonusOverview(input: BonusRunInput, auth: AuthContext) {
   // 在籍している人と、賞与が登録されている人を出す
   const listed = employeesSnap.docs.map((d, i) => ({ d, i })).filter(({ d, i }) => periodTarget(d.data(), input.payMonth) || snaps[i * 3].exists);
   // 今の料率（この事業所・この月は全員同じ）。計算した後に料率が変わった人を見分ける
-  const currentFingerprint = await findAllRates(auth.companyId, input.payMonth, office.prefectureCode, office.insurerId).then(rateFingerprint, () => null);
+  const currentFingerprint = await findAllRates(auth.companyId, input.payMonth, office.prefectureCode, office.insurerId, office.healthInsuranceType).then(rateFingerprint, () => null);
   const rows = await mapConcurrent(listed, 20, ({ d, i }) =>
     buildRow(auth.companyId, input.payMonth, d, snaps[i * 3].data(), snaps[i * 3 + 1].data(), snaps[i * 3 + 2].data(), filingOf.get(d.id) ?? null, currentFingerprint));
 

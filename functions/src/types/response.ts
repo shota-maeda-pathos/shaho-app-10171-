@@ -56,6 +56,14 @@ export interface OfficeResponse {
   /** 賞与の支給予定月（不支給報告書の判定に使う） */
   bonusMonths: number[];
   isActive: boolean;
+  /** 健康保険の区分（未設定は協会けんぽ） */
+  healthInsuranceType: 'kyokai' | 'union';
+  pensionOfficeName: string | null;
+  officeCode: string | null;
+  /** 廃止した日（廃止していなければ null） */
+  abolishedOn: string | null;
+  /** 配属できない理由（設定が足りない項目）。空なら配属できる */
+  setupIssues: string[];
   /** 更新時の expectedVersion に使う */
   version: number;
   createdAt: string;

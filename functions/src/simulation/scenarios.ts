@@ -46,7 +46,7 @@ async function officeRates(auth: AuthContext, officeId: string, yearMonth: strin
     const snap = await db.doc(`companies/${auth.companyId}/offices/${officeId}`).get();
     if (!snap.exists) throw notFound('事業所');
     const o = snap.data() as OfficeDoc;
-    const rates = await findAllRates(auth.companyId, yearMonth, o.prefectureCode, o.insurerId);
+    const rates = await findAllRates(auth.companyId, yearMonth, o.prefectureCode, o.insurerId, o.healthInsuranceType);
     if (!rates.health) throw notFound(`健康保険料率（${o.name}・${yearMonth}）`);
     cache.set(officeId, { rates, rule: normalizeRoundingRule(o.roundingRule), name: o.name });
   }
