@@ -111,7 +111,8 @@ export async function applyRates(auth: AuthContext, csv: string) {
   await batch.commit();
   const from = rows.map(r => r.appliedFrom).sort()[0];
   await notify({
-    companyId: auth.companyId, category: 'system', targetType: 'insuranceRate', createdBy: auth.uid,
+    // targetType はお知らせを見せる相手（all・office・employee）
+    companyId: auth.companyId, category: 'system', targetType: 'all', targetId: 'insuranceRate', createdBy: auth.uid,
     title: '料率を切り替えました',
     body: `${from}分以降の保険料に新しい料率を使います。すでに計算した月は、毎月の処理で「計算し直しが必要」「訂正が必要」と出た人を確かめてください。`,
   });

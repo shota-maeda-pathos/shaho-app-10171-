@@ -1,5 +1,6 @@
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { db } from '../config';
+import { notifyGradeChange } from '../utils/notify-employee';
 
 type GradeLike = { effectiveMonth: string; healthGradeNumber?: number; healthStandardRemuneration?: number; pensionGradeNumber?: number; pensionStandardRemuneration?: number };
 type PremiumLike = { yearMonth: string; healthGradeNumber?: number; healthStandardRemuneration?: number; pensionGradeNumber?: number; pensionStandardRemuneration?: number };
@@ -47,4 +48,6 @@ export const gradeOutdatedMark = onDocumentWritten({ document: 'companies/{compa
   const months = [before?.effectiveMonth, after?.effectiveMonth, event.params.gradeId].filter((m): m is string => typeof m === 'string' && /^\d{4}-\d{2}$/.test(m));
   if (!months.length) return;
   await markGradeOutdated(event.params.companyId, event.params.employeeId, months.sort()[0]);
+  // 本人あてのお知らせ（カタログ5章 等級変更の通知）。削除（承認の取消）は知らせない
+  await notifyGradeChange(event.params.companyId, event.params.employeeId, before, after);
 });

@@ -6,6 +6,8 @@ import { AuthService } from '../../core/services/auth.service';
 interface PremiumMonth {
   yearMonth: string; standardRemuneration: number | null; health: number; childSupport: number; longTermCare: number | null;
   pension: number; total: number; isExempted: boolean; changeReason: string | null; change: number | null;
+  /** 訂正した月の理由（古いサーバーは返さない） */
+  corrected?: string | null;
 }
 
 interface PortalDetails {
@@ -65,7 +67,8 @@ const PROFILE_LABELS: [string, string][] = [
             <tbody>
               @for (m of p.months; track m.yearMonth) {
                 <tr [class.changed]="m.changeReason">
-                  <td>{{ m.yearMonth }}@if (m.changeReason) { <span class="reason">{{ m.changeReason }}（{{ (m.change ?? 0) >= 0 ? '+' : '' }}{{ m.change | number }}円）</span> }</td>
+                  <td>{{ m.yearMonth }}@if (m.changeReason) { <span class="reason">{{ m.changeReason }}（{{ (m.change ?? 0) >= 0 ? '+' : '' }}{{ m.change | number }}円）</span> }
+                    @if (m.corrected) { <span class="reason">訂正済み：{{ m.corrected }}</span> }</td>
                   <td>{{ m.standardRemuneration | number }}</td><td>{{ m.health | number }}</td><td>{{ m.childSupport | number }}</td>
                   <td>{{ m.longTermCare === null ? '—' : (m.longTermCare | number) }}</td><td>{{ m.pension | number }}</td>
                   <td><b>{{ m.total | number }}</b>@if (m.isExempted) { （免除）}</td>

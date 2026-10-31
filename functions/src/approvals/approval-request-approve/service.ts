@@ -18,6 +18,8 @@ export async function approveApprovalRequest(
     `companies/${auth.companyId}/employees/${input.employeeId}`,
   );
 
+  let requestType = '';
+  let targetPath = '';
   const result = await db.runTransaction(async (tx) => {
     const empSnap = await tx.get(empRef);
     if (!empSnap.exists || empSnap.data()!.deletedAt !== null) {
@@ -38,6 +40,8 @@ export async function approveApprovalRequest(
     }
 
     const reqData = reqSnap.data()! as ApprovalRequestDoc;
+    requestType = reqData.requestType;
+    targetPath = reqData.targetPath;
     if (reqData.status !== 'pending') {
       throw invalidArg(`この承認リクエストは既に処理済みです（状態: ${reqData.status}）`);
     }
@@ -182,6 +186,11 @@ export async function approveApprovalRequest(
     return input.requestId;
   });
 
+  // 訂正した保険料が承認し直されたら、本人に訂正があった旨を知らせる（まとめての承認でも出す）
+  if (requestType === 'monthlyInsurance') {
+    const { notifyCorrectedPremium } = await import('../../utils/notify-employee');
+    await notifyCorrectedPremium(auth.companyId, input.employeeId, targetPath);
+  }
   // 毎月の処理でまとめて承認するときは、1人ずつの手続きの更新と通知を出さない（給与・保険料は手続きに関わらない）
   if (options.notify === false) return { success: true, id: result };
   const { refreshEmployeeProcedures } = await import('../../procedures/hooks');

@@ -114,7 +114,9 @@ export async function getPortalDetails(auth: AuthContext) {
     health: num(m.healthInsurance?.employeeAmount), childSupport: num(m.childSupportPayment?.employeeAmount),
     longTermCare: m.longTermCareInsurance ? num(m.longTermCareInsurance.employeeAmount) : null,
     pension: num(m.pensionInsurance?.employeeAmount), total: num(m.totalEmployeeAmount), isExempted: m.isExempted === true,
-  })), months.map(m => ({ yearMonth: m.yearMonth, healthGrade: m.healthGradeNumber, pensionGrade: m.pensionGradeNumber })));
+  })), months.map(m => ({ yearMonth: m.yearMonth, healthGrade: m.healthGradeNumber, pensionGrade: m.pensionGradeNumber })))
+    // 訂正した月（カタログ6章⑤）：訂正があった旨と理由を出す
+    .map((p, i) => ({ ...p, corrected: months[i].correctionCount ? String(months[i].correctionReason ?? '保険料を訂正しました') : null }));
 
   const totalOf = (ym: string) => premiumMonths.find(p => p.yearMonth === ym)?.total ?? null;
   const prevMonth = (ym: string) => { const [y, mo] = ym.split('-').map(Number); return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, '0')}`; };
