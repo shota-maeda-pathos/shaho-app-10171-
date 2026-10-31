@@ -94,6 +94,8 @@ lazy(() => require('./audit/seal'), ['auditLogSeal']);
 // ダッシュボードAPI
 lazy(() => require('./dashboard/dashboard-stats/functions'), ['dashboardStats']);
 lazy(() => require('./dashboard/dashboard-analytics/functions'), ['dashboardAnalytics']);
+lazy(() => require('./dashboard/summary/functions'), ['dashboardSummary', 'dashboardSummaryRefresh', 'dashboardSummaryDaily']);
+lazy(() => require('./dashboard/calendar/functions'), ['calendarGet', 'checklistGet', 'checklistSet', 'reminderSettingsUpdate']);
 
 // エクスポートAPI
 lazy(() => require('./exports/employee-export/functions'), ['employeeExport']);

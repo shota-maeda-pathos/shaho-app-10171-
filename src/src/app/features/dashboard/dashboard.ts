@@ -9,6 +9,7 @@ import { ApprovalBadgeService } from '../../core/services/approval-badge.service
 import { OfficeContextService } from '../../core/services/office-context.service';
 import { StatusBadgeComponent, StatusTone, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent, PageHeadComponent } from '../../shared/ui';
 import { LifeEventCardsComponent } from '../procedures/life-events';
+import { SummaryCardsComponent } from './summary-cards';
 
 /** サーバーの homeTodos・homeBulkTodo が返す1件 */
 interface HomeTodo {
@@ -39,7 +40,7 @@ type Group = { key: string; label: string; items: HomeTodo[] };
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, StatusBadgeComponent, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent, LifeEventCardsComponent, PageHeadComponent],
+  imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, StatusBadgeComponent, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent, LifeEventCardsComponent, PageHeadComponent, SummaryCardsComponent],
   template: `
     <div class="app-page">
       <app-page-head [heading]="greeting() + '、' + (auth.profile()?.displayName ?? 'ユーザー') + 'さん'">
@@ -63,6 +64,8 @@ type Group = { key: string; label: string; items: HomeTodo[] };
           <a routerLink="/filings" [class.warn]="dueSoon() > 0"><span class="n">{{ dueSoon() }}<small>件</small></span><span class="l">期限切れ・7日以内</span></a>
           <a routerLink="/procedures" [queryParams]="office.queryParams()"><span class="n">{{ waiting().length }}<small>件</small></span><span class="l">ほかの人の作業待ち</span></a>
         </nav>
+
+        @if (isOperator()) { <app-summary-cards /> }
 
         <div class="split" [class.solo]="!isOperator()">
         <section class="card" aria-labelledby="todo-heading">
