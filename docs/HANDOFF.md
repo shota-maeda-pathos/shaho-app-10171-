@@ -250,7 +250,11 @@
 
 ## 6. 次にやるべきタスク
 
-0. **次は段階9（周辺機能）**：方針の案 `docs/stage9-plan.md`（2026-10-31 作成、**未承認**。「決めてほしいこと」10項目をユーザーに示して合意を取ってから着手）。段階8の残りの確認は下の項目。
+0. **段階9（周辺機能）を進めている**：方針 `docs/stage9-plan.md`（2026-10-31 ユーザー承認）。
+   - 済み（本番に出して画面で確認、2026-10-31）：本人ポータルの詳しい情報（`portalDetails`）・公開範囲（`portalSettings*`）・本人からの申請（`portalRequest*`、担当者の受付 `/portal-requests`）、ホームの「全体の状況」のカード（`dashboardSummary*`、毎朝6時に集計）、手続きカレンダー `/calendar`（`calendarGet`・`checklist*`・`reminderSettingsUpdate`）。確認の結果は 11・12章のチェックリスト。テストデータ：中野 拓夢（test7）の住所を申請→反映で「兵庫県西宮市甲子園町1-82（テスト）」にした。
+   - 途中：保険料の分析（計算部品 `functions/src/dashboard/cost-analysis/rules.ts` だけ。service・関数・画面・グラフ・CSV が残り）。
+   - 未着手：試算5種、帳票5種と CSV、料率の CSV 取込と額表。
+   - 気づいたこと：test7 の2026年10月分の子ども・子育て支援金（本人）が0円（計算か取込の確認が要る）。ホーム上の「期限切れ・7日以内」（やることの期限）とカードの届出の件数は数え方が違う。段階8の残りの確認は下の項目。
    - **段階8（セキュリティ）に着手**（2026-10-31）。方針は `docs/stage8-plan.md`（ユーザー承認済み：サーバー経由のログイン、個人番号は全桁を伏せる、パスワードのポリシー・端末一覧と切断・レート制限・監査ログの画面も作る）。
    - **済み：個人番号**（画面で確認）。Google Cloud の設定（ユーザー承認のうえ内蔵ブラウザーで操作）：キーリング `shaho`・鍵 `my-number`（asia-northeast1）を作り、関数の実行アカウント `99628241631-compute@developer.gserviceaccount.com` に、この鍵の暗号化・復号のロールと、自分自身へのサービスアカウント トークン作成者のロール（サーバー経由のログインのカスタムトークン用）を与えた。関数 `employeeSecretsGet`（登録の有無だけ）・`employeeSecretsUpdate`・`employeeSecretsReveal`（理由つき）を公開。画面は `features/employees/employee-detail/employee-my-number.ts`。高橋 一郎に登録→表示→削除まで確かめ、テストの番号は削除済み。
    - **ログイン（コミット dd596ac、本番に関数16個とルールを公開済み）**：画面は `authLogin`（関数がパスワードを REST で確かめる）→ `signInWithCustomToken`。トークンの `sid` を `companies/{c}/sessions/{sid}` と照らし、`middleware/auth.ts` の `getAuthContext` が8時間・無操作30分・切断・レート制限（1分300回）を確かめる。**`sid` のないトークンは新しい認証でデプロイした関数とルールの社会保険区画で拒まれる**（未デプロイの関数はまだ受け付ける→全関数の再デプロイが要る）。ロックは `loginGuards/{メールのSHA-256}`、パスワードの指紋は `userSecrets/{uid}`（scrypt、直近5個）。画面：`/account`（パスワード変更・端末一覧と切断）、`/invite/:id`（招待を受ける。招待はメールで送らないので、ユーザー管理の「招待のリンクをコピー」で渡す）、ユーザー管理に「ロック解除」「再発行」、会社情報に「Google ログインを許可するドメイン」（`allowedGoogleDomains`）。
