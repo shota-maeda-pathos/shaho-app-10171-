@@ -332,22 +332,44 @@ export class ProcedureGroupsComponent {
       };
     }));
 
-  /** まとめての操作。今は入社だけ（退職・年齢到達は1人ずつの入力が要るため、1人の画面で進める） */
-  actions = computed<BulkAction[]>(() => this.type !== 'onboarding' ? [] : [
-    {
-      key: 'filing', label: '資格取得届を作って承認を依頼する', appliesTo: r => this.itemOf(r.id)?.current === 'filing',
-      caution: '承認を依頼すると、雇用条件と届出は差し戻されるまで直せません。',
-      confirm: {
-        title: '資格取得届を作って承認を依頼する', message: '雇用条件から決まった等級で資格取得届を作り、別の担当者（管理者・承認者）に承認を依頼します。',
-        notice: '依頼中は雇用条件と届出を直せません。資格取得届は入社日から5日以内に提出します。',
-      },
-    },
-    {
-      key: 'complete', label: '手続きを完了する', appliesTo: r => this.itemOf(r.id)?.current === 'confirm',
-      confirm: { title: '入社の手続きを完了する', message: '提出まで終えた人の手続きを完了にし、やることから外します。', confirmLabel: '完了する' },
-    },
-    { key: 'links', label: '入力用リンクをコピーする', appliesTo: r => this.itemOf(r.id)?.current === 'invite' && !!this.itemOf(r.id)?.inviteToken },
-  ]);
+  /**
+   * まとめての操作。1人ずつの入力が要らないステップだけ（退職の資格喪失届は保険証の回収枚数を1人ずつ入れるため、1人の画面で進める）。
+   * key はウィザードの更新の関数（onboardingUpdate など）の step。links は入社の入力用リンクのコピー
+   */
+  actions = computed<BulkAction[]>(() => {
+    const at = (step: string) => (r: TargetRow) => this.itemOf(r.id)?.current === step;
+    const complete: BulkAction = {
+      key: 'complete', label: '手続きを完了する', appliesTo: at('confirm'),
+      confirm: { title: `${this.config.title}の手続きを完了する`, message: '提出まで終えた人の手続きを完了にし、やることから外します。', confirmLabel: '完了する' },
+    };
+    switch (this.type) {
+      case 'onboarding': return [
+        {
+          key: 'filing', label: '資格取得届を作って承認を依頼する', appliesTo: at('filing'),
+          caution: '承認を依頼すると、雇用条件と届出は差し戻されるまで直せません。',
+          confirm: {
+            title: '資格取得届を作って承認を依頼する', message: '雇用条件から決まった等級で資格取得届を作り、別の担当者（管理者・承認者）に承認を依頼します。',
+            notice: '依頼中は雇用条件と届出を直せません。資格取得届は入社日から5日以内に提出します。',
+          },
+        },
+        complete,
+        { key: 'links', label: '入力用リンクをコピーする', appliesTo: r => at('invite')(r) && !!this.itemOf(r.id)?.inviteToken },
+      ];
+      case 'age_event': return [
+        {
+          key: 'filing', label: '届出を作って承認を依頼する', appliesTo: at('filing'),
+          caution: '到達日と届出の要否を確かめた人の届出を作ります。依頼中は直せません。',
+          confirm: {
+            title: '年齢到達の届出を作って承認を依頼する', message: '確かめた内容で届出（70歳到達届・資格喪失届）を作り、別の担当者（管理者・承認者）に承認を依頼します。',
+            notice: '届出は資格を失う日から5日以内に提出します。',
+          },
+        },
+        complete,
+      ];
+      default: return [complete];
+    }
+  });
+  private readonly updateFn = ({ onboarding: 'onboardingUpdate', loss: 'resignationUpdate', age_event: 'ageEventUpdate' } as const)[this.type];
 
   constructor() {
     // 事業所を切り替えたら読み込み直す（まとめの画面は URL の事業所だけ）
@@ -395,7 +417,7 @@ export class ProcedureGroupsComponent {
     }
   }
 
-  // ---- まとめての操作（入社） ----
+  // ---- まとめての操作 ----
 
   async run(req: BulkRun) {
     this.lastAction.set(req.action);
@@ -421,7 +443,7 @@ export class ProcedureGroupsComponent {
       const item = this.itemOf(id);
       if (!item) continue;
       try {
-        await httpsCallable(this.functions, 'onboardingUpdate')({ companyId: this.auth.companyId, procedureId: id, expectedVersion: item.version, step });
+        await httpsCallable(this.functions, this.updateFn)({ companyId: this.auth.companyId, procedureId: id, expectedVersion: item.version, step });
         delete failures[id];
         ok++;
       } catch (e) {
