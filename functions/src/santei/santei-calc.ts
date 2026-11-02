@@ -243,6 +243,8 @@ export interface SanteiFilingPerson {
   備考区分: number[];
   /** 備考「9．その他」の内容 */
   備考その他: string;
+  /** ⑰ 70歳以上被用者だけ（個人番号は載せず基礎年金番号を書く） */
+  基礎年金番号?: string;
 }
 
 /**
@@ -251,7 +253,7 @@ export interface SanteiFilingPerson {
  */
 export function santeiFilingPerson(input: {
   employeeId: string; insuredPersonNumber: string; name: string; birthDate: string;
-  meta: SanteiApprovalMetadata; age70: boolean;
+  meta: SanteiApprovalMetadata; age70: boolean; basicPensionNumber?: string;
 }): SanteiFilingPerson {
   const { meta } = input;
   const usedMonths = meta.months.filter(m => m.used);
@@ -294,6 +296,7 @@ export function santeiFilingPerson(input: {
     備考: notes.join('・'),
     備考区分: codes,
     備考その他: others.join('・'),
+    ...(input.age70 && input.basicPensionNumber ? { 基礎年金番号: input.basicPensionNumber } : {}),
   };
 }
 

@@ -419,6 +419,7 @@ export async function createSanteiFiling(input: SanteiRunInput, auth: AuthContex
       return santeiFilingPerson({
         employeeId: r.employeeId, insuredPersonNumber: e.insuredPersonNumber ?? '', name: nameOf(e),
         birthDate: toDateString(e.birthDate) ?? '', meta, age70: !!e.birthDate && isPensionExcluded(e.birthDate, `${input.year}-07`),
+        basicPensionNumber: e.basicPensionNumber ?? '',
       });
     }),
   ]);

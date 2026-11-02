@@ -231,6 +231,20 @@ export function officeTitle(fd: Data, meta: FilingPrintMeta): string {
   return office ? `${company}　${office}` : company;
 }
 
+/**
+ * 個人番号の欄（12マス）に基礎年金番号（10桁）を左詰めで書く。マスの幅がそろっていない様式があるので、
+ * 原票の点線の位置（PDFの座標、pt）からマスごとに書く。top・height は原票を160%で測った値
+ */
+function pensionNumberInCells(w: Writer, value: unknown, edgesPt: readonly number[], top: number, height: number) {
+  const text = String(value ?? '').replace(/[\s-]/g, '');
+  if (!/^\d{10}$/.test(text)) { w.warnings.add('基礎年金番号は10桁の数字が必要です。現在の値は記入していません。'); return; }
+  const u = (pt: number) => (pt + 8.39055) * 1.6;
+  [...text].forEach((digit, i) => w.text(digit, [u(edgesPt[i]), top, u(edgesPt[i + 1]) - u(edgesPt[i]), height], '基礎年金番号', { size: 10, center: true }));
+}
+/** 賞与支払届の⑦・算定基礎届の⑰の点線の位置（1人目の行。pt） */
+const BONUS_ID_CELLS = [425.4, 436.08, 446.76, 457.6, 468.12, 478.2, 489.6, 500.64, 511.92, 523.2, 534.48, 545.16, 555.84] as const;
+const SANTEI_ID_CELLS = [426.0, 438.24, 449.4, 461.88, 473.4, 485.64, 497.88, 510.12, 522.36, 534.6, 546.84, 559.08, 571.32] as const;
+
 function insuredNumber(w: Writer, value: unknown, box: Box) {
   const number = String(value ?? '');
   if (/^\d{1,6}$/.test(number)) w.text(number,box,'被保険者整理番号',{ size:10,center:true });
@@ -449,7 +463,7 @@ function bonusRow(w: Writer, p: BonusPrintPerson, offset: number, commonDate: un
   if (p.初回支払日) w.text(p.初回支払日,[864,531+offset,23,14],'初回支払日',{size:7,center:true});
   if (p.備考区分?.includes(1)) {
     // ⑦ 個人番号の12桁の枠に、基礎年金番号（10桁）を左から詰めて書く
-    if (p.基礎年金番号) w.digits(p.基礎年金番号,[685,477+offset,216*10/12,27],10,'基礎年金番号');
+    if (p.基礎年金番号) pensionNumberInCells(w, p.基礎年金番号, BONUS_ID_CELLS, 477 + offset, 36);
     else w.warnings.add('70歳以上被用者の人は、個人番号（または基礎年金番号）の欄を原票に記入してください。');
   }
 }
@@ -528,6 +542,8 @@ export interface SanteiPrintPerson {
   months: { 月: number; 支払基礎日数: number; 通貨: number; 現物: number; 合計: number }[];
   総計: number; 平均額: number | null; 修正平均額: number | null; 備考: string;
   備考区分?: number[]; 備考その他?: string;
+  /** ⑰ 70歳以上被用者だけ。個人番号は載せないので基礎年金番号を書く */
+  基礎年金番号?: string;
 }
 
 /** 備考欄の番号の位置（1人目。原票を160%で測った値） */
@@ -574,7 +590,6 @@ export async function createSanteiFilingPdf(fields: Data, persons: SanteiPrintPe
   const fontMetrics = fontkit.create(fontBytes);
   const warnings=new Set<string>();
   const placements: PrintPlacement[]=[];
-  warnings.add('被保険者整理番号・事業所整理記号など、登録されていない欄は原票で確かめてください。');
   for (let start = 0, pageIndex = 0; start < persons.length; start += SANTEI_ROWS, pageIndex++) {
     const [page]=await pdf.copyPages(source,[0]);pdf.addPage(page);
     const w=new Writer(page,font,warnings,placements,pageIndex,fontMetrics);
@@ -588,6 +603,11 @@ export async function createSanteiFilingPdf(fields: Data, persons: SanteiPrintPe
         if (mark) w.circle(mark[0], mark[1] + offset, 12, 11);
       }
       if (p.備考その他) w.text(p.備考その他,[816,581+offset,102,15],'備考（その他）',{size:7});
+      if (p.備考区分?.includes(1)) {
+        // ⑰ 個人番号の12桁の枠に、基礎年金番号（10桁）を左から詰めて書く
+        if (p.基礎年金番号) pensionNumberInCells(w, p.基礎年金番号, SANTEI_ID_CELLS, 468 + offset, 36);
+        else w.warnings.add('70歳以上被用者の人は、個人番号（または基礎年金番号）の欄を原票に記入してください。');
+      }
       if (p.修正平均額 !== null) warnings.add('遡及支払額の欄は記入していません。修正平均額のある人は、遡及支払の月と額を原票に記入してください。');
     });
   }
