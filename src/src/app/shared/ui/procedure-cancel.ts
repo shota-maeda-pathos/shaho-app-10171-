@@ -94,7 +94,7 @@ export class ProcedureCancelComponent {
   private async load(id: string) {
     if (!this.auth.hasAnyRole('admin', 'operator')) { this.state.set(null); return; }
     try {
-      const { data } = await httpsCallable<object, ProcedureSummary>(this.functions, 'procedureGet')({ companyId: this.auth.companyId, procedureId: id });
+      const data = await this.read(id);
       if (data.status === 'completed' || data.status === 'cancelled') { this.state.set(null); return; }
       const own = data.createdBy === this.auth.profile()?.uid;
       const creatorName = own ? '' : (data.createdByName ?? '始めた人');
@@ -105,6 +105,12 @@ export class ProcedureCancelComponent {
     }
   }
 
+  /** 読むだけ（計算し直さない。開いているウィザードの version を変えない） */
+  private async read(id: string) {
+    const { data } = await httpsCallable<object, ProcedureSummary>(this.functions, 'procedureGet')({ companyId: this.auth.companyId, procedureId: id, refresh: false });
+    return data;
+  }
+
   async cancel() {
     const s = this.state();
     if (!s) return;
@@ -112,7 +118,9 @@ export class ProcedureCancelComponent {
     if (reason === null) return;
     this.busy.set(true);
     try {
-      await httpsCallable(this.functions, 'procedureCancel')({ companyId: this.auth.companyId, procedureId: this.procedureId(), reason, expectedVersion: s.proc.version });
+      // 開いたあとにウィザードで進めると version が変わるので、やめる直前に読み直す
+      const latest = await this.read(this.procedureId()!);
+      await httpsCallable(this.functions, 'procedureCancel')({ companyId: this.auth.companyId, procedureId: this.procedureId(), reason, expectedVersion: latest.version });
       this.snackBar.open(`「${s.proc.title}」をやめました`, '閉じる', { duration: 4000 });
       void this.router.navigate(['/procedures']);
     } catch (e: unknown) {

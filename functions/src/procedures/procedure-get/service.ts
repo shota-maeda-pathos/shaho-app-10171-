@@ -72,8 +72,8 @@ export async function getProcedure(
   if (!initial.exists) throw notFound('手続き');
   // Validate before refreshing: refresh reads related records and may write state.
   requireProcedureAccess(auth, initial.data() as ProcedureDoc);
-  const { changed, procedure: proc } = await refreshProcedure(auth.companyId, input.procedureId);
-  void changed;
+  // 「この手続きをやめる」などの読むだけの呼び出しでは計算し直さない（ウィザードが持つ version が古くなり、保存がぶつかるため）
+  const proc = input.refresh !== false ? (await refreshProcedure(auth.companyId, input.procedureId)).procedure : (initial.data() as ProcedureDoc);
 
   if (proc.deletedAt !== null) throw notFound('手続き');
 
