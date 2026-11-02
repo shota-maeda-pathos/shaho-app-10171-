@@ -26,7 +26,12 @@ interface HomeTodo {
   route: string;
   queryParams: Record<string, string>;
   updatedAt: string | null;
+  /** 承認者が承認する番のもの */
+  approve?: boolean;
 }
+
+/** 承認者（担当者でない人）も開ける業務の画面。手続きのウィザードは開けないので、承認は承認の画面で行う */
+const APPROVER_ROUTES = ['/monthly', '/santei', '/bonus'];
 
 /** 毎月の処理・算定・賞与のうち、ホームが1件ずつ読むもの（functions/src/home/service.ts の BulkTarget） */
 interface BulkTarget { kind: 'monthly' | 'santei' | 'bonus'; officeId: string; period: string; officeName: string }
@@ -302,7 +307,13 @@ export class DashboardComponent {
     }
   }
 
-  open(todo: HomeTodo) { void this.router.navigate([todo.route], { queryParams: this.office.openParams(todo.route, todo.queryParams) }); }
+  open(todo: HomeTodo) {
+    if (todo.approve && !this.auth.hasAnyRole('admin', 'operator') && !APPROVER_ROUTES.includes(todo.route)) {
+      void this.router.navigate(['/approvals'], { queryParams: this.office.queryParams() });
+      return;
+    }
+    void this.router.navigate([todo.route], { queryParams: this.office.openParams(todo.route, todo.queryParams) });
+  }
 
   private days(deadline: string) {
     return Math.round((Date.parse(deadline) - Date.parse(this.today())) / 86_400_000);
