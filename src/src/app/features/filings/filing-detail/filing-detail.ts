@@ -56,7 +56,7 @@ interface ArchiveRow { id: string; approvedAt: string | null; approvedByName: st
       @if (loading()) {
         <app-loading-state message="届出を読み込んでいます…" />
       } @else if (filing(); as f) {
-        <app-page-head [heading]="filingTypeLabel(f.filingType)" kicker="届出" backLink="/filings" backLabel="届出一覧">
+        <app-page-head [heading]="filingTypeLabel(f.filingType)" kicker="届出" [backLink]="isStaff ? '/filings' : '/approvals'" [backLabel]="isStaff ? '届出一覧' : '承認'">
           <ng-container meta>
             <span><b>{{ f.employeeName }}</b></span>
             @if (f.effectiveDate) { <span>届出日 {{ f.effectiveDate }}</span> }
@@ -64,7 +64,7 @@ interface ArchiveRow { id: string; approvedAt: string | null; approvedByName: st
           </ng-container>
           <ng-container actions>
             <button mat-stroked-button type="button" (click)="printPdf()" [disabled]="processing()"><mat-icon>picture_as_pdf</mat-icon>公式様式のPDF</button>
-            <a mat-stroked-button [routerLink]="['/employees', employeeId]">従業員の画面</a>
+            @if (isStaff) { <a mat-stroked-button [routerLink]="['/employees', employeeId]">従業員の画面</a> }
           </ng-container>
         </app-page-head>
 
@@ -84,7 +84,7 @@ interface ArchiveRow { id: string; approvedAt: string | null; approvedByName: st
                   </table>
                 }
               }
-              <p class="note">台帳・等級・被扶養者などの登録は自動では直りません。必要なら<a [routerLink]="['/employees', employeeId]">従業員の画面</a>で直してください。</p>
+              @if (isStaff) { <p class="note">台帳・等級・被扶養者などの登録は自動では直りません。必要なら<a [routerLink]="['/employees', employeeId]">従業員の画面</a>で直してください。</p> }
               @if (editable()) {
                 @if (f.filingType === 'correction') {
                   <div class="edit-grid">
@@ -175,7 +175,7 @@ interface ArchiveRow { id: string; approvedAt: string | null; approvedByName: st
             </div>
           }
 
-          @if (f.workflowStatus === 'draft' || f.workflowStatus === 'rejected') {
+          @if (isStaff && (f.workflowStatus === 'draft' || f.workflowStatus === 'rejected')) {
             <app-action-bar [info]="f.workflowStatus === 'rejected' ? '差し戻された内容を直したら、もう一度依頼します。' : ''" notice="依頼中は届出を直せません。直すときは差し戻してもらいます。">
               <button mat-flat-button type="button" (click)="requestApproval()" [disabled]="processing()">承認を依頼する<mat-icon iconPositionEnd>arrow_forward</mat-icon></button>
             </app-action-bar>
@@ -218,6 +218,8 @@ export class FilingDetailComponent implements OnInit {
   private functions = inject(Functions);
   private snackBar = inject(MatSnackBar);
   private auth = inject(AuthService);
+  /** 承認者は承認する前に中身とPDFを確かめるだけ（依頼・訂正・提出・添付は担当者） */
+  readonly isStaff = this.auth.hasAnyRole('admin', 'operator');
   private dialog = inject(MatDialog);
   private confirm = inject(ConfirmService);
 
@@ -260,8 +262,8 @@ export class FilingDetailComponent implements OnInit {
   }
 
   isCorrection() { const t = this.filing()?.filingType; return t === 'correction' || t === 'cancellation'; }
-  editable() { return this.isCorrection() && ['draft', 'rejected'].includes(this.filing()?.workflowStatus) && !this.filing()?.cancelledAt; }
-  canCorrect() { const f = this.filing(); return !!f && !this.isCorrection() && f.submitted && !f.cancelledAt; }
+  editable() { return this.isStaff && this.isCorrection() && ['draft', 'rejected'].includes(this.filing()?.workflowStatus) && !this.filing()?.cancelledAt; }
+  canCorrect() { const f = this.filing(); return this.isStaff && !!f && !this.isCorrection() && f.submitted && !f.cancelledAt; }
   editableKeys() {
     const fd = this.filing()?.formData ?? {};
     return Object.keys(fd).filter(k => fd[k] === null || typeof fd[k] !== 'object');

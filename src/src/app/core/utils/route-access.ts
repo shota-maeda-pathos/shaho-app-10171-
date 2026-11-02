@@ -9,6 +9,7 @@ const ROUTE_ROLES: [prefix: string, roles: Role[]][] = [
   ['/procedures/', ['admin', 'operator']],
   ['/procedures', ['admin', 'operator', 'approver']],
   ['/approvals', ['admin', 'operator', 'approver']],
+  ['/filings/', ['admin', 'operator', 'approver']],
   ['/monthly', ['admin', 'operator', 'approver']],
   ['/santei', ['admin', 'operator', 'approver']],
   ['/bonus', ['admin', 'operator', 'approver']],

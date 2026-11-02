@@ -9,6 +9,7 @@ export const filingGet = onCall(async (request) => {
   const auth = await getAuthContext(request, input.companyId);
   requireLoginEnabled(auth);
   requireNotSuspended(auth);
-  requireRole(auth, 'admin', 'operator');
+  // 承認者も承認する前に中身を確かめる（事業所の範囲は getFiling で確かめる）
+  requireRole(auth, 'admin', 'operator', 'approver');
   return getFiling(input, auth);
 });

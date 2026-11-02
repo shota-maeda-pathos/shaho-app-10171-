@@ -41,10 +41,10 @@ const ACCEPT = 'application/pdf,image/jpeg,image/png';
               @for (f of filesOf(c.key); track f.id) {
                 <div class="file">{{ f.name }} <span class="muted">{{ size(f.size) }}・{{ f.uploadedByName }} {{ f.uploadedAt | date:'M/d H:mm' }}</span>
                   <button mat-button type="button" (click)="open(f)" [disabled]="busy()">開く</button>
-                  @if (!l.locked) { <button mat-button type="button" (click)="remove(f)" [disabled]="busy()">削除</button> }
+                  @if (!l.locked && isStaff) { <button mat-button type="button" (click)="remove(f)" [disabled]="busy()">削除</button> }
                 </div>
               }
-              @if (!l.locked) {
+              @if (!l.locked && isStaff) {
                 <button mat-stroked-button type="button" (click)="pick(c.key)" [disabled]="busy()"><mat-icon>attach_file</mat-icon>この書類を添付する</button>
               }
             </li>
@@ -59,13 +59,13 @@ const ACCEPT = 'application/pdf,image/jpeg,image/png';
         @for (f of filesOf(null); track f.id) {
           <div class="file">{{ f.name }} <span class="muted">{{ size(f.size) }}・{{ f.uploadedByName }} {{ f.uploadedAt | date:'M/d H:mm' }}</span>
             <button mat-button type="button" (click)="open(f)" [disabled]="busy()">開く</button>
-            @if (!l.locked) { <button mat-button type="button" (click)="remove(f)" [disabled]="busy()">削除</button> }
+            @if (!l.locked && isStaff) { <button mat-button type="button" (click)="remove(f)" [disabled]="busy()">削除</button> }
           </div>
         }
       }
       @if (l.locked) {
         <p class="muted">提出を始めたので、添付の追加・削除はできません。</p>
-      } @else {
+      } @else if (isStaff) {
         <button mat-button type="button" (click)="pick(null)" [disabled]="busy()"><mat-icon>add</mat-icon>ほかの書類を添付する</button>
         <p class="muted small">PDF・JPEG・PNG、1ファイル5MBまで、1件の届出に20ファイルまで。</p>
       }
@@ -97,6 +97,8 @@ const ACCEPT = 'application/pdf,image/jpeg,image/png';
 export class FilingAttachmentsComponent implements OnChanges {
   private functions = inject(Functions);
   private auth = inject(AuthService);
+  /** 添付・削除は担当者だけ（承認者は開いて確かめるだけ） */
+  readonly isStaff = inject(AuthService).hasAnyRole('admin', 'operator');
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
 

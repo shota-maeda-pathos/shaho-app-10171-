@@ -239,18 +239,20 @@ export const routes: Routes = [
       },
       {
         path: 'filings',
-        canActivate: [roleGuard('admin', 'operator')],
         data: { title: '届出' },
         children: [
           {
             path: '',
+            canActivate: [roleGuard('admin', 'operator')],
             loadComponent: () =>
               import('./features/filings/filing-list/filing-list').then(
                 (m) => m.FilingListComponent,
               ),
           },
           {
+            // 承認者も、承認する前に届出の中身とPDFを確かめるために開く（操作は担当者だけ）
             path: ':filingId',
+            canActivate: [roleGuard('admin', 'operator', 'approver')],
             data: { title: '届出詳細' },
             loadComponent: () =>
               import('./features/filings/filing-detail/filing-detail').then(

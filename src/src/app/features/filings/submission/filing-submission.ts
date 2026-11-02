@@ -187,7 +187,7 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
         }
 
         <!-- 紙の提出の結果 -->
-        @if (v.paper?.status === 'submitted') {
+        @if (v.paper?.status === 'submitted' && isStaff) {
           <div class="paper">
             <p>紙で提出済みです（{{ v.paper!.submittedDate }}・{{ v.paper!.office || '提出先の記録なし' }}・{{ v.paper!.method === 'mail' ? '郵送' : '窓口' }}）。
               年金事務所から決定通知が届いたら記録してください。</p>
@@ -269,6 +269,7 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
 export class FilingSubmissionComponent implements OnChanges {
   private functions = inject(Functions);
   private auth = inject(AuthService);
+  readonly isStaff = this.auth.hasAnyRole('admin', 'operator');
   private confirmService = inject(ConfirmService);
 
   target = input.required<FilingTarget>();
@@ -397,6 +398,8 @@ export class FilingSubmissionComponent implements OnChanges {
   }
 
   private apply(v: SubmissionView, force = false) {
+    // 承認者は状況を見るだけ（送信・記録・取消は担当者の関数）
+    if (!this.isStaff) v = { ...v, canSend: false, canCancel: false, canPaper: false, canReopen: false, isAdmin: false };
     this.view.set(v);
     if (!v.canSend && v.canPaper) this.method = 'paper';
     if (v.canSend && !v.canPaper) this.method = 'electronic';
