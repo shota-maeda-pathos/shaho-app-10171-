@@ -67,7 +67,8 @@ export function bonusProgress(input: {
   if (premiumWaiting && input.canApprove && !input.reviews.premium?.mine) return { next: '保険料を承認する', tone: 'yours', detail: `${premiumWaiting}名の承認を頼まれています` };
   const toFile = count('filing', 'action');
   if (toFile) return { next: '賞与支払届を作る', tone: 'action', detail: `${toFile}名がまだ届出に載っていません` };
-  const active = input.filings.filter(f => f.status !== 'cancelled' && (f.filingType ?? 'bonusPayment') === 'bonusPayment');
+  // 賞与支払届と、その訂正届・取消届（不支給報告書は除く）
+  const active = input.filings.filter(f => f.status !== 'cancelled' && ((f.filingType ?? 'bonusPayment') === 'bonusPayment' || !!f.correction?.kind));
   const draft = active.find(f => f.status === 'draft');
   if (draft) return { next: draft.rejection ? '差し戻された届出を直す' : '届出の承認を依頼する', tone: 'action', detail: draft.rejection ? `差し戻しの理由：${draft.rejection}` : null };
   const sending = active.find(f => f.status === 'approved' && ['sent', 'received', 'processing'].includes(f.mockStatus ?? ''));

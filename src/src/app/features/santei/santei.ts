@@ -252,20 +252,25 @@ export class SanteiComponent implements OnInit {
 
   runId = () => `${this.office.selected()}_${this.year}`;
 
+  private loadSeq = 0;
+
   async load() {
     if (!this.office.selected()) return;
+    const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set('');
     try {
       const { data } = await this.call<Overview>('santeiRunOverview', {}, 120_000);
+      // 続けて読み込み直したときは、最後に頼んだ結果だけを使う
+      if (seq !== this.loadSeq) return;
       this.data.set(data);
       this.job.set(data.job);
       if (data.job?.status === 'running') this.startPolling(data.job.id);
       else if (data.job && data.job.failed > 0 && !this.failures()) await this.restoreFailures(data.job);
     } catch (e) {
-      this.error.set(message(e, '状況を読み込めませんでした'));
+      if (seq === this.loadSeq) this.error.set(message(e, '状況を読み込めませんでした'));
     } finally {
-      this.loading.set(false);
+      if (seq === this.loadSeq) this.loading.set(false);
     }
   }
 

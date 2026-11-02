@@ -724,7 +724,7 @@ export async function createRunCorrectionPdf(kind: 'correction' | 'cancellation'
   const title = OFFICIAL_FORMS[source === 'santei' ? 'remunerationMonthlyAlgorithm' : 'bonusPayment'].title;
   const names = (persons as { 被保険者氏名?: string }[]).map(p => p.被保険者氏名 ?? '').join('、');
   return decorateCorrection(base, kind, title, `事業所：${meta.officeName}　対象：${persons.length}名（${names}）`,
-    '上の様式に記入した人の届出を取り消します。', corrections, reason, loadAsset);
+    '上の様式に記入した人の届出を取り消します。', corrections, reason, loadAsset, 'bottomRight');
 }
 
 async function defaultLoadAsset(path: string): Promise<Uint8Array> {
@@ -735,21 +735,22 @@ async function defaultLoadAsset(path: string): Promise<Uint8Array> {
 
 /** 記入済みの様式に「訂正届」「取消届」の表示と、理由・訂正箇所の一覧のページを付ける */
 async function decorateCorrection(base: OfficialPdfResult, kind: 'correction' | 'cancellation', title: string, subject: string,
-  cancelText: string, corrections: CorrectionRow[], reason: string, loadAsset: (path: string) => Promise<Uint8Array>): Promise<OfficialPdfResult> {
+  cancelText: string, corrections: CorrectionRow[], reason: string, loadAsset: (path: string) => Promise<Uint8Array>,
+  stampAt: 'top' | 'bottomRight' = 'top'): Promise<OfficialPdfResult> {
   const label = kind === 'correction' ? '訂正' : '取消';
   const pdf = await PDFDocument.load(base.bytes);
   pdf.registerFontkit(fontkit);
   const font = await pdf.embedFont(await loadAsset('/filing-forms/fonts/NotoSansJP-Regular.ttf'), { subset: false });
   const red = rgb(0.8, 0.1, 0.1);
 
-  // 1枚目の上の余白に「訂正」「取消」の表示（様式の記入欄にかからない位置）
+  // 1枚目の余白に「訂正」「取消」の表示（様式の記入欄にかからない位置。算定基礎届・賞与支払届は上に余白がないので右下）
   const first = pdf.getPage(0);
   const media = first.getMediaBox();
   const stamp = `${label}届`;
   const stampSize = 12;
   const stampWidth = font.widthOfTextAtSize(stamp, stampSize) + 16;
-  const sx = media.x + media.width / 2 - stampWidth / 2;
-  const sy = media.y + media.height - 22;
+  const sx = stampAt === 'top' ? media.x + media.width / 2 - stampWidth / 2 : media.x + media.width - stampWidth - 20;
+  const sy = stampAt === 'top' ? media.y + media.height - 22 : media.y + 14;
   first.drawRectangle({ x: sx, y: sy - 4, width: stampWidth, height: stampSize + 8, borderColor: red, borderWidth: 1.2 });
   first.drawText(stamp, { x: sx + 8, y: sy, size: stampSize, font, color: red });
 

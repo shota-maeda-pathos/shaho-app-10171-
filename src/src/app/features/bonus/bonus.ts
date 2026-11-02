@@ -83,8 +83,10 @@ export class BonusComponent implements OnInit {
   canApprove = computed(() => this.data()?.me.canApprove ?? false);
   rowsById = computed(() => new Map((this.data()?.rows ?? []).map(r => [r.employeeId, r])));
   /** 賞与支払届（不支給報告書は別に扱う） */
-  activeFilings = computed(() => (this.data()?.filings ?? []).filter(f => f.status !== 'cancelled' && (f.filingType ?? 'bonusPayment') === 'bonusPayment'));
-  cancelledFilings = computed(() => (this.data()?.filings ?? []).filter(f => f.status === 'cancelled' && (f.filingType ?? 'bonusPayment') === 'bonusPayment'));
+  /** 賞与支払届と、その訂正届・取消届（不支給報告書は別の欄） */
+  private isPaymentFiling = (f: FilingSummary) => (f.filingType ?? 'bonusPayment') === 'bonusPayment' || !!f.correction?.kind;
+  activeFilings = computed(() => (this.data()?.filings ?? []).filter(f => f.status !== 'cancelled' && this.isPaymentFiling(f)));
+  cancelledFilings = computed(() => (this.data()?.filings ?? []).filter(f => f.status === 'cancelled' && this.isPaymentFiling(f)));
   /** この月の賞与不支給報告書（取り消したものは除く） */
   nonPaymentReport = computed(() => (this.data()?.filings ?? []).find(f => f.filingType === 'bonusNonPayment' && f.status !== 'cancelled') ?? null);
   /** 届出に載せられる人（保険料が承認され、まだ届出に載っていない人） */
@@ -281,20 +283,25 @@ export class BonusComponent implements OnInit {
 
   runId = () => `${this.office.selected()}_${this.payMonth}`;
 
+  private loadSeq = 0;
+
   async load() {
     if (!this.office.selected()) return;
+    const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set('');
     try {
       const { data } = await this.call<Overview>('bonusRunOverview', {}, 120_000);
+      // 続けて読み込み直したときは、最後に頼んだ結果だけを使う
+      if (seq !== this.loadSeq) return;
       this.data.set(data);
       this.job.set(data.job);
       if (data.job?.status === 'running') this.startPolling(data.job.id);
       else if (data.job && data.job.failed > 0 && !this.failures()) await this.restoreFailures(data.job);
     } catch (e) {
-      this.error.set(message(e, '状況を読み込めませんでした'));
+      if (seq === this.loadSeq) this.error.set(message(e, '状況を読み込めませんでした'));
     } finally {
-      this.loading.set(false);
+      if (seq === this.loadSeq) this.loading.set(false);
     }
   }
 

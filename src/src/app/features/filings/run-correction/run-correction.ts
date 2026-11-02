@@ -179,8 +179,9 @@ export class RunCorrectionComponent {
       if (!result) return;
       const { filingId } = await this.api().create(this.filing().id, kind, result.employeeIds, result.reason);
       this.snackBar.open(`${result.employeeIds.length}名の${KIND_LABEL[kind]}を作りました${kind === 'correction' ? '。訂正後の値を入れてください' : '。内容を確かめて承認を依頼してください'}`, '閉じる', { duration: 6000 });
-      this.changed.emit();
-      if (kind === 'correction') await this.openEditor(filingId);
+      // 一覧の読み込み直しは1回にする（作った直後と保存の後で2回読むと、遅い方の古い結果が残ることがある）
+      if (kind === 'correction') await this.openEditor(filingId, true);
+      else this.changed.emit();
     } catch (e) {
       this.snackBar.open(errorMessage(e, `${KIND_LABEL[kind]}を作れませんでした`), '閉じる', { duration: 8000 });
     } finally {
@@ -195,13 +196,13 @@ export class RunCorrectionComponent {
     finally { this.working.set(false); }
   }
 
-  private async openEditor(filingId: string) {
+  private async openEditor(filingId: string, created = false) {
     const detail = await this.api().detail(filingId);
     const saved = await firstValueFrom(this.dialog.open(RunCorrectionEditDialogComponent, {
       width: '900px', maxWidth: '96vw',
       data: { source: this.source(), detail, save: (persons: Record<string, Record<string, string | null>> | undefined, reason: string) => this.api().update(filingId, detail.version, persons, reason) },
     }).afterClosed());
-    if (saved) this.changed.emit();
+    if (saved || created) this.changed.emit();
   }
 }
 
