@@ -26,6 +26,14 @@ interface CompanyInfo {
   consultantNumber: string;
 }
 
+interface CompanyHistoryItem {
+  id: string; changedFields: string[]; before: Record<string, unknown>; after: Record<string, unknown>; changedAt: string | null;
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  name: '会社名', representativeName: '代表者名', address: '住所', postalCode: '郵便番号', phone: '電話番号', corporateNumber: '法人番号', laborConsultant: '社会保険労務士',
+};
+
 @Component({
   selector: 'app-company-settings',
   standalone: true,
@@ -103,6 +111,9 @@ interface CompanyInfo {
               <mat-hint>入れると、届出の「社会保険労務士記載欄」に記入します。委託していなければ空欄</mat-hint>
             </mat-form-field>
           </div>
+          @if (editing()) {
+            <p class="notice">会社名・代表者名・住所・電話番号・法人番号・社会保険労務士を変えると、承認済みでまだ提出していない届出の承認は自動で取り消されます（古い内容のまま提出しないため）。承認し直してください。</p>
+          }
           <div class="actions">
             @if (editing()) {
               <button mat-flat-button color="primary" (click)="onSave()" [disabled]="saving()">
@@ -115,6 +126,29 @@ interface CompanyInfo {
               </button>
             }
           </div>
+        </mat-card>
+
+        <mat-card class="form-card history">
+          <h3 class="consultant">変更の履歴</h3>
+          @if (history().length) {
+            <table>
+              <thead><tr><th>日時</th><th>項目</th><th>変更前</th><th>変更後</th></tr></thead>
+              <tbody>
+                @for (h of history(); track h.id) {
+                  @for (f of h.changedFields; track f; let first = $first) {
+                    <tr>
+                      <td>{{ first ? formatDate(h.changedAt) : '' }}</td>
+                      <td>{{ fieldLabel(f) }}</td>
+                      <td>{{ valueText(h.before[f]) }}</td>
+                      <td>{{ valueText(h.after[f]) }}</td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          } @else {
+            <p class="sub">届出に載る項目（会社名・代表者名・住所など）の変更はまだありません。</p>
+          }
         </mat-card>
       }
     </div>
@@ -131,6 +165,12 @@ interface CompanyInfo {
     .setup-icon { font-size: 64px; width: 64px; height: 64px; color: var(--app-brand-strong); }
     .setup-card h2 { margin: 16px 0 8px; }
     .setup-card p { color: #666; margin-bottom: 24px; }
+    .notice { margin: 12px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--app-status-yours-bg); font-size: 13px; }
+    .history { margin-top: 16px; }
+    .history table { border-collapse: collapse; font-size: 13px; width: 100%; }
+    .history th, .history td { padding: 6px 10px; border-bottom: 1px solid var(--app-color-border); text-align: left; vertical-align: top; }
+    .history th { color: var(--app-color-text-sub); font-weight: 500; }
+    .sub { color: var(--app-color-text-sub); font-size: 13px; }
   `],
 })
 export class CompanySettingsComponent implements OnInit {
@@ -152,8 +192,36 @@ export class CompanySettingsComponent implements OnInit {
     consultantName: '', consultantNumber: '',
   };
 
+  history = signal<CompanyHistoryItem[]>([]);
+
   async ngOnInit() {
     await this.loadCompany();
+    await this.loadHistory();
+  }
+
+  private async loadHistory() {
+    try {
+      const { data } = await httpsCallable<object, { items: CompanyHistoryItem[] }>(this.functions, 'companyHistoryList')({ companyId: this.auth.companyId });
+      this.history.set(data.items);
+    } catch {
+      // 履歴は見られる役割が限られる（閲覧者など）。見られなくても会社情報は使える
+      this.history.set([]);
+    }
+  }
+
+  fieldLabel(f: string) { return FIELD_LABELS[f] ?? f; }
+
+  valueText(v: unknown): string {
+    if (v === null || v === undefined || v === '') return '（空）';
+    if (typeof v === 'object') {
+      const c = v as { name?: string; registrationNumber?: string };
+      return [c.name, c.registrationNumber].filter(Boolean).join(' ');
+    }
+    return String(v);
+  }
+
+  formatDate(iso: string | null) {
+    return iso ? new Date(iso).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' }) : '';
   }
 
   private async loadCompany() {
@@ -222,6 +290,8 @@ export class CompanySettingsComponent implements OnInit {
       this.version++;
       this.editing.set(false);
       this.snackBar.open('会社情報を更新しました', '閉じる', { duration: 3000 });
+      // 履歴はトリガーが少し遅れて残すので、間をおいて読み直す
+      setTimeout(() => void this.loadHistory(), 3000);
     } catch (e: any) {
       this.snackBar.open(`保存に失敗しました：${e?.message ?? ''}`, '閉じる', { duration: 6000 });
     } finally {

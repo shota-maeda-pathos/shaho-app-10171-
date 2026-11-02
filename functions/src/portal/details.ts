@@ -13,7 +13,7 @@ const EMPLOYMENT_LABELS: Record<string, string> = {
   executiveFull: '役員（常勤）', executivePart: '役員（非常勤）',
 };
 
-const FILING_LABELS: Record<string, string> = {
+export const FILING_LABELS: Record<string, string> = {
   acquisitionNotification: '資格取得届', lossNotification: '資格喪失届', pensionLoss70: '資格喪失届・70歳以上被用者該当届',
   remunerationMonthlyAlgorithm: '算定基礎届', remunerationMonthlyChange: '月額変更届', bonusPayment: '賞与支払届',
   bonusNonPayment: '賞与不支給報告書', dependentChange: '被扶養者（異動）届', maternityLeaveStart: '産前産後休業取得者申出書',

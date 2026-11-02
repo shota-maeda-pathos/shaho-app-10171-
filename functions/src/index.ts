@@ -151,6 +151,7 @@ lazy(() => require('./filings/archive/functions'), ['filingArchiveList', 'filing
 lazy(() => require('./approvals/index/functions'), [
   'approvalIndexRequest', 'approvalSearch', 'approvalBadgeGet', 'approvalDetailGet', 'approvalBulkApprove', 'approvalCancel', 'approvalSettingsGet', 'approvalIndexRebuild', 'approvalReminder',
 ]);
+lazy(() => require('./approvals/auto-cancel/functions'), ['companyChangedForFilings', 'employeeChangedForFilings', 'salaryChangedForFilings', 'companyHistoryList']);
 
 // 通知API
 lazy(() => require('./notifications/notification-create/functions'), ['notificationCreate']);
