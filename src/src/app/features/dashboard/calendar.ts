@@ -42,12 +42,13 @@ interface ChecklistItem { key: string; label: string; link: string; done: boolea
       } @else { <p class="sub">期限の{{ reminderDays }}日前にお知らせが届きます。</p> }
     </section>
 
+    @if (eventsError()) { <p class="sub" role="alert">{{ eventsError() }} <button mat-button type="button" (click)="loadEvents()">読み込み直す</button></p> }
     @for (m of months(); track m.month) {
       <section class="card month">
         <h3>{{ m.month }}月</h3>
         @for (e of m.events; track $index) {
           <div class="event" [class]="e.kind"><span class="date">{{ dateLabel(e) }}</span><span>{{ e.title }}@if (e.officeName) {（{{ e.officeName }}）}</span></div>
-        } @empty { <p class="sub">予定はありません。</p> }
+        } @empty { <p class="sub">{{ eventsLoading() ? '読み込んでいます…' : '予定はありません。' }}</p> }
       </section>
     }
   `,
@@ -79,6 +80,9 @@ export class CalendarComponent implements OnInit {
   isAdmin = this.auth.hasRole('admin');
   year = signal(Number(this.today.slice(0, 4)));
   events = signal<CalendarEvent[]>([]);
+  /** 予定の読み込み中（数秒かかるので、その間に「予定はありません」と出さない） */
+  eventsLoading = signal(true);
+  eventsError = signal('');
   checklist = signal<ChecklistItem[]>([]);
   reminderDays = 7;
 
@@ -101,8 +105,17 @@ export class CalendarComponent implements OnInit {
   }
 
   async loadEvents() {
-    const { data } = await httpsCallable<object, { events: CalendarEvent[] }>(this.functions, 'calendarGet')({ companyId: this.auth.companyId, year: this.year() });
-    this.events.set(data.events);
+    this.eventsLoading.set(true);
+    this.eventsError.set('');
+    this.events.set([]);
+    try {
+      const { data } = await httpsCallable<object, { events: CalendarEvent[] }>(this.functions, 'calendarGet')({ companyId: this.auth.companyId, year: this.year() });
+      this.events.set(data.events);
+    } catch {
+      this.eventsError.set('予定を読み込めませんでした。');
+    } finally {
+      this.eventsLoading.set(false);
+    }
   }
 
   async loadChecklist() {

@@ -29,7 +29,7 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import { OfficeContextService } from '../../../core/services/office-context.service';
 import { relationshipLabel } from '../../dependent-change/dependent-change.types';
-import { PageHeadComponent, StatusBadgeComponent } from '../../../shared/ui';
+import { ErrorStateComponent, PageHeadComponent, StatusBadgeComponent } from '../../../shared/ui';
 
 interface Office {
   id: string;
@@ -152,7 +152,7 @@ interface OnboardResult {
   host: { class: 'app-page' },
   standalone: true,
   imports: [
-    PageHeadComponent, StatusBadgeComponent,
+    ErrorStateComponent, PageHeadComponent, StatusBadgeComponent,
     EmployeeLeavesComponent, EmployeeExemptionsComponent, EmployeeBonusComponent, EmployeeMyNumberComponent, EmployeeStatusComponent, EmployeePortalInviteComponent,
     DecimalPipe, FormsModule, RouterLink, MatCardModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatButtonModule, MatIconModule, MatDatepickerModule,
@@ -161,6 +161,11 @@ interface OnboardResult {
     MatStepperModule, MatCheckboxModule, MatListModule,
   ],
   template: `
+    @if (loadError(); as msg) {
+      <!-- 読み込めなかったとき（担当事業所外など）は、空の入力欄や操作を出さない -->
+      <app-page-head heading="従業員" kicker="従業員" backLink="/employees" backLabel="従業員の一覧" />
+      <app-error-state [message]="msg" (retry)="loadEmployee()" />
+    } @else {
     <app-page-head [heading]="isNew ? '従業員を登録する' : (form.lastName + ' ' + form.firstName)" kicker="従業員" backLink="/employees" backLabel="従業員の一覧">
       @if (!isNew) {
         <ng-container meta>
@@ -872,6 +877,7 @@ interface OnboardResult {
         }
       </mat-tab-group>
     }
+    }
   `,
   styles: [`
     .danger { color: var(--app-status-error-fg); }
@@ -937,6 +943,8 @@ export class EmployeeDetailComponent implements OnInit {
   private snackBar = inject(MatSnackBar);
 
   loading = signal(false);
+  /** 従業員を読み込めなかった理由（担当事業所外・存在しないなど）。あるときは画面の本体を出さない */
+  loadError = signal<string | null>(null);
   saving = signal(false);
   resigning = signal(false);
   transferring = signal(false);
@@ -1074,6 +1082,7 @@ export class EmployeeDetailComponent implements OnInit {
 
   async loadEmployee() {
     this.loading.set(true);
+    this.loadError.set(null);
     try {
       const fn = httpsCallable<any, any>(this.functions, 'employeeGet');
       const result = await fn({
@@ -1114,9 +1123,12 @@ export class EmployeeDetailComponent implements OnInit {
         residenceCardNumber: data.foreignInfo?.residenceCardNumber ?? '',
         workPermission: data.foreignInfo?.workPermission ?? false,
       };
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to load employee', e);
-      this.snackBar.open('従業員データの取得に失敗しました', '閉じる', { duration: 3000 });
+      const code = String(e?.code ?? '');
+      this.loadError.set(code.includes('permission-denied') ? 'この従業員は担当事業所の外のため、表示できません。'
+        : code.includes('not-found') ? 'この従業員は見つかりません（削除された可能性があります）。'
+        : '従業員を読み込めませんでした。');
     } finally {
       this.loading.set(false);
     }

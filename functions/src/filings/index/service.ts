@@ -27,6 +27,8 @@ async function entryOf(path: string, data: FirebaseFirestore.DocumentData): Prom
   const base = `companies/${src.companyId}`;
   if (src.source === 'employee') data = { ...data, approvalPending: await latestRequestPending(base, src.parentId, path) };
   const employee = src.source === 'employee' ? (await db.doc(`${base}/employees/${src.parentId}`).get()).data() ?? null : null;
+  // 削除した従業員の届出は一覧に載せない（従業員の画面からも開けないため）
+  if (src.source === 'employee' && (!employee || employee.deletedAt)) return null;
   const officeId = src.source === 'employee' ? employee?.officeId : data.officeId ?? src.parentId.replace(/_[^_]+$/, '');
   const office = officeId ? (await db.doc(`${base}/offices/${officeId}`).get()).data() ?? null : null;
   return buildIndexEntry(data, { ...src, path, employee, office, runOfficeId: officeId });
@@ -58,6 +60,7 @@ export async function syncFilingIndex(path: string, after: FirebaseFirestore.Doc
   }
   const entry = await entryOf(path, after);
   if (entry) await ref.set({ ...entry, updatedAt: FieldValue.serverTimestamp() });
+  else await ref.delete();
   // 算定基礎届・賞与支払届は承認も届出の status で持つため、承認の索引もここで合わせる
   if (src.source !== 'employee') await (await import('../../approvals/index/service')).syncRunFilingApproval(path, after);
 }
@@ -85,6 +88,8 @@ export async function rebuildFilingIndex(auth: AuthContext) {
       const src = sourceOfPath(f.ref.path);
       if (!src) continue;
       const employee = src.source === 'employee' ? employeeData.get(src.parentId) ?? null : null;
+      // 削除した従業員の届出は載せない（トリガーの entryOf と同じ）。live に入れないので古い索引は消える
+      if (src.source === 'employee' && (!employee || employee.deletedAt)) continue;
       const data = f.data();
       const officeId = src.source === 'employee' ? employee?.officeId : data.officeId ?? src.parentId.replace(/_[^_]+$/, '');
       const entry = buildIndexEntry(data, { ...src, path: f.ref.path, employee, office: offices.get(officeId) ?? null, runOfficeId: officeId });
