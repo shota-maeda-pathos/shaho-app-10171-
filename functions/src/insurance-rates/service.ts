@@ -8,7 +8,8 @@ import { mapConcurrent } from '../utils/parallel';
 import { notify } from '../utils/notify';
 import { resolveGradeTable, splitPremium } from '../insurance/calculator';
 import { splitCsvLine } from '../monthly/rules';
-import { RATE_TYPE_LABELS, RateRow, parseRateCsv, previousMonth } from './rules';
+import { CSV_HEADER, RATE_TYPE_LABELS, RateRow, parseRateCsv, previousMonth } from './rules';
+import { missingKyokaiCsv } from './kyokai-rates';
 
 /**
  * 料率の CSV 取込と切替（カタログ1章・6章）。取り込む前に今の料率との差を見せ、
@@ -137,10 +138,11 @@ export async function addUnionRates(auth: AuthContext, input: {
   return applyRates(auth, lines.join('\n'));
 }
 
-/** 料率の履歴（新しい順） */
+/** 料率の履歴（新しい順）と、まだ登録していない協会けんぽの料率（47都道府県の公表値。取り込む CSV にして返す） */
 export async function rateHistory(auth: AuthContext) {
   const snap = await db.collection(`companies/${auth.companyId}/insuranceRates`).get();
   return {
+    kyokaiMissing: missingKyokaiCsv(snap.docs.map(d => d.data() as InsuranceRateDoc), CSV_HEADER),
     items: snap.docs.map(d => d.data() as InsuranceRateDoc).map(r => ({
       insuranceType: r.insuranceType, typeLabel: RATE_TYPE_LABELS[r.insuranceType] ?? r.insuranceType, prefectureCode: r.prefectureCode ?? '', insurerId: r.insurerId ?? '',
       appliedFrom: r.appliedFrom, appliedUntil: r.appliedUntil ?? null, totalRate: r.totalRate, employeeRate: r.employeeRate, employerRate: r.employerRate, note: r.note ?? '',

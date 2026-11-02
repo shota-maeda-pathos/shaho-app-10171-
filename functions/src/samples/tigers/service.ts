@@ -18,7 +18,7 @@ export async function seedTigersSamples(auth: AuthContext) {
     const entries: { path: string; data: Record<string, unknown> }[] = [];
     const add = (path: string, data: Record<string, unknown>) => entries.push({ path: `${base}/${path}`, data: { ...shared, ...data } });
     const officeId = 'sample-tigers-office';
-    add(`offices/${officeId}`, { name: 'サンプル甲子園事業所', officeNumber: 'TEST-001', prefectureCode: '28', insurerId: 'sample-insurer', address: 'テスト用住所', phone: '000-0000-0000', closingDay: 0, paymentDay: 25, paymentMonth: 'current', deductionMethod: 'current', roundingRule: 'statutory', isActive: true });
+    add(`offices/${officeId}`, { name: 'サンプル甲子園事業所', officeNumber: 'TEST-001', prefectureCode: '28', address: 'テスト用住所', phone: '000-0000-0000', closingDay: 0, paymentDay: 25, paymentMonth: 'current', deductionMethod: 'current', roundingRule: 'statutory', isActive: true });
     add('departments/sample-tigers-team', { name: 'サンプル営業部', officeId, parentId: null, sortOrder: 1, isActive: true });
     for (const player of samplePlayers) {
       const id = `sample-tigers-${String(player.n).padStart(2, '0')}`;
@@ -38,19 +38,9 @@ export async function seedTigersSamples(auth: AuthContext) {
     if (existing.some(doc => doc.exists)) throw new HttpsError('already-exists', 'サンプルIDまたは社員番号が既存データと重複しています。上書きせず中断しました');
     const companyRef = db.doc(base);
     const company = await tx.get(companyRef);
-    // Do not replace rates already configured in this company.
-    const rates: { type: string; employee: number; employer: number }[] = [
-      { type: 'health', employee: 50, employer: 50 }, { type: 'pension', employee: 91.5, employer: 91.5 },
-      { type: 'longTermCare', employee: 8, employer: 8 }, { type: 'childSupport', employee: 0, employer: 3.6 },
-    ];
-    const missing = [];
-    for (const rate of rates) {
-      const snapshot = await tx.get(db.collection(`${base}/insuranceRates`).where('insuranceType', '==', rate.type).where('appliedUntil', '==', null).limit(1));
-      if (snapshot.empty) missing.push(rate);
-    }
+    // 料率はここで作らない（架空の料率が事業所の都道府県の料率より優先されてしまうため）。協会けんぽの料率は料率の画面から取り込む
     if (!company.exists) tx.create(companyRef, { ...shared, name: 'サンプル株式会社タイガース', representativeName: '金本 知憲', address: 'テスト用住所', email: 'sample-company@example.com' });
     refs.forEach((ref, i) => tx.create(ref, entries[i].data));
-    for (const rate of missing) tx.create(db.doc(`${base}/insuranceRates/sample-${rate.type}`), { ...shared, insuranceType: rate.type, insurerId: 'sample-insurer', prefectureCode: '28', appliedFrom: '2026-04', appliedUntil: null, totalRate: rate.employee + rate.employer, employeeRate: rate.employee, employerRate: rate.employer, gradeTable: null, note: '計算動作確認だけに使う架空の料率。実務利用不可。' });
     tx.create(marker, { ...shared, employeeCount: samplePlayers.length, createdBy: auth.uid });
     tx.create(db.collection(`${base}/auditLogs`).doc(), { entity: 'sampleSet', entityId: 'tigers-v1', action: 'create', changes: { employeeCount: samplePlayers.length }, performedBy: auth.uid, performedAt: now, version: 1 });
     return { created: samplePlayers.length, total: samplePlayers.length, alreadyExists: false };

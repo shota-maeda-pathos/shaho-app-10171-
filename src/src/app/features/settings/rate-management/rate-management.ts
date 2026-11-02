@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
@@ -9,6 +10,7 @@ import { ConfirmService } from '../../../shared/confirm-dialog/confirm-dialog';
 
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatCardModule } from '@angular/material/card';
 interface PreviewItem { line: number; typeLabel: string; prefectureCode: string; insurerId: string; appliedFrom: string; totalRate: number; employeeRate: number; employerRate: number; current: { totalRate: number; appliedFrom: string } | null; change: number | null; duplicate: boolean }
 interface ImpactRow { officeId: string; officeName: string; kind: 'monthly' | 'bonus'; yearMonth: string; unconfirmed: number; pending: number; confirmed: number }
 interface HistoryItem { typeLabel: string; prefectureCode: string; insurerId: string; appliedFrom: string; appliedUntil: string | null; totalRate: number; employeeRate: number; employerRate: number; note: string }
@@ -19,12 +21,19 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
 @Component({
   selector: 'app-rate-management',
   standalone: true,
-  imports: [MatFormFieldModule, MatInputModule, FormsModule, RouterLink, MatButtonModule],
+  imports: [MatCardModule, MatFormFieldModule, MatInputModule, FormsModule, RouterLink, MatButtonModule, MatIconModule],
   template: `
-    <div class="section">
+    <div class="section"><mat-card class="settings-card">
+      <h3 class="first">料率を CSV で取り込む</h3>
       <p class="sub">新しい料率を CSV で取り込みます。料率は‰（例：健康保険 99.1）で書きます。本人・会社の欄が空なら折半です（子ども・子育て拠出金は会社だけ）。
         切り替えると、前の料率は「いつまで」が付いて履歴に残ります。<a routerLink="/grade-table">保険料額表を見る</a></p>
-      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="file"><mat-label>CSV ファイル</mat-label><input matInput type="file" accept=".csv,text/csv" (change)="pick($event)"></mat-form-field>
+      <label class="file" [class.disabled]="busy()"><mat-icon>upload_file</mat-icon>CSV ファイルを選ぶ<input type="file" accept=".csv,text/csv" (change)="pick($event)" [disabled]="busy()"></label>
+      @if (kyokai(); as k) {
+        @if (k.rows > 0) {
+          <p class="notice">協会けんぽの料率（令和6〜8年度の公表値）のうち、まだ登録していないものが {{ k.prefectures }}都道府県・{{ k.rows }}件あります。登録していない都道府県の事業所は保険料を計算できません。
+            <button mat-stroked-button type="button" (click)="csv = k.csv" [disabled]="busy()">未登録の協会けんぽの料率を入れる</button></p>
+        } @else { <p class="sub">協会けんぽの料率は、47都道府県すべて（令和6〜8年度）登録済みです。</p> }
+      }
       <textarea rows="6" [(ngModel)]="csv" name="csv" [placeholder]="sample"></textarea>
       <div class="actions">
         <button mat-stroked-button type="button" (click)="csv = sample">書き方の例を入れる</button>
@@ -55,7 +64,9 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
         <button mat-flat-button color="primary" type="button" (click)="apply()" [disabled]="busy() || errors().length > 0 || hasDuplicate()">この内容で取り込んで切り替える</button>
       }
 
-      <h3>組合健保の料率を登録する</h3>
+      </mat-card>
+      <mat-card class="settings-card">
+      <h3 class="first">組合健保の料率を登録する</h3>
       <p class="sub">組合健保の事業所（設定の「事業所」で区分を組合健保にした事業所）は、ここで登録した保険者番号の料率だけで計算します。本人と会社の負担割合が折半でなければ、本人負担を入れます。</p>
       <div class="union">
         <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>保険者番号</mat-label><input matInput [(ngModel)]="union.insurerId" name="uInsurer" maxlength="20"></mat-form-field>
@@ -70,18 +81,23 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
       }
       <button mat-stroked-button type="button" (click)="addUnion()" [disabled]="busy() || !union.insurerId || !union.appliedFrom || !union.healthTotal || union.healthEmployee === null">組合健保の料率を登録する</button>
 
-      <h3>料率の履歴</h3>
+      </mat-card>
+      <mat-card class="settings-card">
+      <h3 class="first">料率の履歴</h3>
       <table><thead><tr><th>種類</th><th>都道府県</th><th>適用期間</th><th class="num">料率</th><th class="num">本人／会社</th><th>備考</th></tr></thead><tbody>
         @for (h of history(); track $index) {
           <tr><td>{{ h.typeLabel }}</td><td>{{ h.prefectureCode || '全国' }}{{ h.insurerId ? '・' + h.insurerId : '' }}</td><td>{{ h.appliedFrom }}〜{{ h.appliedUntil ?? '' }}</td><td class="num">{{ h.totalRate }}‰</td><td class="num">{{ h.employeeRate }}／{{ h.employerRate }}</td><td class="small">{{ h.note }}</td></tr>
         }
       </tbody></table>
-    </div>
+    </mat-card></div>
   `,
   styles: [`
     .section { padding: 24px 0; }
     .sub { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
-    .file { display: block; margin: 8px 0; font-size: var(--app-font-sm); }
+    .file { display: inline-flex; align-items: center; gap: 4px; margin: 8px 0; padding: 6px 12px; border: 1px solid var(--app-color-border); border-radius: var(--app-radius-pill); cursor: pointer; font-size: var(--app-font-sm); position: relative; }
+    .file input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .file:focus-within { outline: 2px solid var(--app-color-link); }
+    .file.disabled { opacity: .5; pointer-events: none; }
     textarea { width: 100%; font-family: monospace; font-size: 12px; padding: 8px; box-sizing: border-box; }
     .actions { display: flex; gap: 8px; margin: 8px 0 16px; }
     table { width: 100%; border-collapse: collapse; font-size: var(--app-font-sm); margin-bottom: 12px; }
@@ -92,8 +108,11 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
     .union { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; margin: 8px 0; font-size: var(--app-font-sm); }
     .union label { display: flex; flex-direction: column; gap: 2px; }
     .union input:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; }
+    .notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; background: var(--app-status-attention-bg); color: var(--app-status-attention-fg); font-size: var(--app-font-sm); }
     .errors { color: var(--app-status-error-fg); font-size: var(--app-font-sm); }
     h3 { margin: 24px 0 8px; }
+    h3.first { margin-top: 0; }
+    .settings-card > button { align-self: flex-start; }
   `],
 })
 export class RateManagementComponent implements OnInit {
@@ -109,6 +128,7 @@ export class RateManagementComponent implements OnInit {
   errors = signal<string[]>([]);
   impact = signal<ImpactRow[]>([]);
   history = signal<HistoryItem[]>([]);
+  kyokai = signal<{ csv: string; rows: number; prefectures: number } | null>(null);
 
   union: { insurerId: string; appliedFrom: string; healthTotal: number | null; healthEmployee: number | null; careTotal: number | null; careEmployee: number | null } = {
     insurerId: '', appliedFrom: '', healthTotal: null, healthEmployee: null, careTotal: null, careEmployee: null,
@@ -151,8 +171,9 @@ export class RateManagementComponent implements OnInit {
   }
 
   async loadHistory() {
-    const { data } = await httpsCallable<object, { items: HistoryItem[] }>(this.functions, 'rateHistoryList')({ companyId: this.auth.companyId });
+    const { data } = await httpsCallable<object, { items: HistoryItem[]; kyokaiMissing?: { csv: string; rows: number; prefectures: number } }>(this.functions, 'rateHistoryList')({ companyId: this.auth.companyId });
     this.history.set(data.items);
+    this.kyokai.set(data.kyokaiMissing ?? null);
   }
 
   async preview() {

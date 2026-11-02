@@ -25,7 +25,7 @@ import { samplePlayers } from './data';
 const auth = () => makeAuth({ uid: 'MJNjXeCfoYaohOgT5G4EZQf8URE3' });
 const base = 'companies/company-001';
 beforeEach(() => { mockData.clear(); mockRatesExist = false; });
-test('creates nine employees, actual birthdays, matching emails and calculation masters', async () => {
+test('creates nine employees, actual birthdays, matching emails, and no fictional rates', async () => {
   expect(await seedTigersSamples(auth())).toEqual({ created: 9, total: 9, alreadyExists: false });
   for (const p of samplePlayers) {
     const id = `sample-tigers-${String(p.n).padStart(2, '0')}`;
@@ -38,7 +38,9 @@ test('creates nine employees, actual birthdays, matching emails and calculation 
     expect(mockData.has(`${base}/employeeNumbers/${employee.employeeNumber}`)).toBe(true);
   }
   expect(samplePlayers.some(p => p.last === '藤村')).toBe(false);
-  expect(mockData.has(`${base}/insuranceRates/sample-health`)).toBe(true);
+  // 架空の料率は作らない（兵庫の協会けんぽの料率より優先されてしまうため）。事業所に架空の保険者も付けない
+  expect([...mockData.keys()].some(k => k.includes('/insuranceRates/'))).toBe(false);
+  expect(mockData.get(`${base}/offices/sample-tigers-office`).insurerId).toBeUndefined();
 });
 test('repeated invocation creates no duplicate or overwrite', async () => {
   await seedTigersSamples(auth());
@@ -46,7 +48,7 @@ test('repeated invocation creates no duplicate or overwrite', async () => {
   expect((await seedTigersSamples(auth())).alreadyExists).toBe(true);
   expect(mockData.size).toBe(count);
 });
-test('preserves existing company name and rates', async () => {
+test('preserves existing company name', async () => {
   mockData.set(base, { name: '既存会社' }); mockRatesExist = true;
   await seedTigersSamples(auth());
   expect(mockData.get(base)).toEqual({ name: '既存会社' });
