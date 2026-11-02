@@ -65,6 +65,7 @@ const PROCEDURE_TYPE_LABELS: Record<string, string> = {
   transfer: '異動手続き',
   age_event: '年齢到達手続き',
   employment_change: '雇用条件の変更',
+  grade_correction: '等級の遡及訂正',
 };
 
 const STATUS_LABELS: Record<string, string> = {

@@ -1,4 +1,5 @@
 import { filingContentHash } from '../../utils/hash';
+import { laborConsultantText } from '../../companies/labor-consultant';
 
 // 届出の保存原本（カタログ 9章「保存原本のアーカイブ」）。承認した時点の記入内容と、PDFに使う様式の版を残し、
 // あとで同じPDFを作り直せるようにする。原本は追記するだけで、消さない（承認を取り消しても残る）。
@@ -43,6 +44,8 @@ export interface ArchiveMeta {
   representativeName: string;
   effectiveDate: string;
   employeeNumber: string;
+  /** 社会保険労務士記載欄（承認時点の会社の設定。委託していなければ空） */
+  laborConsultant?: string;
 }
 
 export interface ArchiveDoc {
@@ -80,11 +83,11 @@ export function buildArchive(input: {
   const meta: ArchiveMeta = header ? {
     companyName: text(header['会社名']), officeName: text(header['事業所名称']), officeNumber: text(header['事業所整理記号']),
     officeAddress: text(header['事業所所在地']), officePhone: text(header['電話番号']), representativeName: text(header['事業主氏名']),
-    effectiveDate: text(header['届出年月日'] ?? effective), employeeNumber: '',
+    effectiveDate: text(header['届出年月日'] ?? effective), employeeNumber: '', laborConsultant: text(header['社会保険労務士']),
   } : {
     companyName: text(input.company?.name), officeName: text(input.office?.name), officeNumber: text(input.office?.officeNumber),
     officeAddress: text(input.office?.address), officePhone: text(input.office?.phone), representativeName: text(input.company?.representativeName),
-    effectiveDate: effective, employeeNumber: text(input.employee?.employeeNumber),
+    effectiveDate: effective, employeeNumber: text(input.employee?.employeeNumber), laborConsultant: laborConsultantText(input.company?.laborConsultant),
   };
   return {
     source: input.source, filingType, formType,

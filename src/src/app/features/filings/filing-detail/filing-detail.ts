@@ -410,7 +410,7 @@ export class FilingDetailComponent implements OnInit {
       });
       const d = result.data;
       const [companyResult, employeeResult] = await Promise.all([
-        httpsCallable<{ companyId: string }, { representativeName: string }>(this.functions, 'companyGet')({ companyId: this.auth.companyId }),
+        httpsCallable<{ companyId: string }, { representativeName: string; laborConsultant?: { name: string; registrationNumber: string } | null }>(this.functions, 'companyGet')({ companyId: this.auth.companyId }),
         httpsCallable<{ companyId: string; employeeId: string }, { officeId: string }>(this.functions, 'employeeGet')({ companyId: this.auth.companyId, employeeId: this.employeeId }),
       ]);
       const { data: officeData } = await httpsCallable<object, { items: { id: string; name: string; officeNumber: string; address: string; phone: string }[] }>(this.functions, 'officeList')({ companyId: this.auth.companyId, includeInactive: true });
@@ -425,6 +425,7 @@ export class FilingDetailComponent implements OnInit {
         representativeName: companyResult.data.representativeName,
         effectiveDate: d.effectiveDate,
         employeeNumber: d.employeeNumber,
+        laborConsultant: (lc => lc ? `${lc.name}${lc.registrationNumber ? `（登録番号 ${lc.registrationNumber}）` : ''}` : '')(companyResult.data.laborConsultant),
       };
       const [{ createOfficialFilingPdf, OFFICIAL_FORMS }, { OfficialPdfPreviewComponent }] = await Promise.all([
         import('../templates/official-filing-pdf'), import('../templates/official-pdf-preview'),

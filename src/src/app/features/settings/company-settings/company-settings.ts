@@ -21,6 +21,9 @@ interface CompanyInfo {
   pensionCode: string;
   /** Google ログインを許可するドメイン（画面ではカンマ区切り） */
   allowedGoogleDomains: string;
+  /** 届出を委託している社会保険労務士（委託していなければ空） */
+  consultantName: string;
+  consultantNumber: string;
 }
 
 @Component({
@@ -88,6 +91,18 @@ interface CompanyInfo {
             <input matInput [(ngModel)]="company.allowedGoogleDomains" [readonly]="!editing()" placeholder="example.com, example.co.jp">
             <mat-hint>カンマで区切る。空欄なら、招待された人はどの Google アカウントでもログインできます</mat-hint>
           </mat-form-field>
+          <h3 class="consultant">社会保険労務士（届出を委託している場合）</h3>
+          <div class="form-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>氏名</mat-label>
+              <input matInput [(ngModel)]="company.consultantName" [readonly]="!editing()" maxlength="100">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>登録番号</mat-label>
+              <input matInput [(ngModel)]="company.consultantNumber" [readonly]="!editing()" maxlength="20">
+              <mat-hint>入れると、届出の「社会保険労務士記載欄」に記入します。委託していなければ空欄</mat-hint>
+            </mat-form-field>
+          </div>
           <div class="actions">
             @if (editing()) {
               <button mat-flat-button color="primary" (click)="onSave()" [disabled]="saving()">
@@ -111,6 +126,7 @@ interface CompanyInfo {
     .loading { display: flex; justify-content: center; padding: 48px; }
     .actions { display: flex; gap: 12px; margin-top: 16px; }
     .domains { width: 100%; margin-top: 8px; }
+    .consultant { margin: 20px 0 8px; font-size: 15px; font-weight: 500; }
     .setup-card { padding: 48px; text-align: center; }
     .setup-icon { font-size: 64px; width: 64px; height: 64px; color: var(--app-brand-strong); }
     .setup-card h2 { margin: 16px 0 8px; }
@@ -133,6 +149,7 @@ export class CompanySettingsComponent implements OnInit {
     name: '', corporateNumber: '', representativeName: '',
     address: '', phone: '', email: '',
     healthInsurerId: '', pensionCode: '', allowedGoogleDomains: '',
+    consultantName: '', consultantNumber: '',
   };
 
   async ngOnInit() {
@@ -155,6 +172,8 @@ export class CompanySettingsComponent implements OnInit {
         healthInsurerId: data.healthInsurerId ?? '',
         pensionCode: data.pensionCode ?? '',
         allowedGoogleDomains: (data.allowedGoogleDomains ?? []).join(', '),
+        consultantName: data.laborConsultant?.name ?? '',
+        consultantNumber: data.laborConsultant?.registrationNumber ?? '',
       };
     } catch {
       this.snackBar.open('会社情報の取得に失敗しました', '閉じる', { duration: 3000 });
@@ -190,12 +209,15 @@ export class CompanySettingsComponent implements OnInit {
   async onSave() {
     this.saving.set(true);
     try {
+      const { consultantName, consultantNumber, ...company } = this.company;
+      if (consultantName.trim() && !consultantNumber.trim()) throw new Error('社会保険労務士の登録番号を入れてください');
       const fn = httpsCallable<any, any>(this.functions, 'companyUpdate');
       await fn({
         companyId: this.auth.companyId,
         expectedVersion: this.version,
-        ...this.company,
+        ...company,
         allowedGoogleDomains: this.company.allowedGoogleDomains.split(/[,、\s]+/).map(d => d.trim()).filter(Boolean),
+        laborConsultant: consultantName.trim() ? { name: consultantName.trim(), registrationNumber: consultantNumber.trim() } : null,
       });
       this.version++;
       this.editing.set(false);

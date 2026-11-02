@@ -27,6 +27,7 @@ const KIND_LABELS: Record<string, string> = {
 const TYPE_LABELS: Record<string, string> = {
   acquisition: '入社', loss: '退職', dependent_change: '扶養', maternity_leave: '産休', childcare_leave: '育休', monthly_change: '等級の見直し',
   annual_review: '算定基礎届', bonus_payment: '賞与', transfer: '事業所間の異動', age_event: '年齢到達', employment_change: '雇用条件の変更',
+  grade_correction: '等級の遡及訂正',
 };
 
 type Tab = 'active' | 'done';

@@ -81,6 +81,14 @@ const TRANSFER_WIZARD_STEPS: StepTemplate[] = [
   { id: 'confirm', label: '完了を確認する', type: 'confirmation', dependsOn: ['filings'], isConditional: false, condition: null },
 ];
 
+const GRADE_CORRECTION_STEPS: StepTemplate[] = [
+  { id: 'entry', label: '直す等級を入れて影響を確かめる', type: 'data_entry', dependsOn: [], isConditional: false, condition: null },
+  // 共通の更新処理（refresh.ts）が届出の承認として扱わないよう、承認の待ちも data_entry にする
+  { id: 'grade_approval', label: '等級の承認を受ける', type: 'data_entry', dependsOn: ['entry'], isConditional: false, condition: null },
+  { id: 'correct', label: '影響する月の保険料を直す', type: 'calculation', dependsOn: ['grade_approval'], isConditional: false, condition: null },
+  { id: 'settle', label: '差額の精算方法を記録する', type: 'confirmation', dependsOn: ['correct'], isConditional: false, condition: null },
+];
+
 const EMPLOYMENT_CHANGE_STEPS: StepTemplate[] = [
   { id: 'entry', label: '新しい雇用条件を入れる', type: 'data_entry', dependsOn: [], isConditional: false, condition: null },
   // 雇用条件の承認は手続きの状態（employmentChange.approvalId）で追う。type を approval にすると届出の承認と混ざる
@@ -199,6 +207,7 @@ const TEMPLATE_MAP: Record<ProcedureType, StepTemplate[]> = {
   transfer: TRANSFER_STEPS,
   age_event: AGE_EVENT_STEPS,
   employment_change: EMPLOYMENT_CHANGE_STEPS,
+  grade_correction: GRADE_CORRECTION_STEPS,
 };
 
 const PROCEDURE_TYPE_LABELS: Record<ProcedureType, string> = {
@@ -213,6 +222,7 @@ const PROCEDURE_TYPE_LABELS: Record<ProcedureType, string> = {
   transfer: '異動手続き',
   age_event: '年齢到達手続き',
   employment_change: '雇用条件の変更',
+  grade_correction: '等級の遡及訂正',
 };
 
 /** 入社手続き（ウィザード）のステップ */
@@ -243,6 +253,11 @@ export function buildTransferWizardSteps(): ProcedureStep[] {
 /** 雇用条件の変更（ウィザード）のステップ */
 export function buildEmploymentChangeSteps(): ProcedureStep[] {
   return toSteps(EMPLOYMENT_CHANGE_STEPS);
+}
+
+/** 等級の遡及訂正（ウィザード）のステップ */
+export function buildGradeCorrectionSteps(): ProcedureStep[] {
+  return toSteps(GRADE_CORRECTION_STEPS);
 }
 
 /** 年齢到達（ウィザード）のステップ */

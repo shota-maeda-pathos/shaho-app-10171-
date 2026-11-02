@@ -12,6 +12,8 @@ export interface CompanyResponse {
   healthInsurerId: string;
   pensionCode: string;
   allowedGoogleDomains: string[];
+  /** 届出を委託している社会保険労務士（届出の社労士欄に書く）。委託していなければ null */
+  laborConsultant: { name: string; registrationNumber: string } | null;
   version: number;
 }
 
@@ -32,6 +34,7 @@ export async function getCompany(
     healthInsurerId: d.healthInsurerId ?? '',
     pensionCode: d.pensionCode ?? '',
     allowedGoogleDomains: d.allowedGoogleDomains ?? [],
+    laborConsultant: d.laborConsultant?.name ? { name: d.laborConsultant.name, registrationNumber: d.laborConsultant.registrationNumber ?? '' } : null,
     version: d.version ?? 1,
   };
 }

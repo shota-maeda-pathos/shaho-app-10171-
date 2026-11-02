@@ -2,7 +2,7 @@ import { onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 import { getAuthContext, requireRole } from '../middleware/auth';
 import { validate } from '../middleware/validation';
-import { applyRates, gradeTableView, previewRates, rateHistory } from './service';
+import { addUnionRates, applyRates, gradeTableView, previewRates, rateHistory } from './service';
 
 const companyId = z.string().min(1);
 const csv = z.string().min(1).max(200_000);
@@ -21,6 +21,18 @@ export const rateImportApply = onCall(async request => {
   const auth = await getAuthContext(request, input.companyId);
   requireRole(auth, 'admin');
   return applyRates(auth, input.csv);
+});
+
+/** 組合健保の料率を登録する（負担割合つき）。管理者だけ */
+export const rateUnionAdd = onCall(async request => {
+  const input = validate(z.object({
+    companyId, insurerId: z.string().trim().min(1).max(20).regex(/^[^,]+$/), appliedFrom: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+    healthTotal: z.number().positive(), healthEmployee: z.number().min(0),
+    careTotal: z.number().positive().nullable(), careEmployee: z.number().min(0).nullable(), note: z.string().max(100).default(''),
+  }), request.data);
+  const auth = await getAuthContext(request, input.companyId);
+  requireRole(auth, 'admin');
+  return addUnionRates(auth, input);
 });
 
 export const rateHistoryList = onCall(async request => {

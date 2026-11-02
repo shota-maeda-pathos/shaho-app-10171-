@@ -20,10 +20,17 @@ import { MonthlyInsuranceCalculateInput } from './schema';
 
 const ZERO: InsurancePremiumBreakdown = { employeeAmount: 0, employerAmount: 0 };
 
+/** 保存しない試し計算（等級の遡及訂正で、直した等級での額を先に見せる）。grade を渡すとその等級で計算する */
+export interface MonthlyCalcOptions {
+  dryRun?: boolean;
+  grade?: Pick<GradeDoc, 'healthGradeNumber' | 'healthStandardRemuneration' | 'pensionGradeNumber' | 'pensionStandardRemuneration'>;
+}
+
 export async function calculateMonthlyInsurance(
   input: MonthlyInsuranceCalculateInput,
   auth: AuthContext,
-): Promise<MutationResponse> {
+  options: MonthlyCalcOptions = {},
+): Promise<MutationResponse & { preview?: { totalEmployeeAmount: number; totalEmployerAmount: number; healthGradeNumber: number; pensionGradeNumber: number } }> {
   const empRef = db.doc(
     `companies/${auth.companyId}/employees/${input.employeeId}`,
   );
@@ -69,10 +76,10 @@ export async function calculateMonthlyInsurance(
       .limit(1)
       .get();
 
-    if (gradesSnap.empty) {
+    if (gradesSnap.empty && !options.grade) {
       throw invalidArg('適用中の等級が見つかりません');
     }
-    const grade = gradesSnap.docs[0].data() as GradeDoc;
+    const grade = options.grade ?? (gradesSnap.docs[0].data() as GradeDoc);
 
     const officeSnap = await tx.get(
       db.doc(`companies/${auth.companyId}/offices/${employee.officeId}`),
@@ -94,6 +101,7 @@ export async function calculateMonthlyInsurance(
       input.yearMonth,
       office.prefectureCode,
       office.insurerId,
+      office.healthInsuranceType,
     );
 
     if (!healthExcluded && !rates.health) {
@@ -157,6 +165,9 @@ export async function calculateMonthlyInsurance(
       `companies/${auth.companyId}/employees/${input.employeeId}/monthlyInsurance/${docId}`,
     );
 
+    if (options.dryRun) {
+      return { docId, preview: { totalEmployeeAmount, totalEmployerAmount, healthGradeNumber: grade.healthGradeNumber, pensionGradeNumber: grade.pensionGradeNumber } };
+    }
     const existingDoc = await tx.get(insuranceRef);
     if (existingDoc.exists && existingDoc.data()!.approvalPending) throw invalidArg('承認申請中の月次保険料は再計算できません');
     if (existingDoc.exists && existingDoc.data()!.isConfirmed) {
@@ -188,6 +199,8 @@ export async function calculateMonthlyInsurance(
       sameMonthAcquisitionAndLoss: coverage.sameMonthAcquisitionAndLoss,
       roundingRule,
       rateFingerprint: rateFingerprint(rates),
+      // 今の等級で計算したので、等級の変化の印（grades/outdated.ts）を外す
+      gradeOutdated: false,
       lastRejection: null,
       isConfirmed: false,
       approvalPending: false,
@@ -214,8 +227,8 @@ export async function calculateMonthlyInsurance(
       version,
     });
 
-    return docId;
+    return { docId, preview: undefined };
   });
 
-  return { success: true, id: result };
+  return { success: true, id: result.docId, ...(result.preview ? { preview: result.preview } : {}) };
 }

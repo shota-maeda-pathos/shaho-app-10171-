@@ -23,10 +23,13 @@ function toRecord(employeeId: string, d: FirebaseFirestore.DocumentData): MonthR
 export async function getCostAnalysis(auth: AuthContext, fiscalYear: number, officeId?: string) {
   if (officeId) requireOffice(auth, officeId);
   const base = `companies/${auth.companyId}`;
-  const [empSnap, deptSnap] = await Promise.all([
+  const [empSnap, deptSnap, officeSnap] = await Promise.all([
     db.collection(`${base}/employees`).where('deletedAt', '==', null).select('officeId', 'departmentId').get(),
     db.collection(`${base}/departments`).get(),
+    db.collection(`${base}/offices`).select('name').get(),
   ]);
+  const officeName = new Map(officeSnap.docs.map(d => [d.id, d.data().name as string]));
+  const deptOffice = new Map(deptSnap.docs.map(d => [d.id, d.data().officeId as string]));
   const employees = empSnap.docs.filter(e => (!officeId || e.data().officeId === officeId) && (auth.roles.includes('admin') || auth.officeIds.includes(e.data().officeId)));
   const deptName = new Map(deptSnap.docs.map(d => [d.id, d.data().name as string]));
   const deptOf = new Map(employees.map(e => [e.id, e.data().departmentId as string | null]));
@@ -64,12 +67,15 @@ export async function getCostAnalysis(auth: AuthContext, fiscalYear: number, off
   const prevKey = latestMonth ? [...new Set(records.map(r => r.yearMonth))].filter(m => m < latestMonth).sort().at(-1) ?? null : null;
   const previous = prevKey ? records.filter(r => r.yearMonth === prevKey) : [];
 
-  const departments = new Map<string, { employee: number; employer: number; people: number }>();
+  // 部署別は部署IDで集める（別の事業所に同じ名前の部署があっても混ぜない）。名前は事業所名を添えて区別する
+  const departments = new Map<string, { name: string; employee: number; employer: number; people: number }>();
   for (const r of latest) {
-    const name = deptName.get(deptOf.get(r.employeeId) ?? '') ?? '部署なし';
-    const cur = departments.get(name) ?? { employee: 0, employer: 0, people: 0 };
-    departments.set(name, { employee: cur.employee + r.totalEmployee, employer: cur.employer + r.totalEmployer, people: cur.people + 1 });
+    const id = deptOf.get(r.employeeId) ?? '';
+    const name = deptName.get(id);
+    const cur = departments.get(name ? id : '') ?? { name: name ?? '部署なし', employee: 0, employer: 0, people: 0 };
+    departments.set(name ? id : '', { ...cur, employee: cur.employee + r.totalEmployee, employer: cur.employer + r.totalEmployer, people: cur.people + 1 });
   }
+  const sameName = (n: string) => [...departments.values()].filter(v => v.name === n).length > 1;
 
   return {
     fiscalYear,
@@ -81,7 +87,9 @@ export async function getCostAnalysis(auth: AuthContext, fiscalYear: number, off
     }),
     breakdown: breakdown(latest),
     changeFactors: latest.length || previous.length ? changeFactors(previous, latest) : null,
-    departments: [...departments.entries()].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.employer - a.employer),
+    departments: [...departments.entries()].map(([id, v]) => ({
+      ...v, id: id || null, name: sameName(v.name) && id ? `${v.name}（${officeName.get(deptOffice.get(id) ?? '') ?? ''}）` : v.name,
+    })).sort((a, b) => b.employer - a.employer),
     gradeHistogram: gradeHistogram(latest),
     annual: annualCost(months, employerOf(thisYear), bonusThis, latestMonth),
     previousAnnual: annualCost(prevMonths, employerOf(lastYear), bonusPrev),

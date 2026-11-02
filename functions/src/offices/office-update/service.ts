@@ -41,6 +41,10 @@ export async function updateOffice(
     for (const f of fields) {
       if (input[f] !== undefined) updates[f] = input[f];
     }
+    // 組合健保は保険者番号の料率を使うので、保険者番号を必須にする（カタログ1章）
+    const type = input.healthInsuranceType !== undefined ? input.healthInsuranceType : data.healthInsuranceType;
+    const insurer = input.insurerId !== undefined ? input.insurerId : data.insurerId;
+    if (type === 'union' && !String(insurer ?? '').trim()) throw new HttpsError('invalid-argument', '組合健保の事業所は、保険者番号を入れてください');
 
     tx.update(ref, updates);
   });

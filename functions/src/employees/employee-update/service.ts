@@ -8,6 +8,7 @@ import { notFound } from '../../utils/errors';
 import { toTimestamp } from '../../utils/firestore';
 import { EmployeeUpdateInput } from './schema';
 import { EMPLOYEE_PROFILE_KEYS } from '../../types/catalog-schemas';
+import { assertDepartment } from '../../offices/departments';
 
 const MUTABLE_FIELDS = [
   'lastName',
@@ -46,6 +47,8 @@ export async function updateEmployee(
     if (!auth.roles.includes('admin')) {
       requireOffice(auth, current.officeId);
     }
+    // 所属部署は同じ事業所の、使っている部署だけ（カタログ1章 部署の管理）
+    if (input.departmentId && input.departmentId !== current.departmentId) await assertDepartment(auth.companyId, input.departmentId, current.officeId);
 
     const now = Timestamp.now();
     const updateData: Record<string, unknown> = {

@@ -153,7 +153,7 @@ async function estimateMonth(companyId: string, ctx: Context, empPath: string, m
   if (grades.empty) return null;
   const grade = grades.docs[0].data() as GradeDoc;
   const rule = normalizeRoundingRule(ctx.office.roundingRule);
-  const rates = await findAllRates(companyId, month, ctx.office.prefectureCode, ctx.office.insurerId);
+  const rates = await findAllRates(companyId, month, ctx.office.prefectureCode, ctx.office.insurerId, ctx.office.healthInsuranceType);
   const birth = ctx.employee.birthDate;
   const healthOn = (ctx.employment?.healthInsuranceEnrolled ?? true) && !isHealthExcluded(birth, month) && !!rates.health;
   const pensionOn = (ctx.employment?.pensionEnrolled ?? true) && !isPensionExcluded(birth, month) && !!rates.pension;

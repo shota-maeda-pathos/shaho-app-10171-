@@ -78,6 +78,7 @@ export const OfficeExtraFields = {
   insuredNumberMode: z.enum(['auto', 'manual']).optional(),
   fullTimeWeeklyHours: z.number().min(1).max(60).nullable().optional(),
   fullTimeMonthlyDays: z.number().min(1).max(31).nullable().optional(),
+  healthInsuranceType: z.enum(['kyokai', 'union']).nullable().optional(),
 };
 
 export const OFFICE_EXTRA_KEYS = Object.keys(OfficeExtraFields) as (keyof typeof OfficeExtraFields)[];

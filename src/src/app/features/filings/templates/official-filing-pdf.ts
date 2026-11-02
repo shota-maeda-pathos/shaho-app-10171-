@@ -11,6 +11,8 @@ export interface FilingPrintMeta {
   representativeName: string;
   effectiveDate: string;
   employeeNumber?: string;
+  /** 社会保険労務士記載欄（例：「山田 花子（登録番号 13000001）」）。委託していなければ空 */
+  laborConsultant?: string;
 }
 
 export const OFFICIAL_FORMS: Record<string, { file: string; title: string; source: string }> = {
@@ -165,7 +167,13 @@ interface HeaderLayout {
   name: Box;
   representative: Box;
   phone: [Box, Box, Box];
+  /** 社会保険労務士記載欄の「氏名等」の右（2026-10-31 様式の文字の位置から測り、枠に収まることを画面で確認） */
+  consultant?: Box;
 }
+const CONSULTANT: Record<string, Box> = {
+  acquisition: [593, 270, 295, 56], loss: [619, 279, 270, 56], change: [590, 263, 290, 54],
+  santei: [617, 307, 275, 50], bonus: [600, 307, 280, 46], dependent: [600, 270, 280, 50],
+};
 const HEADERS: Record<string, HeaderLayout> = {
   acquisition: { date: [[84,101,29,13],[133,101,28,13],[179,101,28,13]], symbol:[[113.36,118.78,82.94,29.18],[210.13,118.78,82.94,29.18]], number:[348.37,118.78,138.24,29.18], address:[117,181,366,45], name:[117,243,366,33], representative:[117,288,366,28], phone:[[172,321,65,19],[253,321,95,19],[365,321,65,19]] },
   loss: { date:[[124,89,31,13],[185,89,29,13],[248,89,27,13]], symbol:[[123.06,105.44,101.37,27.46],[241.33,105.44,101.37,27.46]], number:[384.94,105.44,126.72,27.46], address:[128,169,379,43], name:[128,233,379,31], representative:[128,279,379,30], phone:[[175,326,65,19],[266,326,93,19],[378,326,65,19]] },
@@ -206,6 +214,10 @@ function header(w: Writer, key: string, fd: Data, meta: FilingPrintMeta) {
     phone.forEach((part,i)=>w.text(part,h.phone[i],'電話番号',{ size:9,center:true }));
   } else if (phone.join('')) w.warnings.add('電話番号を市外局番・市内局番・加入者番号に分けて登録してください。');
   else w.warnings.add('電話番号が未登録です。');
+  // 社会保険労務士に届出を委託しているときだけ書く（カタログ1章）
+  const consultant = fd['社会保険労務士'] ?? meta.laborConsultant;
+  const box = CONSULTANT[key === 'childcare-end' ? 'childcare' : key];
+  if (consultant && box) w.text(consultant, box, '社会保険労務士', { size: 9 });
 }
 
 function insuredNumber(w: Writer, value: unknown, box: Box) {

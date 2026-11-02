@@ -32,7 +32,17 @@ interface OfficeRow {
   bonusMonths?: number[];
   /** 古いサーバーは返さない */
   version?: number;
+  prefectureCode?: string;
+  insurerId?: string;
+  healthInsuranceType?: 'kyokai' | 'union';
+  pensionOfficeName?: string | null;
+  officeCode?: string | null;
+  abolishedOn?: string | null;
+  /** 配属できない理由（空なら配属できる）。古いサーバーは返さない */
+  setupIssues?: string[];
 }
+
+interface OfficeEdit { id: string; version: number; name: string; prefectureCode: string; healthInsuranceType: 'kyokai' | 'union'; insurerId: string; pensionOfficeName: string; officeCode: string; abolishedOn: string }
 
 type RoundingRule = 'statutory' | 'truncate' | 'round' | 'ceil';
 
@@ -136,6 +146,38 @@ const PREFECTURES: Record<string, string> = {
         </div>
       }
 
+      @if (editing(); as e) {
+        <mat-card class="form-card">
+          <h3>{{ e.name }} の設定</h3>
+          <div class="form-grid">
+            <mat-form-field appearance="outline"><mat-label>都道府県</mat-label>
+              <mat-select [(ngModel)]="e.prefectureCode">@for (pref of prefectureList; track pref.code) { <mat-option [value]="pref.code">{{ pref.name }}</mat-option> }</mat-select></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>管轄年金事務所</mat-label>
+              <input matInput [(ngModel)]="e.pensionOfficeName" maxlength="100"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>健康保険の区分</mat-label>
+              <mat-select [(ngModel)]="e.healthInsuranceType">
+                <mat-option value="kyokai">協会けんぽ（都道府県の料率）</mat-option>
+                <mat-option value="union">組合健保（保険者番号の料率）</mat-option>
+              </mat-select></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>保険者番号{{ e.healthInsuranceType === 'union' ? '（必須）' : '' }}</mat-label>
+              <input matInput [(ngModel)]="e.insurerId" maxlength="20"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>事業所番号（5桁、任意）</mat-label>
+              <input matInput [(ngModel)]="e.officeCode" maxlength="5"></mat-form-field>
+          </div>
+          @if (e.healthInsuranceType === 'union') { <p class="hint">組合健保の料率（本人と会社の負担割合つき）は、設定の「料率」で保険者番号を指定して登録します。</p> }
+          <div class="form-actions">
+            <button mat-button type="button" (click)="editing.set(null)">閉じる</button>
+            <button mat-flat-button color="primary" type="button" (click)="saveEdit(e)" [disabled]="savingId() === e.id">保存</button>
+          </div>
+          <h3>事業所の廃止</h3>
+          <p class="hint">在籍している従業員が0人で、進行中の手続きがないときだけ廃止できます。廃止した事業所は消さずに残り、過去の保険料・届出から見られます。従業員の配属先には選べなくなります。</p>
+          <div class="abolish">
+            <mat-form-field appearance="outline"><mat-label>廃止日</mat-label><input matInput type="date" [(ngModel)]="e.abolishedOn"></mat-form-field>
+            <button mat-stroked-button type="button" class="danger" (click)="abolish(e)" [disabled]="!e.abolishedOn || savingId() === e.id">この事業所を廃止する</button>
+          </div>
+        </mat-card>
+      }
+
       @if (loading()) {
         <div class="loading"><mat-spinner diameter="40"></mat-spinner></div>
       } @else {
@@ -192,12 +234,22 @@ const PREFECTURES: Record<string, string> = {
                 }
               </td>
             </ng-container>
+            <ng-container matColumnDef="insurer">
+              <th mat-header-cell *matHeaderCellDef>健康保険</th>
+              <td mat-cell *matCellDef="let row">{{ row.healthInsuranceType === 'union' ? '組合健保' : '協会けんぽ' }}@if (row.insurerId) { <div class="hint">{{ row.insurerId }}</div> }</td>
+            </ng-container>
             <ng-container matColumnDef="status">
               <th mat-header-cell *matHeaderCellDef>状態</th>
               <td mat-cell *matCellDef="let row">
-                <span class="status-chip" [class.inactive]="!row.isActive">
-                  {{ row.isActive ? '有効' : '無効' }}
-                </span>
+                @if (row.abolishedOn) {
+                  <span class="status-chip inactive">廃止（{{ row.abolishedOn }}）</span>
+                } @else if (row.setupIssues?.length) {
+                  <span class="status-chip warn">設定が終わっていません</span>
+                  <div class="hint">配属できません。足りない設定：{{ row.setupIssues.join('・') }}</div>
+                } @else {
+                  <span class="status-chip" [class.inactive]="!row.isActive">{{ row.isActive ? '配属できます' : '無効' }}</span>
+                }
+                @if (!row.abolishedOn && row.version !== undefined) { <button mat-button type="button" (click)="startEdit(row)">設定</button> }
               </td>
             </ng-container>
             <tr mat-header-row *matHeaderRowDef="columns"></tr>
@@ -226,6 +278,9 @@ const PREFECTURES: Record<string, string> = {
     .empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; color: #ccc; }
     .status-chip { padding: 4px 12px; border-radius: 16px; font-size: 12px; background: #e8f5e9; color: #2e7d32; }
     .status-chip.inactive { background: #f5f5f5; color: #999; }
+    .status-chip.warn { background: var(--app-status-action-bg); color: var(--app-status-action-fg); }
+    .abolish { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .danger { color: var(--app-status-action-fg); }
     .months { display: flex; flex-wrap: wrap; gap: 2px 8px; max-width: 260px; margin-bottom: 4px; }
     .months label { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
     .rounding-select { padding: 6px 8px; max-width: 260px; font: inherit; }
@@ -253,7 +308,9 @@ export class OfficeManagementComponent implements OnInit {
   /** 移行の対象（サーバーの migrateOfficeRoundingRule と同じ条件：切捨てか未設定） */
   needsMigration = computed(() => this.offices().filter(o => !o.roundingRule || o.roundingRule === 'truncate'));
 
-  columns = ['officeNumber', 'name', 'address', 'phone', 'paymentInfo', 'rounding', 'bonusMonths', 'status'];
+  columns = ['officeNumber', 'name', 'address', 'insurer', 'paymentInfo', 'rounding', 'bonusMonths', 'status'];
+  /** 設定を直している事業所（都道府県・区分・保険者番号・管轄年金事務所、廃止） */
+  editing = signal<OfficeEdit | null>(null);
   readonly monthList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   /** 賞与の支給予定月を編集中の事業所 */
   bonusEditing = signal<{ id: string; months: number[] } | null>(null);
@@ -273,7 +330,8 @@ export class OfficeManagementComponent implements OnInit {
     this.loading.set(true);
     try {
       const fn = httpsCallable<any, any>(this.functions, 'officeList');
-      const result = await fn({ companyId: this.auth.companyId });
+      // 廃止した事業所も出し、配属できるか（設定の不足・料率）も調べる
+      const result = await fn({ companyId: this.auth.companyId, includeInactive: true, withSetup: true });
       this.offices.set(result.data.items ?? []);
     } catch {
       this.offices.set([]);
@@ -327,6 +385,48 @@ export class OfficeManagementComponent implements OnInit {
     } finally {
       this.savingId.set('');
       await this.loadOffices();
+    }
+  }
+
+  startEdit(row: OfficeRow) {
+    this.editing.set({
+      id: row.id, version: row.version ?? 1, name: row.name, prefectureCode: row.prefectureCode ?? '', healthInsuranceType: row.healthInsuranceType ?? 'kyokai',
+      insurerId: row.insurerId ?? '', pensionOfficeName: row.pensionOfficeName ?? '', officeCode: row.officeCode ?? '', abolishedOn: '',
+    });
+  }
+
+  async saveEdit(e: OfficeEdit) {
+    this.savingId.set(e.id);
+    try {
+      await httpsCallable(this.functions, 'officeUpdate')({
+        companyId: this.auth.companyId, officeId: e.id, expectedVersion: e.version,
+        prefectureCode: e.prefectureCode || undefined, healthInsuranceType: e.healthInsuranceType, insurerId: e.insurerId.trim(),
+        pensionOfficeName: e.pensionOfficeName.trim() || null, officeCode: e.officeCode.trim() || null,
+      });
+      this.snackBar.open(`${e.name}の設定を保存しました`, '閉じる', { duration: 3000 });
+      this.editing.set(null);
+      await this.loadOffices();
+    } catch (err: unknown) {
+      this.snackBar.open(`保存できませんでした：${err instanceof Error ? err.message : ''}`, '閉じる', { duration: 6000 });
+    } finally {
+      this.savingId.set('');
+    }
+  }
+
+  async abolish(e: OfficeEdit) {
+    const ok = await this.confirm(`${e.name}を廃止しますか`,
+      `${e.abolishedOn}付けで廃止します。在籍している従業員がいる・進行中の手続きがある場合は廃止できません。廃止した事業所は消さずに残り、元に戻す操作はありません。`, '廃止する');
+    if (!ok) return;
+    this.savingId.set(e.id);
+    try {
+      await httpsCallable(this.functions, 'officeAbolish')({ companyId: this.auth.companyId, officeId: e.id, abolishedOn: e.abolishedOn, expectedVersion: e.version });
+      this.snackBar.open(`${e.name}を廃止しました`, '閉じる', { duration: 4000 });
+      this.editing.set(null);
+      await this.loadOffices();
+    } catch (err: unknown) {
+      this.snackBar.open(`廃止できませんでした：${err instanceof Error ? err.message : ''}`, '閉じる', { duration: 8000 });
+    } finally {
+      this.savingId.set('');
     }
   }
 

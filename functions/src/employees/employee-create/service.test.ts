@@ -7,6 +7,8 @@ jest.mock('../../config', () => ({
     return mockDb;
   },
 }));
+// 事業所の設定の確かめ（料率・管轄年金事務所）は offices/lifecycle.test.ts で見る
+jest.mock('../../offices/lifecycle', () => ({ assertAssignable: jest.fn() }));
 
 import { createEmployee } from './service';
 

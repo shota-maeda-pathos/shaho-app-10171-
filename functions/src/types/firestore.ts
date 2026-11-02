@@ -103,6 +103,10 @@ export interface OfficeDoc {
   fullTimeWeeklyHours?: number | null;
   /** 通常の労働者の月所定労働日数（適用判定の3/4基準）。未設定は21日 */
   fullTimeMonthlyDays?: number | null;
+  /** 健康保険の区分（カタログ1章）。未設定は協会けんぽ。組合健保なら保険者番号（insurerId）の料率だけを使う */
+  healthInsuranceType?: 'kyokai' | 'union' | null;
+  /** 事業所の廃止（カタログ1章 事業所ライフサイクル）。廃止した事業所は消さずに残す */
+  abolishedOn?: string | null;
 }
 
 export interface DepartmentDoc {
@@ -354,7 +358,8 @@ export type ProcedureType =
   | 'bonus_payment'
   | 'transfer'
   | 'age_event'
-  | 'employment_change';
+  | 'employment_change'
+  | 'grade_correction';
 
 export type ProcedureStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -455,6 +460,26 @@ export interface ProcedureDoc {
   employmentChange?: EmploymentChangeState;
   /** 事業所間異動（ウィザード）の状態 */
   transfer?: TransferState;
+  /** 等級の遡及訂正（修正等級を含む、ウィザード）の状態 */
+  gradeCorrection?: GradeCorrectionState;
+}
+
+/** 等級の遡及訂正の手続き（カタログ5章 修正等級・6章 訂正・遡及）。等級を直して承認を受け、影響する月の保険料をまとめて直し、精算の方法を記録する */
+export interface GradeCorrectionState {
+  /** pensionOffice：年金事務所からの修正の指示、error：誤りの訂正 */
+  reasonType: 'pensionOffice' | 'error';
+  reason: string;
+  effectiveMonth: string | null;
+  healthGradeNumber: number | null;
+  pensionGradeNumber: number | null;
+  /** 直す前のその月の等級（記録用） */
+  before: { healthGradeNumber: number; healthStandardRemuneration: number; pensionGradeNumber: number; pensionStandardRemuneration: number; determinationType: string; filingId: string | null } | null;
+  approvalRequestId: string | null;
+  /** まとめて訂正した月（計算し直して確認を依頼した月） */
+  correctedMonths: string[];
+  /** 訂正の前の額（月ごと。差額の記録） */
+  diffs: { yearMonth: string; beforeEmployee: number; beforeEmployer: number; afterEmployee: number; afterEmployer: number; collected: number | null }[];
+  settlement: { method: 'nextPayroll' | 'separate' | 'none'; payMonth: string | null; amount: number; note: string } | null;
 }
 
 /** 事業所間異動の手続き（ウィザード）の状態 */

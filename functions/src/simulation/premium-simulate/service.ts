@@ -43,7 +43,7 @@ export async function simulatePremium(
   const office = officeSnap.data()! as OfficeDoc;
 
   // 本処理と同じ料率検索・等級表・端数処理を使う
-  const rates = await findAllRates(auth.companyId, ym, office.prefectureCode, office.insurerId);
+  const rates = await findAllRates(auth.companyId, ym, office.prefectureCode, office.insurerId, office.healthInsuranceType);
   const healthRate = rates.health;
   const pensionRate = rates.pension;
   const longTermCareRate = rates.longTermCare;

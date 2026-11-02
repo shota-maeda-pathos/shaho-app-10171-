@@ -1,6 +1,7 @@
 // 算定基礎届（定時決定）。一括型：事業所×年ごとに、対象者を確かめる → 等級の承認 → 届出を作る → 届出の承認と提出
 import { filingContentHash } from '../utils/hash';
 import { buildArchive } from '../filings/archive/rules';
+import { laborConsultantText } from '../companies/labor-consultant';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
@@ -419,6 +420,7 @@ export async function createSanteiFiling(input: SanteiRunInput, auth: AuthContex
   const header = {
     '事業所整理記号': office.officeNumber ?? '', '事業所名称': office.name ?? '', '事業所所在地': office.address ?? '',
     '電話番号': office.phone ?? '', '事業主氏名': company.data()?.representativeName ?? '', '会社名': company.data()?.name ?? '',
+    '社会保険労務士': laborConsultantText(company.data()?.laborConsultant),
     '対象年': input.year, '適用年月': santeiEffectiveMonth(input.year),
   };
 

@@ -51,6 +51,8 @@ interface EmployeeForm {
   gender: 'male' | 'female';
   hireDate: string;
   officeId: string;
+  /** 所属部署（部署なしは空） */
+  departmentId: string;
   healthInsuranceNumber: string;
   pensionNumber: string;
   basicPensionNumber: string;
@@ -473,6 +475,17 @@ interface OnboardResult {
                       }
                     </mat-select>
                   </mat-form-field>
+
+                  <!-- 所属部署（カタログ1章 部署の管理）。部署は設定の「部署」で作る -->
+                  <mat-form-field appearance="outline">
+                    <mat-label>部署</mat-label>
+                    <mat-select [(ngModel)]="form.departmentId" name="departmentId">
+                      <mat-option value="">部署なし</mat-option>
+                      @for (d of officeDepartments(); track d.id) {
+                        <mat-option [value]="d.id">{{ d.name }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
                 </div>
 
                 <mat-divider></mat-divider>
@@ -631,6 +644,8 @@ interface OnboardResult {
             <div class="tab-content">
               <div class="page-header">
                 <h2>等級・標準報酬月額履歴</h2>
+                <!-- 年金事務所からの修正の指示や誤りで、過去の等級を直してその月以降の保険料をまとめて直す（カタログ5章・6章） -->
+                <a mat-stroked-button [routerLink]="['/grade-corrections', 'new']" [queryParams]="{ employeeId }">等級を遡って直す</a>
               </div>
 
               @if (grades().length > 0) {
@@ -898,6 +913,7 @@ export class EmployeeDetailComponent implements OnInit {
     gender: 'male',
     hireDate: '',
     officeId: '',
+    departmentId: '',
     healthInsuranceNumber: '',
     pensionNumber: '',
     basicPensionNumber: '',
@@ -965,7 +981,16 @@ export class EmployeeDetailComponent implements OnInit {
     } catch (e) {
       console.error('Failed to load offices', e);
     }
+    try {
+      const { data } = await httpsCallable<object, { items: Department[] }>(this.functions, 'departmentList')({ companyId: this.auth.companyId });
+      this.departments.set(data.items);
+    } catch {
+      // 部署が読めなければ「部署なし」だけになる
+    }
   }
+
+  /** 選んでいる事業所の部署 */
+  officeDepartments() { return this.departments().filter(d => d.officeId === this.form.officeId); }
 
   async loadEmployee() {
     this.loading.set(true);
@@ -990,6 +1015,7 @@ export class EmployeeDetailComponent implements OnInit {
         gender: data.gender ?? 'male',
         hireDate: data.hireDate ?? '',
         officeId: data.officeId ?? '',
+        departmentId: data.departmentId ?? '',
         healthInsuranceNumber: data.healthInsuranceNumber ?? '',
         pensionNumber: data.pensionNumber ?? '',
         basicPensionNumber: data.basicPensionNumber ?? '',
@@ -1016,6 +1042,7 @@ export class EmployeeDetailComponent implements OnInit {
         const result = await fn({
           companyId: this.auth.companyId,
           ...this.form,
+          departmentId: this.form.departmentId || null,
         });
         this.snackBar.open('従業員を登録しました', '閉じる', { duration: 3000 });
         this.router.navigate(['/employees', result.data.employeeId]);
@@ -1026,6 +1053,7 @@ export class EmployeeDetailComponent implements OnInit {
           employeeId: this.employeeId,
           expectedVersion: this.version,
           ...this.form,
+          departmentId: this.form.departmentId || null,
         });
         this.version++;
         this.snackBar.open('従業員を更新しました', '閉じる', { duration: 3000 });
@@ -1083,7 +1111,7 @@ export class EmployeeDetailComponent implements OnInit {
     this.form = {
       employeeNumber: '', lastName: '', firstName: '',
       lastNameKana: '', firstNameKana: '', birthDate: '',
-      gender: 'male', hireDate: '', officeId: '',
+      gender: 'male', hireDate: '', officeId: '', departmentId: '',
       healthInsuranceNumber: '', pensionNumber: '',
       basicPensionNumber: '', address: '', memo: '',
     };

@@ -34,9 +34,11 @@ lazy(() => require('./auth-session/functions'), ['authLogin', 'authGoogleLogin',
 // 組織マスタAPI
 lazy(() => require('./offices/office-list/functions'), ['officeList']);
 lazy(() => require('./offices/department-list/functions'), ['departmentList']);
+lazy(() => require('./offices/departments'), ['departmentSave']);
 lazy(() => require('./offices/insurance-rate-list/functions'), ['insuranceRateList']);
 lazy(() => require('./offices/office-update/functions'), ['officeUpdate']);
 lazy(() => require('./offices/office-create/functions'), ['officeCreate']);
+lazy(() => require('./offices/office-abolish/functions'), ['officeAbolish']);
 
 // 雇用API
 lazy(() => require('./employments/employment-create/functions'), ['employmentCreate']);
@@ -44,6 +46,7 @@ lazy(() => require('./employments/employment-create/functions'), ['employmentCre
 // 等級API
 lazy(() => require('./grades/grade-create/functions'), ['gradeCreate']);
 lazy(() => require('./grades/grade-update/functions'), ['gradeUpdate']);
+lazy(() => require('./grades/outdated'), ['gradeOutdatedMark']);
 lazy(() => require('./santei/functions'), [
   'santeiRunOverview', 'santeiRunHold', 'santeiDecision', 'santeiJobStart', 'santeiJobGet', 'santeiJobChunk', 'santeiFilingCreate', 'santeiFilingUpdate', 'santeiFilingGet', 'sampleSanteiCreate',
 ]);
@@ -99,7 +102,7 @@ lazy(() => require('./dashboard/calendar/functions'), ['calendarGet', 'checklist
 lazy(() => require('./dashboard/cost-analysis/functions'), ['costAnalysis']);
 lazy(() => require('./simulation/functions'), ['simulationRaise', 'simulationHire', 'simulationAnnual', 'simulationRateChange', 'simulationBonus']);
 lazy(() => require('./reports/functions'), ['reportData']);
-lazy(() => require('./insurance-rates/functions'), ['rateImportPreview', 'rateImportApply', 'rateHistoryList', 'gradeTableGet']);
+lazy(() => require('./insurance-rates/functions'), ['rateImportPreview', 'rateImportApply', 'rateUnionAdd', 'rateHistoryList', 'gradeTableGet']);
 
 // エクスポートAPI
 lazy(() => require('./exports/employee-export/functions'), ['employeeExport']);
@@ -191,6 +194,7 @@ lazy(() => require('./employment-change/functions'), [
   'employmentChangeStart', 'employmentChangeGet', 'employmentChangePreview', 'employmentChangeUpdate', 'sampleChangeCreate',
 ]);
 lazy(() => require('./transfer/functions'), ['transferStart', 'transferGet', 'transferPreview', 'transferUpdate']);
+lazy(() => require('./grade-correction/functions'), ['gradeCorrectionStart', 'gradeCorrectionGet', 'gradeCorrectionPreview', 'gradeCorrectionUpdate']);
 lazy(() => require('./employees/employee-other-employer/functions'), ['employeeOtherEmployerSet']);
 lazy(() => require('./age-event/functions'), ['ageEventStart', 'ageEventGet', 'ageEventPreview', 'ageEventUpdate', 'sampleAgeCreate']);
 lazy(() => require('./procedures/group-list'), ['procedureGroupList']);

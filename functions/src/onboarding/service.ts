@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'crypto';
 import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import { assertAssignable } from '../offices/lifecycle';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
 import {
@@ -66,6 +67,8 @@ export async function startOnboarding(input: OnboardingStartInput, auth: AuthCon
   requireOffice(auth, input.officeId);
   const officeSnap = await db.doc(`companies/${auth.companyId}/offices/${input.officeId}`).get();
   if (!officeSnap.exists) throw invalidArg('指定された事業所が存在しません');
+  // 設定が終わっていない事業所・廃止した事業所には配属しない（カタログ1章 事業所ライフサイクル）
+  await assertAssignable(auth.companyId, input.officeId);
 
   const base = `companies/${auth.companyId}`;
   const batchId = input.people.length > 1 ? db.collection(`${base}/procedures`).doc().id : null;

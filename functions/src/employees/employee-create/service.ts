@@ -6,6 +6,8 @@ import { toTimestamp } from '../../utils/firestore';
 import { MutationResponse } from '../../types/response';
 import { EmployeeCreateInput } from './schema';
 import { pickProfile } from '../../types/catalog-schemas';
+import { assertAssignable } from '../../offices/lifecycle';
+import { assertDepartment } from '../../offices/departments';
 
 export async function createEmployee(
   input: EmployeeCreateInput,
@@ -21,6 +23,9 @@ export async function createEmployee(
   if (!officeDoc.exists) {
     throw invalidArg('指定された事業所が存在しません');
   }
+  // 設定が終わっていない事業所・廃止した事業所には配属しない（カタログ1章 事業所ライフサイクル）
+  await assertAssignable(auth.companyId, input.officeId);
+  await assertDepartment(auth.companyId, input.departmentId, input.officeId);
 
   if (input.requestId) {
     const existing = await db

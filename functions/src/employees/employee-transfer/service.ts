@@ -7,6 +7,7 @@ import { MutationResponse } from '../../types/response';
 import { notFound } from '../../utils/errors';
 import { toTimestamp } from '../../utils/firestore';
 import { EmployeeTransferInput } from './schema';
+import { assertAssignable } from '../../offices/lifecycle';
 
 export async function transferEmployee(
   input: EmployeeTransferInput,
@@ -16,6 +17,8 @@ export async function transferEmployee(
     `companies/${auth.companyId}/employees/${input.employeeId}`,
   );
 
+  // 設定が終わっていない事業所・廃止した事業所には配属しない（カタログ1章 事業所ライフサイクル）
+  await assertAssignable(auth.companyId, input.newOfficeId);
   await db.runTransaction(async (tx) => {
     const doc = await tx.get(docRef);
     if (!doc.exists || doc.data()!.deletedAt !== null) {

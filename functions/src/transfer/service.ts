@@ -10,6 +10,7 @@ import { requireProcedureAccess } from '../procedures/access';
 import { completed, requireVersion, setStep, statusReasonOf, stepOf } from '../procedures/wizard';
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
 import { OfficeFacts, transferFacts } from './rules';
+import { assertAssignable } from '../offices/lifecycle';
 
 type TransferProc = ProcedureDoc & { transfer: TransferState };
 const nameOf = (e: { lastName: string; firstName: string }) => `${e.lastName} ${e.firstName}`;
@@ -141,6 +142,8 @@ export async function saveTransferEntry(input: { companyId: string; procedureId:
   requireVersion(proc, input.expectedVersion);
   if (proc.transfer.applied) throw invalidArg('台帳の所属事業所を変えたあとは、異動先・異動日は直せません');
   requireOffice(auth, input.toOfficeId);
+  // 設定が終わっていない事業所・廃止した事業所には異動できない（カタログ1章 事業所ライフサイクル）
+  await assertAssignable(input.companyId, input.toOfficeId);
   const facts = await previewTransfer(input, auth);
   await db.runTransaction(async tx => {
     const latest = (await tx.get(ref)).data() as TransferProc;

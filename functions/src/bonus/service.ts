@@ -1,6 +1,7 @@
 // 賞与（一括型）。事業所×支給月ごとに、賞与を登録する → 賞与額の承認 → 保険料の計算と承認 → 賞与支払届の作成・承認・提出
 import { filingContentHash } from '../utils/hash';
 import { buildArchive } from '../filings/archive/rules';
+import { laborConsultantText } from '../companies/labor-consultant';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
@@ -9,6 +10,7 @@ import { invalidArg, notFound } from '../utils/errors';
 import { mapConcurrent } from '../utils/parallel';
 import { normalizeEmployment, qualificationDates, toDateString } from '../utils/employment';
 import { isPensionExcluded } from '../utils/age';
+import { findAllRates, rateFingerprint, rateValuesChanged } from '../utils/insurance-rate';
 import { lastDayOfMonth } from '../insurance/calculator';
 import { calculateBonusInsurance } from '../insurance/bonus-insurance-calculate/service';
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
@@ -142,7 +144,7 @@ const rejectionOf = (d: FirebaseFirestore.DocumentData | undefined) =>
 /** 1人分の状況。賞与がある人だけ、年度累計・資格・適用を調べる */
 async function buildRow(companyId: string, payMonth: string, doc: FirebaseFirestore.DocumentSnapshot,
   b: FirebaseFirestore.DocumentData | undefined, p: FirebaseFirestore.DocumentData | undefined, h: FirebaseFirestore.DocumentData | undefined,
-  filingId: string | null): Promise<BonusRow> {
+  filingId: string | null, currentFingerprint: string | null = null): Promise<BonusRow> {
   const employee = doc.data() as EmployeeDoc;
   const row: BonusRow = {
     employeeId: doc.id, employeeNumber: employee.employeeNumber ?? '', name: nameOf(employee), inPeriod: periodTarget(employee, payMonth),
@@ -187,10 +189,15 @@ async function buildRow(companyId: string, payMonth: string, doc: FirebaseFirest
       exempted: p.isExempted === true, confirmed: p.isConfirmed === true, pending: p.approvalPending === true, version: p.version ?? 0,
     };
     if (p.isExempted) row.warnings.push('産休・育休のため保険料は免除です（届出は出します）');
+    const rateChanged = typeof p.rateFingerprint === 'string' && currentFingerprint !== null && rateValuesChanged(p.rateFingerprint, currentFingerprint, payMonth);
     if (!p.isConfirmed && !p.approvalPending) {
       if (p.bonusVersion !== b.version) row.stale = true;
       else if (typeof p.priorCumulativeBonusAmount === 'number' && p.priorCumulativeBonusAmount !== earlier.cumulative) row.stale = true;
       if (row.stale) row.warnings.push('計算した後に賞与額または年度累計が変わりました。計算し直してください');
+      else if (rateChanged) { row.stale = true; row.warnings.push('計算した後に料率が変わりました。計算し直してください'); }
+    } else if (rateChanged) {
+      // 賞与の保険料には訂正の操作がないため、知らせるだけ（段階10で訂正を足すか決める）
+      row.warnings.push(p.isConfirmed ? '確定した後に料率が変わりました。保険料の額を確かめてください' : '確認を依頼した後に料率が変わりました。差し戻してから計算し直してください');
     }
   }
   return row;
@@ -217,8 +224,10 @@ export async function bonusOverview(input: BonusRunInput, auth: AuthContext) {
   }
   // 在籍している人と、賞与が登録されている人を出す
   const listed = employeesSnap.docs.map((d, i) => ({ d, i })).filter(({ d, i }) => periodTarget(d.data(), input.payMonth) || snaps[i * 3].exists);
+  // 今の料率（この事業所・この月は全員同じ）。計算した後に料率が変わった人を見分ける
+  const currentFingerprint = await findAllRates(auth.companyId, input.payMonth, office.prefectureCode, office.insurerId, office.healthInsuranceType).then(rateFingerprint, () => null);
   const rows = await mapConcurrent(listed, 20, ({ d, i }) =>
-    buildRow(auth.companyId, input.payMonth, d, snaps[i * 3].data(), snaps[i * 3 + 1].data(), snaps[i * 3 + 2].data(), filingOf.get(d.id) ?? null));
+    buildRow(auth.companyId, input.payMonth, d, snaps[i * 3].data(), snaps[i * 3 + 1].data(), snaps[i * 3 + 2].data(), filingOf.get(d.id) ?? null, currentFingerprint));
 
   const runData = run.data() ?? {};
   const paid = rows.filter(r => r.bonus);
@@ -672,6 +681,7 @@ export async function createBonusFiling(input: BonusRunInput, auth: AuthContext)
   const header = {
     '事業所整理記号': office.officeNumber ?? '', '事業所名称': office.name ?? '', '事業所所在地': office.address ?? '',
     '電話番号': office.phone ?? '', '事業主氏名': company.data()?.representativeName ?? '', '会社名': company.data()?.name ?? '',
+    '社会保険労務士': laborConsultantText(company.data()?.laborConsultant),
     '支給月': input.payMonth, '賞与支払年月日': commonPaymentDate(firstDates) ?? '',
   };
   const deadline = bonusFilingDeadline(firstDates[0]);
