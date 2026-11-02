@@ -106,7 +106,9 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
     .kinds { display: flex; gap: 6px; flex-wrap: wrap; margin: 16px 0 8px; }
     .kinds button { padding: 6px 14px; border: 1px solid var(--app-color-border); border-radius: 999px; background: var(--app-color-surface); cursor: pointer; font: inherit; }
     .kinds button.on { background: var(--app-color-link); color: #fff; border-color: var(--app-color-link); }
-    .form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 12px 0; }
+    /* 欄の上端をそろえる（注記のある欄があっても、枠の位置がずれないように）。ボタンは枠の高さの真ん中に合わせる */
+    .form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; margin: 12px 0; }
+    .form > button { margin-top: 4px; }
     .form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
     .form input:not(.mat-mdc-input-element), .form textarea:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; border: 1px solid var(--app-color-border); border-radius: 6px; }
     .wide { flex: 1 1 100%; }
