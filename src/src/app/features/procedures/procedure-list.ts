@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Functions, httpsCallable } from '@angular/fire/functions';
@@ -40,7 +42,7 @@ type Who = 'all' | 'mine' | 'waiting';
 @Component({
   selector: 'app-procedure-list',
   standalone: true,
-  imports: [FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, PageHeadComponent, StatusBadgeComponent, EmptyStateComponent, ErrorStateComponent, LoadingStateComponent],
+  imports: [FormsModule, MatFormFieldModule, MatInputModule, RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, PageHeadComponent, StatusBadgeComponent, EmptyStateComponent, ErrorStateComponent, LoadingStateComponent],
   template: `
     <div class="app-page">
       <app-page-head heading="手続き">
@@ -61,7 +63,7 @@ type Who = 'all' | 'mine' | 'waiting';
         </div>
 
         <div class="toolbar">
-          <input class="search" type="search" [ngModel]="query()" (ngModelChange)="query.set($event)" placeholder="氏名・手続きの名前で探す" aria-label="氏名・手続きの名前で探す">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search-field"><input matInput type="search" [ngModel]="query()" (ngModelChange)="query.set($event)" placeholder="氏名・手続きの名前で探す" aria-label="氏名・手続きの名前で探す"><mat-icon matSuffix>search</mat-icon></mat-form-field>
           @if (bulkPending()) { <span class="pending"><mat-spinner diameter="14"></mat-spinner>毎月の処理・賞与・算定を確かめています（残り {{ bulkPending() }}件）</span> }
           <span class="grow"></span>
           @if (tab() === 'active') {

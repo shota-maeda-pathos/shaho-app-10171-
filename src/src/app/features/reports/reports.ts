@@ -62,7 +62,7 @@ const KINDS: { kind: Kind; label: string; note: string; needs: ('month' | 'emplo
     h2 { margin: 0; font-size: var(--app-font-md); }
     .form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 8px; }
     .form label { display: flex; flex-direction: column; gap: 2px; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
-    .form input { padding: 6px 8px; font: inherit; border: 1px solid var(--app-color-border); border-radius: 6px; }
+    .form input:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; border: 1px solid var(--app-color-border); border-radius: 6px; }
     .sub { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
     .preview iframe { width: 100%; height: 75vh; border: 1px solid var(--app-color-border); margin-top: 8px; }
     .preview .head a { margin-left: auto; color: var(--app-color-link); }

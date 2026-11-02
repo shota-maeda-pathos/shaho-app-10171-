@@ -78,7 +78,7 @@ export class TargetDetailDirective {
   selector: 'app-target-list',
   standalone: true,
   imports: [
-    NgTemplateOutlet, FormsModule, MatButtonModule, MatCheckboxModule, MatIconModule, MatMenuModule, MatProgressSpinnerModule,
+    NgTemplateOutlet, FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatCheckboxModule, MatIconModule, MatMenuModule, MatProgressSpinnerModule,
     StatusBadgeComponent, EmptyStateComponent, LoadingStateComponent, TermComponent, ActionBarComponent, SidePanelComponent,
   ],
   template: `
@@ -93,7 +93,7 @@ export class TargetDetailDirective {
     }
 
     <div class="toolbar">
-      <input class="search" type="search" [ngModel]="query()" (ngModelChange)="query.set($event)" placeholder="氏名・社員番号で探す" aria-label="氏名・社員番号で探す">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search-field"><input matInput type="search" [ngModel]="query()" (ngModelChange)="query.set($event)" placeholder="氏名・社員番号で探す" aria-label="氏名・社員番号で探す"><mat-icon matSuffix>search</mat-icon></mat-form-field>
       <span class="grow"></span>
       <div class="chips" role="group" aria-label="絞り込み">
         @for (c of visibleChips(); track c.key) {

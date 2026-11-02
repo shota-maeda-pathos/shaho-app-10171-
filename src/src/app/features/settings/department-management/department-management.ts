@@ -51,7 +51,7 @@ interface Office { id: string; name: string }
     .sub { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
     .add { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin: 12px 0 20px; }
     .add label { display: flex; flex-direction: column; gap: 2px; font-size: var(--app-font-sm); }
-    input, select { padding: 6px 8px; font: inherit; }
+    input:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; }
     .short { width: 5em; }
     table { width: 100%; border-collapse: collapse; font-size: var(--app-font-sm); margin-bottom: 12px; }
     td, th { padding: 4px 6px; border-bottom: 1px solid var(--app-color-border); text-align: left; }

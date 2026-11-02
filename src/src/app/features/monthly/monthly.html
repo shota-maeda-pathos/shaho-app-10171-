@@ -73,7 +73,7 @@
                   <p class="hint">固定的＝基本給・住宅手当・通勤手当など毎月決まって支払うもの（変わると随時改定の対象）。非固定的＝残業手当など月によって変わるもの。</p>
                   @for (item of list; track $index; let i = $index) {
                     <div class="item-row">
-                      <input type="text" [(ngModel)]="item.name" maxlength="30" placeholder="項目名（例：住宅手当）" [attr.aria-label]="'給与項目' + (i + 1) + 'の名前'">
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="item-name"><input matInput type="text" [(ngModel)]="item.name" maxlength="30" placeholder="項目名（例：住宅手当）" [attr.aria-label]="'給与項目' + (i + 1) + 'の名前'"></mat-form-field>
                       <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select [(ngModel)]="item.kind" [attr.aria-label]="'給与項目' + (i + 1) + 'の区分'">
                         <mat-option value="fixed">固定的</mat-option>
                         <mat-option value="variable">非固定的</mat-option>

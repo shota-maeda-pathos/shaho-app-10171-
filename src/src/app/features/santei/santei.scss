@@ -1,9 +1,7 @@
 .offices { display: flex; flex-wrap: wrap; gap: var(--app-space-2); }
 
-.month {
-  display: inline-flex; align-items: center; gap: var(--app-space-2); font-size: var(--app-font-sm); color: var(--app-color-text-sub);
-  input, select { padding: 6px var(--app-space-2); font: inherit; border: 1px solid var(--app-color-border); border-radius: var(--app-radius); }
-}
+// 支給月・対象の年（Material の入力欄）
+.month { width: 180px; }
 a { color: var(--app-color-link); }
 
 .job {

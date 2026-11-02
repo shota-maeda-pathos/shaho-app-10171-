@@ -91,7 +91,7 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
         </div>
 
         <div class="toolbar">
-          <input class="search" type="search" [(ngModel)]="keyword" (keydown.enter)="load()" placeholder="氏名・内容で探す（Enter）" aria-label="氏名・内容で探す">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search-field"><input matInput type="search" [(ngModel)]="keyword" (keydown.enter)="load()" placeholder="氏名・内容で探す（Enter）" aria-label="氏名・内容で探す"><mat-icon matSuffix>search</mat-icon></mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select [(ngModel)]="requestType" (ngModelChange)="load()" aria-label="種類">
             <mat-option value="">すべての種類</mat-option>
             @for (t of types; track t[0]) { <mat-option [value]="t[0]">{{ t[1] }}</mat-option> }
@@ -252,7 +252,7 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
     .tabs button.on { color: var(--app-color-text); border-bottom-color: var(--app-status-yours-fg); }
     .badge { font-size: 11px; padding: 0 6px; border-radius: 10px; background: var(--app-status-waiting-bg); }
     .toolbar { display: flex; align-items: center; gap: var(--app-space-2); flex-wrap: wrap; padding: var(--app-space-3) var(--app-space-5); border-bottom: 1px solid var(--app-color-border); }
-    .toolbar select, .search { padding: 7px 10px; border: 1px solid var(--app-color-border); border-radius: var(--app-radius); font: inherit; font-size: var(--app-font-sm); background: var(--app-color-surface); }
+    .search { padding: 7px 10px; border: 1px solid var(--app-color-border); border-radius: var(--app-radius); font: inherit; font-size: var(--app-font-sm); background: var(--app-color-surface); }
     .search { min-width: 220px; }
     .grow { flex: 1; }
     .chips { display: flex; gap: var(--app-space-2); }

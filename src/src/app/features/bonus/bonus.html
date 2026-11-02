@@ -21,9 +21,7 @@
         </ng-container>
       }
       <ng-container actions>
-        <label class="month">支給月
-          <input type="month" [ngModel]="payMonth" (ngModelChange)="changeMonth($event)" [disabled]="busy()">
-        </label>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="month"><mat-label>支給月</mat-label><input matInput type="month" [ngModel]="payMonth" (ngModelChange)="changeMonth($event)" [disabled]="busy()"></mat-form-field>
         <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || busy()"><mat-icon>refresh</mat-icon>読み込み直す</button>
       </ng-container>
     </app-page-head>

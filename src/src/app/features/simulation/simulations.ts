@@ -108,7 +108,7 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
     .kinds button.on { background: var(--app-color-link); color: #fff; border-color: var(--app-color-link); }
     .form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 12px 0; }
     .form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
-    .form input, .form select, .form textarea { padding: 6px 8px; font: inherit; border: 1px solid var(--app-color-border); border-radius: 6px; }
+    .form input:not(.mat-mdc-input-element), .form textarea:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; border: 1px solid var(--app-color-border); border-radius: 6px; }
     .wide { flex: 1 1 100%; }
     .result { background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); padding: 16px; }
     .big { font-size: 18px; font-weight: 700; }

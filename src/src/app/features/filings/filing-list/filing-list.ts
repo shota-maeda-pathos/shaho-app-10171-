@@ -106,7 +106,7 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
         </div>
 
         <form class="toolbar" (ngSubmit)="search()">
-          <input name="keyword" [(ngModel)]="keyword" placeholder="氏名・社員番号で探す（Enter）" aria-label="氏名・社員番号">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="keyword-field"><mat-label>氏名・社員番号で探す</mat-label><input matInput name="keyword" [(ngModel)]="keyword" aria-label="氏名・社員番号"><mat-icon matSuffix>search</mat-icon></mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select name="type" [(ngModel)]="filingType" (ngModelChange)="search()" aria-label="届出の種類">
             <mat-option value="">すべての届出</mat-option>
             @for (t of types; track t[0]) { <mat-option [value]="t[0]">{{ t[1] }}</mat-option> }
@@ -126,7 +126,7 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
                 <mat-option value="accepted">紙で受理</mat-option>
                 <mat-option value="returned">紙で返戻</mat-option>
               </mat-select></mat-form-field>
-              <input name="acceptance" [(ngModel)]="acceptanceNumber" placeholder="受付番号（MOCK-…）" aria-label="受付番号">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>受付番号</mat-label><input matInput name="acceptance" [(ngModel)]="acceptanceNumber" placeholder="MOCK-…"></mat-form-field>
               <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select name="base" [(ngModel)]="periodBase" aria-label="期間の基準">
                 <mat-option value="created">作成日</mat-option>
                 <mat-option value="submitted">提出日</mat-option>
@@ -197,8 +197,9 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
     .badge { font-size: 11px; padding: 0 6px; border-radius: 10px; background: var(--app-status-waiting-bg); }
     .badge.warn { color: var(--app-status-error-fg); background: var(--app-status-error-bg); }
     .toolbar { display: flex; flex-wrap: wrap; gap: var(--app-space-2); align-items: center; padding: var(--app-space-3) var(--app-space-5); border-bottom: 1px solid var(--app-color-border); }
-    .toolbar input, .toolbar select, .zip-row input, .zip-row select { padding: 7px 10px; border: 1px solid var(--app-color-border); border-radius: var(--app-radius); font: inherit; font-size: var(--app-font-sm); background: var(--app-color-surface); }
-    .toolbar > input { min-width: 220px; }
+    .zip-row input:not(.mat-mdc-input-element) { padding: 7px 10px; border: 1px solid var(--app-color-border); border-radius: var(--app-radius); font: inherit; font-size: var(--app-font-sm); background: var(--app-color-surface); }
+    .keyword-field { width: 260px; }
+    .date-field { width: 168px; }
     .more { display: flex; flex-wrap: wrap; gap: var(--app-space-2); align-items: center; width: 100%; }
     .note { margin: 0; padding: var(--app-space-2) var(--app-space-5); color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
     .sub { margin: 0; color: var(--app-color-text-sub); }

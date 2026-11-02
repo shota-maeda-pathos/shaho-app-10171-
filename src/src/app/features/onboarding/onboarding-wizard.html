@@ -52,8 +52,7 @@
               <mat-form-field appearance="outline"><mat-label>社員番号</mat-label>
                 <input matInput [(ngModel)]="employeeNumber" required maxlength="20"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>被保険者整理番号（分かれば）</mat-label>
-                <input matInput [(ngModel)]="insuredPersonNumber" maxlength="10">
-                <mat-hint>分からなければ空欄で構いません</mat-hint></mat-form-field>
+                <input matInput [(ngModel)]="insuredPersonNumber" maxlength="10"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>姓</mat-label><input matInput [(ngModel)]="profile.lastName" required></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>名</mat-label><input matInput [(ngModel)]="profile.firstName" required></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>姓（フリガナ）</mat-label><input matInput [(ngModel)]="profile.lastNameKana" required></mat-form-field>

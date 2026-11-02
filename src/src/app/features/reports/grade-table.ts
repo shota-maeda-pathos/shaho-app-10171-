@@ -46,7 +46,7 @@ interface Table { yearMonth: string; prefectureCode: string; rates: { health: nu
     :host { display: block; padding: var(--app-space-5); }
     .form { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 12px; flex-wrap: wrap; }
     .form label { display: flex; flex-direction: column; gap: 2px; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
-    .form select, .form input { padding: 6px 8px; font: inherit; }
+    .form input:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; }
     .wrap { overflow-x: auto; }
     table { border-collapse: collapse; font-size: var(--app-font-sm); min-width: 820px; width: 100%; background: var(--app-color-surface); }
     td, th { padding: 3px 8px; border: 1px solid var(--app-color-border); }
