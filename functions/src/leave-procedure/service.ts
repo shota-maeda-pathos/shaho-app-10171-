@@ -28,7 +28,7 @@ const SHORT: Record<Kind, string> = { maternity: '産休', childcare: '育休' }
 
 // ── 開始 ────────────────────────────────────────────
 
-export async function startLeave(input: { employeeId: string; kind: Kind; sourceProcedureId: string | null }, auth: AuthContext) {
+export async function startLeave(input: { employeeId: string; kind: Kind; sourceProcedureId: string | null; sourceRequestId?: string | null }, auth: AuthContext) {
   const base = `companies/${auth.companyId}`;
   const empPath = `${base}/employees/${input.employeeId}`;
   const [empSnap, employmentSnap] = await Promise.all([
@@ -69,6 +69,18 @@ export async function startLeave(input: { employeeId: string; kind: Kind; source
     }
   }
 
+  // 本人からの申請から始めたときは、申請の出産予定日・子・期間を入れておく（担当者がウィザードで確かめて直す）
+  let expectedBirthDate: string | null = null;
+  if (input.sourceRequestId) {
+    const { leaveStateFromRequest, loadRequestForHandoff } = await import('../portal/handoff');
+    const req = await loadRequestForHandoff(auth.companyId, input.sourceRequestId, input.employeeId, ['leave']);
+    if (req.detail.kind !== input.kind) throw invalidArg('申請の休業の種類と違います');
+    const s = leaveStateFromRequest(input.kind, req.detail);
+    expectedBirthDate = s.expectedBirthDate;
+    child = s.child ?? child;
+    period = s.period ?? period;
+  }
+
   const name = nameOf(employee);
   const now = Timestamp.now();
   const ref = db.collection(`${base}/procedures`).doc();
@@ -82,7 +94,7 @@ export async function startLeave(input: { employeeId: string; kind: Kind; source
     assignedTo: auth.uid, createdBy: auth.uid, references: [], notes: '', version: 1,
     createdAt: now, updatedAt: now, completedAt: null, deletedAt: null,
     leaveProcedure: {
-      kind: input.kind, expectedBirthDate: null, multiple: false, child, period,
+      kind: input.kind, expectedBirthDate, multiple: false, child, period,
       filingKind: 'start', filingId: null, startFilingId: null, filedWithBirth: false, pending: null, history: [],
       leaveId: null, exemptionId: null, sourceProcedureId: input.sourceProcedureId,
     },

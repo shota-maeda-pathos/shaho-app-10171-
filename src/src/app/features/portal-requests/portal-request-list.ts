@@ -24,10 +24,11 @@ const DETAIL_LABELS: Record<string, string> = {
   lastName: '姓', firstName: '名', lastNameKana: '姓（カナ）', firstNameKana: '名（カナ）', changedOn: '変わった日',
   birthDate: '生年月日', relationship: '続柄', coResident: '同居', annualIncome: '年収の見込み', since: '日付',
   dependentName: '家族の氏名', reason: '理由', kind: '休業', startDate: '開始日', endDate: '終了予定日', expectedBirthDate: '出産予定日',
+  childLastName: '子の姓', childFirstName: '子の名', childBirthDate: '子の生年月日', gender: '性別',
 };
 const VALUE_LABELS: Record<string, string> = {
   spouse: '配偶者', child: '子', parent: '父母', grandparent: '祖父母', sibling: '兄弟姉妹', grandchild: '孫', other: 'その他',
-  maternity: '産前産後休業', childcare: '育児休業', true: 'はい', false: 'いいえ',
+  maternity: '産前産後休業', childcare: '育児休業', true: 'はい', false: 'いいえ', male: '男', female: '女',
 };
 
 /**
@@ -147,10 +148,10 @@ export class PortalRequestListComponent implements OnInit {
     try {
       const leave = r.type === 'leave';
       const { data } = await httpsCallable<object, { procedureId: string }>(this.functions, leave ? 'leaveProcedureStart' : 'dependentChangeStart')({
-        companyId: this.auth.companyId, employeeId: r.employeeId, ...(leave ? { kind: r.detail['kind'] } : {}),
+        companyId: this.auth.companyId, employeeId: r.employeeId, sourceRequestId: r.id, ...(leave ? { kind: r.detail['kind'] } : {}),
       });
       await this.handle(r, 'inProgress');
-      this.snackBar.open('手続きを始めました。申請の内容を見ながら入力してください', '閉じる', { duration: 6000 });
+      this.snackBar.open('手続きを始めました。申請の内容を入れてあるので、確かめて進めてください', '閉じる', { duration: 6000 });
       await this.router.navigate([leave ? '/leaves' : '/dependents', data.procedureId]);
     } catch (e: any) {
       this.snackBar.open(`始められませんでした：${e?.message ?? ''}`, '閉じる', { duration: 6000 });

@@ -59,6 +59,8 @@ const STATUS_LABELS: Record<string, string> = { submitted: '受付待ち', inPro
               <mat-form-field appearance="outline"><mat-label>姓</mat-label><input matInput [(ngModel)]="f['lastName']" name="dLast"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>名</mat-label><input matInput [(ngModel)]="f['firstName']" name="dFirst"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>生年月日</mat-label><input matInput type="date" [(ngModel)]="f['birthDate']" name="dBirth"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>性別</mat-label>
+                <mat-select [(ngModel)]="f['gender']" name="dGender"><mat-option value="female">女</mat-option><mat-option value="male">男</mat-option></mat-select></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>続柄</mat-label>
                 <mat-select [(ngModel)]="f['relationship']" name="rel">
                   <mat-option value="spouse">配偶者</mat-option><mat-option value="child">子</mat-option><mat-option value="parent">父母</mat-option>
@@ -79,13 +81,18 @@ const STATUS_LABELS: Record<string, string> = { submitted: '受付待ち', inPro
               <mat-form-field appearance="outline"><mat-label>開始日</mat-label><input matInput type="date" [(ngModel)]="f['startDate']" name="ls"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>終了予定日</mat-label><input matInput type="date" [(ngModel)]="f['endDate']" name="le"></mat-form-field>
               @if (f['kind'] === 'maternity') { <mat-form-field appearance="outline"><mat-label>出産予定日</mat-label><input matInput type="date" [(ngModel)]="f['expectedBirthDate']" name="eb"></mat-form-field> }
+              @if (f['kind'] === 'childcare') {
+                <mat-form-field appearance="outline"><mat-label>子の姓</mat-label><input matInput [(ngModel)]="f['childLastName']" name="cl"></mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>子の名</mat-label><input matInput [(ngModel)]="f['childFirstName']" name="cf"></mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>子の生年月日</mat-label><input matInput type="date" [(ngModel)]="f['childBirthDate']" name="cb"></mat-form-field>
+              }
             }
           }
         </div>
         <mat-form-field appearance="outline" class="wide"><mat-label>担当者への連絡（任意）</mat-label><input matInput [(ngModel)]="note" name="note"></mat-form-field>
-        @if (type === 'dependentAdd' || type === 'dependentRemove') {
+        @if (type === 'dependentAdd' || type === 'dependentRemove' || type === 'leave') {
           <div class="attach">
-            <label>書類を添える（PDF・JPEG・PNG、1ファイル5MBまで。続柄や収入が分かる書類など）
+            <label>書類を添える（PDF・JPEG・PNG、1ファイル5MBまで。{{ type === 'leave' ? '母子健康手帳の写しなど出産・出生を確かめられる書類' : '続柄や収入が分かる書類など' }}）
               <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" (change)="pick($event)"></label>
             @if (files.length) { <span class="sub">{{ files.length }}ファイルを選んでいます</span> }
           </div>

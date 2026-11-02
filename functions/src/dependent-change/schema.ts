@@ -10,6 +10,8 @@ export const DependentChangeStartSchema = z.object({
   companyId: id,
   employeeId: id,
   sourceProcedureId: id.nullish().transform(v => v ?? null),
+  /** 本人からの申請（ポータル）から始めたときの申請のID。中身を最初の入力に引き継ぐ */
+  sourceRequestId: id.nullish().transform(v => v ?? null),
 });
 export const DependentChangeGetSchema = z.object({ companyId: id, procedureId: id });
 

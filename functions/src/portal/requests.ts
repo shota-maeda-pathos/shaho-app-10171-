@@ -27,9 +27,9 @@ export const REQUEST_TYPES = {
 export const RequestCreateSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('address'), postalCode: z.string().regex(/^\d{3}-?\d{4}$/), prefecture: z.string().min(1).max(10), city: z.string().min(1).max(50), addressLine: z.string().min(1).max(100), building: z.string().max(100).optional(), movedOn: date }),
   z.object({ type: z.literal('name'), lastName: z.string().min(1).max(30), firstName: z.string().min(1).max(30), lastNameKana: z.string().min(1).max(60), firstNameKana: z.string().min(1).max(60), changedOn: date }),
-  z.object({ type: z.literal('dependentAdd'), lastName: z.string().min(1).max(30), firstName: z.string().min(1).max(30), lastNameKana: z.string().max(60).optional(), firstNameKana: z.string().max(60).optional(), birthDate: date, relationship: z.enum(['spouse', 'child', 'parent', 'grandparent', 'sibling', 'grandchild', 'other']), coResident: z.boolean(), annualIncome: z.number().int().min(0).max(100_000_000), since: date }),
+  z.object({ type: z.literal('dependentAdd'), lastName: z.string().min(1).max(30), firstName: z.string().min(1).max(30), lastNameKana: z.string().max(60).optional(), firstNameKana: z.string().max(60).optional(), birthDate: date, gender: z.enum(['male', 'female']).optional(), relationship: z.enum(['spouse', 'child', 'parent', 'grandparent', 'sibling', 'grandchild', 'other']), coResident: z.boolean(), annualIncome: z.number().int().min(0).max(100_000_000), since: date }),
   z.object({ type: z.literal('dependentRemove'), dependentName: z.string().min(1).max(60), reason: z.string().min(1).max(200), since: date }),
-  z.object({ type: z.literal('leave'), kind: z.enum(['maternity', 'childcare']), startDate: date, endDate: date, expectedBirthDate: date.optional(), note: z.string().max(400).optional() }),
+  z.object({ type: z.literal('leave'), kind: z.enum(['maternity', 'childcare']), startDate: date, endDate: date, expectedBirthDate: date.optional(), childLastName: z.string().max(30).optional(), childFirstName: z.string().max(30).optional(), childBirthDate: date.optional(), note: z.string().max(400).optional() }),
 ]);
 
 export const RequestCreateInput = z.object({ companyId: z.string().min(1), request: RequestCreateSchema, note: z.string().max(400).optional() });

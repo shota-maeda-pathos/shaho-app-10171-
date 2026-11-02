@@ -45,7 +45,7 @@ function dependentView(id: string, d: DependentDoc) {
 
 // ── 開始 ────────────────────────────────────────────
 
-export async function startDependentChange(input: { employeeId: string; sourceProcedureId: string | null }, auth: AuthContext) {
+export async function startDependentChange(input: { employeeId: string; sourceProcedureId: string | null; sourceRequestId?: string | null }, auth: AuthContext) {
   const base = `companies/${auth.companyId}`;
   const empPath = `${base}/employees/${input.employeeId}`;
   const [empSnap, employmentSnap] = await Promise.all([
@@ -79,6 +79,14 @@ export async function startDependentChange(input: { employeeId: string; sourcePr
         income: 0, coResident: true, occupation: '', isDisabled: false, reason: '', exceptionReason: '',
       }));
     }
+  }
+
+  // 本人からの申請から始めたときは、申請の中身を項目として入れておく（担当者がウィザードで確かめて直す）
+  if (input.sourceRequestId) {
+    const { dependentItemFromRequest, loadRequestForHandoff } = await import('../portal/handoff');
+    const req = await loadRequestForHandoff(auth.companyId, input.sourceRequestId, input.employeeId, ['dependentAdd', 'dependentRemove']);
+    const item = dependentItemFromRequest(req.type, req.detail, await currentDependents(auth.companyId, input.employeeId));
+    if (item) items = [...items, item];
   }
 
   const name = nameOf(employee);

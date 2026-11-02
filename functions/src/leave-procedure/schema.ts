@@ -10,6 +10,8 @@ export const LeaveStartSchema = z.object({
   employeeId: id,
   kind: z.enum(['maternity', 'childcare']),
   sourceProcedureId: id.nullish().transform(v => v ?? null),
+  /** 本人からの申請（ポータル）から始めたときの申請のID。中身を最初の入力に引き継ぐ */
+  sourceRequestId: id.nullish().transform(v => v ?? null),
 });
 export const LeaveGetSchema = z.object({ companyId: id, procedureId: id });
 
