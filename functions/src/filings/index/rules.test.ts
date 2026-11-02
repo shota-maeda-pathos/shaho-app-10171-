@@ -70,6 +70,10 @@ describe('状態のそろえ方', () => {
   it('従業員の下の届出：3軸から画面の状態', () => {
     expect(employeeFilingStatus({ workflowStatus: 'draft', mockStatus: 'notStarted', submissionStatus: 'notSubmitted' })).toEqual({ status: 'draft', paperStatus: 'none' });
     expect(employeeFilingStatus({ workflowStatus: 'rejected', mockStatus: 'notStarted', submissionStatus: 'notSubmitted' }).status).toBe('rejected');
+    // 承認を依頼しても workflowStatus は下書き・差戻しのまま。最新の依頼が承認待ちなら承認待ち（届出の画面と同じ）
+    expect(employeeFilingStatus({ workflowStatus: 'draft', approvalPending: true, mockStatus: 'notStarted', submissionStatus: 'notSubmitted' }).status).toBe('pending');
+    expect(employeeFilingStatus({ workflowStatus: 'rejected', approvalPending: true, mockStatus: 'notStarted', submissionStatus: 'notSubmitted' }).status).toBe('pending');
+    expect(employeeFilingStatus({ workflowStatus: 'approved', approvalPending: false, mockStatus: 'notStarted', submissionStatus: 'notSubmitted' }).status).toBe('approved');
     expect(employeeFilingStatus({ workflowStatus: 'approved', mockStatus: 'completed', submissionStatus: 'notSubmitted' }).status).toBe('completed');
     expect(employeeFilingStatus({ workflowStatus: 'approved', mockStatus: 'failed', submissionStatus: 'notSubmitted' }).status).toBe('mockFailed');
     expect(employeeFilingStatus({ workflowStatus: 'approved', mockStatus: 'notStarted', submissionStatus: 'accepted' })).toEqual({ status: 'approved', paperStatus: 'accepted' });

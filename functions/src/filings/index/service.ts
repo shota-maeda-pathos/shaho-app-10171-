@@ -25,10 +25,25 @@ async function entryOf(path: string, data: FirebaseFirestore.DocumentData): Prom
   const src = sourceOfPath(path);
   if (!src) return null;
   const base = `companies/${src.companyId}`;
+  if (src.source === 'employee') data = { ...data, approvalPending: await latestRequestPending(base, src.parentId, path) };
   const employee = src.source === 'employee' ? (await db.doc(`${base}/employees/${src.parentId}`).get()).data() ?? null : null;
   const officeId = src.source === 'employee' ? employee?.officeId : data.officeId ?? src.parentId.replace(/_[^_]+$/, '');
   const office = officeId ? (await db.doc(`${base}/offices/${officeId}`).get()).data() ?? null : null;
   return buildIndexEntry(data, { ...src, path, employee, office, runOfficeId: officeId });
+}
+
+/** 従業員の届出の最新の承認の依頼が承認待ちか（届出の画面の filingGet と同じ決め方） */
+async function latestRequestPending(base: string, employeeId: string, filingPath: string): Promise<boolean> {
+  const requests = await db.collection(`${base}/employees/${employeeId}/approvalRequests`).where('targetPath', '==', filingPath).get();
+  const last = requests.docs.map(d => d.data()).sort((a, b) => (b.requestedAt?.toMillis?.() ?? 0) - (a.requestedAt?.toMillis?.() ?? 0))[0];
+  return last?.status === 'pending';
+}
+
+/** 承認の依頼が動いたら、その届出の索引も合わせる（依頼では届出そのものは書き換わらないため） */
+export async function syncFilingIndexForRequest(request: FirebaseFirestore.DocumentData | undefined) {
+  if (request?.requestType !== 'filing' || !request.targetPath) return;
+  const snap = await db.doc(request.targetPath).get();
+  if (snap.exists) await syncFilingIndex(snap.ref.path, snap.data());
 }
 
 /** トリガーから呼ぶ：届出が書き換わったら索引を合わせる（消えたら索引も消す） */

@@ -11,12 +11,16 @@ import {
   syncRequestIndex,
 } from './service';
 import { markSummaryStale } from '../../dashboard/summary/service';
+import { syncFilingIndexForRequest } from '../../filings/index/service';
 
 /** 承認申請の索引。Firestore のトリガーはデータベースと同じ地域に置く */
 export const approvalIndexRequest = onDocumentWritten(
   { document: 'companies/{companyId}/employees/{employeeId}/approvalRequests/{requestId}', region: 'asia-northeast1' },
   async (event) => {
-    await syncRequestIndex(event.document, event.data?.after.exists ? event.data.after.data() : undefined);
+    const after = event.data?.after.exists ? event.data.after.data() : undefined;
+    await syncRequestIndex(event.document, after);
+    // 届出の一覧の「承認待ち」も合わせる（消えたときは前の内容から届出を探す）
+    await syncFilingIndexForRequest(after ?? event.data?.before.data());
     await markSummaryStale(event.params.companyId);
   },
 );

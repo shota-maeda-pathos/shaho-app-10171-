@@ -86,7 +86,8 @@ export function employeeFilingStatus(data: Data): { status: FilingStatus; paperS
   const paperStatus = sub.paperStatus;
   if (data.cancelledAt || workflow === 'cancelled') return { status: 'cancelled', paperStatus };
   if (workflow === 'approved') return { status: sub.status ?? 'approved', paperStatus };
-  if (workflow === 'pending') return { status: 'pending', paperStatus };
+  // 承認を依頼しても届出の workflowStatus は下書き・差戻しのまま（依頼は approvalRequests にある）。最新の依頼が承認待ちなら承認待ち
+  if (workflow === 'pending' || data.approvalPending === true) return { status: 'pending', paperStatus };
   if (workflow === 'rejected') return { status: 'rejected', paperStatus };
   return { status: 'draft', paperStatus };
 }
