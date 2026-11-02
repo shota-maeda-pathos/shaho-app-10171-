@@ -321,13 +321,6 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/account/account').then((m) => m.AccountComponent),
       },
-      {
-        path: 'ui-samples',
-        canActivate: [roleGuard('admin', 'operator')],
-        data: { title: '画面部品の見本' },
-        loadComponent: () =>
-          import('./features/ui-samples/ui-samples').then((m) => m.UiSamplesComponent),
-      },
     ],
   },
 ];
