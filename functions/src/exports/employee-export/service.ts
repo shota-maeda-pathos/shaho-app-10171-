@@ -2,6 +2,7 @@ import { db } from '../../config';
 import { Timestamp } from 'firebase-admin/firestore';
 import { AuthContext, requireOffice } from '../../middleware/auth';
 import { EmployeeExportInput } from './schema';
+import { EMPLOYEE_CSV_COLUMNS, EXPORT_ONLY_COLUMNS } from '../../employees/employee-csv-import/rules';
 
 export interface EmployeeExportResponse {
   csv: string;
@@ -25,27 +26,31 @@ export async function exportEmployees(
 
   const snap = await query.get();
 
-  const headers = [
-    '社員番号', '姓', '名', '姓カナ', '名カナ',
-    '生年月日', '性別', '事業所ID', '入社日', '退職日',
-    '在籍状況',
-  ];
+  // 列は従業員CSVの取込と同じ（出力して直したものを、そのまま取り込める）。個人番号は出さない（カタログ14章）
+  const columns = EMPLOYEE_CSV_COLUMNS.filter(c => c.field !== 'myNumber');
+  const headers = [...columns.map(c => c.label), ...EXPORT_ONLY_COLUMNS];
 
   const docs = snap.docs.filter((doc) =>
     auth.roles.includes('admin') || auth.officeIds.includes(doc.data().officeId),
   );
+  const [offices, departments] = docs.length
+    ? await Promise.all([db.collection(`companies/${auth.companyId}/offices`).get(), db.collection(`companies/${auth.companyId}/departments`).get()])
+    : [null, null];
+  const officeName = new Map((offices?.docs ?? []).map(d => [d.id, String(d.data().name ?? d.id)]));
+  const departmentName = new Map((departments?.docs ?? []).map(d => [d.id, String(d.data().name ?? '')]));
   const rows = docs.map((doc) => {
     const d = doc.data();
+    const value = (field: string): unknown => {
+      switch (field) {
+        case 'birthDate': case 'hireDate': return formatDate(d[field]);
+        case 'gender': return d.gender === 'male' ? '男' : d.gender === 'female' ? '女' : '';
+        case 'office': return officeName.get(d.officeId) ?? d.officeId ?? '';
+        case 'department': return d.departmentId ? departmentName.get(d.departmentId) ?? '' : '';
+        default: return d[field] ?? '';
+      }
+    };
     return [
-      d.employeeNumber ?? '',
-      d.lastName ?? '',
-      d.firstName ?? '',
-      d.lastNameKana ?? '',
-      d.firstNameKana ?? '',
-      formatDate(d.birthDate),
-      d.gender ?? '',
-      d.officeId ?? '',
-      formatDate(d.hireDate),
+      ...columns.map(c => value(c.field)),
       formatDate(d.resignationDate),
       d.isActive ? '在籍' : '退職',
     ].map(escapeCsv).join(',');

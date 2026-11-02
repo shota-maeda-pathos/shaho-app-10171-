@@ -92,13 +92,8 @@ export const routes: Routes = [
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '給与' },
         children: [
-          {
-            path: '',
-            loadComponent: () =>
-              import('./features/salary/salary-list/salary-list').then(
-                (m) => m.SalaryListComponent,
-              ),
-          },
+          // 旧い給与の一覧は毎月の処理へ移した（給与の取込・承認・公開は毎月の処理で行う）
+          { path: '', redirectTo: '/monthly', pathMatch: 'full' },
           {
             path: ':employeeId',
             data: { title: '給与編集' },

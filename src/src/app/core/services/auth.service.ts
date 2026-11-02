@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  Auth, GoogleAuthProvider, User, onAuthStateChanged, signInWithCustomToken, signInWithPopup, signOut,
+  Auth, GoogleAuthProvider, User, onAuthStateChanged, sendPasswordResetEmail, signInWithCustomToken, signInWithPopup, signOut,
 } from '@angular/fire/auth';
 import { Firestore, doc, getDoc, onSnapshot } from '@angular/fire/firestore';
 import { Functions, httpsCallable } from '@angular/fire/functions';
@@ -137,6 +137,21 @@ export class AuthService {
     // セッションつきのトークンでログインし直しても「ログインの状態が変わった」と通知されず、画面が進まないので、いったん抜ける
     if (this.auth.currentUser) await signOut(this.auth);
     await signInWithCustomToken(this.auth, result.token);
+  }
+
+  /**
+   * パスワードの再設定のメールを送る（Firebase の標準のメールと再設定の画面）。
+   * 登録のないメールアドレスかどうかは伝えない。再設定したパスワードがポリシーを満たさない・前に使ったものなら、次のログインで変更を求める
+   */
+  async sendPasswordReset(email: string): Promise<void> {
+    try {
+      await sendPasswordResetEmail(this.auth, email, { url: `${location.origin}/login` });
+    } catch (e: any) {
+      if (e?.code === 'auth/invalid-email' || e?.code === 'auth/missing-email') throw new Error('メールアドレスの形が正しくありません');
+      if (e?.code === 'auth/too-many-requests') throw new Error('続けて送りすぎました。しばらく待ってからもう一度お試しください');
+      if (e?.code === 'auth/network-request-failed') throw new Error('通信できませんでした。もう一度お試しください');
+      // 登録のないメールアドレスなどは、送ったときと同じ案内にする
+    }
   }
 
   async login(email: string, password: string): Promise<void> {

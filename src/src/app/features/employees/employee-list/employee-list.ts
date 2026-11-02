@@ -54,7 +54,7 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
       <ng-container actions>
         <button mat-stroked-button (click)="exportCsv()" [disabled]="exporting()">
           <mat-icon>download</mat-icon>
-          {{ exporting() ? '出力中...' : '在籍者CSV出力' }}
+          {{ exporting() ? '出力中...' : '在籍者をCSVに出力' }}
         </button>
         <button mat-stroked-button (click)="openCsvImport()">
           <mat-icon>upload_file</mat-icon>
@@ -295,7 +295,7 @@ export class EmployeeListComponent implements OnInit {
   }
 
   openCsvImport() {
-    const ref = this.dialog.open(CsvImportDialogComponent, { width: '640px' });
+    const ref = this.dialog.open(CsvImportDialogComponent, { width: '720px', maxWidth: '95vw', disableClose: true });
     ref.afterClosed().subscribe((imported) => {
       if (imported) {
         this.employees.set([]);

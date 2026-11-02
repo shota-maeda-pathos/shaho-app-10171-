@@ -21,7 +21,9 @@ const roleRank = (roles: string[]) => Math.min(...(roles ?? []).map(r => ROLE_OR
 interface InvitationListItem {
   id: string;
   email: string;
+  displayName: string;
   roles: string[];
+  officeIds: string[];
   status: string;
   expiresAt: string;
 }
@@ -64,7 +66,9 @@ export async function listUsers(
     return {
       id: d.id,
       email: data.email,
+      displayName: data.displayName ?? '',
       roles: data.roles,
+      officeIds: data.officeIds ?? [],
       status: data.status,
       expiresAt: data.expiresAt?.toDate?.()?.toISOString?.() ?? '',
     };

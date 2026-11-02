@@ -6,11 +6,35 @@ import { invalidArg } from '../../utils/errors';
 import { UserInviteInput } from './schema';
 
 const INVITATION_EXPIRY_DAYS = 7;
+const OFFICE_ROLES = ['operator', 'approver', 'viewer'];
+
+/**
+ * 招待の中身を確かめる。担当者・承認者・閲覧者（管理者でない人）は担当事業所が要る（ないと何も見えない）。
+ * 従業員（本人）は従業員につなぐ必要があるので、従業員の画面の「本人ポータル」から招待する
+ */
+export function inviteProblem(input: Pick<UserInviteInput, 'roles' | 'officeIds' | 'employeeId'>): string | null {
+  if (input.roles.includes('employee') && !input.employeeId) {
+    return '従業員（本人）は、従業員の画面の「本人ポータル」から招待してください（従業員の記録につなぐため）';
+  }
+  if (!input.roles.includes('admin') && input.roles.some(r => OFFICE_ROLES.includes(r)) && !(input.officeIds ?? []).length) {
+    return '担当事業所を選んでください（担当者・承認者・閲覧者は、担当事業所のデータだけを扱います）';
+  }
+  return null;
+}
 
 export async function inviteUser(
   input: UserInviteInput,
   auth: AuthContext,
 ): Promise<MutationResponse> {
+  const problem = inviteProblem(input);
+  if (problem) throw invalidArg(problem);
+  const officeIds = [...new Set(input.officeIds ?? [])];
+  if (officeIds.length) {
+    const offices = await db.getAll(...officeIds.map(id => db.doc(`companies/${auth.companyId}/offices/${id}`)));
+    const missing = offices.find(o => !o.exists || o.data()?.abolishedOn);
+    if (missing) throw invalidArg(`担当事業所が見つからないか、廃止されています（${missing.id}）`);
+  }
+
   const result = await db.runTransaction(async (tx) => {
     const existingUsersSnap = await db
       .collection(`companies/${auth.companyId}/users`)
@@ -44,8 +68,9 @@ export async function inviteUser(
 
     tx.set(inviteRef, {
       email: input.email,
+      displayName: input.displayName,
       roles: input.roles,
-      officeIds: input.officeIds ?? [],
+      officeIds,
       employeeId: input.employeeId ?? null,
       status: 'pending',
       invitedBy: auth.uid,
@@ -61,7 +86,7 @@ export async function inviteUser(
       entity: 'invitation',
       entityId: inviteRef.id,
       action: 'invite',
-      changes: {},
+      changes: { email: input.email, displayName: input.displayName, roles: input.roles, officeIds },
       performedBy: auth.uid,
       performedAt: now,
       version: 1,

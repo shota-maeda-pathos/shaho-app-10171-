@@ -347,7 +347,7 @@ export class SalaryEditComponent implements OnInit {
 
   goBack() {
     if (this.returnTo) this.router.navigate(['/monthly'], { queryParams: { officeId: this.returnTo.officeId, payMonth: this.yearMonth } });
-    else this.router.navigate(['/salary']);
+    else this.router.navigate(['/monthly']);
   }
 
   private toRecord(entries: AllowanceEntry[]): Record<string, number> {

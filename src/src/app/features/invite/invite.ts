@@ -10,6 +10,7 @@ import { AuthService } from '../../core/services/auth.service';
 
 interface InvitationInfo {
   email: string;
+  displayName?: string;
   expiresAt: string;
   googleAllowed: boolean;
 }
@@ -74,6 +75,7 @@ export class InviteComponent implements OnInit {
     try {
       const { data } = await httpsCallable<object, InvitationInfo>(this.functions, 'authInvitationGet')({ companyId: this.auth.companyId, invitationId: this.id });
       this.info.set(data);
+      if (data.displayName && !this.displayName) this.displayName = data.displayName;
     } catch (e: any) {
       this.error.set(e?.message ?? '招待を読み込めませんでした');
     }

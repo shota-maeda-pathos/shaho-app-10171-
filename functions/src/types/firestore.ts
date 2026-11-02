@@ -336,6 +336,8 @@ export interface UserDoc {
 
 export interface InvitationDoc {
   email: string;
+  /** 招待するときに入れた氏名（登録の画面に最初から入れる。従業員の招待にはない） */
+  displayName?: string;
   roles: ('admin' | 'approver' | 'operator' | 'viewer' | 'employee')[];
   officeIds: string[];
   employeeId: string | null;

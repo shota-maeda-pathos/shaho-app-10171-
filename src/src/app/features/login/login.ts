@@ -57,7 +57,19 @@ import { LogoComponent } from '../../shared/ui';
           <button mat-stroked-button type="button" class="full-width login-btn" (click)="onGoogle()" [disabled]="submitting()">
             Google でログイン
           </button>
-          <p class="note">パスワードを忘れたときは管理者に連絡してください。</p>
+          @if (!resetOpen()) {
+            <button mat-button type="button" class="reset-link" (click)="openReset()">パスワードを忘れたとき</button>
+          } @else {
+            <div class="reset" role="region" aria-label="パスワードの再設定">
+              <p class="note">上の欄のメールアドレスに、パスワードを再設定するリンクを送ります。新しいパスワードは8文字以上で、英字と数字を混ぜてください（前に使ったものは使えません）。</p>
+              @if (resetMessage()) { <p class="note done" role="status">{{ resetMessage() }}</p> }
+              @if (resetError()) { <p class="error">{{ resetError() }}</p> }
+              <button mat-stroked-button type="button" class="full-width" (click)="onReset()" [disabled]="resetting() || !email.trim()">
+                再設定のメールを送る
+              </button>
+              <p class="note">5回続けて間違えてロックされたときは、30分待つか管理者に解除を頼んでください。メールアドレスを変えたいときも管理者に連絡してください。</p>
+            </div>
+          }
         </mat-card-content>
       </mat-card>
     </div>
@@ -90,6 +102,10 @@ import { LogoComponent } from '../../shared/ui';
     .or { display: flex; align-items: center; gap: var(--app-space-2); margin: var(--app-space-4) 0 var(--app-space-2); color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
     .or::before, .or::after { content: ''; flex: 1; border-top: 1px solid var(--app-color-border); }
     .note { margin: var(--app-space-3) 0 0; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
+    .note.done { color: var(--app-color-text); }
+    .reset-link { margin-top: var(--app-space-3); padding: 0; }
+    .reset { margin-top: var(--app-space-3); display: flex; flex-direction: column; gap: var(--app-space-2); }
+    .reset .note { margin: 0; }
     .error { color: var(--app-status-action-fg); font-size: var(--app-font-md); margin: var(--app-space-2) 0; }
     .timeout-msg { color: var(--app-color-text); font-size: var(--app-font-md); margin: 0 0 var(--app-space-4); padding: var(--app-space-2) var(--app-space-3); background: var(--app-status-action-bg); border-radius: var(--app-radius); }
   `],
@@ -104,6 +120,10 @@ export class LoginComponent implements OnInit {
   error = signal('');
   submitting = signal(false);
   endedReason = signal<string | null>(null);
+  resetOpen = signal(false);
+  resetting = signal(false);
+  resetMessage = signal('');
+  resetError = signal('');
 
   ngOnInit() {
     const legacy = this.route.snapshot.queryParams['reason'] === 'timeout' ? 'セッションがタイムアウトしました。再度ログインしてください。' : null;
@@ -112,6 +132,26 @@ export class LoginComponent implements OnInit {
 
   async onLogin() {
     await this.run(() => this.auth.login(this.email, this.password));
+  }
+
+  openReset() {
+    this.resetOpen.set(true);
+    this.resetMessage.set('');
+    this.resetError.set('');
+  }
+
+  async onReset() {
+    this.resetting.set(true);
+    this.resetMessage.set('');
+    this.resetError.set('');
+    try {
+      await this.auth.sendPasswordReset(this.email.trim());
+      this.resetMessage.set(`${this.email.trim()} が登録されていれば、再設定のメールを送りました。届かないときは迷惑メールのフォルダも確かめてください。`);
+    } catch (e: any) {
+      this.resetError.set(e?.message ?? '送れませんでした。もう一度お試しください');
+    } finally {
+      this.resetting.set(false);
+    }
   }
 
   async onGoogle() {

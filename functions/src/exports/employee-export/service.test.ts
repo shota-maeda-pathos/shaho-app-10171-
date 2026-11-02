@@ -4,7 +4,9 @@ const mockGet = jest.fn();
 const mockWhere = jest.fn();
 jest.mock('../../config', () => {
   const q: any = { where: (...args: unknown[]) => { mockWhere(...args); return q; }, orderBy: () => q, get: () => mockGet() };
-  return { db: { collection: () => q } };
+  const offices = { get: async () => ({ docs: [{ id: 'office-001', data: () => ({ name: '本社' }) }] }) };
+  const departments = { get: async () => ({ docs: [] }) };
+  return { db: { collection: (path: string) => (path.endsWith('/offices') ? offices : path.endsWith('/departments') ? departments : q) } };
 });
 import { exportEmployees } from './service';
 const input = { companyId: 'company-001' };
@@ -19,6 +21,10 @@ test('admin exports all offices with BOM, real dates and resignationDate', async
   expect(result.csv.startsWith('\uFEFF')).toBe(true);
   expect(result.csv).toContain('1990-01-15');
   expect(result.csv).toContain('2026-10-01,退職');
+  // 取込と同じ列（事業所は名前、性別は男／女）。個人番号の列はない
+  expect(result.csv.split('\r\n')[0]).toContain('社員番号,姓,名,姓カナ,名カナ,生年月日,性別,事業所,部署,入社日');
+  expect(result.csv).not.toContain('個人番号');
+  expect(result.csv).toContain(',本社,');
   expect(result.csv).not.toContain('[object Object]');
   expect(mockWhere).toHaveBeenCalledWith('deletedAt', '==', null);
 });

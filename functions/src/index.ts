@@ -21,6 +21,7 @@ lazy(() => require('./companies/company-update/functions'), ['companyUpdate']);
 
 // 従業員API
 lazy(() => require('./employees/employee-create/functions'), ['employeeCreate']);
+lazy(() => require('./employees/employee-csv-import/functions'), ['employeeCsvImport']);
 lazy(() => require('./employees/employee-onboard/functions'), ['employeeOnboard']);
 lazy(() => require('./employees/employee-list/functions'), ['employeeList']);
 lazy(() => require('./employees/employee-get/functions'), ['employeeGet']);
@@ -182,7 +183,6 @@ lazy(() => require('./procedures/procedure-cancel/functions'), ['procedureCancel
 
 // セットアップ
 lazy(() => require('./seed/seed-master/functions'), ['seedMasterData']);
-lazy(() => require('./seed/seed-grades/functions'), ['seedGrades']);
 lazy(() => require('./migrations/rounding-rule'), ['migrateOfficeRoundingRule']);
 lazy(() => require('./migrations/rate-repair'), ['migrateInsuranceRates']);
 lazy(() => require('./migrations/grade-numbers'), ['migrateGradeNumbers']);

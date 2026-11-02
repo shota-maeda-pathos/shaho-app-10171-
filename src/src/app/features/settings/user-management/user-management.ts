@@ -14,7 +14,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
-import { AccessOffice, UserAccessDialogComponent, UserAccessResult } from './user-access-dialog';
+import { AccessOffice, USER_ROLES, UserAccessDialogComponent, UserAccessResult } from './user-access-dialog';
 
 interface UserRow {
   id: string;
@@ -29,7 +29,9 @@ interface UserRow {
 interface InvitationRow {
   id: string;
   email: string;
+  displayName?: string;
   roles: string[];
+  officeIds?: string[];
   status: string;
   expiresAt: string;
 }
@@ -62,25 +64,42 @@ const ROLE_LABELS: Record<string, string> = {
           <h3>新規ユーザー招待</h3>
           <div class="form-row">
             <mat-form-field appearance="outline">
+              <mat-label>氏名</mat-label>
+              <input matInput [(ngModel)]="inviteName" maxlength="50">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
               <mat-label>メールアドレス</mat-label>
               <input matInput [(ngModel)]="inviteEmail" type="email">
             </mat-form-field>
+          </div>
+          <div class="form-row">
             <mat-form-field appearance="outline">
-              <mat-label>ロール</mat-label>
+              <mat-label>ロール（複数選択可）</mat-label>
               <mat-select [(ngModel)]="inviteRoles" multiple>
-                <mat-option value="admin">管理者</mat-option>
-                <mat-option value="approver">承認者</mat-option>
-                <mat-option value="operator">担当者</mat-option>
-                <mat-option value="viewer">閲覧者</mat-option>
-                <mat-option value="employee">従業員</mat-option>
+                @for (role of staffRoles; track role.value) {
+                  <mat-option [value]="role.value">{{ role.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>担当事業所（複数選択可）</mat-label>
+              <mat-select [(ngModel)]="inviteOfficeIds" multiple [disabled]="inviteRoles.includes('admin')">
+                @for (office of offices(); track office.id) {
+                  @if (office.isActive) { <mat-option [value]="office.id">{{ office.name }}</mat-option> }
+                }
               </mat-select>
             </mat-form-field>
           </div>
+          @if (inviteRoles.includes('admin')) {
+            <p class="form-note">管理者は全事業所を扱えます（担当事業所は選びません）。</p>
+          } @else if (inviteNeedsOffices() && inviteOfficeIds.length === 0) {
+            <p class="form-note">担当者・承認者・閲覧者は、選んだ担当事業所のデータだけを扱います。担当事業所を選んでください。</p>
+          }
+          <p class="form-note">招待はメールでは送りません。作るとリンクをコピーするので、本人に渡してください（期限7日。「招待中」からもう一度コピーできます）。従業員（本人ポータル）は、従業員の画面の「本人ポータル」から招待します。</p>
           <div class="form-actions">
             <button mat-stroked-button (click)="showInviteForm.set(false)">キャンセル</button>
-            <button mat-flat-button color="primary" (click)="sendInvite()"
-              [disabled]="!inviteEmail || inviteRoles.length === 0 || inviting()">
-              招待を送信
+            <button mat-flat-button color="primary" (click)="sendInvite()" [disabled]="!canInvite()">
+              招待を作ってリンクをコピー
             </button>
           </div>
         </mat-card>
@@ -108,8 +127,19 @@ const ROLE_LABELS: Record<string, string> = {
             </ng-container>
 
             <ng-container matColumnDef="email">
-              <th mat-header-cell *matHeaderCellDef>メール</th>
-              <td mat-cell *matCellDef="let row">{{ row.email }}</td>
+              <th mat-header-cell *matHeaderCellDef>氏名・メール</th>
+              <td mat-cell *matCellDef="let row">
+                @if (row.displayName) { <div>{{ row.displayName }}</div> }
+                <div>{{ row.email }}</div>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="inviteOffices">
+              <th mat-header-cell *matHeaderCellDef>担当事業所</th>
+              <td mat-cell *matCellDef="let row">
+                @if (row.roles.includes('admin')) { 全事業所 }
+                @else { @for (id of row.officeIds ?? []; track id) { <div>{{ officeName(id) }}</div> } }
+              </td>
             </ng-container>
 
             <ng-container matColumnDef="roles">
@@ -178,8 +208,19 @@ const ROLE_LABELS: Record<string, string> = {
         <mat-card>
           <table mat-table [dataSource]="invitations()" class="full-width-table">
             <ng-container matColumnDef="email">
-              <th mat-header-cell *matHeaderCellDef>メール</th>
-              <td mat-cell *matCellDef="let row">{{ row.email }}</td>
+              <th mat-header-cell *matHeaderCellDef>氏名・メール</th>
+              <td mat-cell *matCellDef="let row">
+                @if (row.displayName) { <div>{{ row.displayName }}</div> }
+                <div>{{ row.email }}</div>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="inviteOffices">
+              <th mat-header-cell *matHeaderCellDef>担当事業所</th>
+              <td mat-cell *matCellDef="let row">
+                @if (row.roles.includes('admin')) { 全事業所 }
+                @else { @for (id of row.officeIds ?? []; track id) { <div>{{ officeName(id) }}</div> } }
+              </td>
             </ng-container>
 
             <ng-container matColumnDef="roles">
@@ -228,6 +269,7 @@ const ROLE_LABELS: Record<string, string> = {
     .invite-form h3 { margin: 0 0 16px; }
     .form-row { display: flex; gap: 16px; }
     .form-row mat-form-field { flex: 1; }
+    .form-note { font-size: 13px; color: var(--app-text-secondary, #5f6368); margin: 0 0 8px; }
     .form-actions { display: flex; justify-content: flex-end; gap: 12px; }
     .full-width-table { width: 100%; }
     .loading-container { display: flex; justify-content: center; padding: 48px; }
@@ -259,11 +301,15 @@ export class UserManagementComponent implements OnInit {
   error = signal('');
   officeError = signal('');
 
+  inviteName = '';
   inviteEmail = '';
   inviteRoles: string[] = [];
+  inviteOfficeIds: string[] = [];
+  /** この画面で招待するのはスタッフだけ（従業員は従業員の記録につなぐため、従業員の画面から招待する） */
+  readonly staffRoles = USER_ROLES.filter(role => role.value !== 'employee');
 
   userColumns = ['displayName', 'email', 'roles', 'offices', 'status', 'actions'];
-  invitationColumns = ['email', 'roles', 'status', 'expiresAt', 'inviteActions'];
+  invitationColumns = ['email', 'roles', 'inviteOffices', 'status', 'expiresAt', 'inviteActions'];
 
   ngOnInit() {
     this.loadUsers();
@@ -348,19 +394,33 @@ export class UserManagementComponent implements OnInit {
     }
   }
 
+  inviteNeedsOffices() {
+    return !this.inviteRoles.includes('admin') && this.inviteRoles.some(role => this.isOfficeRole(role));
+  }
+
+  canInvite() {
+    return !this.inviting() && !!this.inviteName.trim() && !!this.inviteEmail.trim() && this.inviteRoles.length > 0
+      && (!this.inviteNeedsOffices() || this.inviteOfficeIds.length > 0);
+  }
+
   async sendInvite() {
     this.inviting.set(true);
     try {
-      const fn = httpsCallable(this.functions, 'userInvite');
-      await fn({
+      const fn = httpsCallable<object, { id: string }>(this.functions, 'userInvite');
+      const email = this.inviteEmail.trim();
+      const { data } = await fn({
         companyId: this.auth.companyId,
-        email: this.inviteEmail,
+        email,
+        displayName: this.inviteName.trim(),
         roles: this.inviteRoles,
+        officeIds: this.inviteRoles.includes('admin') ? [] : this.inviteOfficeIds,
       });
-      this.snackBar.open('招待を送信しました', '閉じる', { duration: 3000 });
+      this.inviteName = '';
       this.inviteEmail = '';
       this.inviteRoles = [];
+      this.inviteOfficeIds = [];
       this.showInviteForm.set(false);
+      await this.copyLink({ id: data.id, email, roles: [], status: 'pending', expiresAt: '' });
       this.loadUsers();
     } catch (e: any) {
       this.snackBar.open(`エラー: ${e.message}`, '閉じる', { duration: 5000 });

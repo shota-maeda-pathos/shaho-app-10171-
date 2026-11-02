@@ -289,11 +289,18 @@ async function loadInvitation(companyId: string, invitationId: string) {
   return { ref, inv };
 }
 
-export async function invitationGet(input: InvitationGetInput): Promise<{ email: string; expiresAt: string; googleAllowed: boolean }> {
+export async function invitationGet(input: InvitationGetInput): Promise<{ email: string; displayName: string; expiresAt: string; googleAllowed: boolean }> {
   const { inv } = await loadInvitation(input.companyId, input.invitationId);
   const company = await db.doc(base(input.companyId)).get();
+  let displayName = inv.displayName ?? '';
+  // 従業員の招待は台帳の氏名を入れておく
+  if (!displayName && inv.employeeId) {
+    const emp = (await db.doc(`${base(input.companyId)}/employees/${inv.employeeId}`).get()).data() as EmployeeDoc | undefined;
+    if (emp) displayName = `${emp.lastName ?? ''} ${emp.firstName ?? ''}`.trim();
+  }
   return {
     email: inv.email,
+    displayName,
     expiresAt: (inv.expiresAt as Timestamp).toDate().toISOString(),
     googleAllowed: domainAllowed(inv.email, company.data()?.allowedGoogleDomains),
   };
