@@ -179,6 +179,7 @@ lazy(() => require('./seed/seed-master/functions'), ['seedMasterData']);
 lazy(() => require('./seed/seed-grades/functions'), ['seedGrades']);
 lazy(() => require('./migrations/rounding-rule'), ['migrateOfficeRoundingRule']);
 lazy(() => require('./migrations/rate-repair'), ['migrateInsuranceRates']);
+lazy(() => require('./migrations/grade-numbers'), ['migrateGradeNumbers']);
 lazy(() => require('./onboarding/functions'), [
   'onboardingStart', 'onboardingGet', 'onboardingList', 'onboardingPreview', 'onboardingUpdate', 'onboardInviteGet', 'onboardInviteSubmit',
 ]);
