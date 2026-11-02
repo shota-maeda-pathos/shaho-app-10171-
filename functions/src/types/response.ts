@@ -78,6 +78,13 @@ export interface OfficeResponse {
   healthInsuranceType: 'kyokai' | 'union';
   pensionOfficeName: string | null;
   officeCode: string | null;
+  postalCode: string | null;
+  /** 適用年月日（社会保険の適用事業所になった日） */
+  appliedDate: string | null;
+  /** 被保険者整理番号の付け方（auto：台帳に登録するとき事業所の中の次の番号を付ける） */
+  insuredNumberMode: 'auto' | 'manual';
+  fullTimeWeeklyHours: number | null;
+  fullTimeMonthlyDays: number | null;
   /** 廃止した日（廃止していなければ null） */
   abolishedOn: string | null;
   /** 配属できない理由（設定が足りない項目）。空なら配属できる */

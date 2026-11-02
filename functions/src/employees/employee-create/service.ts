@@ -8,6 +8,7 @@ import { EmployeeCreateInput } from './schema';
 import { pickProfile } from '../../types/catalog-schemas';
 import { assertAssignable } from '../../offices/lifecycle';
 import { assertDepartment } from '../../offices/departments';
+import { insuredCounterPath, nextInsuredNumber } from '../../offices/insured-number';
 
 export async function createEmployee(
   input: EmployeeCreateInput,
@@ -36,14 +37,23 @@ export async function createEmployee(
     }
   }
 
+  // 事業所の設定が「自動」で番号の指定がなければ、被保険者整理番号を付ける（カタログ1章 整理番号の採番）
+  const autoNumber = officeDoc.data()!.insuredNumberMode === 'auto' && !input.insuredPersonNumber;
+  const usedNumbers = autoNumber
+    ? (await db.collection(`companies/${auth.companyId}/employees`).where('officeId', '==', input.officeId).select('insuredPersonNumber').get())
+      .docs.map((d) => d.data().insuredPersonNumber as string | null | undefined)
+    : [];
+
   const result = await db.runTransaction(async (tx) => {
     const reserveRef = db.doc(
       `companies/${auth.companyId}/employeeNumbers/${input.employeeNumber}`,
     );
-    const reserveDoc = await tx.get(reserveRef);
+    const counterRef = db.doc(insuredCounterPath(auth.companyId, input.officeId));
+    const [reserveDoc, counter] = await Promise.all([tx.get(reserveRef), autoNumber ? tx.get(counterRef) : Promise.resolve(null)]);
     if (reserveDoc.exists) {
       throw alreadyExists('この社員番号');
     }
+    const insuredPersonNumber = autoNumber ? nextInsuredNumber(usedNumbers, Number(counter?.data()?.last ?? 0)) : null;
 
     const now = Timestamp.now();
     const docRef = db
@@ -70,11 +80,14 @@ export async function createEmployee(
       userId: null,
       isActive: true,
       ...pickProfile(input),
+      ...(insuredPersonNumber ? { insuredPersonNumber } : {}),
       version: 1,
       deletedAt: null,
       createdAt: now,
       updatedAt: now,
     });
+
+    if (insuredPersonNumber) tx.set(counterRef, { last: Number(insuredPersonNumber), updatedAt: now }, { merge: true });
 
     if (input.requestId) {
       const reqRef = db.doc(

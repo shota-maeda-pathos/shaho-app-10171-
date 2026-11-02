@@ -37,12 +37,22 @@ interface OfficeRow {
   healthInsuranceType?: 'kyokai' | 'union';
   pensionOfficeName?: string | null;
   officeCode?: string | null;
+  postalCode?: string | null;
+  appliedDate?: string | null;
+  insuredNumberMode?: 'auto' | 'manual';
+  fullTimeWeeklyHours?: number | null;
+  fullTimeMonthlyDays?: number | null;
   abolishedOn?: string | null;
   /** 配属できない理由（空なら配属できる）。古いサーバーは返さない */
   setupIssues?: string[];
 }
 
-interface OfficeEdit { id: string; version: number; name: string; prefectureCode: string; healthInsuranceType: 'kyokai' | 'union'; insurerId: string; pensionOfficeName: string; officeCode: string; abolishedOn: string }
+interface OfficeEdit {
+  id: string; version: number; name: string; prefectureCode: string; healthInsuranceType: 'kyokai' | 'union'; insurerId: string; pensionOfficeName: string; officeCode: string; abolishedOn: string;
+  /** 事業所整理記号（届出の「事業所整理記号」） */
+  officeNumber: string; postalCode: string; address: string; phone: string; appliedDate: string; insuredNumberMode: 'auto' | 'manual';
+  fullTimeWeeklyHours: string; fullTimeMonthlyDays: string;
+}
 
 type RoundingRule = 'statutory' | 'truncate' | 'round' | 'ceil';
 
@@ -149,6 +159,22 @@ const PREFECTURES: Record<string, string> = {
       @if (editing(); as e) {
         <mat-card class="form-card">
           <h3>{{ e.name }} の設定</h3>
+          <h4>届出に載る事業所の情報</h4>
+          <div class="form-grid">
+            <mat-form-field appearance="outline"><mat-label>事業所名</mat-label>
+              <input matInput [(ngModel)]="e.name" maxlength="100" required></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>事業所整理記号</mat-label>
+              <input matInput [(ngModel)]="e.officeNumber" maxlength="20" placeholder="例：01-イロハ"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>郵便番号</mat-label>
+              <input matInput [(ngModel)]="e.postalCode" maxlength="8" placeholder="123-4567"></mat-form-field>
+            <mat-form-field appearance="outline" class="wide"><mat-label>所在地</mat-label>
+              <input matInput [(ngModel)]="e.address" maxlength="200"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>電話番号</mat-label>
+              <input matInput [(ngModel)]="e.phone" maxlength="20" placeholder="03-1234-5678"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>適用年月日</mat-label>
+              <input matInput type="date" [(ngModel)]="e.appliedDate"></mat-form-field>
+          </div>
+          <h4>保険・加入の判定</h4>
           <div class="form-grid">
             <mat-form-field appearance="outline"><mat-label>都道府県</mat-label>
               <mat-select [(ngModel)]="e.prefectureCode">@for (pref of prefectureList; track pref.code) { <mat-option [value]="pref.code">{{ pref.name }}</mat-option> }</mat-select></mat-form-field>
@@ -163,7 +189,18 @@ const PREFECTURES: Record<string, string> = {
               <input matInput [(ngModel)]="e.insurerId" maxlength="20"></mat-form-field>
             <mat-form-field appearance="outline"><mat-label>事業所番号（5桁、任意）</mat-label>
               <input matInput [(ngModel)]="e.officeCode" maxlength="5"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>被保険者整理番号の付け方</mat-label>
+              <mat-select [(ngModel)]="e.insuredNumberMode">
+                <mat-option value="manual">手で入れる</mat-option>
+                <mat-option value="auto">台帳に登録するとき自動で付ける</mat-option>
+              </mat-select></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>正社員の週の所定労働時間</mat-label>
+              <input matInput inputmode="decimal" [(ngModel)]="e.fullTimeWeeklyHours" placeholder="40"><span matTextSuffix>時間</span></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>正社員の月の所定労働日数</mat-label>
+              <input matInput inputmode="numeric" [(ngModel)]="e.fullTimeMonthlyDays" placeholder="20"><span matTextSuffix>日</span></mat-form-field>
           </div>
+          @if (e.insuredNumberMode === 'auto') { <p class="hint">自動にすると、従業員を台帳に登録するときに、この事業所で使っている番号の次の番号を付けます（手で入れた番号があればそちらを使います）。</p> }
+          <p class="hint">所定労働時間・日数は、パート・短時間の人の加入の判定（4分の3基準）に使います。空欄なら週40時間として判定します。</p>
           @if (e.healthInsuranceType === 'union') { <p class="hint">組合健保の料率（本人と会社の負担割合つき）は、設定の「料率」で保険者番号を指定して登録します。</p> }
           <div class="form-actions">
             <button mat-button type="button" (click)="editing.set(null)">閉じる</button>
@@ -271,6 +308,8 @@ const PREFECTURES: Record<string, string> = {
     .form-card { padding: 24px; margin-bottom: 16px; }
     .form-card h3 { margin: 0 0 16px; font-size: 18px; font-weight: 500; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+    .form-grid .wide { grid-column: span 2; }
+    h4 { margin: 12px 0 4px; font-size: 13px; color: var(--app-color-text-sub); }
     .form-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
     .full-width-table { width: 100%; }
     .loading { display: flex; justify-content: center; padding: 48px; }
@@ -392,6 +431,10 @@ export class OfficeManagementComponent implements OnInit {
     this.editing.set({
       id: row.id, version: row.version ?? 1, name: row.name, prefectureCode: row.prefectureCode ?? '', healthInsuranceType: row.healthInsuranceType ?? 'kyokai',
       insurerId: row.insurerId ?? '', pensionOfficeName: row.pensionOfficeName ?? '', officeCode: row.officeCode ?? '', abolishedOn: '',
+      officeNumber: row.officeNumber ?? '', postalCode: row.postalCode ?? '', address: row.address ?? '', phone: row.phone ?? '',
+      appliedDate: row.appliedDate ?? '', insuredNumberMode: row.insuredNumberMode ?? 'manual',
+      fullTimeWeeklyHours: row.fullTimeWeeklyHours != null ? String(row.fullTimeWeeklyHours) : '',
+      fullTimeMonthlyDays: row.fullTimeMonthlyDays != null ? String(row.fullTimeMonthlyDays) : '',
     });
   }
 
@@ -402,6 +445,10 @@ export class OfficeManagementComponent implements OnInit {
         companyId: this.auth.companyId, officeId: e.id, expectedVersion: e.version,
         prefectureCode: e.prefectureCode || undefined, healthInsuranceType: e.healthInsuranceType, insurerId: e.insurerId.trim(),
         pensionOfficeName: e.pensionOfficeName.trim() || null, officeCode: e.officeCode.trim() || null,
+        name: e.name.trim() || undefined, officeNumber: e.officeNumber.trim(), postalCode: e.postalCode.trim() || null,
+        address: e.address.trim(), phone: e.phone.trim(), appliedDate: e.appliedDate || null, insuredNumberMode: e.insuredNumberMode,
+        fullTimeWeeklyHours: e.fullTimeWeeklyHours.trim() ? Number(e.fullTimeWeeklyHours) : null,
+        fullTimeMonthlyDays: e.fullTimeMonthlyDays.trim() ? Number(e.fullTimeMonthlyDays) : null,
       });
       this.snackBar.open(`${e.name}の設定を保存しました`, '閉じる', { duration: 3000 });
       this.editing.set(null);
