@@ -423,7 +423,7 @@ export async function createSanteiFiling(input: SanteiRunInput, auth: AuthContex
     }),
   ]);
   const header = {
-    '事業所整理記号': office.officeNumber ?? '', '事業所名称': office.name ?? '', '事業所所在地': office.address ?? '',
+    '事業所整理記号': office.officeNumber ?? '', '事業所番号': office.officeCode ?? '', '事業所名称': office.name ?? '', '事業所所在地': office.address ?? '',
     '電話番号': office.phone ?? '', '事業主氏名': company.data()?.representativeName ?? '', '会社名': company.data()?.name ?? '',
     '社会保険労務士': laborConsultantText(company.data()?.laborConsultant),
     '対象年': input.year, '適用年月': santeiEffectiveMonth(input.year),

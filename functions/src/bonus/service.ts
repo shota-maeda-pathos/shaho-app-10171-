@@ -684,7 +684,7 @@ export async function createBonusFiling(input: BonusRunInput, auth: AuthContext)
   });
   const firstDates = details.map(p => p.賞与支払年月日).sort();
   const header = {
-    '事業所整理記号': office.officeNumber ?? '', '事業所名称': office.name ?? '', '事業所所在地': office.address ?? '',
+    '事業所整理記号': office.officeNumber ?? '', '事業所番号': office.officeCode ?? '', '事業所名称': office.name ?? '', '事業所所在地': office.address ?? '',
     '電話番号': office.phone ?? '', '事業主氏名': company.data()?.representativeName ?? '', '会社名': company.data()?.name ?? '',
     '社会保険労務士': laborConsultantText(company.data()?.laborConsultant),
     '支給月': input.payMonth, '賞与支払年月日': commonPaymentDate(firstDates) ?? '',

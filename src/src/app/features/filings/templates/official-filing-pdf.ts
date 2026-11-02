@@ -5,7 +5,10 @@ import type { Font as FontKitFont } from '@pdf-lib/fontkit';
 export interface FilingPrintMeta {
   companyName: string;
   officeName: string;
+  /** 事業所整理記号（例：01-イロハ。事業所の設定の officeNumber） */
   officeNumber: string;
+  /** 事業所番号（5桁。事業所の設定の officeCode） */
+  officeCode?: string;
   officeAddress: string;
   officePhone: string;
   representativeName: string;
@@ -196,16 +199,16 @@ function header(w: Writer, key: string, fd: Data, meta: FilingPrintMeta) {
   if (submitted?.era === 9) [submitted.eraYear, submitted.month, submitted.day].forEach((value,i) =>
     w.text(value,h.date[i],'届出年月日',{size:8,center:true}));
   else w.warnings.add('届出年月日が未登録、または令和の日付ではありません。');
-  // Existing drafts incorrectly copied officeNumber into this field. Never repeat it as a symbol.
-  const symbol = fd['事業所整理記号'];
-  if (typeof symbol === 'string' && symbol.trim() && symbol !== meta.officeNumber) {
+  // 事業所整理記号は「01-イロハ」のように2つに分けて書く（届出に写した値、なければ事業所の設定の値）
+  const symbol = String(fd['事業所整理記号'] || meta.officeNumber || '').trim();
+  if (symbol) {
     const parts = symbol.split(/[-－―ー]/);
     if (parts.length === 2 && parts.every(Boolean)) {
       w.cells(parts[0],h.symbol[0],4,'事業所整理記号',true);
       w.cells(parts[1],h.symbol[1],4,'事業所整理記号');
-    } else w.warnings.add('事業所整理記号は番号と区別して確認してください。現在の値は記入していません。');
-  } else w.warnings.add('事業所整理記号が未登録、または事業所番号と同じ値です。');
-  if (h.number) w.digits(fd['事業所番号'] ?? meta.officeNumber,h.number,5,'事業所番号',true);
+    } else w.warnings.add('事業所整理記号は「01-イロハ」のように、ハイフンで2つに分けて登録してください。現在の値は記入していません。');
+  } else w.warnings.add('事業所整理記号が未登録です。');
+  if (h.number) w.digits(fd['事業所番号'] || meta.officeCode,h.number,5,'事業所番号',true);
   w.text(fd['事業所所在地'] ?? meta.officeAddress,h.address,'事業所所在地',{ required:true });
   w.text(fd['事業所名称'] ?? meta.officeName,h.name,'事業所名称',{ required:true });
   w.text(fd['事業主氏名'] ?? meta.representativeName,h.representative,'事業主氏名',{ required:true });

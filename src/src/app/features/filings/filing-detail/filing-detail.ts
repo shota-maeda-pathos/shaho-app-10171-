@@ -413,13 +413,14 @@ export class FilingDetailComponent implements OnInit {
         httpsCallable<{ companyId: string }, { representativeName: string; laborConsultant?: { name: string; registrationNumber: string } | null }>(this.functions, 'companyGet')({ companyId: this.auth.companyId }),
         httpsCallable<{ companyId: string; employeeId: string }, { officeId: string }>(this.functions, 'employeeGet')({ companyId: this.auth.companyId, employeeId: this.employeeId }),
       ]);
-      const { data: officeData } = await httpsCallable<object, { items: { id: string; name: string; officeNumber: string; address: string; phone: string }[] }>(this.functions, 'officeList')({ companyId: this.auth.companyId, includeInactive: true });
+      const { data: officeData } = await httpsCallable<object, { items: { id: string; name: string; officeNumber: string; officeCode?: string | null; address: string; phone: string }[] }>(this.functions, 'officeList')({ companyId: this.auth.companyId, includeInactive: true });
       const office = officeData.items.find(item => item.id === employeeResult.data.officeId);
       if (!office) throw new Error('届出の事業所情報を取得できませんでした。');
       const meta: FilingPrintMeta = {
         companyName: d.companyName,
         officeName: office.name,
         officeNumber: office.officeNumber,
+        officeCode: office.officeCode ?? '',
         officeAddress: office.address,
         officePhone: office.phone,
         representativeName: companyResult.data.representativeName,

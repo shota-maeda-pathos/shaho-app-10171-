@@ -39,6 +39,8 @@ export interface ArchiveMeta {
   companyName: string;
   officeName: string;
   officeNumber: string;
+  /** 事業所番号（5桁）。この項目を足す前の保存原本にはない */
+  officeCode?: string;
   officeAddress: string;
   officePhone: string;
   representativeName: string;
@@ -81,11 +83,11 @@ export function buildArchive(input: {
   const header = (d.header ?? null) as Record<string, unknown> | null;
   const effective = d.effectiveDate?.toDate ? d.effectiveDate.toDate().toISOString().slice(0, 10) : text(d.effectiveDate);
   const meta: ArchiveMeta = header ? {
-    companyName: text(header['会社名']), officeName: text(header['事業所名称']), officeNumber: text(header['事業所整理記号']),
+    companyName: text(header['会社名']), officeName: text(header['事業所名称']), officeNumber: text(header['事業所整理記号']), officeCode: text(header['事業所番号']),
     officeAddress: text(header['事業所所在地']), officePhone: text(header['電話番号']), representativeName: text(header['事業主氏名']),
     effectiveDate: text(header['届出年月日'] ?? effective), employeeNumber: '', laborConsultant: text(header['社会保険労務士']),
   } : {
-    companyName: text(input.company?.name), officeName: text(input.office?.name), officeNumber: text(input.office?.officeNumber),
+    companyName: text(input.company?.name), officeName: text(input.office?.name), officeNumber: text(input.office?.officeNumber), officeCode: text(input.office?.officeCode),
     officeAddress: text(input.office?.address), officePhone: text(input.office?.phone), representativeName: text(input.company?.representativeName),
     effectiveDate: effective, employeeNumber: text(input.employee?.employeeNumber), laborConsultant: laborConsultantText(input.company?.laborConsultant),
   };
