@@ -59,6 +59,12 @@ export async function createApprovalRequest(
       if (targetData.approvalPending) throw invalidArg('既に承認申請中です');
       if (previous.exists) throw invalidArg('再計算してから再申請してください');
     }
+    // 届出・等級・雇用条件：同じ対象に承認待ちがあれば新しく作らず、その依頼を返す（画面で二度押しても二重にならない）
+    if (!locked && !isDeferred) {
+      const existing = await tx.get(requests.where('targetPath', '==', input.targetPath));
+      const pending = existing.docs.find((d) => d.data().status === 'pending');
+      if (pending) return pending.id;
+    }
     const now = Timestamp.now();
     if (locked) tx.update(targetRef, { approvalPending: true, updatedAt: now });
 

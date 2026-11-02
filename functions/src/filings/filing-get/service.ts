@@ -67,7 +67,8 @@ export async function getFiling(
     employeeId: input.employeeId,
     employeeName: `${empData.lastName} ${empData.firstName}`,
     filingType: data.filingType,
-    workflowStatus: data.workflowStatus,
+    // 承認を依頼したあとも届出の workflowStatus は下書き・差戻しのまま。画面には最新の依頼が承認待ちなら「承認待ち」と出す
+    workflowStatus: (data.workflowStatus === 'draft' || data.workflowStatus === 'rejected') && last?.status === 'pending' ? 'pending' : data.workflowStatus,
     mockStatus: data.mockStatus,
     submissionStatus: data.submissionStatus,
     effectiveDate: data.effectiveDate,
