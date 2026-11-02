@@ -53,8 +53,7 @@ const PROFILE_LABELS: [string, string][] = [
         <section class="card">
           <h2>等級が変わりました</h2>
           @for (c of d.gradeChanges!.slice(0, 3); track c.effectiveMonth) {
-            <p class="change">{{ c.effectiveMonth }}から（{{ c.reason }}）：健康保険 {{ c.oldHealthGrade }}→{{ c.newHealthGrade }}等級、厚生年金 {{ c.oldPensionGrade }}→{{ c.newPensionGrade }}等級
-              @if (c.premiumChange !== null) { 。毎月の保険料は {{ c.premiumChange >= 0 ? '+' : '' }}{{ c.premiumChange | number }}円 }</p>
+            <p class="change">{{ c.effectiveMonth }}から（{{ c.reason }}）：健康保険 {{ c.oldHealthGrade }}→{{ c.newHealthGrade }}等級、厚生年金 {{ c.oldPensionGrade }}→{{ c.newPensionGrade }}等級@if (c.premiumChange !== null) {。毎月の保険料は {{ c.premiumChange >= 0 ? '+' : '' }}{{ c.premiumChange | number }}円}</p>
           }
         </section>
       }

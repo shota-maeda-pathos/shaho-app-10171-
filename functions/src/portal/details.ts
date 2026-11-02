@@ -151,7 +151,10 @@ export async function getPortalDetails(auth: AuthContext) {
         oldPensionGrade: before.pensionGradeNumber, newPensionGrade: g.pensionGradeNumber,
         premiumChange: after !== null && prior !== null ? after - prior : null,
       };
-    }).reverse() : null,
+    })
+      // 定時決定などで等級が変わらなかった決定は「等級が変わりました」に出さない
+      .filter(c => c.oldHealthGrade !== c.newHealthGrade || c.oldPensionGrade !== c.newPensionGrade)
+      .reverse() : null,
     filings: filings ? filings.docs.map(d => d.data()).filter(f => f.workflowStatus !== 'draft').map(f => ({
       type: FILING_LABELS[f.filingType] ?? f.filingType,
       requestedAt: (f.createdAt?.toDate?.() as Date | undefined)?.toISOString() ?? null,
