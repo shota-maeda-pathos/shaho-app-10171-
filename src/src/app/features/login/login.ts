@@ -103,7 +103,7 @@ import { LogoComponent } from '../../shared/ui';
     .or::before, .or::after { content: ''; flex: 1; border-top: 1px solid var(--app-color-border); }
     .note { margin: var(--app-space-3) 0 0; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
     .note.done { color: var(--app-color-text); }
-    .reset-link { margin-top: var(--app-space-3); padding: 0; }
+    .reset-link { display: flex; margin: var(--app-space-3) auto 0; padding: 0 var(--app-space-2); }
     .reset { margin-top: var(--app-space-3); display: flex; flex-direction: column; gap: var(--app-space-2); }
     .reset .note { margin: 0; }
     .error { color: var(--app-status-action-fg); font-size: var(--app-font-md); margin: var(--app-space-2) 0; }

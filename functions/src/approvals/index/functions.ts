@@ -10,12 +10,14 @@ import {
   approvalBadge, approvalDetail, approvalSettings, bulkApprove, cancelApproval, rebuildApprovalIndex, remindApprovals, searchApprovals,
   syncRequestIndex,
 } from './service';
+import { markSummaryStale } from '../../dashboard/summary/service';
 
 /** 承認申請の索引。Firestore のトリガーはデータベースと同じ地域に置く */
 export const approvalIndexRequest = onDocumentWritten(
   { document: 'companies/{companyId}/employees/{employeeId}/approvalRequests/{requestId}', region: 'asia-northeast1' },
   async (event) => {
     await syncRequestIndex(event.document, event.data?.after.exists ? event.data.after.data() : undefined);
+    await markSummaryStale(event.params.companyId);
   },
 );
 

@@ -68,10 +68,29 @@ export async function computeSummary(companyId: string): Promise<{ computedAt: s
   return { computedAt: computedAt.toDate().toISOString(), offices: counts };
 }
 
+/**
+ * 承認・届出・本人からの申請が動いたら、保存した数字を古いしるしにする（トリガーから呼ぶ）。
+ * 次にホームを開いた人のところで数え直す。印を付けられなくても元の処理は止めない
+ */
+export async function markSummaryStale(companyId: string): Promise<void> {
+  try {
+    await db.doc(`companies/${companyId}/dashboard/summary`).set({ staleAt: Timestamp.now() }, { merge: true });
+  } catch { /* 毎朝6時と「数え直す」で追いつく */ }
+}
+
+/** 数えたあとに動きがあったか、数えたのが今日（東京）より前なら古い */
+function isStale(data: FirebaseFirestore.DocumentData | undefined, today: string): boolean {
+  const computedAt: Timestamp | undefined = data?.computedAt;
+  if (!computedAt) return false;
+  const staleAt: Timestamp | undefined = data?.staleAt;
+  if (staleAt && staleAt.toMillis() > computedAt.toMillis()) return true;
+  return computedAt.toDate().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }) < today;
+}
+
 export interface SummaryCard { key: SummaryKey; label: string; link: string; urgent: boolean; count: number }
 
 /** 保存した数字を、見る人の事業所の範囲（と選んだ事業所）で合計する */
-export async function readSummary(auth: AuthContext, officeId?: string): Promise<{ computedAt: string | null; cards: SummaryCard[] }> {
+export async function readSummary(auth: AuthContext, officeId?: string): Promise<{ computedAt: string | null; stale: boolean; cards: SummaryCard[] }> {
   const snap = await db.doc(`companies/${auth.companyId}/dashboard/summary`).get();
   const offices = (snap.data()?.offices ?? {}) as Record<string, SummaryCounts>;
   const total = Object.fromEntries(Object.keys(SUMMARY_CARDS).map(k => [k, 0])) as SummaryCounts;
@@ -82,6 +101,7 @@ export async function readSummary(auth: AuthContext, officeId?: string): Promise
   }
   return {
     computedAt: snap.data()?.computedAt?.toDate?.().toISOString() ?? null,
+    stale: isStale(snap.data(), new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' })),
     cards: (Object.keys(SUMMARY_CARDS) as SummaryKey[]).map(key => ({ key, ...SUMMARY_CARDS[key], count: total[key] })),
   };
 }

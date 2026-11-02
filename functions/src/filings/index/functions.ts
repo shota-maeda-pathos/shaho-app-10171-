@@ -5,10 +5,12 @@ import { getAuthContext, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validation';
 import { FilingIndexRebuildSchema, FilingSearchSchema } from './schema';
 import { rebuildFilingIndex, searchFilings, syncFilingIndex } from './service';
+import { markSummaryStale } from '../../dashboard/summary/service';
 
 // 届出の索引。Firestore のトリガーはデータベースと同じ地域に置く
 const trigger = (document: string) => onDocumentWritten({ document, region: 'asia-northeast1' }, async (event) => {
   await syncFilingIndex(event.document, event.data?.after.exists ? event.data.after.data() : undefined);
+  await markSummaryStale(event.params.companyId);
 });
 
 export const filingIndexEmployee = trigger('companies/{companyId}/employees/{parentId}/filings/{filingId}');

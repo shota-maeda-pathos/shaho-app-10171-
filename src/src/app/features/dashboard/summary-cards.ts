@@ -19,6 +19,7 @@ const GROUPS: { label: string; cards: [key: string, short: string][] }[] = [
 
 /**
  * 業務の状況のカード（カタログ12章の10種＋本人からの申請）。数字は毎朝6時と「数え直す」で集計して保存したもの。
+ * 承認・届出・本人からの申請が動いたあと（と日が変わったあと）は、開いたときに保存した数字を出してから裏で数え直す。
  * 期限・止まっている手続き・今月の処理・これから起きることの4つに分けて並べる。押すとその一覧へ移る
  */
 @Component({
@@ -29,7 +30,7 @@ const GROUPS: { label: string; cards: [key: string, short: string][] }[] = [
     <section class="summary" aria-labelledby="summary-heading">
       <div class="head">
         <h2 id="summary-heading">全体の状況</h2>
-        @if (computedAt()) { <span class="sub">{{ computedAt() | date: 'M/d H:mm' }} 時点</span> } @else if (!loading()) { <span class="sub">まだ集計していません</span> }
+        @if (computedAt()) { <span class="sub">{{ computedAt() | date: 'M/d H:mm' }} 時点{{ loading() ? '（数え直しています…）' : '' }}</span> } @else if (!loading()) { <span class="sub">まだ集計していません</span> }
         @if (canRefresh) { <button mat-button type="button" (click)="refresh()" [disabled]="loading()"><mat-icon>refresh</mat-icon>{{ loading() ? '数えています…' : '数え直す' }}</button> }
       </div>
       <div class="groups">
@@ -89,23 +90,30 @@ export class SummaryCardsComponent {
   constructor() {
     effect(() => {
       this.office.selected();
-      untracked(() => void this.call('dashboardSummary'));
+      untracked(() => void this.load());
     });
   }
 
   refresh() { void this.call('dashboardSummaryRefresh'); }
 
-  private async call(name: string) {
+  /** 保存した数字をすぐ出し、古ければ（承認などが動いた・前の日に数えた）数え直して差し替える */
+  private async load() {
+    const data = await this.call('dashboardSummary');
+    if (data?.stale) await this.call('dashboardSummary', { ifStale: true });
+  }
+
+  private async call(name: string, extra: object = {}) {
     this.loading.set(true);
     try {
-      const { data } = await httpsCallable<object, { computedAt: string | null; cards: SummaryCard[] }>(this.functions, name, { timeout: 300_000 })({
-        companyId: this.auth.companyId, ...this.office.params(),
+      const { data } = await httpsCallable<object, { computedAt: string | null; stale?: boolean; cards: SummaryCard[] }>(this.functions, name, { timeout: 300_000 })({
+        companyId: this.auth.companyId, ...this.office.params(), ...extra,
       });
       this.cards.set(data.cards);
       this.computedAt.set(data.computedAt);
       // まだ一度も数えていなければ、数えられる人が開いたときに自動で数える（0件と見分けがつかないため）
       if (!data.computedAt && name === 'dashboardSummary' && this.canRefresh && !this.autoRefreshed) { this.autoRefreshed = true; queueMicrotask(() => this.refresh()); }
-    } catch { /* カードが読めなくても、やることリストは使える */ } finally {
+      return data;
+    } catch { return null; /* カードが読めなくても、やることリストは使える */ } finally {
       this.loading.set(false);
     }
   }

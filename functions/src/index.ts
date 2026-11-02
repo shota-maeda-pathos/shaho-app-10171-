@@ -100,7 +100,7 @@ lazy(() => require('./audit/seal'), ['auditLogSeal']);
 // ダッシュボードAPI
 lazy(() => require('./dashboard/dashboard-stats/functions'), ['dashboardStats']);
 lazy(() => require('./dashboard/dashboard-analytics/functions'), ['dashboardAnalytics']);
-lazy(() => require('./dashboard/summary/functions'), ['dashboardSummary', 'dashboardSummaryRefresh', 'dashboardSummaryDaily']);
+lazy(() => require('./dashboard/summary/functions'), ['dashboardSummary', 'dashboardSummaryRefresh', 'dashboardSummaryDaily', 'dashboardSummaryStalePortal']);
 lazy(() => require('./dashboard/calendar/functions'), ['calendarGet', 'checklistGet', 'checklistSet', 'reminderSettingsUpdate']);
 lazy(() => require('./dashboard/cost-analysis/functions'), ['costAnalysis']);
 lazy(() => require('./simulation/functions'), ['simulationRaise', 'simulationHire', 'simulationAnnual', 'simulationRateChange', 'simulationBonus']);
