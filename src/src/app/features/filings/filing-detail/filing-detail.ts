@@ -38,7 +38,7 @@ const FILING_TYPE_LABELS: Record<string, string> = {
 };
 
 const WORKFLOW_STATUS_LABELS: Record<string, string> = {
-  draft: '下書き', pending: '承認待ち', approved: '承認済', rejected: '差戻し',
+  draft: '下書き', pending: '承認待ち', approved: '承認済', rejected: '差戻し', cancelled: '取消',
 };
 /** 保存原本の一覧の1行 */
 interface ArchiveRow { id: string; approvedAt: string | null; approvedByName: string; filingVersion: number; form: { checkedOn: string } | null }
@@ -341,7 +341,7 @@ export class FilingDetailComponent implements OnInit {
   });
   currentStep = computed(() => this.stepItems().find(s => s.state !== 'done')?.key ?? 'submit');
   approvalTone(ws: string): StatusTone {
-    return ws === 'approved' ? 'done' : ws === 'pending' ? 'waiting' : ws === 'rejected' ? 'attention' : 'yours';
+    return ws === 'approved' ? 'done' : ws === 'pending' ? 'waiting' : ws === 'rejected' ? 'attention' : ws === 'cancelled' ? 'waiting' : 'yours';
   }
   scrollTo(key: string) {
     document.getElementById(key === 'correction' ? (this.isCorrection() ? 'sec-correction' : 'sec-approval') : `sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });

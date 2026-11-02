@@ -51,7 +51,7 @@ const ACCEPT = 'application/pdf,image/jpeg,image/png';
           }
         </ul>
       } @else {
-        <p class="muted">この届出は、原則として添付書類はいりません。年金事務所から求められたときは、下の「ほかの書類を添付する」で添付します。</p>
+        <p class="muted">この届出は、原則として添付書類はいりません。@if (isStaff) {年金事務所から求められたときは、下の「ほかの書類を添付する」で添付します。}</p>
       }
 
       @if (filesOf(null).length) {
