@@ -128,6 +128,7 @@ lazy(() => require('./insurance/monthly-insurance-get/functions'), ['monthlyInsu
 lazy(() => require('./samples/tigers/functions'), ['sampleTigersCreate', 'tigersRegister']);
 lazy(() => require('./samples/load/functions'), ['sampleLoadCreate']);
 lazy(() => require('./samples/union/functions'), ['sampleUnionCreate']);
+lazy(() => require('./samples/demo/functions'), ['sampleDemoCreate']);
 
 lazy(() => require('./employees/employee-history-list/functions'), ['employeeHistoryList']);
 

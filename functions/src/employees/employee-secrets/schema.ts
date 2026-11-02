@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidMyNumber } from '../../utils/check-digit';
 
 export const SecretsGetSchema = z.object({
   companyId: z.string(),
@@ -11,7 +12,7 @@ export const SecretsUpdateSchema = z.object({
   companyId: z.string(),
   employeeId: z.string(),
   // null は登録の取り消し
-  myNumber: z.string().regex(/^\d{12}$/, '個人番号は12桁の数字です').nullable(),
+  myNumber: z.string().regex(/^\d{12}$/, '個人番号は12桁の数字です').refine(isValidMyNumber, '個人番号が正しくありません（最後の検査用数字が合いません）').nullable(),
   expectedVersion: z.number(),
 });
 

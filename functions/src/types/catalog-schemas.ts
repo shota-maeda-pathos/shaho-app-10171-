@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidCorporateNumber, isValidInsurerNumber } from '../utils/check-digit';
 
 // カタログで追加になった項目の入力スキーマ。旧画面からの入力と互換を保つため、すべて任意
 
@@ -6,6 +7,12 @@ export const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((valu
   const date = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }, '有効な日付を入力してください');
+
+/** 健康保険の保険者番号（8桁）。空は未登録 */
+export const insurerIdField = z.string().trim().max(20).refine(v => v === '' || isValidInsurerNumber(v), '保険者番号が正しくありません（8桁の数字で、最後の検査用数字が合いません）');
+
+/** 法人番号（13桁）。空は未登録 */
+export const corporateNumberField = z.string().trim().max(13).refine(v => v === '' || isValidCorporateNumber(v), '法人番号が正しくありません（13桁の数字で、先頭の検査用数字が合いません）');
 
 const optionalText = (max: number) => z.string().max(max).nullable().optional();
 

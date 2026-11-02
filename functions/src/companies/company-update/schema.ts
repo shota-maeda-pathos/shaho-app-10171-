@@ -1,14 +1,15 @@
 import { z } from 'zod';
+import { corporateNumberField, insurerIdField } from '../../types/catalog-schemas';
 
 export const CompanyUpdateSchema = z.object({
   companyId: z.string().min(1),
   name: z.string().min(1).max(100).optional(),
-  corporateNumber: z.string().max(13).optional(),
+  corporateNumber: corporateNumberField.optional(),
   representativeName: z.string().max(100).optional(),
   address: z.string().max(200).optional(),
   phone: z.string().max(20).optional(),
   email: z.string().email().optional(),
-  healthInsurerId: z.string().max(20).optional(),
+  healthInsurerId: insurerIdField.optional(),
   pensionCode: z.string().max(20).optional(),
   postalCode: z.string().regex(/^\d{3}-?\d{4}$/).optional(),
   /** 特定適用事業所（厚生年金の被保険者数が基準以上の法人）か。未設定の間は短時間労働者の適用を担当者判断とする */

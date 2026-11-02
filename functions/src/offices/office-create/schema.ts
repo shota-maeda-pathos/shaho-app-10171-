@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { OfficeExtraFields, RoundingRuleSchema } from '../../types/catalog-schemas';
+import { insurerIdField, OfficeExtraFields, RoundingRuleSchema } from '../../types/catalog-schemas';
 
 export const OfficeCreateSchema = z.object({
   companyId: z.string().min(1),
   name: z.string().min(1).max(100),
   officeNumber: z.string().max(20).optional(),
   prefectureCode: z.string().length(2).optional(),
-  insurerId: z.string().max(20).optional(),
+  insurerId: insurerIdField.optional(),
   address: z.string().max(200).optional(),
   phone: z.string().max(20).optional(),
   closingDay: z.number().int().min(1).max(31).optional(),
