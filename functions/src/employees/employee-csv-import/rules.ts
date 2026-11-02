@@ -202,6 +202,19 @@ export function planEmployeeCsv(text: string, ctx: CsvContext): CsvPlan {
   if (read.error) { plan.errors.push({ line: 1, employeeNumber: '', message: read.error }); return plan; }
 
   const byNumber = new Map(ctx.existing.map(e => [e.employeeNumber, e]));
+  // Excel で CSV を開いて保存すると先頭の 0 が消える（0019 → 19）。数字だけの社員番号は、0 を除いて1人に決まればその人とみなす
+  const digitsKey = (n: string) => (/^\d+$/.test(n) ? n.replace(/^0+(?=\d)/, '') : null);
+  const byDigits = new Map<string, CsvExisting | null>();
+  for (const e of ctx.existing) {
+    const k = digitsKey(e.employeeNumber);
+    if (k !== null) byDigits.set(k, byDigits.has(k) ? null : e);
+  }
+  const findEmployee = (n: string): CsvExisting | null => {
+    const exact = byNumber.get(n);
+    if (exact) return exact;
+    const k = digitsKey(n);
+    return k === null ? null : byDigits.get(k) ?? null;
+  };
   const nameBirth = (last: string, first: string, birth: string) => `${last.replace(/\s/g, '')}|${first.replace(/\s/g, '')}|${birth}`;
   const byNameBirth = new Map<string, CsvExisting>();
   for (const e of ctx.existing) {
@@ -229,11 +242,13 @@ export function planEmployeeCsv(text: string, ctx: CsvContext): CsvPlan {
       const r = normalizeCell(col.field, row.cells.get(col.field) ?? '');
       if ('message' in r) errs.push(r.message); else val[col.field] = r.value;
     }
-    const employeeNumber = val.employeeNumber ?? (row.cells.get('employeeNumber') ?? '').trim();
-    const pushErr = (message: string) => plan.errors.push({ line: row.line, employeeNumber, message });
-    if (!val.employeeNumber) { pushErr(errs[0] ?? '社員番号を入れてください'); continue; }
+    const written = val.employeeNumber ?? (row.cells.get('employeeNumber') ?? '').trim();
+    if (!val.employeeNumber) { plan.errors.push({ line: row.line, employeeNumber: written, message: errs[0] ?? '社員番号を入れてください' }); continue; }
 
-    const current = byNumber.get(employeeNumber) ?? null;
+    const current = findEmployee(written);
+    // 台帳の人と決まったら、台帳の社員番号で扱う（先頭の 0 が消えていても）
+    const employeeNumber = current?.employeeNumber ?? written;
+    const pushErr = (message: string) => plan.errors.push({ line: row.line, employeeNumber, message });
     if (current && !current.isActive) errs.push('退職した従業員は取込で直せません（従業員の画面で直してください）');
     if (!current) {
       const missing = EMPLOYEE_CSV_COLUMNS.filter(c => c.required && !val[c.field]).map(c => c.label);

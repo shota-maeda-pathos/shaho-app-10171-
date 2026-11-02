@@ -118,6 +118,19 @@ describe('planEmployeeCsv', () => {
     expect(scoped.errors[0].message).toContain('担当事業所外');
   });
 
+  it('Excel で先頭の 0 が消えた社員番号（0019 → 19）も、1人に決まれば台帳のその人として更新する', () => {
+    const zero = ctx({ existing: [existing({ id: 'emp-19', employeeNumber: '0019' })] });
+    const plan = planEmployeeCsv(csv('19,,,,,,,,,,,03-1234-5678,'), zero);
+    expect(plan.errors).toEqual([]);
+    expect(plan.updates[0]).toMatchObject({ employeeId: 'emp-19', employeeNumber: '0019' });
+    // 0 を除くと2人に当たるときは決めない（新規として扱い、必須の項目が足りなければ誤り）
+    const twins = ctx({ existing: [existing({ id: 'a', employeeNumber: '019' }), existing({ id: 'b', employeeNumber: '0019', values: { lastName: '別', firstName: '人', birthDate: '1980-01-01' } })] });
+    expect(planEmployeeCsv(csv('19,,,,,,,,,,,03-1234-5678,'), twins).errors[0].message).toContain('新しく登録する');
+    // 同じ人を 0019 と 19 で2回書いたら重複
+    const dup = planEmployeeCsv(csv('0019,,,,,,,,,,,03-1234-5678,', '19,,,,,,,,,,,03-1234-5679,'), zero);
+    expect(dup.errors[0]).toMatchObject({ line: 3, message: expect.stringContaining('同じ社員番号') });
+  });
+
   it('退職した従業員は取込で直さない', () => {
     const plan = planEmployeeCsv(csv('1,,,,,,,,,,,03-1111-2222,'), ctx({ existing: [existing({ isActive: false })] }));
     expect(plan.errors[0].message).toContain('退職');
