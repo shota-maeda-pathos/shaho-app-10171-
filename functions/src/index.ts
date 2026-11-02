@@ -146,6 +146,7 @@ lazy(() => require('./filings/index/functions'), [
 ]);
 lazy(() => require('./filings/submission/functions'), ['filingSubmissionGet', 'filingSubmissionAction', 'filingMockSettings', 'filingMockAdvance']);
 lazy(() => require('./filings/correction/functions'), ['filingCorrectionCreate', 'filingCorrectionUpdate']);
+lazy(() => require('./filings/run-correction/functions'), ['runCorrectionCreate', 'runCorrectionUpdate']);
 lazy(() => require('./filings/attachments/functions'), ['filingAttachmentList', 'filingAttachmentUpload', 'filingAttachmentGet', 'filingAttachmentDelete']);
 lazy(() => require('./filings/archive/functions'), ['filingArchiveList', 'filingArchiveGet', 'filingArchiveBatch']);
 lazy(() => require('./approvals/index/functions'), [

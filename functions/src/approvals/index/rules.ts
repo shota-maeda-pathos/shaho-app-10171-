@@ -145,7 +145,8 @@ export function buildRunFilingEntry(input: {
   if (!status) return null;
   const { deadline, note } = filingDeadline(String(f.filingType ?? ''), f);
   const persons = Array.isArray(f.employeeIds) ? f.employeeIds.length : 0;
-  const label = input.source === 'santei' ? `${f.year}年の算定基礎届` : f.filingType === 'bonusNonPayment' ? `${f.payMonth}の賞与不支給報告書` : `${f.payMonth}支給の賞与支払届`;
+  const base = input.source === 'santei' ? `${f.year}年の算定基礎届` : f.filingType === 'bonusNonPayment' ? `${f.payMonth}の賞与不支給報告書` : `${f.payMonth}支給の賞与支払届`;
+  const label = f.filingType === 'correction' ? `${base}の訂正届` : f.filingType === 'cancellation' ? `${base}の取消届` : base;
   return {
     kind: 'runFiling',
     requestId: input.filingId,

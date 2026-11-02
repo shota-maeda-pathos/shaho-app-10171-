@@ -120,8 +120,23 @@ export class SanteiPersonComponent {
   standalone: true,
   imports: [DecimalPipe, MatDialogModule, MatButtonModule],
   template: `
-    <h2 mat-dialog-title>{{ data.year }}年 算定基礎届（{{ f.number }}件目・{{ f.persons.length }}名）</h2>
+    <h2 mat-dialog-title>{{ data.year }}年 算定基礎届{{ f.correction?.kind ? (f.correction.kind === 'correction' ? 'の訂正届' : 'の取消届') : '' }}（{{ f.number }}件目・{{ f.persons.length }}名）</h2>
     <mat-dialog-content>
+      @if (f.correction?.kind) {
+        <p class="sub"><b>{{ f.correction.originalNumber }}件目の届出の{{ f.correction.kind === 'correction' ? '訂正届' : '取消届' }}</b>。理由：{{ f.correction.reason }}</p>
+        @if (f.correction.kind === 'correction') {
+          <div class="table-wrap corrections">
+            <table>
+              <thead><tr><th>訂正箇所</th><th>訂正前</th><th>訂正後</th></tr></thead>
+              <tbody>
+                @for (c of f.corrections; track $index) { <tr><td>{{ c.field }}</td><td>{{ c.before || '（空欄）' }}</td><td class="after">{{ c.after || '（空欄）' }}</td></tr> }
+                @empty { <tr><td colspan="3">まだ直した項目がありません。</td></tr> }
+              </tbody>
+            </table>
+          </div>
+          <p class="sub">下の表は訂正後の内容です。</p>
+        }
+      }
       <p class="sub">
         {{ f.header['事業所名称'] }}・適用年月 {{ data.year }}年9月。中身は承認された等級の申請内容から作っています。
         総計・平均額は支払基礎日数の基準を満たした月の支払額です。
@@ -162,6 +177,8 @@ export class SanteiPersonComponent {
     th, td { padding: 4px 6px; border-bottom: 1px solid var(--app-color-border); text-align: left; vertical-align: top; }
     th { background: var(--app-color-surface-sub); position: sticky; top: 0; }
     .num { text-align: right; white-space: nowrap; }
+    .corrections { max-height: 30vh; margin-bottom: 8px; }
+    .after { color: #b91c1c; }
   `],
 })
 export class SanteiFilingDialogComponent {
@@ -176,16 +193,21 @@ export class SanteiFilingDialogComponent {
   async pdf() {
     this.working.set(true);
     try {
-      const [{ createSanteiFilingPdf, OFFICIAL_FORMS }, { OfficialPdfPreviewComponent }] = await Promise.all([
+      const [{ createSanteiFilingPdf, createRunCorrectionPdf, OFFICIAL_FORMS }, { OfficialPdfPreviewComponent }] = await Promise.all([
         import('../filings/templates/official-filing-pdf'), import('../filings/templates/official-pdf-preview'),
       ]);
       const h = this.f.header;
-      const output = await createSanteiFilingPdf(h, this.f.persons, {
+      const kind = this.f.correction?.kind;
+      const meta = {
         companyName: String(h['会社名'] ?? ''), officeName: String(h['事業所名称'] ?? ''), officeNumber: String(h['事業所整理記号'] ?? ''),
         officeAddress: String(h['事業所所在地'] ?? ''), officePhone: String(h['電話番号'] ?? ''), representativeName: String(h['事業主氏名'] ?? ''),
         effectiveDate: this.f.submission?.date ?? new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }),
-      });
-      const form = OFFICIAL_FORMS['remunerationMonthlyAlgorithm'];
+      };
+      const output = kind
+        ? await createRunCorrectionPdf(kind, 'santei', h, this.f.persons, this.f.corrections, this.f.correction.reason ?? '', meta)
+        : await createSanteiFilingPdf(h, this.f.persons, meta);
+      const form = { ...OFFICIAL_FORMS['remunerationMonthlyAlgorithm'] };
+      if (kind) form.title = `${form.title}（${kind === 'correction' ? '訂正届' : '取消届'}）`;
       this.dialog.open(OfficialPdfPreviewComponent, {
         width: '1100px', height: '94vh', maxWidth: '96vw',
         data: { ...output, title: form.title, filename: `${form.title}_${this.data.year}_${this.f.number}.pdf`,

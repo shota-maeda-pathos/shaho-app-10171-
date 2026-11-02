@@ -1,3 +1,4 @@
+import type { RunCorrectionInfo, RunCorrectionRow } from '../filings/run-correction/run-correction';
 import { StatusTone } from '../../shared/ui';
 
 // functions/src/santei/santei-calc.ts・service.ts と同じ形
@@ -63,6 +64,8 @@ export interface FilingSummary {
   submission: { method: 'mock' | 'paper'; date: string; acceptanceNumber: string | null } | null;
   /** 模擬電子申請の状態（送信中・送信エラー・返戻など） */
   mockStatus: string | null;
+  /** 訂正届・取消届まわり */
+  correction: RunCorrectionInfo;
   version: number;
   createdAt: string | null;
 }
@@ -92,6 +95,9 @@ export interface FilingPerson {
 export interface FilingDetail extends FilingSummary {
   header: Record<string, string | number>;
   persons: FilingPerson[];
+  /** 訂正届・取消届：元の届出の行と訂正箇所 */
+  originalPersons: FilingPerson[] | null;
+  corrections: RunCorrectionRow[];
 }
 
 export type SanteiAction = 'requestGradeApproval' | 'approveGrade';

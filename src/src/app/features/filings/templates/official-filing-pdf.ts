@@ -704,14 +704,39 @@ export interface CorrectionRow { field: string; before: string; after: string }
  */
 export async function createCorrectionPdf(kind: 'correction' | 'cancellation', originalType: string, formData: Data,
   corrections: CorrectionRow[], reason: string, meta: FilingPrintMeta,
-  loadAsset: (path: string) => Promise<Uint8Array> = async path => {
-    const response=await fetch(path);
-    if(!response.ok) throw new Error('公式PDFまたは日本語フォントを読み込めませんでした。再読み込みしてください。');
-    return new Uint8Array(await response.arrayBuffer());
-  }): Promise<OfficialPdfResult> {
+  loadAsset: (path: string) => Promise<Uint8Array> = defaultLoadAsset): Promise<OfficialPdfResult> {
   const base = await createOfficialFilingPdf(originalType, formData, meta, loadAsset);
-  const label = kind === 'correction' ? '訂正' : '取消';
   const title = OFFICIAL_FORMS[originalType]?.title ?? '届出';
+  return decorateCorrection(base, kind, title, `事業所：${meta.officeName}　被保険者：${String(formData['被保険者氏名'] ?? '')}`,
+    'この届出（上の様式に記入した内容）を取り消します。', corrections, reason, loadAsset);
+}
+
+/**
+ * 算定基礎届・賞与支払届の訂正届・取消届。元の様式に、選んだ人の行だけ（訂正届は訂正後の値、取消届は元の値）を記入し、
+ * 1枚目の上の余白に赤で「訂正届」「取消届」、最後に理由と訂正箇所（人ごと）の一覧を付ける
+ */
+export async function createRunCorrectionPdf(kind: 'correction' | 'cancellation', source: 'santei' | 'bonus', header: Data, persons: unknown[],
+  corrections: CorrectionRow[], reason: string, meta: FilingPrintMeta,
+  loadAsset: (path: string) => Promise<Uint8Array> = defaultLoadAsset): Promise<OfficialPdfResult> {
+  const base = source === 'santei'
+    ? await createSanteiFilingPdf(header, persons as SanteiPrintPerson[], meta, loadAsset)
+    : await createBonusFilingPdf(header, persons as BonusPrintPerson[], meta, loadAsset);
+  const title = OFFICIAL_FORMS[source === 'santei' ? 'remunerationMonthlyAlgorithm' : 'bonusPayment'].title;
+  const names = (persons as { 被保険者氏名?: string }[]).map(p => p.被保険者氏名 ?? '').join('、');
+  return decorateCorrection(base, kind, title, `事業所：${meta.officeName}　対象：${persons.length}名（${names}）`,
+    '上の様式に記入した人の届出を取り消します。', corrections, reason, loadAsset);
+}
+
+async function defaultLoadAsset(path: string): Promise<Uint8Array> {
+  const response=await fetch(path);
+  if(!response.ok) throw new Error('公式PDFまたは日本語フォントを読み込めませんでした。再読み込みしてください。');
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+/** 記入済みの様式に「訂正届」「取消届」の表示と、理由・訂正箇所の一覧のページを付ける */
+async function decorateCorrection(base: OfficialPdfResult, kind: 'correction' | 'cancellation', title: string, subject: string,
+  cancelText: string, corrections: CorrectionRow[], reason: string, loadAsset: (path: string) => Promise<Uint8Array>): Promise<OfficialPdfResult> {
+  const label = kind === 'correction' ? '訂正' : '取消';
   const pdf = await PDFDocument.load(base.bytes);
   pdf.registerFontkit(fontkit);
   const font = await pdf.embedFont(await loadAsset('/filing-forms/fonts/NotoSansJP-Regular.ttf'), { subset: false });
@@ -745,12 +770,13 @@ export async function createCorrectionPdf(kind: 'correction' | 'cancellation', o
   const text = (t: string, x: number, size = 10, color = rgb(0, 0, 0)) => page.drawText(t, { x, y, size, font, color });
   text(`${label}届（${title}）`, left, 16, red);
   y -= 24;
-  text(`事業所：${meta.officeName}　被保険者：${String(formData['被保険者氏名'] ?? '')}`, left);
+  for (const line of wrap(subject, right - left, 10)) { text(line, left); y -= 15; }
+  y += 15;
   y -= 18;
   for (const line of wrap(`${label}の理由：${reason}`, right - left, 10)) { text(line, left); y -= 15; }
   y -= 8;
   if (kind === 'cancellation') {
-    text('この届出（上の様式に記入した内容）を取り消します。', left);
+    text(cancelText, left);
   } else {
     const header = () => {
       page.drawRectangle({ x: left, y: y - 6, width: right - left, height: 20, color: rgb(0.93, 0.93, 0.93) });

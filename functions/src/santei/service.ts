@@ -1,6 +1,7 @@
 // 算定基礎届（定時決定）。一括型：事業所×年ごとに、対象者を確かめる → 等級の承認 → 届出を作る → 届出の承認と提出
 import { filingContentHash } from '../utils/hash';
 import { buildArchive } from '../filings/archive/rules';
+import { RunCorrectionSummary, runCorrectionSummary } from '../filings/run-correction/rules';
 import { laborConsultantText } from '../companies/labor-consultant';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
@@ -131,6 +132,8 @@ export interface SanteiFilingSummary {
   submission: { method: 'mock' | 'paper'; date: string; acceptanceNumber: string | null } | null;
   /** 模擬電子申請の状態（送信中・送信エラー・返戻など。届出の画面の提出の部品が詳しく出す） */
   mockStatus: string | null;
+  /** 訂正届・取消届まわり */
+  correction: RunCorrectionSummary;
   version: number;
   createdAt: string | null;
 }
@@ -143,6 +146,7 @@ function filingSummary(d: FirebaseFirestore.DocumentSnapshot, auth: AuthContext)
     rejection: f.rejection?.comment ?? null,
     submission: f.submission ? { method: f.submission.method, date: f.submission.date, acceptanceNumber: f.submission.acceptanceNumber ?? null } : null,
     mockStatus: f.mock?.status ?? null,
+    correction: runCorrectionSummary(f),
     version: f.version, createdAt: iso(f.createdAt),
   };
 }
@@ -168,7 +172,8 @@ export async function santeiOverview(input: SanteiRunInput, auth: AuthContext) {
   const decisionOf = new Map(decisions.docs.map(d => [d.id, d.data().decision as SanteiDecision]));
   const filingOf = new Map<string, string>();
   for (const f of filings.docs) {
-    if (f.data().status === 'cancelled') continue;
+    // 訂正届・取消届は元の届出に載った人のもの。載っている届出は元の届出のまま
+    if (f.data().status === 'cancelled' || f.data().originalFilingId) continue;
     for (const id of f.data().employeeIds ?? []) filingOf.set(id, f.id);
   }
 
@@ -527,15 +532,16 @@ export async function updateSanteiFiling(input: SanteiFilingUpdateInput, auth: A
       entity: 'santeiFiling', entityId: input.filingId, action: 'update', changes: { status: { from: f.status, to: patch.status ?? f.status } },
       note: input.comment ?? null, performedBy: auth.uid, performedAt: now, version: f.version + 1,
     });
-    return { status: (patch.status ?? f.status) as string, persons: (f.employeeIds ?? []).length as number, number: f.number as number };
+    return { status: (patch.status ?? f.status) as string, persons: (f.employeeIds ?? []).length as number, number: f.number as number, filingType: f.filingType as string };
   });
   if ('mockErrors' in result) return { success: false, mockErrors: result.mockErrors };
 
   if (input.action === 'requestApproval' || input.action === 'approve' || input.action === 'reject') {
     const { notify } = await import('../utils/notify');
+    const name = result.filingType === 'correction' ? '算定基礎届の訂正届' : result.filingType === 'cancellation' ? '算定基礎届の取消届' : '算定基礎届';
     await notify({
       companyId: auth.companyId, category: 'filing', targetType: 'santeiRun', targetId: runRef.id, createdBy: auth.uid,
-      title: input.action === 'requestApproval' ? '算定基礎届：届出の承認の依頼' : input.action === 'approve' ? '算定基礎届が承認されました' : '算定基礎届が差し戻されました',
+      title: input.action === 'requestApproval' ? `${name}：届出の承認の依頼` : input.action === 'approve' ? `${name}が承認されました` : `${name}が差し戻されました`,
       body: `${input.year}年の算定基礎届（${result.number}件目・${result.persons}名）${input.action === 'reject' ? `：${input.comment || '理由の記入なし'}` : ''}`,
     });
   }
@@ -548,5 +554,8 @@ export async function getSanteiFiling(input: SanteiFilingGetInput, auth: AuthCon
   const snap = await runRef.collection('filings').doc(input.filingId).get();
   if (!snap.exists) throw notFound('届出');
   const f = snap.data()!;
-  return { ...filingSummary(snap, auth), header: f.header, persons: f.persons as SanteiFilingPerson[] };
+  return {
+    ...filingSummary(snap, auth), header: f.header, persons: f.persons as SanteiFilingPerson[],
+    originalPersons: (f.originalPersons ?? null) as SanteiFilingPerson[] | null, corrections: f.corrections ?? [],
+  };
 }

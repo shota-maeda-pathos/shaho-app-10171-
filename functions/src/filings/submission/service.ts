@@ -36,6 +36,11 @@ const isApproved = (source: FilingSource, data: FirebaseFirestore.DocumentData) 
 
 /** 送信前に確かめる必須項目。足りないものの一覧 */
 async function missingFields(source: FilingSource, data: FirebaseFirestore.DocumentData): Promise<string[]> {
+  if (source !== 'employee' && (data.filingType === 'correction' || data.filingType === 'cancellation')) {
+    const { runCorrectionErrors } = await import('../run-correction/rules');
+    const base = source === 'santei' ? (await import('../../santei/service')).mockErrors(data) : (await import('../../bonus/service')).mockErrors(data);
+    return [...runCorrectionErrors(data), ...base];
+  }
   if (source === 'santei') return (await import('../../santei/service')).mockErrors(data);
   if (source === 'bonus') return (await import('../../bonus/service')).mockErrors(data);
   if (data.filingType === 'correction' || data.filingType === 'cancellation') {
@@ -86,6 +91,8 @@ async function afterChange(path: string, before: MockState | null, after: MockSt
   }
   // 賞与不支給報告書は、提出を終えたら不支給の記録と支給予定月の変更を反映する
   if (src.source === 'bonus') await (await import('../../bonus/service')).afterBonusFilingSubmitted(path);
+  // 算定基礎届・賞与支払届の訂正届・取消届は、提出を終えたら元の届出に印を付ける
+  if (src.source !== 'employee') await (await import('../run-correction/service')).afterRunCorrectionSubmitted(path, src.source);
   // 模擬電子申請の結果（完了・返戻）はダッシュボードに通知する
   if (after && before?.status !== after.status && (after.status === 'completed' || after.status === 'returned')) {
     const { notify } = await import('../../utils/notify');

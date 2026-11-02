@@ -1,3 +1,4 @@
+import type { RunCorrectionInfo, RunCorrectionRow } from '../filings/run-correction/run-correction';
 import { StatusTone } from '../../shared/ui';
 
 // functions/src/bonus/bonus-calc.ts・service.ts と同じ形
@@ -54,6 +55,8 @@ export interface FilingSummary {
   submission: { method: 'mock' | 'paper'; date: string; acceptanceNumber: string | null } | null;
   /** 模擬電子申請の状態（送信中・送信エラー・返戻など） */
   mockStatus: string | null;
+  /** 訂正届・取消届まわり */
+  correction: RunCorrectionInfo;
   /** bonusPayment（賞与支払届）／bonusNonPayment（賞与不支給報告書） */
   filingType: string;
   /** 賞与不支給報告書の③ 支給予定月の変更（変更しないときは null） */
@@ -79,6 +82,9 @@ export interface FilingPerson {
 export interface FilingDetail extends FilingSummary {
   header: Record<string, string | number>;
   persons: FilingPerson[];
+  /** 訂正届・取消届：元の届出の行と訂正箇所 */
+  originalPersons: FilingPerson[] | null;
+  corrections: RunCorrectionRow[];
 }
 
 export type BonusAction = 'requestBonusApproval' | 'approveBonus' | 'calculate' | 'requestPremiumApproval' | 'approvePremium';

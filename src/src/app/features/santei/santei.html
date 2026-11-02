@@ -83,7 +83,7 @@
             @for (f of activeFilings(); track f.id) {
               <li class="filing" [attr.data-tone]="filingTone(f)">
                 <div class="filing-head">
-                  <strong>{{ f.number }}件目の算定基礎届</strong>
+                  <strong>{{ filingTitle(f) }}</strong>
                   <span>{{ f.personCount }}名</span>
                   <span class="app-status" [attr.data-tone]="filingTone(f)">{{ statusLabels[f.status] }}</span>
                 </div>
@@ -112,6 +112,7 @@
                     <app-filing-attachments [target]="{ source: 'santei', parentId: runId(), filingId: f.id }" />
                   </details>
                 }
+                <app-run-correction source="santei" [parentId]="runId()" [officeId]="office.selected()" [period]="year" [filing]="f" (changed)="load()" />
               </li>
             }
           </ul>

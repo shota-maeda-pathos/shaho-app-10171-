@@ -214,7 +214,7 @@
                 @for (f of activeFilings(); track f.id) {
                   <li class="filing" [attr.data-tone]="filingTone(f)">
                     <div class="filing-head">
-                      <strong>{{ f.number }}件目の賞与支払届</strong>
+                      <strong>{{ filingTitle(f) }}</strong>
                       <span>{{ f.personCount }}名</span>
                       <span class="app-status" [attr.data-tone]="filingTone(f)">{{ statusLabels[f.status] }}</span>
                       @if (f.deadline && f.status !== 'submitted') { <span class="filing-status" [class]="dueClass(f.deadline)">期限 {{ f.deadline }}</span> }
@@ -244,6 +244,7 @@
                         <app-filing-attachments [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" />
                       </details>
                     }
+                    <app-run-correction source="bonus" [parentId]="runId()" [officeId]="office.selected()" [period]="payMonth" [filing]="f" (changed)="load()" />
                   </li>
                 }
               </ul>

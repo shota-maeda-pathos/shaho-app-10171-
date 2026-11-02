@@ -1,6 +1,7 @@
 // 賞与（一括型）。事業所×支給月ごとに、賞与を登録する → 賞与額の承認 → 保険料の計算と承認 → 賞与支払届の作成・承認・提出
 import { filingContentHash } from '../utils/hash';
 import { buildArchive } from '../filings/archive/rules';
+import { RunCorrectionSummary, runCorrectionSummary } from '../filings/run-correction/rules';
 import { laborConsultantText } from '../companies/labor-consultant';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
@@ -119,6 +120,8 @@ export interface BonusFilingSummary {
   filingType: string;
   /** 賞与不支給報告書の③ 支給予定月の変更（変更しないときは null） */
   change: { before: number[]; after: number[]; noMoreBonus: boolean } | null;
+  /** 訂正届・取消届まわり */
+  correction: RunCorrectionSummary;
   version: number;
   createdAt: string | null;
 }
@@ -134,6 +137,7 @@ function filingSummary(d: FirebaseFirestore.DocumentSnapshot, auth: AuthContext)
     filingType: f.filingType ?? 'bonusPayment',
     change: f.filingType === 'bonusNonPayment' && Array.isArray(f.header?.['変更後の支払予定月'])
       ? { before: f.header['変更前の支払予定月'] ?? [], after: f.header['変更後の支払予定月'], noMoreBonus: !!f.header['今後は支給しない'] } : null,
+    correction: runCorrectionSummary(f),
     version: f.version, createdAt: iso(f.createdAt),
   };
 }
@@ -219,7 +223,8 @@ export async function bonusOverview(input: BonusRunInput, auth: AuthContext) {
   const [snaps, run, filings] = await Promise.all([getAllChunked(refs), runRef.get(), runRef.collection('filings').orderBy('number', 'asc').get()]);
   const filingOf = new Map<string, string>();
   for (const f of filings.docs) {
-    if (f.data().status === 'cancelled') continue;
+    // 訂正届・取消届は元の届出に載った人のもの。載っている届出は元の届出のまま
+    if (f.data().status === 'cancelled' || f.data().originalFilingId) continue;
     for (const id of f.data().employeeIds ?? []) filingOf.set(id, f.id);
   }
   // 在籍している人と、賞与が登録されている人を出す
@@ -795,15 +800,16 @@ export async function updateBonusFiling(input: BonusFilingUpdateInput, auth: Aut
       entity: 'bonusFiling', entityId: input.filingId, action: 'update', changes: { status: { from: f.status, to: patch.status ?? f.status } },
       note: input.comment ?? null, performedBy: auth.uid, performedAt: now, version: f.version + 1,
     });
-    return { status: (patch.status ?? f.status) as string, persons: (f.employeeIds ?? []).length as number, number: f.number as number };
+    return { status: (patch.status ?? f.status) as string, persons: (f.employeeIds ?? []).length as number, number: f.number as number, filingType: f.filingType as string };
   });
   if ('mockErrors' in result) return { success: false, mockErrors: result.mockErrors };
 
   if (input.action === 'requestApproval' || input.action === 'approve' || input.action === 'reject') {
     const { notify } = await import('../utils/notify');
+    const name = result.filingType === 'correction' ? '賞与支払届の訂正届' : result.filingType === 'cancellation' ? '賞与支払届の取消届' : '賞与支払届';
     await notify({
       companyId: auth.companyId, category: 'filing', targetType: 'bonusRun', targetId: runRef.id, createdBy: auth.uid,
-      title: input.action === 'requestApproval' ? '賞与支払届：届出の承認の依頼' : input.action === 'approve' ? '賞与支払届が承認されました' : '賞与支払届が差し戻されました',
+      title: input.action === 'requestApproval' ? `${name}：届出の承認の依頼` : input.action === 'approve' ? `${name}が承認されました` : `${name}が差し戻されました`,
       body: `${input.payMonth}支給の賞与支払届（${result.number}件目・${result.persons}名）${input.action === 'reject' ? `：${input.comment || '理由の記入なし'}` : ''}`,
     });
   }
@@ -816,5 +822,8 @@ export async function getBonusFiling(input: BonusFilingGetInput, auth: AuthConte
   const snap = await runRef.collection('filings').doc(input.filingId).get();
   if (!snap.exists) throw notFound('届出');
   const f = snap.data()!;
-  return { ...filingSummary(snap, auth), header: f.header, persons: f.persons as BonusFilingPerson[] };
+  return {
+    ...filingSummary(snap, auth), header: f.header, persons: f.persons as BonusFilingPerson[],
+    originalPersons: (f.originalPersons ?? null) as BonusFilingPerson[] | null, corrections: f.corrections ?? [],
+  };
 }

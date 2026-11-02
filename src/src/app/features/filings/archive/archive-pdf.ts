@@ -38,7 +38,9 @@ export async function pdfFromArchive(a: FilingArchive): Promise<OfficialPdfResul
   const m = await import('../templates/official-filing-pdf');
   const meta: FilingPrintMeta = a.meta;
   let result: OfficialPdfResult;
-  if (a.filingType === 'correction' || a.filingType === 'cancellation') {
+  if ((a.filingType === 'correction' || a.filingType === 'cancellation') && a.source !== 'employee') {
+    result = await m.createRunCorrectionPdf(a.filingType, a.source, a.header ?? {}, a.persons ?? [], a.corrections ?? [], a.reason ?? '', meta);
+  } else if (a.filingType === 'correction' || a.filingType === 'cancellation') {
     result = await m.createCorrectionPdf(a.filingType, a.formType, a.formData ?? {}, a.corrections ?? [], a.reason ?? '', meta);
   } else if (a.source === 'santei') {
     result = await m.createSanteiFilingPdf(a.header ?? {}, (a.persons ?? []) as SanteiPrintPerson[], meta);

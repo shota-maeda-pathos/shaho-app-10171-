@@ -1,5 +1,6 @@
 import { FilingSubmissionComponent } from '../filings/submission/filing-submission';
 import { FilingAttachmentsComponent } from '../filings/attachments/filing-attachments';
+import { RunCorrectionComponent, runFilingTitle } from '../filings/run-correction/run-correction';
 import { Component, computed, DestroyRef, effect, inject, OnInit, signal, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -44,7 +45,7 @@ const STEPS: StepDef[] = [
   standalone: true,
   imports: [
     DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule,
-    TargetListComponent, TargetCellDirective, TargetDetailDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent, FilingAttachmentsComponent,
+    TargetListComponent, TargetCellDirective, TargetDetailDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent, RunCorrectionComponent, FilingAttachmentsComponent,
     PageHeadComponent, StepperComponent, StepLeadComponent, BonusPersonComponent,
   ],
   templateUrl: './bonus.html',
@@ -276,6 +277,8 @@ export class BonusComponent implements OnInit {
   }
 
   /** 届出の提出の部品に渡す run のID（サーバーの bonusRunId と同じ形） */
+  filingTitle(f: FilingSummary) { return runFilingTitle(f, '賞与支払届'); }
+
   runId = () => `${this.office.selected()}_${this.payMonth}`;
 
   async load() {
@@ -516,14 +519,14 @@ export class BonusComponent implements OnInit {
         width: '460px',
         data: action === 'reject' ? { title: '届出を差し戻す', label: '差し戻しの理由', type: 'text', button: '差し戻す', required: true }
           : action === 'cancel' ? { title: '届出を取り消す', label: '', type: 'none', button: '取り消す', required: false,
-            text: `${f.number}件目の届出（${f.personCount}名）を取り消します。載っていた人は「届出 未作成」に戻り、作り直せます。` }
+            text: f.correction?.kind ? `${this.filingTitle(f)}（${f.personCount}名）を取り下げます。元の届出はそのままです。` : `${f.number}件目の届出（${f.personCount}名）を取り消します。載っていた人は「届出 未作成」に戻り、作り直せます。` }
           : { title: '紙で提出したことを記録する', label: '提出した日', type: 'date', button: '記録する', required: true },
       }).afterClosed());
       if (value === undefined || value === null) return;
       extra = action === 'reject' ? { comment: value } : action === 'paperSubmit' ? { date: value } : {};
     } else if (action === 'requestApproval' || action === 'approve') {
       const report = f.filingType === 'bonusNonPayment';
-      const what = report ? '賞与不支給報告書' : `${f.number}件目の賞与支払届`;
+      const what = report ? '賞与不支給報告書' : this.filingTitle(f);
       const count = report ? '1件' : `${f.personCount}名`;
       const ok = await this.confirm.ask(action === 'requestApproval'
         ? { title: `${what}の承認を依頼する`, count, message: '別の担当者（管理者・承認者）に、届出の承認を依頼します。', notice: '依頼中は届出を直せません。直すときは差し戻してもらいます。', confirmLabel: '承認を依頼する' }
