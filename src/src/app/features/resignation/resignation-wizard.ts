@@ -18,13 +18,14 @@ import {
 import { errorMessage } from '../onboarding/onboarding.types';
 import { DUE_SOURCE_LABEL, LossReason, monthLabel, ResignationFacts, ResignationKey, ResignationView, Settlement } from './resignation.types';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 const KEYS: ResignationKey[] = ['entry', 'settlement', 'account', 'filing', 'approval', 'submit', 'confirm'];
 
 /** 退職手続きのウィザード（個人型）。退職日の登録から資格喪失届の提出まで1つの画面で進める */
 @Component({
   selector: 'app-resignation-wizard',
   standalone: true,
-  imports: [
+  imports: [MatDatepickerModule,
     GroupNavComponent, FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule,
     MatRadioModule, WizardComponent, TermComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],

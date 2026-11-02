@@ -8,6 +8,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { BonusPayment, BonusRow, FilingDetail, monthLabel } from './bonus.types';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 /**
  * 1人分の賞与（右のパネルの中身）。支給の内訳（同じ月に複数回なら行を足す）・年度の累計・保険料の内訳を見て、承認前なら直す。
  * 保存すると支給の一覧を save に出す（空の一覧は登録を消す）。計算はサーバーで行い、ここでは目安の合計だけ出す
@@ -15,7 +18,7 @@ import { BonusPayment, BonusRow, FilingDetail, monthLabel } from './bonus.types'
 @Component({
   selector: 'app-bonus-person',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule],
+  imports: [MatDatepickerModule, MatFormFieldModule, MatInputModule, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule],
   template: `
     @let r = row();
     @let b = r.bonus;
@@ -33,7 +36,7 @@ import { BonusPayment, BonusRow, FilingDetail, monthLabel } from './bonus.types'
         <tbody>
           @for (p of payments(); track $index; let i = $index) {
             <tr>
-              <td><input type="date" [ngModel]="p.date" (ngModelChange)="set(i, 'date', $event)" [min]="payMonth() + '-01'" [max]="lastDay()" [attr.aria-label]="(i + 1) + '回目の支給日'"></td>
+              <td><mat-form-field appearance="outline" subscriptSizing="dynamic" class="date-field"><input matInput [ngModel]="p.date" (ngModelChange)="set(i, 'date', $event)" [min]="payMonth() + '-01'" [max]="lastDay()" [attr.aria-label]="(i + 1) + '回目の支給日'" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field></td>
               <td class="num"><input type="number" min="0" step="1" [ngModel]="p.cash" (ngModelChange)="set(i, 'cash', $event)" [attr.aria-label]="(i + 1) + '回目の賞与額'"></td>
               <td class="num"><input type="number" min="0" step="1" [ngModel]="p.inKind" (ngModelChange)="set(i, 'inKind', $event)" [attr.aria-label]="(i + 1) + '回目の現物'"></td>
               <td><button mat-icon-button type="button" (click)="remove(i)" [attr.aria-label]="(i + 1) + '回目の支給を消す'"><mat-icon>delete</mat-icon></button></td>
@@ -131,7 +134,7 @@ export class BonusPersonComponent {
   submit() {
     const list = this.payments();
     const month = this.payMonth();
-    if (list.some(p => !p.date.startsWith(`${month}-`))) return this.error.set(`支給日は${this.month()}の日付にしてください`);
+    if (list.some(p => !p.date?.startsWith(`${month}-`))) return this.error.set(`支給日は${this.month()}の日付にしてください`);
     if (list.some(p => p.cash + p.inKind <= 0)) return this.error.set('支給額が0円の行があります');
     if (new Set(list.map(p => p.date)).size !== list.length) return this.error.set('同じ支給日が2回あります（同じ日の支給は1行にまとめてください）');
     this.save.emit(list);

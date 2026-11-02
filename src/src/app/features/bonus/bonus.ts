@@ -26,6 +26,9 @@ import {
 } from './bonus.types';
 import { BonusFilingDialogComponent, BonusPersonComponent } from './bonus-dialogs';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 /** ステップ。what は本体の見出しの横に出す1行。注意は操作バーの主ボタンの横に出す（BulkAction の caution） */
 interface StepDef { key: StepKey; label: string; what: string }
 
@@ -43,7 +46,7 @@ const STEPS: StepDef[] = [
 @Component({
   selector: 'app-bonus',
   standalone: true,
-  imports: [
+  imports: [MatDatepickerModule, MatFormFieldModule, MatInputModule,
     DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule,
     TargetListComponent, TargetCellDirective, TargetDetailDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent, RunCorrectionComponent, FilingAttachmentsComponent,
     PageHeadComponent, StepperComponent, StepLeadComponent, BonusPersonComponent,

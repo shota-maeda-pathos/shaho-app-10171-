@@ -13,6 +13,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, WizardComponent, WizardStep, createDraftAutosave } from '../../shared/ui';
 import { errorMessage } from '../onboarding/onboarding.types';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 type Key = 'entry' | 'apply' | 'filings' | 'confirm' | 'done';
 const KEYS: Key[] = ['entry', 'apply', 'filings', 'confirm'];
 
@@ -40,7 +41,7 @@ interface TransferView {
 @Component({
   selector: 'app-transfer-wizard',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule,
+  imports: [MatDatepickerModule, DatePipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule,
     WizardComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent],
   templateUrl: './transfer-wizard.html',
   styleUrls: ['../onboarding/onboarding-wizard.scss'],

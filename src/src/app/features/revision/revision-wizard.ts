@@ -18,6 +18,7 @@ import {
 import { errorMessage } from '../onboarding/onboarding.types';
 import { addMonth, ChangeForm, Evaluation, monthLabel, RevisionKey, RevisionView } from './revision.types';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 const KEYS: RevisionKey[] = ['change', 'judge', 'filing', 'approval', 'submit', 'confirm'];
 
 /**
@@ -27,7 +28,7 @@ const KEYS: RevisionKey[] = ['change', 'judge', 'filing', 'approval', 'submit', 
 @Component({
   selector: 'app-revision-wizard',
   standalone: true,
-  imports: [
+  imports: [MatDatepickerModule,
     FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule, MatInputModule, MatRadioModule,
     WizardComponent, TermComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],

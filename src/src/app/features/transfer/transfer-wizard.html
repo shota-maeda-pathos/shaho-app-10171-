@@ -27,7 +27,7 @@
                 @for (o of offices(); track o.id) { @if (o.id !== v.from.id) { <mat-option [value]="o.id">{{ o.name }}</mat-option> } }
               </mat-select></mat-form-field>
             <mat-form-field appearance="outline"><mat-label>異動日（異動先で働き始める日）</mat-label>
-              <input matInput type="date" [(ngModel)]="transferDate" (ngModelChange)="changed()" name="transferDate"></mat-form-field>
+              <input matInput [(ngModel)]="transferDate" (ngModelChange)="changed()" name="transferDate" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
             <mat-form-field appearance="outline"><mat-label>異動の理由（任意）</mat-label>
               <input matInput [(ngModel)]="reason" (ngModelChange)="dirty.set(true)" name="reason" maxlength="200"></mat-form-field>
           </fieldset>

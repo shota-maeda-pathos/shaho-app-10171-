@@ -18,6 +18,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { ConfirmDialogComponent } from '../../../shared/confirm-dialog/confirm-dialog';
 import { TermComponent } from '../../../shared/ui';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 interface OfficeRow {
   id: string;
   name: string;
@@ -68,7 +69,7 @@ const PREFECTURES: Record<string, string> = {
 @Component({
   selector: 'app-office-management',
   standalone: true,
-  imports: [
+  imports: [MatDatepickerModule,
     CommonModule, FormsModule,
     MatTableModule, MatCardModule, MatIconModule,
     MatButtonModule, MatChipsModule, MatProgressSpinnerModule,
@@ -172,7 +173,7 @@ const PREFECTURES: Record<string, string> = {
           <h3>事業所の廃止</h3>
           <p class="hint">在籍している従業員が0人で、進行中の手続きがないときだけ廃止できます。廃止した事業所は消さずに残り、過去の保険料・届出から見られます。従業員の配属先には選べなくなります。</p>
           <div class="abolish">
-            <mat-form-field appearance="outline"><mat-label>廃止日</mat-label><input matInput type="date" [(ngModel)]="e.abolishedOn"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>廃止日</mat-label><input matInput [(ngModel)]="e.abolishedOn" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
             <button mat-stroked-button type="button" class="danger" (click)="abolish(e)" [disabled]="!e.abolishedOn || savingId() === e.id">この事業所を廃止する</button>
           </div>
         </mat-card>

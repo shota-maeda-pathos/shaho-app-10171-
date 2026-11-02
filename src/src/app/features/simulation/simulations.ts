@@ -9,6 +9,7 @@ import { OfficeContextService } from '../../core/services/office-context.service
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 type Kind = 'raise' | 'hire' | 'annual' | 'rateChange' | 'bonus';
 const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHire', annual: 'simulationAnnual', rateChange: 'simulationRateChange', bonus: 'simulationBonus' };
 
@@ -16,7 +17,7 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
 @Component({
   selector: 'app-simulations',
   standalone: true,
-  imports: [MatFormFieldModule, MatInputModule, MatSelectModule, DecimalPipe, FormsModule, MatButtonModule],
+  imports: [MatDatepickerModule, MatFormFieldModule, MatInputModule, MatSelectModule, DecimalPipe, FormsModule, MatButtonModule],
   template: `
     <div class="kinds">
       @for (k of kinds; track k[0]) { <button type="button" [class.on]="kind === k[0]" (click)="kind = k[0]; result.set(null); error.set('')">{{ k[1] }}</button> }
@@ -35,7 +36,7 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
         @case ('hire') {
           @if (!officeId()) { <p class="warn">上で事業所を1つ選んでください。</p> }
           <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>想定の報酬月額（円）</mat-label><input matInput type="number" min="0" [(ngModel)]="remuneration" name="rem"></mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>生年月日</mat-label><input matInput type="date" [(ngModel)]="birthDate" name="bd"></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>生年月日</mat-label><input matInput [(ngModel)]="birthDate" name="bd" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 startView="multi-year" /></mat-form-field>
         }
         @case ('annual') {
           <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>賞与1回の想定額（円）</mat-label><input matInput type="number" min="0" [(ngModel)]="bonusPerPayment" name="bpp"></mat-form-field>
@@ -49,7 +50,7 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
         @case ('bonus') {
           @if (!officeId()) { <p class="warn">上で事業所を1つ選んでください。</p> }
           <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>従業員ID（任意。入れると今年度の累計で上限を判定）</mat-label><input matInput [(ngModel)]="employeeId" name="eid"></mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>生年月日（従業員IDがないとき）</mat-label><input matInput type="date" [(ngModel)]="birthDate" name="bd2"></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>生年月日（従業員IDがないとき）</mat-label><input matInput [(ngModel)]="birthDate" name="bd2" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 startView="multi-year" /></mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>賞与額（円）</mat-label><input matInput type="number" min="0" [(ngModel)]="bonusAmount" name="ba"></mat-form-field>
         }
       }

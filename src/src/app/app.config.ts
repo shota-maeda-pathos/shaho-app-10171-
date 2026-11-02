@@ -10,6 +10,8 @@ import { environment } from '../environments/environment';
 import { routes } from './app.routes';
 import { GlobalErrorHandler } from './core/services/error-handler.service';
 import { PageTitleStrategy } from './core/services/page-title.strategy';
+import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
+import { IsoStringDateAdapter, ISO_DATE_FORMATS } from './shared/ui/date-adapter';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -19,6 +21,9 @@ export const appConfig: ApplicationConfig = {
     {provide:RouteReuseStrategy,useClass:OfficeRouteReuseStrategy},
     { provide: TitleStrategy, useClass: PageTitleStrategy },
     provideAnimationsAsync(),
+    // 日付の入力は Material の日付ピッカー。値は今までどおり「YYYY-MM-DD」の文字列
+    { provide: DateAdapter, useClass: IsoStringDateAdapter },
+    { provide: MAT_DATE_FORMATS, useValue: ISO_DATE_FORMATS },
     provideFirebaseApp(() => initializeApp(environment.firebase)),
     provideAuth(() => {
       const auth = getAuth();

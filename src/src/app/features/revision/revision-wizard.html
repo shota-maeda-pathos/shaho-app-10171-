@@ -32,9 +32,9 @@
                 <input matInput [(ngModel)]="form.note" (ngModelChange)="dirty.set(true)" name="note" maxlength="200" placeholder="例：昇給、住宅手当の新設"></mat-form-field>
             } @else {
               <mat-form-field appearance="outline"><mat-label>休業を終えた日（復帰の前日）</mat-label>
-                <input matInput type="date" [(ngModel)]="form.endDate" (ngModelChange)="changed()" name="endDate"></mat-form-field>
+                <input matInput [(ngModel)]="form.endDate" (ngModelChange)="changed()" name="endDate" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>養育する子の生年月日</mat-label>
-                <input matInput type="date" [(ngModel)]="form.childBirthDate" (ngModelChange)="changed()" name="childBirth"></mat-form-field>
+                <input matInput [(ngModel)]="form.childBirthDate" (ngModelChange)="changed()" name="childBirth" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 /></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>養育する子の氏名</mat-label>
                 <input matInput [(ngModel)]="form.childName" (ngModelChange)="dirty.set(true)" name="childName" maxlength="100"></mat-form-field>
               <div></div>
@@ -43,7 +43,7 @@
               <mat-checkbox [(ngModel)]="form.applied" (ngModelChange)="changed()" name="applied" [disabled]="v.locked">本人の申出あり</mat-checkbox>
               @if (form.applied) {
                 <mat-form-field appearance="outline"><mat-label>申出を受けた日</mat-label>
-                  <input matInput type="date" [(ngModel)]="form.appliedDate" (ngModelChange)="dirty.set(true)" name="appliedDate"></mat-form-field>
+                  <input matInput [(ngModel)]="form.appliedDate" (ngModelChange)="dirty.set(true)" name="appliedDate" [matDatepicker]="dp3" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp3" /><mat-datepicker #dp3 /></mat-form-field>
               }
             }
           </fieldset>

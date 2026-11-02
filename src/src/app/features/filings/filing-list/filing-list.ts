@@ -10,6 +10,7 @@ import { EmptyStateComponent, ErrorStateComponent, LoadingStateComponent, PageHe
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import {
   FILING_STATUS_LABELS, FILING_TYPE_LABELS, FilingStatus, filingTone, filingTypeLabel, PAPER_STATUS_LABELS, PaperStatus,
 } from '../filing-labels';
@@ -54,7 +55,7 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
 @Component({
   selector: 'app-filing-list',
   standalone: true,
-  imports: [MatFormFieldModule, MatInputModule, MatSelectModule,
+  imports: [MatDatepickerModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     FormsModule, RouterLink, MatButtonModule, MatIconModule,
     StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent, EmptyStateComponent, PageHeadComponent,
   ],
@@ -83,8 +84,8 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
               <mat-option value="submitted">提出日</mat-option>
               <mat-option value="created">作成日</mat-option>
             </mat-select></mat-form-field>
-            <input type="date" [(ngModel)]="zipFrom" name="zipFrom" aria-label="から"> 〜
-            <input type="date" [(ngModel)]="zipTo" name="zipTo" aria-label="まで">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="date-field"><input matInput [(ngModel)]="zipFrom" name="zipFrom" aria-label="から" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field> 〜
+            <mat-form-field appearance="outline" subscriptSizing="dynamic" class="date-field"><input matInput [(ngModel)]="zipTo" name="zipTo" aria-label="まで" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 /></mat-form-field>
             <button mat-flat-button type="button" (click)="makeZip()" [disabled]="zipBusy() || !zipFrom || !zipTo">ZIPを作る</button>
           </div>
           @if (zipStatus()) { <p role="status">{{ zipStatus() }}</p> }
@@ -131,8 +132,8 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
                 <mat-option value="submitted">提出日</mat-option>
                 <mat-option value="deadline">期限</mat-option>
               </mat-select></mat-form-field>
-              <input type="date" name="from" [(ngModel)]="from" aria-label="から"> 〜
-              <input type="date" name="to" [(ngModel)]="to" aria-label="まで">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="date-field"><input matInput name="from" [(ngModel)]="from" aria-label="から" [matDatepicker]="dp3" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp3" /><mat-datepicker #dp3 /></mat-form-field> 〜
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="date-field"><input matInput name="to" [(ngModel)]="to" aria-label="まで" [matDatepicker]="dp4" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp4" /><mat-datepicker #dp4 /></mat-form-field>
               <button mat-stroked-button type="submit"><mat-icon>search</mat-icon>探す</button>
             </div>
           }

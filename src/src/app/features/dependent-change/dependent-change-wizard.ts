@@ -17,6 +17,7 @@ import {
   ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep, createDraftAutosave,
 } from '../../shared/ui';
 import { errorMessage } from '../onboarding/onboarding.types';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import {
   ChangeItem, ChangeKind, DependentKey, DependentView, emptyItem, RELATIONSHIP_OPTIONS, relationshipLabel, REMOVE_REASONS, Summary,
 } from './dependent-change.types';
@@ -27,7 +28,7 @@ const KEYS: DependentKey[] = ['change', 'filing', 'approval', 'submit', 'confirm
 @Component({
   selector: 'app-dependent-change-wizard',
   standalone: true,
-  imports: [
+  imports: [MatDatepickerModule,
     FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule,
     MatInputModule, MatRadioModule, MatSelectModule, WizardComponent, TermComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],

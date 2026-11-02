@@ -13,6 +13,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { StatusBadgeComponent } from '../../../shared/ui';
 import { errorMessage } from '../../onboarding/onboarding.types';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 export interface FilingTarget {
   source: 'employee' | 'santei' | 'bonus';
   /** 従業員の届出なら従業員ID、算定基礎届・賞与支払届なら run のID（`{事業所ID}_{年 or 支給月}`） */
@@ -53,7 +54,7 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
 @Component({
   selector: 'app-filing-submission',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatRadioModule, StatusBadgeComponent],
+  imports: [MatDatepickerModule, DatePipe, FormsModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatRadioModule, StatusBadgeComponent],
   template: `
     @if (error()) {
       <div class="alert" role="alert">{{ error() }} <button mat-button type="button" (click)="load()">読み込み直す</button></div>
@@ -155,7 +156,7 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
           } @else if (method === 'paper' && v.canPaper) {
             <p class="sub">PDFを印刷し、年金事務所へ郵送か窓口で提出してから記録します。</p>
             <div class="fields">
-              <mat-form-field appearance="outline"><mat-label>提出した日</mat-label><input matInput type="date" [(ngModel)]="paperDate" name="paperDate"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>提出した日</mat-label><input matInput [(ngModel)]="paperDate" name="paperDate" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>提出先（年金事務所名など）</mat-label><input matInput [(ngModel)]="paperOffice" name="paperOffice"></mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>提出方法</mat-label>
@@ -171,7 +172,7 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
           <details class="more">
             <summary>実際に紙でも提出した記録を残す</summary>
             <div class="fields">
-              <mat-form-field appearance="outline"><mat-label>提出した日</mat-label><input matInput type="date" [(ngModel)]="paperDate" name="paperDate2"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>提出した日</mat-label><input matInput [(ngModel)]="paperDate" name="paperDate2" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 /></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>提出先（年金事務所名など）</mat-label><input matInput [(ngModel)]="paperOffice" name="paperOffice2"></mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>提出方法</mat-label>
@@ -195,7 +196,7 @@ const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tok
               <mat-radio-button value="returned">返戻された</mat-radio-button>
             </mat-radio-group>
             <div class="fields">
-              <mat-form-field appearance="outline"><mat-label>受け取った日</mat-label><input matInput type="date" [(ngModel)]="resultDate" name="resultDate"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>受け取った日</mat-label><input matInput [(ngModel)]="resultDate" name="resultDate" [matDatepicker]="dp3" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp3" /><mat-datepicker #dp3 /></mat-form-field>
               <mat-form-field appearance="outline" class="wide">
                 <mat-label>{{ result === 'returned' ? '返戻の理由' : '決定通知の内容（任意）' }}</mat-label>
                 <input matInput [(ngModel)]="resultNote" name="resultNote">

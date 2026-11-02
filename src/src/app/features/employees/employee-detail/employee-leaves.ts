@@ -9,6 +9,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 interface Leave {
   id: string;
   leaveTypeLabel: string;
@@ -23,7 +24,7 @@ interface Leave {
 @Component({
   selector: 'app-employee-leaves',
   standalone: true,
-  imports: [FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [MatDatepickerModule, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   template: `
     <h2>休業管理</h2>
     <p>産休・育休は、申出書・保険料の免除・休業中の変更届や終了届までを手続きの画面で進めます。</p>
@@ -35,10 +36,10 @@ interface Leave {
     <form #form="ngForm" (ngSubmit)="register()">
       <div class="fields">
         <mat-form-field appearance="outline"><mat-label>開始予定日</mat-label>
-          <input matInput type="date" name="start" [(ngModel)]="start" required>
+          <input matInput name="start" [(ngModel)]="start" required [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 />
         </mat-form-field>
         <mat-form-field appearance="outline"><mat-label>終了予定日</mat-label>
-          <input matInput type="date" name="end" [(ngModel)]="end" [min]="start" required>
+          <input matInput name="end" [(ngModel)]="end" [min]="start" required [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 />
         </mat-form-field>
       </div>
       <p>介護休業は保険料の免除がありません。休業の予定と実績だけを記録します。</p>
@@ -73,7 +74,7 @@ interface Leave {
               <form #updateForm="ngForm" (ngSubmit)="updateLeave()">
                 <mat-form-field appearance="outline">
                   <mat-label>{{ edit.action === 'start' ? '実際の開始日' : '実際の終了日' }}</mat-label>
-                  <input matInput type="date" name="actualDate" [(ngModel)]="edit.date" [min]="edit.action === 'end' ? leave.actualStartDate : null" required>
+                  <input matInput name="actualDate" [(ngModel)]="edit.date" [min]="edit.action === 'end' ? leave.actualStartDate : null" required [matDatepicker]="dp3" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp3" /><mat-datepicker #dp3 />
                 </mat-form-field>
                 <button mat-flat-button type="submit" [disabled]="updateForm.invalid || updating()">{{ updating() ? '保存中...' : '保存' }}</button>
                 <button mat-button type="button" (click)="editing.set(null)" [disabled]="updating()">キャンセル</button>

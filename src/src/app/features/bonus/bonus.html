@@ -92,7 +92,7 @@
                 支給した場合は賞与を登録してください。支給しなかった場合は、ここで報告書<app-term key="bonusNonPayment" [showLabel]="false" />を作り、承認を受けて提出します。</div>
             </div>
             <div class="np-form">
-              <label class="np-field">届書の提出日 <input type="date" [(ngModel)]="npDate" name="npDate"></label>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="np-field"><mat-label>届書の提出日</mat-label><input matInput [(ngModel)]="npDate" name="npDate" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
               <fieldset>
                 <legend>今後の賞与の支給予定月（③ 支給予定月の変更）</legend>
                 <label><input type="radio" name="npChange" value="keep" [(ngModel)]="npChange"> 変えない（今の予定月：{{ monthsText(d.office.bonusMonths) }}）</label>
