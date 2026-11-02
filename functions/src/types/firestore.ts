@@ -672,6 +672,8 @@ export interface ResignationState {
   filingId: string | null;
   /** 退職後のポータル閲覧の最終日 YYYY-MM-DD */
   accessUntil: string | null;
+  /** 同月得喪で、年金事務所から厚生年金保険料の還付の通知が届いたときの記録（本人負担分は本人へ返金する） */
+  pensionRefund?: { month: string; employeeAmount: number; employerAmount: number; noticeDate: string; recordedAt: Timestamp; recordedBy: string } | null;
 }
 
 /** 本人が招待リンクから入力した内容。台帳への登録は担当者が確かめてから行う */

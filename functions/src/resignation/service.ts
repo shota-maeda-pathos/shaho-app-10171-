@@ -266,6 +266,9 @@ export async function getResignation(companyId: string, procedureId: string, aut
       viewOnlyFrom: facts?.account.viewOnlyFrom ?? null,
     },
     cards: rs.cards,
+    pensionRefund: rs.pensionRefund
+      ? { month: rs.pensionRefund.month, employeeAmount: rs.pensionRefund.employeeAmount, employerAmount: rs.pensionRefund.employerAmount, noticeDate: rs.pensionRefund.noticeDate }
+      : null,
     filing: filing && rs.filingId ? {
       id: rs.filingId, version: filing.version, workflowStatus: filing.workflowStatus,
       mockStatus: filing.mockStatus, submissionStatus: filing.submissionStatus, resultNote: filing.resultNote,
@@ -595,3 +598,55 @@ export async function completeResignation(input: { companyId: string; procedureI
   return { success: true, id: input.procedureId };
 }
 
+// ── 同月得喪の厚生年金保険料の還付 ───────────────────────────
+
+/**
+ * 同月得喪で、同じ月に別の厚生年金・国民年金に入った人は、厚生年金保険料が後日年金事務所から還付される。
+ * 還付の通知が届いたことを記録し、その月の厚生年金保険料（本人・会社）を残して、担当者には本人負担分の返金を、本人には返金されることを知らせる
+ */
+export async function recordPensionRefund(input: { companyId: string; procedureId: string; expectedVersion: number; noticeDate: string }, auth: AuthContext) {
+  const { ref, proc } = await loadProcedure(input.companyId, input.procedureId, auth);
+  requireVersion(proc, input.expectedVersion);
+  const rs = proc.resignation;
+  if (!rs.resignationDate) throw invalidArg('先に退職日を入れてください');
+  if (rs.pensionRefund) throw invalidArg('還付の通知は記録済みです');
+  const ctx = await contextOf(input.companyId, proc);
+  const facts = factsOf(ctx, rs.resignationDate, rs.reason);
+  if (!facts.sameMonth || !facts.lost.pension || !facts.lastChargedMonth) throw invalidArg('同月得喪で厚生年金に加入していた人だけが還付の対象です');
+  const month = facts.lastChargedMonth;
+  const premium = await db.doc(`${ctx.base}/employees/${proc.employeeId}/monthlyInsurance/${month}`).get();
+  const pension = premium.data()?.pensionInsurance as { employeeAmount?: number; employerAmount?: number } | undefined;
+  if (!premium.exists || !pension) throw invalidArg(`${Number(month.slice(5))}月分の保険料がまだ計算されていません。毎月の処理で計算してから記録してください`);
+  const employeeAmount = Number(pension.employeeAmount ?? 0);
+  const employerAmount = Number(pension.employerAmount ?? 0);
+  await db.runTransaction(async tx => {
+    const latest = (await tx.get(ref)).data() as ResignationProcedure;
+    requireVersion(latest, input.expectedVersion);
+    if (latest.resignation.pensionRefund) throw invalidArg('還付の通知は記録済みです');
+    const now = Timestamp.now();
+    tx.update(ref, {
+      'resignation.pensionRefund': { month, employeeAmount, employerAmount, noticeDate: input.noticeDate, recordedAt: now, recordedBy: auth.uid },
+      version: latest.version + 1, updatedAt: now,
+    });
+    tx.set(db.collection(`companies/${input.companyId}/auditLogs`).doc(), {
+      entity: 'procedure', entityId: input.procedureId, action: 'update',
+      changes: { pensionRefund: { from: null, to: { month, employeeAmount, employerAmount } } }, note: `還付の通知 ${input.noticeDate}`,
+      performedBy: auth.uid, performedAt: now, version: latest.version + 1,
+    });
+  });
+  const yen = (n: number) => `${n.toLocaleString('ja-JP')}円`;
+  const ym = `${month.slice(0, 4)}年${Number(month.slice(5))}月分`;
+  const { notify } = await import('../utils/notify');
+  await notify({
+    companyId: input.companyId, category: 'salary', targetType: 'procedure', targetId: input.procedureId, createdBy: auth.uid, officeId: proc.officeId ?? null,
+    title: '厚生年金保険料の還付（同月得喪）：本人へ返金してください',
+    body: `${proc.employeeName}さんの${ym}の厚生年金保険料（本人負担 ${yen(employeeAmount)}・会社負担 ${yen(employerAmount)}）が年金事務所から還付されます。本人負担の ${yen(employeeAmount)} を${proc.employeeName}さんに返金してください`,
+  });
+  // 本人あて（ポータルのお知らせ）。退職後の閲覧期間のあいだ見られる
+  await notify({
+    companyId: input.companyId, category: 'salary', targetType: 'employee', targetId: proc.employeeId!, createdBy: auth.uid,
+    title: '厚生年金保険料の返金のお知らせ',
+    body: `入社した月に退職したため（同月得喪）、${ym}の厚生年金保険料のうち、あなたの負担分 ${yen(employeeAmount)} が返金されます。返金の方法は会社からの連絡をお待ちください`,
+  });
+  return { success: true, employeeAmount, employerAmount, month };
+}

@@ -32,5 +32,7 @@ export const LossFilingSchema = z.object({
   cardsUnreturnable: z.number().int().min(0).max(20),
 });
 export const CompleteSchema = z.object({ ...Base });
+/** 同月得喪の厚生年金保険料の還付の通知が届いた（届いた日） */
+export const PensionRefundSchema = z.object({ ...Base, noticeDate: calendarDate });
 
 export type EntryInput = z.output<typeof EntrySchema>;

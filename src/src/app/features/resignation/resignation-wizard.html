@@ -220,6 +220,23 @@
           @if (v.settlement && v.settlement.totals.transfer > 0 && !isDone()) {
             <p class="sub">別途回収が残っていても手続きは完了できます。入金されたら毎月の処理で記録してください。</p>
           }
+          @if (v.facts?.sameMonth && v.facts?.lost?.pension) {
+            <section class="refund" aria-labelledby="refund-heading">
+              <h3 id="refund-heading">厚生年金保険料の還付（同月得喪）</h3>
+              @if (v.pensionRefund; as r) {
+                <p><app-status-badge tone="done" label="記録済み" />
+                  {{ r.noticeDate | date:'yyyy年M月d日' }}に還付の通知が届きました。{{ r.month.slice(0, 4) }}年{{ +r.month.slice(5) }}月分の厚生年金保険料
+                  （本人負担 {{ r.employeeAmount | number }}円・会社負担 {{ r.employerAmount | number }}円）が還付されます。
+                  本人負担の {{ r.employeeAmount | number }}円を本人へ返金してください（本人にはポータルで知らせました）。</p>
+              } @else {
+                <p class="sub">同じ月に別の厚生年金・国民年金に入った場合、年金事務所から厚生年金保険料が還付されます。通知が届いたら記録すると、その月の本人負担分を本人へ返金するよう担当者に、返金されることを本人に知らせます。</p>
+                <div class="refund-form">
+                  <mat-form-field appearance="outline"><mat-label>通知が届いた日</mat-label><input matInput type="date" [(ngModel)]="refundNoticeDate"></mat-form-field>
+                  <button mat-stroked-button type="button" (click)="recordRefund()" [disabled]="busy() || !refundNoticeDate">還付の通知が届いたことを記録する</button>
+                </div>
+              }
+            </section>
+          }
         }
       }
     </app-wizard>

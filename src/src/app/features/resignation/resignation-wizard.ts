@@ -67,6 +67,8 @@ export class ResignationWizardComponent implements OnInit, OnDestroy {
 
   // アカウント・届出・提出
   accessUntil = '';
+  /** 同月得喪の還付の通知が届いた日 */
+  refundNoticeDate = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
   cardsReturned = 0;
   cardsUnreturnable = 0;
   method: 'electronic' | 'paper' = 'electronic';
@@ -247,6 +249,10 @@ export class ResignationWizardComponent implements OnInit, OnDestroy {
       case 'filing': return this.run('filing', { cardsReturned: Number(this.cardsReturned) || 0, cardsUnreturnable: Number(this.cardsUnreturnable) || 0 }, '資格喪失届を作り、承認を依頼しました');
       case 'confirm': return this.run('complete', {}, '退職の手続きを完了しました');
     }
+  }
+
+  recordRefund() {
+    return this.run('pensionRefund', { noticeDate: this.refundNoticeDate }, '還付の通知を記録し、担当者と本人に知らせました');
   }
 
   private async run(step: string, payload: object, done: string, after?: () => void) {

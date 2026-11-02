@@ -4,3 +4,8 @@
 .settlement td:first-child { white-space: nowrap; }
 .block { display: block; }
 .pay-month { margin-bottom: var(--app-space-4); }
+
+/* 同月得喪の厚生年金保険料の還付 */
+.refund { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--app-color-border); }
+.refund h3 { margin: 0 0 6px; font-size: 14px; }
+.refund-form { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }

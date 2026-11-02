@@ -3,11 +3,11 @@ import { z } from 'zod';
 import { getAuthContext, requireRole } from '../middleware/auth';
 import { validate } from '../middleware/validation';
 import {
-  AccountSchema, CompleteSchema, EntrySchema, LossFilingSchema, ResignationGetSchema, ResignationPreviewSchema,
+  AccountSchema, CompleteSchema, PensionRefundSchema, EntrySchema, LossFilingSchema, ResignationGetSchema, ResignationPreviewSchema,
   ResignationStartSchema, SettlementPreviewSchema, SettlementSchema,
 } from './schema';
 import {
-  completeResignation, getResignation, previewEntry, previewSettlement, saveAccount, saveEntry, saveSettlement,
+  completeResignation, recordPensionRefund, getResignation, previewEntry, previewSettlement, saveAccount, saveEntry, saveSettlement,
   startResignation, submitLossFiling,
 } from './service';
 
@@ -48,6 +48,7 @@ export const resignationUpdate = onCall(async (request) => {
     case 'account': return saveAccount(validate(AccountSchema, data), auth);
     case 'filing': return submitLossFiling(validate(LossFilingSchema, data), auth);
     case 'complete': return completeResignation(validate(CompleteSchema, data), auth);
+    case 'pensionRefund': return recordPensionRefund(validate(PensionRefundSchema, data), auth);
     default: throw new HttpsError('invalid-argument', '操作が不正です');
   }
 });

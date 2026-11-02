@@ -46,6 +46,8 @@ export interface ResignationView {
   settlement: (Settlement & { lastPayMonth: string | null; decided: boolean }) | null;
   account: { hasUser: boolean; email: string | null; accessUntil: string | null; viewOnlyFrom: string | null };
   cards: { returned: number; unreturnable: number } | null;
+  /** 同月得喪の厚生年金保険料の還付（通知が届いたら記録する） */
+  pensionRefund: { month: string; employeeAmount: number; employerAmount: number; noticeDate: string } | null;
   filing: { id: string; version: number; workflowStatus: string; mockStatus: string; submissionStatus: string; resultNote: string | null } | null;
   approval: { status: string; comment: string | null } | null;
   locked: boolean;
