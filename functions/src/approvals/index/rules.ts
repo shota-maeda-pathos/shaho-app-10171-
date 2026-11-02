@@ -223,6 +223,67 @@ function flatten(value: unknown, prefix: string, out: Map<string, string>) {
 export interface DiffRow { field: string; before: string; after: string }
 
 /**
+ * 保険料・給与・賞与・雇用条件の承認の記録は英語の項目名で持つので、画面には日本語の名前で出す。
+ * 名前のない項目（訂正の回数・計算し直しの印などの内部の値）は出さない。届出の記入内容は日本語の項目名なのでそのまま
+ */
+const FIELD_LABELS: Record<string, string> = {
+  yearMonth: '対象の月', correctionReason: '訂正の理由', roundingRule: '端数処理', rateFingerprint: '使った料率',
+  healthGradeNumber: '健康保険の等級', pensionGradeNumber: '厚生年金の等級',
+  healthStandardRemuneration: '健康保険の標準報酬月額', pensionStandardRemuneration: '厚生年金の標準報酬月額',
+  'healthInsurance.employeeAmount': '健康保険（本人）', 'healthInsurance.employerAmount': '健康保険（会社）',
+  'longTermCareInsurance.employeeAmount': '介護保険（本人）', 'longTermCareInsurance.employerAmount': '介護保険（会社）',
+  'pensionInsurance.employeeAmount': '厚生年金（本人）', 'pensionInsurance.employerAmount': '厚生年金（会社）',
+  'childSupportPayment.employeeAmount': '子ども・子育て支援金（本人）', 'childSupportPayment.employerAmount': '子ども・子育て支援金（会社）',
+  'childSupportContribution.employerAmount': '子ども・子育て拠出金（会社）',
+  totalEmployeeAmount: '本人負担の合計', totalEmployerAmount: '会社負担の合計',
+  isExempted: '保険料の免除', isLongTermCareApplicable: '介護保険の対象', isHealthExcluded: '健康保険に入らない', isPensionExcluded: '厚生年金に入らない',
+  sameMonthAcquisitionAndLoss: '同じ月の取得と喪失',
+  standardBonusAmount: '標準賞与額', totalBonusAmount: '賞与の合計', healthCappedAmount: '健康保険の上限後の額', pensionCappedAmount: '厚生年金の上限後の額',
+  cumulativeBonusAmount: '年度の累計', priorCumulativeBonusAmount: '前回までの年度の累計', healthOverCap: '健康保険の上限を超えた', pensionOverCap: '厚生年金の上限を超えた',
+  bonusTarget: '賞与の保険料の対象', bonusTargetReason: '対象にならない理由', cashAmount: '通貨', totalAmount: '支給額の合計', paymentDate: '支給日',
+  baseSalary: '基本給', paymentBasisDays: '支払基礎日数', totalFixedWage: '固定的賃金の合計', totalVariableWage: '非固定的賃金の合計', totalSalary: '総支給額',
+  inKindAmount: '現物給与', retroactivePay: '遡及差額', noPay: '無給', noPayReason: '無給の理由',
+  employmentType: '雇用区分', contractType: '契約の種類', workStyle: '働き方', insuredCategory: '被保険者の種別',
+  weeklyHours: '週の所定労働時間', weeklyDays: '週の所定労働日数', monthlyHours: '月の所定労働時間', monthlyDays: '月の所定労働日数',
+  wageType: '賃金の形態', wageAmount: '賃金額', contractStartDate: '契約の開始日', contractEndDate: '契約の終了日', renewalExpected: '更新の見込み',
+  probationStartDate: '試用期間の開始日', probationEndDate: '試用期間の終了日', plannedEffectiveDate: '変える日', isStudent: '学生',
+  socialInsuranceEnrolled: '社会保険に加入', healthInsuranceEnrolled: '健康保険に加入', pensionEnrolled: '厚生年金に加入', longTermCareEnrolled: '介護保険に加入',
+  'applicabilityJudgement.result': '加入の判定', 'applicabilityJudgement.reason': '判定の理由', 'applicabilityOverride.reason': '判定と違う区分にした理由', note: '備考',
+};
+
+const RATE_SHORT: Record<string, string> = { health: '健保', longTermCare: '介護', pension: '厚年', childSupport: '拠出金', childSupportPayment: '支援金' };
+
+/** 項目の画面の名前。null は出さない項目 */
+export function fieldLabel(path: string): string | null {
+  if (!/^[A-Za-z]/.test(path)) return path;
+  const allowance = path.match(/^(fixed|variable)Allowances\.(.+)$/);
+  if (allowance) return `${allowance[1] === 'fixed' ? '固定' : '非固定'}：${allowance[2]}`;
+  return FIELD_LABELS[path] ?? null;
+}
+
+/** 値の画面の書き方（はい／いいえ、料率の指紋は「健保 101.2‰」のように） */
+function valueText(path: string, value: string): string {
+  if (value === 'true') return 'はい';
+  if (value === 'false') return 'いいえ';
+  if (path === 'rateFingerprint' && value) {
+    return value.split('|').map(part => part.split(':')).filter(([k, from]) => RATE_SHORT[k] && from && from !== '-')
+      .map(([k, , v]) => { const [, , total] = (v ?? '').split('/'); return `${RATE_SHORT[k]} ${total}‰`; }).join('・');
+  }
+  return value;
+}
+
+/** 承認の記録の記入内容を、画面の名前と値の組にする（届出は記入内容をそのまま） */
+export function snapshotContent(snapshot: Data | null): Record<string, unknown> {
+  if (!snapshot) return {};
+  if (snapshot.formData) return snapshot.formData as Record<string, unknown>;
+  const flat = new Map<string, string>();
+  flatten(snapshot, '', flat);
+  const out: Record<string, unknown> = {};
+  for (const [path, value] of flat) { const label = fieldLabel(path); if (label) out[label] = valueText(path, value); }
+  return out;
+}
+
+/**
  * 前回の版との差分。届出は記入内容（formData）を、それ以外は対象の中身を比べる。
  * 項目名は「formData.」を外して届出の項目名のまま出す
  */
@@ -237,7 +298,8 @@ export function diffSnapshots(before: Data | null, after: Data | null): DiffRow[
   for (const key of new Set([...a.keys(), ...b.keys()])) {
     const x = a.get(key) ?? '';
     const y = b.get(key) ?? '';
-    if (x !== y) rows.push({ field: key, before: x, after: y });
+    const label = fieldLabel(key);
+    if (x !== y && label) rows.push({ field: label, before: valueText(key, x), after: valueText(key, y) });
   }
   return rows.sort((p, q) => p.field.localeCompare(q.field, 'ja'));
 }

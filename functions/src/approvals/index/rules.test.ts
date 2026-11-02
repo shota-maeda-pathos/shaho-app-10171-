@@ -1,5 +1,5 @@
 import { contentHash, filingContentHash } from '../../utils/hash';
-import { buildRequestEntry, buildRunFilingEntry, diffSnapshots, isDueSoon, isOverdue, isStale, runApprovalStatus, summaryOf } from './rules';
+import { buildRequestEntry, buildRunFilingEntry, diffSnapshots, snapshotContent, isDueSoon, isOverdue, isStale, runApprovalStatus, summaryOf } from './rules';
 
 describe('内容の指紋', () => {
   it('キーの順が違っても同じ内容なら同じ', () => {
@@ -82,6 +82,21 @@ describe('前回の版との差分', () => {
       { field: '被扶養者一覧[1].氏名', before: '花子', after: 'はな子' },
       { field: '報酬月額', before: '280,000', after: '300,000' },
     ]));
+  });
+
+  it('保険料の記録は日本語の項目名で出し、内部の値（訂正の回数など）は出さない。料率の指紋は料率にする', () => {
+    const fp = (h: string) => `health:2026-03:${h}|pension:2024-04:91.5/91.5/183|longTermCare:-|childSupport:2024-04:0/3.6/3.6|childSupportPayment:2026-04:1.15/1.15/2.3`;
+    const before = { yearMonth: '2026-10', correctionCount: 1, gradeOutdated: null, healthInsurance: { employeeAmount: 15000 }, totalEmployeeAmount: 42795, rateFingerprint: fp('50/50/100'), isExempted: false };
+    const after = { yearMonth: '2026-10', correctionCount: 2, gradeOutdated: false, healthInsurance: { employeeAmount: 15180 }, totalEmployeeAmount: 42975, rateFingerprint: fp('50.6/50.6/101.2'), isExempted: false };
+    expect(diffSnapshots(before, after)).toEqual(expect.arrayContaining([
+      { field: '健康保険（本人）', before: '15,000', after: '15,180' },
+      { field: '本人負担の合計', before: '42,795', after: '42,975' },
+      { field: '使った料率', before: '健保 100‰・厚年 183‰・拠出金 3.6‰・支援金 2.3‰', after: '健保 101.2‰・厚年 183‰・拠出金 3.6‰・支援金 2.3‰' },
+    ]));
+    expect(diffSnapshots(before, after)).toHaveLength(3);
+    expect(snapshotContent({ ...after, fixedAllowances: { 通勤手当: 10000 } })).toEqual(expect.objectContaining({ 対象の月: '2026-10', 保険料の免除: 'いいえ', '固定：通勤手当': '10,000' }));
+    expect(Object.keys(snapshotContent(after))).not.toContain('correctionCount');
+    expect(snapshotContent({ formData: { 氏名: '山田' } })).toEqual({ 氏名: '山田' });
   });
 
   it('前回がなければ差分なし', () => {

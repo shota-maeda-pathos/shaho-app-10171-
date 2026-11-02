@@ -7,7 +7,7 @@ import { filingContentHash } from '../../utils/hash';
 import { invalidArg, notFound } from '../../utils/errors';
 import { mapConcurrent } from '../../utils/parallel';
 import {
-  ApprovalIndexEntry, buildRequestEntry, buildRunFilingEntry, diffSnapshots, isDueSoon, isOverdue, isStale,
+  ApprovalIndexEntry, buildRequestEntry, buildRunFilingEntry, diffSnapshots, snapshotContent, isDueSoon, isOverdue, isStale,
 } from './rules';
 import { ApprovalBulkInput, ApprovalCancelInput, ApprovalDetailInput, ApprovalSearchInput, ApprovalSettingsInput, ApprovalTarget } from './schema';
 
@@ -228,7 +228,7 @@ export async function approvalDetail(input: ApprovalDetailInput, auth: AuthConte
   const idx = ordered.findIndex(d => d.id === t.requestId);
   const previous = idx > 0 ? ordered[idx - 1] : null;
   const target = targetSnap?.exists ? targetSnap.data()! : null;
-  const content = (req.snapshotData?.formData ?? req.snapshotData ?? {}) as Record<string, unknown>;
+  const content = snapshotContent(req.snapshotData ?? null);
   const users = new Map<string, string>();
   for (const uid of new Set(ordered.flatMap(d => [d.requestedBy, d.reviewedBy]).filter(Boolean) as string[])) {
     users.set(uid, (await userName(auth.companyId, uid))?.displayName ?? '');
