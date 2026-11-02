@@ -1,6 +1,5 @@
 import { Component, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import { MatTabsModule } from '@angular/material/tabs';
 import {
   BulkAction, BulkRun, EmptyStateComponent, ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent,
@@ -46,7 +45,7 @@ function sampleRows(count: number): (TargetRow & { salary: number })[] {
   selector: 'app-ui-samples',
   standalone: true,
   imports: [
-    DecimalPipe, RouterLink, MatTabsModule, WizardComponent, TargetListComponent, TargetCellDirective,
+    DecimalPipe, MatTabsModule, WizardComponent, TargetListComponent, TargetCellDirective,
     StatusBadgeComponent, TermComponent, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent,
   ],
   template: `
@@ -100,8 +99,7 @@ function sampleRows(count: number): (TargetRow & { salary: number })[] {
               <app-status-badge tone="action" label="期限切れ" /> <app-status-badge tone="waiting" label="承認待ち" /></p>
 
             <h2 class="section-title">用語の説明</h2>
-            <p>用語の横の「?」を押すと説明が出ます：<app-term key="santei" />、<app-term key="paymentBasisDays" />、<app-term key="rounding" />。
-              すべての言葉は<a routerLink="/glossary">用語集</a>で読めます。</p>
+            <p>用語の横の「?」を押すと説明が出ます：<app-term key="santei" />、<app-term key="paymentBasisDays" />、<app-term key="rounding" />。</p>
 
             <h2 class="section-title">読み込み中・データなし・エラー</h2>
             <div class="states">

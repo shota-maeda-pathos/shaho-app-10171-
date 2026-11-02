@@ -327,12 +327,6 @@ export const routes: Routes = [
           import('./features/account/account').then((m) => m.AccountComponent),
       },
       {
-        path: 'glossary',
-        data: { title: '用語集' },
-        loadComponent: () =>
-          import('./features/glossary/glossary').then((m) => m.GlossaryComponent),
-      },
-      {
         path: 'ui-samples',
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '画面部品の見本' },

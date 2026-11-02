@@ -47,7 +47,7 @@ export class LayoutComponent {
   );
 
   /**
-   * サイドバーは5項目（ui-proposals の案どおり）。集計・用語集・設定は「管理」の下に置く。
+   * サイドバーは5項目（ui-proposals の案どおり）。集計・設定は「管理」の下に置く（用語の説明は各画面の「?」で読む）。
    * 手続きを始める・毎月の処理・賞与・算定・各手続きの画面は「手続き」の中として扱う。
    * match は、その項目を選択中として表示するURLの先頭（業務の途中の画面も含める）
    */
@@ -63,7 +63,6 @@ export class LayoutComponent {
   ];
   moreItems: NavItem[] = [
     { icon: 'trending_up', label: '集計・試算', route: '/analytics', roles: ['admin', 'operator', 'viewer'], match: ['/analytics', '/simulation'] },
-    { icon: 'menu_book', label: '用語集', route: '/glossary', roles: ['admin', 'approver', 'operator', 'viewer'], match: ['/glossary'] },
     { icon: 'settings', label: '事業所・設定', route: '/settings', roles: ['admin'], match: ['/settings'] },
   ];
 
