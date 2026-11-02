@@ -133,6 +133,9 @@ export class AuthService {
   private async finishLogin(result: LoginResult): Promise<void> {
     this.endedReason.set(null);
     this.mustChangePassword.set(result.mustChangePassword);
+    // Google で本人を確かめたときは、同じ人（同じ uid）でログインしたままになっている。そのまま
+    // セッションつきのトークンでログインし直しても「ログインの状態が変わった」と通知されず、画面が進まないので、いったん抜ける
+    if (this.auth.currentUser) await signOut(this.auth);
     await signInWithCustomToken(this.auth, result.token);
   }
 
