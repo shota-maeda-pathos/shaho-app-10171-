@@ -3,7 +3,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { db } from '../config';
 import type { AuthContext } from '../middleware/auth';
-import type { InvitationDoc, UserDoc } from '../types/firestore';
+import type { EmployeeDoc, InvitationDoc, UserDoc } from '../types/firestore';
 import { checkPassword } from './identity';
 import { emailKey, hashPassword, matchesHash } from './passwords';
 import {
@@ -280,7 +280,9 @@ async function loadInvitation(companyId: string, invitationId: string) {
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', '招待が見つかりません。管理者に確かめてください');
   const inv = snap.data() as InvitationDoc;
-  if (inv.status !== 'pending') throw new HttpsError('failed-precondition', 'この招待はもう使われています。ログイン画面からログインしてください');
+  if (inv.status === 'accepted') throw new HttpsError('failed-precondition', 'この招待はもう使われています。ログイン画面からログインしてください');
+  // 再発行・作り直しで無効にした招待（expired・reissued）
+  if (inv.status !== 'pending') throw new HttpsError('failed-precondition', 'この招待のリンクは使えなくなりました。新しい招待のリンクを管理者に確かめてください');
   if ((inv.expiresAt as Timestamp).toMillis() < Date.now()) {
     throw new HttpsError('failed-precondition', '招待の期限（7日）が切れています。管理者に再発行を頼んでください');
   }
@@ -297,9 +299,26 @@ export async function invitationGet(input: InvitationGetInput): Promise<{ email:
   };
 }
 
+/**
+ * 従業員につなぐ招待を受けられるか。退職した人・ほかのアカウントにつながっている人は断る
+ * （招待してから受け取るまでに退職したり、別の招待で先につながったりすることがある）
+ */
+export function employeeLinkProblem(employee: EmployeeDoc | undefined, uid: string | null): string | null {
+  if (!employee || employee.deletedAt) return 'この招待の従業員が見つかりません。管理者に確かめてください';
+  if (!employee.isActive || employee.resignationDate) return '退職した従業員の招待は受けられません。管理者に確かめてください';
+  if (employee.userId && employee.userId !== uid) return 'この従業員はすでに別のアカウントにつながっています。管理者に確かめてください';
+  return null;
+}
+
 /** 招待を受けて利用者になる。招待されたメールアドレスでだけ登録できる（招待のない登録はできない） */
 export async function invitationAccept(input: InvitationAcceptInput, client: Client): Promise<LoginResult> {
   const { ref: invRef, inv } = await loadInvitation(input.companyId, input.invitationId);
+  const employeeRef = inv.employeeId ? db.doc(`${base(input.companyId)}/employees/${inv.employeeId}`) : null;
+  // アカウントを作る前にも確かめる（作ってから断ると、使えないアカウントが残る）
+  if (employeeRef) {
+    const problem = employeeLinkProblem((await employeeRef.get()).data() as EmployeeDoc | undefined, null);
+    if (problem) throw new HttpsError('failed-precondition', problem);
+  }
   let uid: string;
   let method: 'password' | 'google';
   if (input.idToken) {
@@ -331,9 +350,13 @@ export async function invitationAccept(input: InvitationAcceptInput, client: Cli
   const now = Timestamp.now();
   const userRef = db.doc(`${base(input.companyId)}/users/${uid}`);
   await db.runTransaction(async (tx) => {
-    const [invSnap, userSnap] = await Promise.all([tx.get(invRef), tx.get(userRef)]);
+    const [invSnap, userSnap, employeeSnap] = await Promise.all([tx.get(invRef), tx.get(userRef), employeeRef ? tx.get(employeeRef) : null]);
     if (invSnap.data()?.status !== 'pending') throw new HttpsError('failed-precondition', 'この招待はもう使われています');
     if (userSnap.exists) throw new HttpsError('already-exists', 'このアカウントはすでに利用者として登録されています');
+    if (employeeSnap) {
+      const problem = employeeLinkProblem(employeeSnap.data() as EmployeeDoc | undefined, uid);
+      if (problem) throw new HttpsError('failed-precondition', problem);
+    }
     tx.set(userRef, {
       email: inv.email,
       displayName: input.displayName,
@@ -347,7 +370,7 @@ export async function invitationAccept(input: InvitationAcceptInput, client: Cli
       updatedAt: now,
     });
     tx.update(invRef, { status: 'accepted', acceptedAt: now, acceptedBy: uid, updatedAt: now });
-    if (inv.employeeId) tx.update(db.doc(`${base(input.companyId)}/employees/${inv.employeeId}`), { userId: uid, updatedAt: now });
+    if (employeeRef) tx.update(employeeRef, { userId: uid, updatedAt: now });
   });
   await audit(input.companyId, 'invitationAccept', { uid, name: input.displayName }, client, { invitationId: input.invitationId, method });
   const result = await startSession(input.companyId, uid, method, client, null);

@@ -10,7 +10,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
-import { ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, WizardComponent, WizardStep } from '../../shared/ui';
+import { ErrorStateComponent, LoadingStateComponent, WizardComponent, WizardStep } from '../../shared/ui';
 import { errorMessage } from '../onboarding/onboarding.types';
 
 type Key = 'entry' | 'grade_approval' | 'correct' | 'settle' | 'done';
@@ -56,7 +56,7 @@ const STATE_LABEL = { unconfirmed: '未確定', pending: '確認を依頼中', c
   selector: 'app-grade-correction-wizard',
   standalone: true,
   imports: [DecimalPipe, NgTemplateOutlet, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatRadioModule,
-    WizardComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent],
+    WizardComponent, LoadingStateComponent, ErrorStateComponent],
   templateUrl: './grade-correction-wizard.html',
   styleUrls: ['../onboarding/onboarding-wizard.scss'],
   styles: [`

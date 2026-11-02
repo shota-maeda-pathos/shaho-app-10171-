@@ -1,4 +1,5 @@
 import { FilingSubmissionComponent } from '../filings/submission/filing-submission';
+import { EmployeePortalInviteComponent } from '../employees/employee-detail/employee-portal-invite';
 import { GroupNavComponent, groupBackLabel } from '../procedures/procedure-groups';
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
@@ -43,7 +44,7 @@ const defaultContract = (): ContractForm => ({
   selector: 'app-onboarding-wizard',
   standalone: true,
   imports: [MatDatepickerModule,
-    GroupNavComponent, FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule,
+    GroupNavComponent, FilingSubmissionComponent, EmployeePortalInviteComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule,
     MatInputModule, MatRadioModule, MatSelectModule, WizardComponent, TermComponent, StatusBadgeComponent,
     LoadingStateComponent, ErrorStateComponent,
   ],

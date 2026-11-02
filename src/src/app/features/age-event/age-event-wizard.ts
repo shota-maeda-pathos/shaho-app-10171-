@@ -13,7 +13,7 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import { GroupNavComponent, groupBackLabel } from '../procedures/procedure-groups';
 import {
-  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep, createDraftAutosave,
+  ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, WizardComponent, WizardStep, createDraftAutosave,
 } from '../../shared/ui';
 import { errorMessage } from '../onboarding/onboarding.types';
 import { AgeKey, AgeView, monthLabel, Pension70Result } from './age-event.types';
@@ -29,7 +29,7 @@ const KEYS: AgeKey[] = ['check', 'filing', 'approval', 'submit', 'confirm'];
   standalone: true,
   imports: [
     GroupNavComponent, FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatRadioModule,
-    WizardComponent, TermComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
+    WizardComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],
   templateUrl: './age-event-wizard.html',
   styleUrls: ['../onboarding/onboarding-wizard.scss'],

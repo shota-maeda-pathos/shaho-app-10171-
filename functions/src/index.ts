@@ -90,6 +90,7 @@ lazy(() => require('./users/user-suspend/functions'), ['userSuspend', 'userUnsus
 
 // 招待API
 lazy(() => require('./users/invitation-list/functions'), ['invitationList']);
+lazy(() => require('./users/employee-portal-invite/functions'), ['employeePortalStatus', 'employeePortalInvite']);
 
 // 監査ログAPI
 lazy(() => require('./audit/audit-log-list/functions'), ['auditLogList', 'auditLogExport', 'auditLogVerify']);

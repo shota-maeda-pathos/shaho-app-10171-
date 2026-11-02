@@ -1,6 +1,6 @@
 import { FilingSubmissionComponent } from '../filings/submission/filing-submission';
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -29,7 +29,7 @@ const KEYS: RevisionKey[] = ['change', 'judge', 'filing', 'approval', 'submit', 
   selector: 'app-revision-wizard',
   standalone: true,
   imports: [MatDatepickerModule,
-    FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule, MatInputModule, MatRadioModule,
+    FilingSubmissionComponent, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule, MatInputModule, MatRadioModule,
     WizardComponent, TermComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],
   templateUrl: './revision-wizard.html',

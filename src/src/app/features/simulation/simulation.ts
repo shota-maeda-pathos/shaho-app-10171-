@@ -65,8 +65,9 @@ interface SimResult {
               @if (loading()) {
                 <mat-spinner diameter="20" />
               } @else {
-                <mat-icon>calculate</mat-icon> 計算
+                <mat-icon>calculate</mat-icon>
               }
+              @if (!loading()) { 計算 }
             </button>
           </div>
         </mat-card-content>

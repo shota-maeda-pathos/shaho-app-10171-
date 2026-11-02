@@ -3,6 +3,7 @@ import { EmployeeLeavesComponent } from './employee-leaves';
 import { EmployeeBonusComponent } from './employee-bonus';
 import { EmployeeMyNumberComponent } from './employee-my-number';
 import { EmployeeStatusComponent } from './employee-status';
+import { EmployeePortalInviteComponent } from './employee-portal-invite';
 import { Component, inject, signal, OnInit, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
@@ -152,7 +153,7 @@ interface OnboardResult {
   standalone: true,
   imports: [
     PageHeadComponent, StatusBadgeComponent,
-    EmployeeLeavesComponent, EmployeeExemptionsComponent, EmployeeBonusComponent, EmployeeMyNumberComponent, EmployeeStatusComponent,
+    EmployeeLeavesComponent, EmployeeExemptionsComponent, EmployeeBonusComponent, EmployeeMyNumberComponent, EmployeeStatusComponent, EmployeePortalInviteComponent,
     DecimalPipe, FormsModule, RouterLink, MatCardModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatButtonModule, MatIconModule, MatDatepickerModule,
     MatProgressSpinnerModule, MatSnackBarModule,
@@ -423,8 +424,9 @@ interface OnboardResult {
                     @if (saving()) {
                       <mat-spinner diameter="20"></mat-spinner>
                     } @else {
-                      <mat-icon>check</mat-icon> 入社手続きを実行
+                      <mat-icon>check</mat-icon>
                     }
+                    @if (!saving()) { 入社手続きを実行 }
                   </button>
                   <button mat-stroked-button matStepperPrevious>
                     <mat-icon>arrow_back</mat-icon> 戻る
@@ -442,6 +444,7 @@ interface OnboardResult {
             <mat-card>
               <mat-card-content>
                 @if (!isNew) { <app-employee-status [employeeId]="employeeId" /> }
+                @if (!isNew && canInvitePortal) { <app-employee-portal-invite [employeeId]="employeeId" /> }
                 <div class="form-grid">
                   <mat-form-field appearance="outline">
                     <mat-label>社員番号</mat-label>
@@ -938,6 +941,8 @@ export class EmployeeDetailComponent implements OnInit {
   resigning = signal(false);
   transferring = signal(false);
   employeeStatus = signal<string>('active');
+  /** 本人ポータルの招待は管理者・担当者だけ（関数も同じ条件） */
+  canInvitePortal = this.auth.hasAnyRole('admin', 'operator');
 
   showTransferPanel = false;
   showOtherPanel = false;

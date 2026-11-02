@@ -229,6 +229,9 @@
               </td></tr>
             }
           </table>
+          @if (isDone() && v.employee) {
+            <app-employee-portal-invite [employeeId]="v.employee.id" />
+          }
           @if (v.selfInput?.dependents?.length) {
             @if (isDone() && v.employee) {
               <div class="row-actions">
