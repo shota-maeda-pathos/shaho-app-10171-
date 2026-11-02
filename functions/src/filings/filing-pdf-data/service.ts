@@ -128,6 +128,9 @@ function buildSections(
         { label: '報酬月額（通貨）', value: yen(fd['報酬月額_通貨']) },
         { label: '報酬月額（現物）', value: yen(fd['報酬月額_現物']) },
         { label: '報酬月額（合計）', value: yen(fd['報酬月額_合計']) },
+        { label: '住所', value: fmt(fd['被保険者住所'] || null) },
+        { label: '被扶養者', value: fmt(fd['被扶養者']) },
+        { label: '備考', value: fmt(fd['備考'] || null) },
       ],
     });
     sections.push({

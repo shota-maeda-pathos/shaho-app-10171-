@@ -6,6 +6,7 @@ import { MutationResponse } from '../../types/response';
 import { notFound } from '../../utils/errors';
 import { toDateString } from '../../utils/firestore';
 import { FilingAutoGenerateInput } from './schema';
+import { acquisitionLedgerFields, acquisitionRemarkItems } from '../acquisition-fields';
 
 function tsToDate(ts: Timestamp): string {
   return toDateString(ts);
@@ -66,6 +67,8 @@ async function buildFormData(
       '厚生年金_等級': grade?.pensionGradeNumber ?? null,
       '厚生年金_標準報酬月額': grade?.pensionStandardRemuneration ?? null,
       '備考': '',
+      '備考項目': acquisitionRemarkItems({ age70: false, otherEmployer: !!employee.otherEmployer, shortTime: employment?.insuredCategory === 'shortTime' }),
+      ...(await acquisitionLedgerFields(companyId, employeeId, employee)),
     };
   }
 

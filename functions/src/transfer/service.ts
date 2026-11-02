@@ -11,6 +11,7 @@ import { completed, requireVersion, setStep, statusReasonOf, stepOf } from '../p
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
 import { OfficeFacts, transferFacts } from './rules';
 import { assertAssignable } from '../offices/lifecycle';
+import { acquisitionLedgerFields, acquisitionRemarkItems } from '../filings/acquisition-fields';
 
 type TransferProc = ProcedureDoc & { transfer: TransferState };
 const nameOf = (e: { lastName: string; firstName: string }) => `${e.lastName} ${e.firstName}`;
@@ -186,6 +187,8 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
   const filings = db.collection(`${empRef.path}/filings`);
   const lossRef = t.filingRequired ? filings.doc() : null;
   const acqRef = t.filingRequired ? filings.doc() : null;
+  // 資格取得届の住所・被扶養者の有無（台帳の値。異動では変わらない）
+  const ledger = t.filingRequired ? await acquisitionLedgerFields(input.companyId, proc.employeeId!, (await empRef.get()).data() as EmployeeDoc) : {};
   let employee!: EmployeeDoc;
   await db.runTransaction(async tx => {
     const latest = (await tx.get(ref)).data() as TransferProc;
@@ -205,7 +208,7 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
     if (lossRef && acqRef && grade) {
       const person = {
         '被保険者整理番号': employee.insuredPersonNumber ?? '', '被保険者氏名': nameOf(employee), '被保険者氏名フリガナ': `${employee.lastNameKana} ${employee.firstNameKana}`,
-        '生年月日': employee.birthDate ? toDateString(employee.birthDate) : '', '性別': employee.gender === 'male' ? '男' : '女', '個人番号': '', '基礎年金番号': '',
+        '生年月日': employee.birthDate ? toDateString(employee.birthDate) : '', '性別': employee.gender === 'male' ? '男' : '女', '個人番号': '', '基礎年金番号': employee.basicPensionNumber ?? '',
       };
       const remuneration = grade.basisRemuneration ?? grade.healthStandardRemuneration;
       const draft = (filingType: string, formData: Record<string, unknown>) => ({
@@ -225,6 +228,8 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
         '健康保険_等級': grade.healthGradeNumber, '健康保険_標準報酬月額': grade.healthStandardRemuneration,
         '厚生年金_等級': grade.pensionGradeNumber, '厚生年金_標準報酬月額': grade.pensionStandardRemuneration,
         '備考': `転勤（${from.name}から）`,
+        '備考項目': acquisitionRemarkItems({ age70: false, otherEmployer: !!employee.otherEmployer, shortTime: false }),
+        ...ledger,
       }));
     }
     let steps = setStep(latest.steps, 'apply', { ...completed(auth.uid), statusDetail: `${to.name}に変更` });

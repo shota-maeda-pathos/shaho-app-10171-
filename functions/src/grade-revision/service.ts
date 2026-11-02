@@ -456,7 +456,7 @@ export function revisionFormData(kind: Kind, d: GradeRevisionDecision, e: Employ
     '被保険者氏名フリガナ': `${e.lastNameKana} ${e.firstNameKana}`,
     '生年月日': e.birthDate ? toDateString(e.birthDate) : '',
     '個人番号': '',
-    '基礎年金番号': '',
+    '基礎年金番号': e.basicPensionNumber ?? '',
     '届出区分': FILING_LABEL[kind],
     '改定年月': d.effectiveMonth,
     '従前の標準報酬月額_健康保険': d.health.currentStandard,

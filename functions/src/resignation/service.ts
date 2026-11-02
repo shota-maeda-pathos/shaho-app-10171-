@@ -506,7 +506,7 @@ export async function submitLossFiling(input: { companyId: string; procedureId: 
     '生年月日': e.birthDate ? toDateString(e.birthDate) : '',
     '性別': e.gender === 'male' ? '男' : '女',
     '個人番号': '',
-    '基礎年金番号': '',
+    '基礎年金番号': e.basicPensionNumber ?? '',
     '届出区分': '資格喪失届',
     '資格喪失年月日': facts.lossDate,
     '喪失原因': facts.lossCause,
