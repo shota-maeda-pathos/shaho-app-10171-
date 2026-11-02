@@ -173,7 +173,7 @@ const PREFECTURES: Record<string, string> = {
             <mat-form-field appearance="outline"><mat-label>電話番号</mat-label>
               <input matInput [(ngModel)]="e.phone" maxlength="20" placeholder="03-1234-5678"></mat-form-field>
             <mat-form-field appearance="outline"><mat-label>適用年月日</mat-label>
-              <input matInput type="date" [(ngModel)]="e.appliedDate"></mat-form-field>
+              <input matInput [(ngModel)]="e.appliedDate" [matDatepicker]="dpApplied" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dpApplied" /><mat-datepicker #dpApplied /></mat-form-field>
           </div>
           <h4>保険・加入の判定</h4>
           <div class="form-grid">
