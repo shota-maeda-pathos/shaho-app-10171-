@@ -93,6 +93,9 @@ export const ContractFields = {
   contractType: z.enum(['indefinite', 'fixed']).default('indefinite'),
   contractEndDate: EmploymentConditionFields.contractEndDate,
   renewalExpected: z.boolean().default(false),
+  /** 試用期間（保険料・届出には使わない管理項目） */
+  probationStartDate: EmploymentConditionFields.probationStartDate,
+  probationEndDate: EmploymentConditionFields.probationEndDate,
   isStudent: z.boolean().default(false),
   /** システムの判定と異なる加入区分にする場合だけ指定する */
   // 呼び出し時に undefined は null になるため、null も「指定なし」として受ける

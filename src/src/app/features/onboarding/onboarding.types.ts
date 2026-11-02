@@ -32,6 +32,9 @@ export interface ContractForm {
   contractType: 'indefinite' | 'fixed';
   contractEndDate: string | null;
   renewalExpected: boolean;
+  /** 試用期間（任意） */
+  probationStartDate?: string | null;
+  probationEndDate?: string | null;
   isStudent: boolean;
   healthInsuranceEnrolled?: boolean;
   pensionEnrolled?: boolean;

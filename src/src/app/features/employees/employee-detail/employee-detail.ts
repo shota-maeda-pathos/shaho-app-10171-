@@ -53,12 +53,32 @@ interface EmployeeForm {
   officeId: string;
   /** 所属部署（部署なしは空） */
   departmentId: string;
-  healthInsuranceNumber: string;
-  pensionNumber: string;
+  /** 台帳の追加項目（カタログ2章）。空欄は保存のときに null にする */
+  formerLastName: string;
+  postalCode: string;
+  prefecture: string;
+  city: string;
+  addressLine: string;
+  building: string;
+  phone: string;
+  email: string;
+  insuredPersonNumber: string;
   basicPensionNumber: string;
-  address: string;
-  memo: string;
+  /** 外国人のとき（在留資格などを入れる） */
+  isForeign: boolean;
+  romanName: string;
+  nationality: string;
+  residenceStatus: string;
+  residencePeriodEnd: string;
+  residenceCardNumber: string;
+  workPermission: boolean;
 }
+
+const EMPTY_PROFILE = {
+  formerLastName: '', postalCode: '', prefecture: '', city: '', addressLine: '', building: '', phone: '', email: '',
+  insuredPersonNumber: '', basicPensionNumber: '',
+  isForeign: false, romanName: '', nationality: '', residenceStatus: '', residencePeriodEnd: '', residenceCardNumber: '', workPermission: false,
+};
 
 interface Dependent {
   id: string;
@@ -488,36 +508,87 @@ interface OnboardResult {
                   </mat-form-field>
                 </div>
 
+                <mat-form-field appearance="outline">
+                  <mat-label>旧姓（任意）</mat-label>
+                  <input matInput [(ngModel)]="form.formerLastName" name="formerLastName">
+                </mat-form-field>
+
                 <mat-divider></mat-divider>
-                <h3>保険番号</h3>
+                <h3>住所・連絡先</h3>
                 <div class="form-grid">
                   <mat-form-field appearance="outline">
-                    <mat-label>健康保険番号</mat-label>
-                    <input matInput [(ngModel)]="form.healthInsuranceNumber" name="healthInsuranceNumber">
+                    <mat-label>郵便番号</mat-label>
+                    <input matInput [(ngModel)]="form.postalCode" name="postalCode" placeholder="123-4567">
                   </mat-form-field>
-
                   <mat-form-field appearance="outline">
-                    <mat-label>厚生年金番号</mat-label>
-                    <input matInput [(ngModel)]="form.pensionNumber" name="pensionNumber">
+                    <mat-label>都道府県</mat-label>
+                    <input matInput [(ngModel)]="form.prefecture" name="prefecture">
                   </mat-form-field>
-
                   <mat-form-field appearance="outline">
-                    <mat-label>基礎年金番号</mat-label>
-                    <input matInput [(ngModel)]="form.basicPensionNumber" name="basicPensionNumber">
+                    <mat-label>市区町村</mat-label>
+                    <input matInput [(ngModel)]="form.city" name="city">
                   </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>番地</mat-label>
+                    <input matInput [(ngModel)]="form.addressLine" name="addressLine">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>建物名・部屋番号</mat-label>
+                    <input matInput [(ngModel)]="form.building" name="building">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>電話番号</mat-label>
+                    <input matInput [(ngModel)]="form.phone" name="phone" placeholder="03-1234-5678">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>メールアドレス</mat-label>
+                    <input matInput type="email" [(ngModel)]="form.email" name="email">
+                  </mat-form-field>
+                </div>
 
+                <mat-divider></mat-divider>
+                <h3>保険の番号</h3>
+                <div class="form-grid">
+                  <mat-form-field appearance="outline">
+                    <mat-label>被保険者整理番号</mat-label>
+                    <input matInput [(ngModel)]="form.insuredPersonNumber" name="insuredPersonNumber">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>基礎年金番号（10桁）</mat-label>
+                    <input matInput [(ngModel)]="form.basicPensionNumber" name="basicPensionNumber" placeholder="1234-567890">
+                  </mat-form-field>
                 </div>
                 @if (!isNew) { <app-employee-my-number [employeeId]="employeeId" /> }
 
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>住所</mat-label>
-                  <input matInput [(ngModel)]="form.address" name="address">
-                </mat-form-field>
-
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>メモ</mat-label>
-                  <textarea matInput [(ngModel)]="form.memo" name="memo" rows="3"></textarea>
-                </mat-form-field>
+                <mat-divider></mat-divider>
+                <h3>外国人の方の情報</h3>
+                <mat-checkbox [(ngModel)]="form.isForeign" name="isForeign">外国籍の従業員（在留資格などを登録する）</mat-checkbox>
+                @if (form.isForeign) {
+                  <p class="hint">退職のときに、厚生年金の脱退一時金の案内を出します。</p>
+                  <div class="form-grid">
+                    <mat-form-field appearance="outline">
+                      <mat-label>ローマ字氏名</mat-label>
+                      <input matInput [(ngModel)]="form.romanName" name="romanName" required>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>国籍</mat-label>
+                      <input matInput [(ngModel)]="form.nationality" name="nationality" required>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>在留資格</mat-label>
+                      <input matInput [(ngModel)]="form.residenceStatus" name="residenceStatus" required>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>在留期間（満了日）</mat-label>
+                      <input matInput type="date" [(ngModel)]="form.residencePeriodEnd" name="residencePeriodEnd">
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>在留カード番号</mat-label>
+                      <input matInput [(ngModel)]="form.residenceCardNumber" name="residenceCardNumber" placeholder="AB12345678CD">
+                    </mat-form-field>
+                  </div>
+                  <mat-checkbox [(ngModel)]="form.workPermission" name="workPermission">資格外活動許可がある</mat-checkbox>
+                }
 
                 <div class="actions">
                   <button mat-flat-button color="primary" (click)="onSave()" [disabled]="saving()">
@@ -618,6 +689,14 @@ interface OnboardResult {
                   <ng-container matColumnDef="socialInsurance">
                     <th mat-header-cell *matHeaderCellDef>社保加入</th>
                     <td mat-cell *matCellDef="let e">{{ e.socialInsuranceEnrolled ? '○' : '×' }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="contract">
+                    <th mat-header-cell *matHeaderCellDef>契約期間</th>
+                    <td mat-cell *matCellDef="let e">{{ e.contractType === 'fixed' ? (e.contractEndDate ? e.contractEndDate + ' まで' : '期間の定めあり') : '定めなし' }}</td>
+                  </ng-container>
+                  <ng-container matColumnDef="probation">
+                    <th mat-header-cell *matHeaderCellDef>試用期間</th>
+                    <td mat-cell *matCellDef="let e">{{ e.probationStartDate || e.probationEndDate ? (e.probationStartDate ?? '') + '〜' + (e.probationEndDate ?? '') : '—' }}</td>
                   </ng-container>
                   <tr mat-header-row *matHeaderRowDef="employmentColumns"></tr>
                   <tr mat-row *matRowDef="let row; columns: employmentColumns"></tr>
@@ -882,7 +961,7 @@ export class EmployeeDetailComponent implements OnInit {
   readonly relationshipLabel = relationshipLabel;
 
   employments = signal<Employment[]>([]);
-  employmentColumns = ['effectiveDate', 'employmentType', 'baseSalary', 'weeklyHours', 'socialInsurance'];
+  employmentColumns = ['effectiveDate', 'employmentType', 'baseSalary', 'weeklyHours', 'socialInsurance', 'contract', 'probation'];
 
   grades = signal<Grade[]>([]);
   gradeColumns = ['effectiveMonth', 'determinationType', 'healthGrade', 'pensionGrade', 'basis'];
@@ -914,11 +993,7 @@ export class EmployeeDetailComponent implements OnInit {
     hireDate: '',
     officeId: '',
     departmentId: '',
-    healthInsuranceNumber: '',
-    pensionNumber: '',
-    basicPensionNumber: '',
-    address: '',
-    memo: '',
+    ...EMPTY_PROFILE,
   };
 
   ngOnInit() {
@@ -1016,11 +1091,23 @@ export class EmployeeDetailComponent implements OnInit {
         hireDate: data.hireDate ?? '',
         officeId: data.officeId ?? '',
         departmentId: data.departmentId ?? '',
-        healthInsuranceNumber: data.healthInsuranceNumber ?? '',
-        pensionNumber: data.pensionNumber ?? '',
+        formerLastName: data.formerLastName ?? '',
+        postalCode: data.postalCode ?? '',
+        prefecture: data.prefecture ?? '',
+        city: data.city ?? '',
+        addressLine: data.addressLine ?? '',
+        building: data.building ?? '',
+        phone: data.phone ?? '',
+        email: data.email ?? '',
+        insuredPersonNumber: data.insuredPersonNumber ?? '',
         basicPensionNumber: data.basicPensionNumber ?? '',
-        address: data.address ?? '',
-        memo: data.memo ?? '',
+        isForeign: !!data.foreignInfo,
+        romanName: data.foreignInfo?.romanName ?? '',
+        nationality: data.foreignInfo?.nationality ?? '',
+        residenceStatus: data.foreignInfo?.residenceStatus ?? '',
+        residencePeriodEnd: data.foreignInfo?.residencePeriodEnd ?? '',
+        residenceCardNumber: data.foreignInfo?.residenceCardNumber ?? '',
+        workPermission: data.foreignInfo?.workPermission ?? false,
       };
     } catch (e) {
       console.error('Failed to load employee', e);
@@ -1034,6 +1121,23 @@ export class EmployeeDetailComponent implements OnInit {
     await this.fetchHistory('扶養家族', 'dependents', this.dependents, append);
   }
 
+  /** 保存する内容。空欄は null にし、外国人情報は外国籍のときだけまとめて送る */
+  private payload() {
+    const f = this.form;
+    const text = (v: string) => (v.trim() ? v.trim() : null);
+    return {
+      employeeNumber: f.employeeNumber, lastName: f.lastName, firstName: f.firstName, lastNameKana: f.lastNameKana, firstNameKana: f.firstNameKana,
+      birthDate: f.birthDate, gender: f.gender, hireDate: f.hireDate, officeId: f.officeId,
+      formerLastName: text(f.formerLastName), postalCode: text(f.postalCode), prefecture: text(f.prefecture), city: text(f.city),
+      addressLine: text(f.addressLine), building: text(f.building), phone: text(f.phone), email: text(f.email),
+      insuredPersonNumber: text(f.insuredPersonNumber), basicPensionNumber: text(f.basicPensionNumber),
+      foreignInfo: f.isForeign ? {
+        romanName: f.romanName.trim(), nationality: f.nationality.trim(), residenceStatus: f.residenceStatus.trim(),
+        residencePeriodEnd: text(f.residencePeriodEnd), residenceCardNumber: text(f.residenceCardNumber.toUpperCase()), workPermission: f.workPermission,
+      } : null,
+    };
+  }
+
   async onSave() {
     this.saving.set(true);
     try {
@@ -1041,7 +1145,7 @@ export class EmployeeDetailComponent implements OnInit {
         const fn = httpsCallable<any, any>(this.functions, 'employeeCreate');
         const result = await fn({
           companyId: this.auth.companyId,
-          ...this.form,
+          ...this.payload(),
           departmentId: this.form.departmentId || null,
         });
         this.snackBar.open('従業員を登録しました', '閉じる', { duration: 3000 });
@@ -1052,7 +1156,7 @@ export class EmployeeDetailComponent implements OnInit {
           companyId: this.auth.companyId,
           employeeId: this.employeeId,
           expectedVersion: this.version,
-          ...this.form,
+          ...this.payload(),
           departmentId: this.form.departmentId || null,
         });
         this.version++;
@@ -1112,8 +1216,7 @@ export class EmployeeDetailComponent implements OnInit {
       employeeNumber: '', lastName: '', firstName: '',
       lastNameKana: '', firstNameKana: '', birthDate: '',
       gender: 'male', hireDate: '', officeId: '', departmentId: '',
-      healthInsuranceNumber: '', pensionNumber: '',
-      basicPensionNumber: '', address: '', memo: '',
+      ...EMPTY_PROFILE,
     };
     this.empForm = {
       employmentType: 'regular', baseSalary: 0,

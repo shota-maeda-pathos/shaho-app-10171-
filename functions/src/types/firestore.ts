@@ -20,6 +20,7 @@ export interface EmployeeDoc {
   updatedAt: Timestamp;
   // 以下はカタログ2章の台帳項目。旧データには存在しないため任意
   formerLastName?: string | null;
+  basicPensionNumber?: string | null;
   postalCode?: string | null;
   prefecture?: string | null;
   city?: string | null;

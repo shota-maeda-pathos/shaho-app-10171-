@@ -101,6 +101,10 @@
                 <input matInput type="date" [(ngModel)]="contract.contractEndDate" (ngModelChange)="contractChanged()"></mat-form-field>
               <mat-checkbox [(ngModel)]="contract.renewalExpected" (ngModelChange)="contractChanged()" [disabled]="locked()">更新する見込みがある</mat-checkbox>
             }
+            <mat-form-field appearance="outline"><mat-label>試用期間の開始日（任意）</mat-label>
+              <input matInput type="date" [(ngModel)]="contract.probationStartDate" (ngModelChange)="contractChanged()"></mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>試用期間の終了日（任意）</mat-label>
+              <input matInput type="date" [(ngModel)]="contract.probationEndDate" (ngModelChange)="contractChanged()"></mat-form-field>
             <mat-form-field appearance="outline"><mat-label>週の所定労働時間</mat-label>
               <input matInput type="number" min="0" max="168" step="0.5" [(ngModel)]="contract.weeklyHours" (ngModelChange)="contractChanged()"><span matTextSuffix>時間</span></mat-form-field>
             <mat-form-field appearance="outline"><mat-label>月の所定労働日数</mat-label>

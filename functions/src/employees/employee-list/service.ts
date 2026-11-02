@@ -4,6 +4,18 @@ import { EmployeeDoc } from '../../types/firestore';
 import { EmployeeResponse, ListResponse } from '../../types/response';
 import { toEmployeeResponse } from '../../utils/firestore';
 import { EmployeeListInput } from './schema';
+import { mapConcurrent } from '../../utils/parallel';
+
+/** 今の雇用条件（適用開始日のある最新の版）の雇用形態。承認待ちの下書き（適用開始日なし）は除く */
+async function employmentTypeOf(companyId: string, employeeId: string): Promise<string | null> {
+  const snap = await db.collection(`companies/${companyId}/employees/${employeeId}/employments`).orderBy('effectiveDate', 'desc').limit(1).get();
+  return (snap.docs[0]?.data().employmentType as string | undefined) ?? null;
+}
+
+async function withEmploymentType(companyId: string, items: EmployeeResponse[]): Promise<EmployeeResponse[]> {
+  const types = await mapConcurrent(items, 20, e => employmentTypeOf(companyId, e.id));
+  return items.map((e, i) => ({ ...e, employmentType: types[i] }));
+}
 
 export async function listEmployees(
   input: EmployeeListInput,
@@ -21,7 +33,8 @@ export async function listEmployees(
     return { items: [], total: 0, hasMore: false };
   }
 
-  if (input.keyword?.trim()) {
+  // 名前・社員番号の検索と雇用形態の絞り込みは、複合索引に頼らずメモリで絞る
+  if (input.keyword?.trim() || input.employmentType) {
     return searchByKeyword(collRef, input, targetOfficeIds, companyId);
   }
 
@@ -61,9 +74,7 @@ export async function listEmployees(
   const docs = hasMore ? snap.docs.slice(0, effectiveLimit) : snap.docs;
 
   return {
-    items: docs.map((d) =>
-      toEmployeeResponse(d.id, d.data() as EmployeeDoc),
-    ),
+    items: await withEmploymentType(companyId, docs.map((d) => toEmployeeResponse(d.id, d.data() as EmployeeDoc))),
     total,
     hasMore,
     lastDocId: docs.length > 0 ? docs[docs.length - 1].id : undefined,
@@ -129,8 +140,13 @@ async function searchByKeyword(
     .filter((row) => row.deletedAt === null)
     .filter((row) => !input.departmentId || row.departmentId === input.departmentId)
     .filter((row) => input.includeResigned || row.isActive === true)
-    .filter((row) => matchesKeyword(row, input.keyword!))
+    .filter((row) => matchesKeyword(row, input.keyword ?? ''))
     .sort(compareByKana);
+  if (input.employmentType) {
+    const types = await mapConcurrent(rows, 30, row => employmentTypeOf(companyId, row.id));
+    const keep = new Set(rows.filter((_, i) => types[i] === input.employmentType).map(row => row.id));
+    rows.splice(0, rows.length, ...rows.filter(row => keep.has(row.id)));
+  }
 
   const start = input.lastDocId ? rows.findIndex((row) => row.id === input.lastDocId) + 1 : 0;
   const effectiveLimit = input.limit ?? 20;
@@ -140,9 +156,9 @@ async function searchByKeyword(
   const fullSnaps = page.length
     ? await db.getAll(...page.map((row) => db.doc(`companies/${companyId}/employees/${row.id}`)))
     : [];
-  const items = fullSnaps
+  const items = await withEmploymentType(companyId, fullSnaps
     .filter((d) => d.exists)
-    .map((d) => toEmployeeResponse(d.id, d.data() as EmployeeDoc));
+    .map((d) => toEmployeeResponse(d.id, d.data() as EmployeeDoc)));
 
   return {
     items,

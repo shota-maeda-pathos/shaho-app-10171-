@@ -274,7 +274,8 @@ export async function saveEmploymentEntry(input: ChangeEntryInput, auth: AuthCon
     contractType: input.contractType, contractStartDate: input.effectiveDate, contractEndDate: input.contractType === 'fixed' ? input.contractEndDate ?? null : null,
     renewalExpected: input.renewalExpected, weeklyDays: null,
     workStyle: j.judgement.insuredCategory === 'shortTime' ? 'shortTime' : ['partTime', 'arbeit'].includes(input.employmentType) ? 'partTime' : 'fullTime',
-    probationStartDate: null, probationEndDate: null, wageType: input.wageType, wageAmount: input.wageAmount, monthlyHours: j.monthlyHours,
+    // 試用期間は雇用条件の変更で変えないので、今の雇用条件から引き継ぐ
+    probationStartDate: current?.doc.probationStartDate ?? null, probationEndDate: current?.doc.probationEndDate ?? null, wageType: input.wageType, wageAmount: input.wageAmount, monthlyHours: j.monthlyHours,
     healthInsuranceEnrolled: j.chosen.health, pensionEnrolled: j.chosen.pension,
     applicabilityReason: j.chosen.health || j.chosen.pension ? 'standard' : 'excluded',
     insuredCategory: j.judgement.insuredCategory ?? 'general', isStudent: input.isStudent,

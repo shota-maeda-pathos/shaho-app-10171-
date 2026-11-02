@@ -29,6 +29,8 @@ export const EmployeeProfileFields = {
   phone: z.string().regex(/^[0-9-]{10,13}$/, '電話番号の形式が正しくありません').nullable().optional(),
   email: z.string().email().nullable().optional(),
   insuredPersonNumber: optionalText(10),
+  /** 基礎年金番号（10桁。個人番号がないときに届出に書く） */
+  basicPensionNumber: z.string().regex(/^\d{4}-?\d{6}$/, '基礎年金番号は10桁の数字です').nullable().optional(),
   qualificationAcquiredDate: calendarDate.nullable().optional(),
   qualificationLostDate: calendarDate.nullable().optional(),
   foreignInfo: ForeignWorkerInfoSchema.nullable().optional(),

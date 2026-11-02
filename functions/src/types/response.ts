@@ -19,6 +19,22 @@ export interface EmployeeResponse {
   updatedAt: string;
   contract?: { type: 'indefinite' | 'fixed'; endDate: string | null; renewalExpected: boolean } | null;
   otherEmployer?: { name: string; since: string | null; note: string } | null;
+  /** 今の雇用条件の雇用形態（一覧で返す） */
+  employmentType?: string | null;
+  /** 台帳の追加項目（カタログ2章） */
+  formerLastName?: string | null;
+  postalCode?: string | null;
+  prefecture?: string | null;
+  city?: string | null;
+  addressLine?: string | null;
+  building?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  insuredPersonNumber?: string | null;
+  basicPensionNumber?: string | null;
+  qualificationAcquiredDate?: string | null;
+  qualificationLostDate?: string | null;
+  foreignInfo?: { romanName: string; nationality: string; residenceStatus: string; residencePeriodEnd: string | null; residenceCardNumber: string | null; workPermission: boolean } | null;
 }
 
 export interface DependentResponse {

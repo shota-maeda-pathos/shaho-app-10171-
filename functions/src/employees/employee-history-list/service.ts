@@ -3,7 +3,7 @@ import { AuthContext, requireOffice } from '../../middleware/auth';
 import { notFound } from '../../utils/errors';
 import { EmployeeHistoryListInput } from './schema';
 const fields = {
-  employments: ['effectiveDate', 'employmentType', 'weeklyHours', 'monthlyDays', 'baseSalary', 'socialInsuranceEnrolled', 'longTermCareEnrolled', 'version'],
+  employments: ['effectiveDate', 'employmentType', 'weeklyHours', 'monthlyDays', 'baseSalary', 'socialInsuranceEnrolled', 'longTermCareEnrolled', 'contractType', 'contractEndDate', 'probationStartDate', 'probationEndDate', 'version'],
   grades: ['effectiveMonth', 'healthGradeNumber', 'healthStandardRemuneration', 'pensionGradeNumber', 'pensionStandardRemuneration', 'determinationType', 'basisRemuneration', 'filingId', 'version'],
   bonuses: ['yearMonth', 'totalAmount', 'standardBonusAmount', 'isConfirmed', 'version'],
   salaries: ['yearMonth', 'baseSalary', 'totalFixedWage', 'totalVariableWage', 'totalSalary', 'isConfirmed', 'version'],

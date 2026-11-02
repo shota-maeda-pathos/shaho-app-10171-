@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { EmploymentTypeSchema } from '../../types/catalog-schemas';
 
 export const EmployeeListSchema = z.object({
   companyId: z.string(),
@@ -6,6 +7,8 @@ export const EmployeeListSchema = z.object({
   departmentId: z.string().optional(),
   includeResigned: z.boolean().optional(),
   keyword: z.string().max(50).optional(),
+  /** 今の雇用条件の雇用形態で絞る */
+  employmentType: EmploymentTypeSchema.optional(),
   limit: z.number().int().min(1).max(100).optional(),
   lastDocId: z.string().optional(),
 });

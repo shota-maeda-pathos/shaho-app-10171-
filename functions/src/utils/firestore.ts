@@ -46,6 +46,19 @@ export function toEmployeeResponse(
     updatedAt: toISOString(data.updatedAt),
     contract: data.contract ?? null,
     otherEmployer: data.otherEmployer ? { name: data.otherEmployer.name, since: data.otherEmployer.since, note: data.otherEmployer.note } : null,
+    formerLastName: data.formerLastName ?? null,
+    postalCode: data.postalCode ?? null,
+    prefecture: data.prefecture ?? null,
+    city: data.city ?? null,
+    addressLine: data.addressLine ?? null,
+    building: data.building ?? null,
+    phone: data.phone ?? null,
+    email: data.email ?? null,
+    insuredPersonNumber: data.insuredPersonNumber ?? null,
+    basicPensionNumber: data.basicPensionNumber ?? null,
+    qualificationAcquiredDate: data.qualificationAcquiredDate ?? null,
+    qualificationLostDate: data.qualificationLostDate ?? null,
+    foreignInfo: data.foreignInfo ?? null,
   };
 }
 

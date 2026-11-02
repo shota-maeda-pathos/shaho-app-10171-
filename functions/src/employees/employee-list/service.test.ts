@@ -35,7 +35,10 @@ jest.mock('../../config', () => {
 
   return {
     db: {
-      collection: jest.fn(() => buildQuery()),
+      // 雇用形態のための雇用条件の読み込み（従業員の検索の条件とは別に数える）
+      collection: jest.fn((path: string) => path.endsWith('/employments')
+        ? { orderBy: () => ({ limit: () => ({ get: async () => ({ docs: [{ data: () => ({ employmentType: path.includes('emp-2') ? 'partTime' : 'regular' }) }] }) }) }) }
+        : buildQuery()),
       doc: jest.fn((path: string) => ({
         path,
         id: path.split('/').pop(),
@@ -210,5 +213,15 @@ describe('listEmployees（検索語あり）', () => {
   it('事業所を指定したらその事業所だけを読む', async () => {
     await listEmployees({ companyId: 'company-001', officeId: 'office-001', keyword: 'アオキ' }, makeAuth({ roles: ['admin'] }));
     expect(capturedQueries).toEqual(['where:officeId:==:office-001']);
+  });
+});
+
+describe('listEmployees（雇用形態）', () => {
+  it('今の雇用条件の雇用形態で絞り、一覧に雇用形態を付けて返す', async () => {
+    fullDocs = { 'emp-1': emp1, 'emp-2': emp2 };
+    mockQueryDocs.mockResolvedValue({ docs: [{ id: 'emp-1', data: () => emp1 }, { id: 'emp-2', data: () => emp2 }] });
+    const result = await listEmployees({ companyId: 'company-001', employmentType: 'partTime' }, makeAuth({ roles: ['admin'] }));
+    expect(result.items.map(i => i.id)).toEqual(['emp-2']);
+    expect(result.items[0].employmentType).toBe('partTime');
   });
 });

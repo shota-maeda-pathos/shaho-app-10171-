@@ -372,6 +372,8 @@ export class OnboardingWizardComponent implements OnInit, OnDestroy {
       monthlyHours: c.wageType === 'hourly' && c.monthlyHours ? Number(c.monthlyHours) : null,
       allowances: Math.floor(Number(c.allowances) || 0), inKind: Math.floor(Number(c.inKind) || 0),
       contractEndDate: c.contractType === 'fixed' ? (c.contractEndDate || null) : null,
+      probationStartDate: c.probationStartDate || null,
+      probationEndDate: c.probationEndDate || null,
       ...(this.deciding() ? { healthInsuranceEnrolled: this.overrideHealth, pensionEnrolled: this.overridePension } : {}),
       ...(this.deciding() && this.overrideReason.trim() ? { overrideReason: this.overrideReason.trim() } : {}),
     };

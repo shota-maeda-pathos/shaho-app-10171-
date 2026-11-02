@@ -7,6 +7,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatSelectModule } from '@angular/material/select';
+import { FormsModule } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
@@ -25,7 +27,12 @@ interface Employee {
   officeId: string;
   hireDate: string;
   resignationDate: string | null;
+  employmentType?: string | null;
 }
+
+const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
+  regular: '正社員', contract: '契約社員', partTime: 'パート', arbeit: 'アルバイト', executiveFull: '役員（常勤）', executivePart: '役員（非常勤）',
+};
 
 @Component({
   selector: 'app-employee-list',
@@ -33,7 +40,7 @@ interface Employee {
   imports: [
     MatTableModule, MatButtonModule, MatIconModule,
     MatFormFieldModule, MatInputModule, MatProgressSpinnerModule,
-    MatChipsModule, MatSnackBarModule, PageHeadComponent,
+    MatChipsModule, MatSnackBarModule, PageHeadComponent, MatSelectModule, FormsModule,
   ],
   template: `
     <app-page-head heading="従業員">
@@ -53,6 +60,30 @@ interface Employee {
         </button>
       </ng-container>
     </app-page-head>
+
+    <form class="filters" (ngSubmit)="search()">
+      <mat-form-field appearance="outline">
+        <mat-label>氏名・カナ・社員番号で探す</mat-label>
+        <input matInput name="keyword" [(ngModel)]="keyword">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>雇用形態</mat-label>
+        <mat-select name="employmentType" [(ngModel)]="employmentType" (selectionChange)="search()">
+          <mat-option value="">すべて</mat-option>
+          @for (t of employmentTypes; track t[0]) { <mat-option [value]="t[0]">{{ t[1] }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>在籍状態</mat-label>
+        <mat-select name="status" [(ngModel)]="includeResigned" (selectionChange)="search()">
+          <mat-option [value]="false">在籍中のみ</mat-option>
+          <mat-option [value]="true">退職者も含める</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-stroked-button type="submit"><mat-icon>search</mat-icon> 探す</button>
+      @if (total() !== null) { <span class="count" role="status">{{ total() }}名</span> }
+    </form>
 
     @if (loading()) {
       <div class="loading">
@@ -76,6 +107,11 @@ interface Employee {
         <ng-container matColumnDef="nameKana">
           <th mat-header-cell *matHeaderCellDef>カナ</th>
           <td mat-cell *matCellDef="let e">{{ e.lastNameKana }} {{ e.firstNameKana }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="employmentType">
+          <th mat-header-cell *matHeaderCellDef>雇用形態</th>
+          <td mat-cell *matCellDef="let e">{{ typeLabel(e.employmentType) }}</td>
         </ng-container>
 
         <ng-container matColumnDef="hireDate">
@@ -107,7 +143,7 @@ interface Employee {
       @if (employees().length === 0) {
         <div class="empty-state">
           <mat-icon>person_off</mat-icon>
-          <p>従業員が登録されていません</p>
+          <p>{{ keyword || employmentType ? '条件に合う従業員はいません' : '従業員が登録されていません' }}</p>
         </div>
       }
 
@@ -132,6 +168,10 @@ interface Employee {
       mat-icon { font-size: 48px; width: 48px; height: 48px; }
     }
     .load-more { text-align: center; margin-top: 16px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: center; margin-bottom: 8px; }
+    .filters mat-form-field { width: 220px; }
+    .filters .count { color: var(--app-color-text-sub); }
+    @media (max-width: 600px) { .filters mat-form-field { width: 100%; } }
   `],
 })
 export class EmployeeListComponent implements OnInit {
@@ -149,7 +189,21 @@ export class EmployeeListComponent implements OnInit {
   hasMore = signal(false);
   private lastDocId: string | null = null;
 
-  displayedColumns = ['employeeNumber', 'name', 'nameKana', 'hireDate', 'status'];
+  displayedColumns = ['employeeNumber', 'name', 'nameKana', 'employmentType', 'hireDate', 'status'];
+  employmentTypes = Object.entries(EMPLOYMENT_TYPE_LABELS);
+  keyword = '';
+  employmentType = '';
+  includeResigned = false;
+  total = signal<number | null>(null);
+  typeLabel = (t: string | null | undefined) => (t ? EMPLOYMENT_TYPE_LABELS[t] ?? t : '—');
+
+  /** 条件を変えたら1ページ目から読み直す */
+  search() {
+    this.employees.set([]);
+    this.lastDocId = null;
+    this.loading.set(false);
+    void this.loadEmployees();
+  }
 
   ngOnInit() {
     this.loadEmployees();
@@ -166,7 +220,11 @@ export class EmployeeListComponent implements OnInit {
         limit: 20,
         ...(this.lastDocId ? { lastDocId: this.lastDocId } : {}),
         ...this.office.params(),
+        ...(this.keyword.trim() ? { keyword: this.keyword.trim() } : {}),
+        ...(this.employmentType ? { employmentType: this.employmentType } : {}),
+        ...(this.includeResigned ? { includeResigned: true } : {}),
       });
+      this.total.set(result.data.total ?? null);
       const items: Employee[] = result.data.items;
       this.hasMore.set(result.data.hasMore);
       if (items.length > 0) {
