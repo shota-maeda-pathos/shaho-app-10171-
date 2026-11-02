@@ -197,10 +197,13 @@ export async function approveApprovalRequest(
   await refreshEmployeeProcedures(auth.companyId, input.employeeId);
 
   const { notify } = await import('../../utils/notify');
+  const { employeeNoticeContext, REQUEST_TYPE_LABELS } = await import('../../utils/notice-context');
+  const who = await employeeNoticeContext(auth.companyId, input.employeeId);
   await notify({
     companyId: auth.companyId,
-    title: '承認完了',
-    body: '承認依頼が承認されました',
+    officeId: who.officeId,
+    title: '承認されました',
+    body: `${who.name}さんの${REQUEST_TYPE_LABELS[requestType] ?? requestType}が承認されました`,
     category: 'approval',
     targetType: 'approvalRequest',
     targetId: result,

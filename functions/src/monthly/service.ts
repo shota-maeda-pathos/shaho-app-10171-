@@ -649,7 +649,7 @@ export async function processMonthlyChunk(companyId: string, jobId: string, chun
     const label = ACTION_LABEL[finished.action as MonthlyAction];
     const forReviewer = finished.action === 'requestSalaryApproval' || finished.action === 'requestPremiumApproval';
     await notify({
-      companyId, category: forReviewer ? 'approval' : 'salary', targetType: 'monthlyRun', targetId: finished.runId, createdBy: finished.createdBy,
+      companyId, category: forReviewer ? 'approval' : 'salary', targetType: 'monthlyRun', targetId: finished.runId, officeId: finished.runId.replace(/_[^_]+$/, ''), createdBy: finished.createdBy,
       title: forReviewer ? `毎月の処理：${label}` : `毎月の処理：${label}が終わりました`,
       body: `${finished.payMonth}支給分 ${finished.total}名中 ${finished.succeeded}名が完了${finished.failed ? `、${finished.failed}名が失敗` : ''}${forReviewer ? '。毎月の処理の画面で確認して承認してください' : ''}`,
     });

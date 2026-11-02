@@ -9,7 +9,10 @@ export interface NotifyParams {
   targetType: string;
   targetId?: string;
   createdBy: string;
+  /** スタッフ向けのお知らせを見せる事業所（担当者・承認者は自分の担当事業所のものだけ見る。管理者はすべて） */
+  officeId?: string | null;
 }
+
 
 export async function notify(params: NotifyParams): Promise<string> {
   const now = Timestamp.now();
@@ -21,6 +24,7 @@ export async function notify(params: NotifyParams): Promise<string> {
     targetType: params.targetType,
     targetId: params.targetId ?? null,
     createdBy: params.createdBy,
+    officeId: params.officeId ?? null,
     isRead: false,
     createdAt: now,
     updatedAt: now,

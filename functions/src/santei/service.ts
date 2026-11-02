@@ -387,7 +387,7 @@ export async function processSanteiChunk(companyId: string, jobId: string, chunk
     const { notify } = await import('../utils/notify');
     const forReviewer = finished.action === 'requestGradeApproval';
     await notify({
-      companyId, category: forReviewer ? 'approval' : 'system', targetType: 'santeiRun', targetId: finished.runId, createdBy: finished.createdBy,
+      companyId, category: forReviewer ? 'approval' : 'system', targetType: 'santeiRun', targetId: finished.runId, officeId: finished.runId.replace(/_[^_]+$/, ''), createdBy: finished.createdBy,
       title: forReviewer ? '算定基礎届：等級の承認の依頼' : `算定基礎届：${ACTION_LABEL[finished.action as SanteiAction]}が終わりました`,
       body: `${finished.year}年の定時決定 ${finished.total}名中 ${finished.succeeded}名が完了${finished.failed ? `、${finished.failed}名が失敗` : ''}${forReviewer ? '。算定基礎届の画面で確認して承認してください' : ''}`,
     });
@@ -540,7 +540,7 @@ export async function updateSanteiFiling(input: SanteiFilingUpdateInput, auth: A
     const { notify } = await import('../utils/notify');
     const name = result.filingType === 'correction' ? '算定基礎届の訂正届' : result.filingType === 'cancellation' ? '算定基礎届の取消届' : '算定基礎届';
     await notify({
-      companyId: auth.companyId, category: 'filing', targetType: 'santeiRun', targetId: runRef.id, createdBy: auth.uid,
+      companyId: auth.companyId, category: 'filing', targetType: 'santeiRun', targetId: runRef.id, createdBy: auth.uid, officeId: input.officeId,
       title: input.action === 'requestApproval' ? `${name}：届出の承認の依頼` : input.action === 'approve' ? `${name}が承認されました` : `${name}が差し戻されました`,
       body: `${input.year}年の算定基礎届（${result.number}件目・${result.persons}名）${input.action === 'reject' ? `：${input.comment || '理由の記入なし'}` : ''}`,
     });

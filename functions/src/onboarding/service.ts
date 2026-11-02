@@ -476,7 +476,7 @@ export async function submitInvite(token: string, data: OnboardingState['selfInp
   const { notify } = await import('../utils/notify');
   await notify({
     companyId, title: '入社する人が入力しました', body: `${proc.employeeName}さんの入力が届きました。内容を確かめて台帳に登録してください`,
-    category: 'system', targetType: 'procedure', targetId: ref.id, createdBy: 'self',
+    category: 'system', targetType: 'procedure', targetId: ref.id, createdBy: 'self', officeId: proc.officeId ?? null,
   });
   return { success: true };
 }

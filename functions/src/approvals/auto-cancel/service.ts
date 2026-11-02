@@ -40,8 +40,10 @@ export async function autoCancelApprovals(companyId: string, scope: { employeeId
   }
   if (cancelled || kept.length) {
     const { notify } = await import('../../utils/notify');
+    // 取り消した届出がすべて同じ事業所なら、その事業所の担当者にも見せる（会社情報の変更など複数の事業所にわたるときは管理者だけ）
+    const offices = [...new Set(targets.map(e => e.officeId).filter(Boolean))];
     await notify({
-      companyId, category: 'approval', targetType: 'approvalAutoCancel', createdBy: 'system',
+      companyId, category: 'approval', targetType: 'approvalAutoCancel', createdBy: 'system', officeId: offices.length === 1 ? offices[0] : null,
       title: cancelled ? `届出の承認を自動で取り消しました（${cancelled}件）` : '承認済みの届出を確かめてください',
       body: `${reason}${kept.length ? `\n取り消せなかった届出：${kept.slice(0, 5).join('／')}${kept.length > 5 ? ` ほか${kept.length - 5}件` : ''}` : ''}`,
     });

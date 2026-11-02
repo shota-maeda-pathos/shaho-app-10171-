@@ -654,7 +654,7 @@ export async function processBonusChunk(companyId: string, jobId: string, chunkI
     const forReviewer = finished.action === 'requestBonusApproval' || finished.action === 'requestPremiumApproval';
     const label = ACTION_LABEL[finished.action as BonusAction];
     await notify({
-      companyId, category: forReviewer ? 'approval' : 'system', targetType: 'bonusRun', targetId: finished.runId, createdBy: finished.createdBy,
+      companyId, category: forReviewer ? 'approval' : 'system', targetType: 'bonusRun', targetId: finished.runId, officeId: finished.runId.replace(/_[^_]+$/, ''), createdBy: finished.createdBy,
       title: forReviewer ? `賞与：${label}` : `賞与：${label}が終わりました`,
       body: `${finished.payMonth}支給の賞与 ${finished.total}名中 ${finished.succeeded}名が完了${finished.failed ? `、${finished.failed}名が失敗` : ''}${forReviewer ? '。賞与の画面で確認して承認してください' : ''}`,
     });
@@ -808,7 +808,7 @@ export async function updateBonusFiling(input: BonusFilingUpdateInput, auth: Aut
     const { notify } = await import('../utils/notify');
     const name = result.filingType === 'correction' ? '賞与支払届の訂正届' : result.filingType === 'cancellation' ? '賞与支払届の取消届' : '賞与支払届';
     await notify({
-      companyId: auth.companyId, category: 'filing', targetType: 'bonusRun', targetId: runRef.id, createdBy: auth.uid,
+      companyId: auth.companyId, category: 'filing', targetType: 'bonusRun', targetId: runRef.id, createdBy: auth.uid, officeId: input.officeId,
       title: input.action === 'requestApproval' ? `${name}：届出の承認の依頼` : input.action === 'approve' ? `${name}が承認されました` : `${name}が差し戻されました`,
       body: `${input.payMonth}支給の賞与支払届（${result.number}件目・${result.persons}名）${input.action === 'reject' ? `：${input.comment || '理由の記入なし'}` : ''}`,
     });

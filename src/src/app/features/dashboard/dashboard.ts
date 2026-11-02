@@ -10,6 +10,7 @@ import { OfficeContextService } from '../../core/services/office-context.service
 import { StatusBadgeComponent, StatusTone, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent, PageHeadComponent } from '../../shared/ui';
 import { LifeEventCardsComponent } from '../procedures/life-events';
 import { SummaryCardsComponent } from './summary-cards';
+import { StaffNoticesComponent } from './staff-notices';
 
 /** サーバーの homeTodos・homeBulkTodo が返す1件 */
 interface HomeTodo {
@@ -40,7 +41,7 @@ type Group = { key: string; label: string; items: HomeTodo[] };
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, StatusBadgeComponent, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent, LifeEventCardsComponent, PageHeadComponent, SummaryCardsComponent],
+  imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, StatusBadgeComponent, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent, LifeEventCardsComponent, PageHeadComponent, SummaryCardsComponent, StaffNoticesComponent],
   template: `
     <div class="app-page">
       <app-page-head [heading]="greeting() + '、' + (auth.profile()?.displayName ?? 'ユーザー') + 'さん'">
@@ -68,7 +69,7 @@ type Group = { key: string; label: string; items: HomeTodo[] };
 
         @if (isOperator()) { <app-summary-cards /> }
 
-        <div class="split" [class.solo]="!isOperator()">
+        <div class="split">
         <section class="card" aria-labelledby="todo-heading">
           <div class="card-head">
             <h2 id="todo-heading">やること</h2>
@@ -108,8 +109,9 @@ type Group = { key: string; label: string; items: HomeTodo[] };
           </div>
         </section>
 
-        @if (isOperator()) {
-          <div class="rail">
+        <div class="rail">
+          <app-staff-notices />
+          @if (isOperator()) {
             <section class="card" aria-labelledby="start-heading">
               <div class="card-head"><h2 id="start-heading">新しく始める</h2></div>
               <div class="card-body"><app-life-event-cards [compact]="true" /></div>
@@ -124,8 +126,8 @@ type Group = { key: string; label: string; items: HomeTodo[] };
                 </ul>
               </section>
             }
-          </div>
-        }
+          }
+        </div>
         </div>
       }
 

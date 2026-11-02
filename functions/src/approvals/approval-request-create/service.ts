@@ -116,10 +116,13 @@ export async function createApprovalRequest(
   // 毎月の処理など大人数をまとめて申請するときは、1人ずつの通知を出さない
   if (options.notify === false) return { success: true, id: result };
   const { notify } = await import('../../utils/notify');
+  const { employeeNoticeContext, REQUEST_TYPE_LABELS } = await import('../../utils/notice-context');
+  const who = await employeeNoticeContext(auth.companyId, input.employeeId);
   await notify({
     companyId: auth.companyId,
-    title: '承認依頼',
-    body: `${input.requestType}の承認依頼が作成されました`,
+    officeId: who.officeId,
+    title: '承認の依頼',
+    body: `${who.name}さんの${REQUEST_TYPE_LABELS[input.requestType] ?? input.requestType}の承認を依頼されました`,
     category: 'approval',
     targetType: 'approvalRequest',
     targetId: result,
