@@ -1,5 +1,5 @@
-import { PortalProfile, PortalPayslip, PortalOverview } from './portal.types';
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { PortalProfile, PortalPayslip, PortalOverview, groupByYear } from './portal.types';
+import { Component, computed, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -71,15 +71,20 @@ import { PortalRequestsComponent } from './portal-requests';
             <h2>給与・社会保険料</h2>
             <p>承認済みの給与を表示します。社会保険料は同じ発生月の承認済み計算額で、給与からの実際の控除額とは異なる場合があります。</p>
             @if (payslips().length === 0 && !loading()) { <p>表示できる承認済み給与はありません。</p> }
-            <mat-list>
-              @for (slip of payslips(); track slip.yearMonth) {
-                <mat-list-item class="payslip-item" (click)="viewPayslip(slip.yearMonth)">
-                  <mat-icon matListItemIcon>description</mat-icon>
-                  <div matListItemTitle>{{ slip.yearMonth }}</div>
-                  <div matListItemLine>支給：{{ slip.totalSalary === null ? '未登録' : (slip.totalSalary | number) + ' 円' }} ／ 同月分社会保険料：{{ slip.insurance?.totalEmployee == null ? '未確定' : (slip.insurance!.totalEmployee | number) + ' 円' }}</div>
-                </mat-list-item>
-              }
-            </mat-list>
+            @for (group of payslipYears(); track group.year) {
+              <details class="year" [open]="$first">
+                <summary><span class="year-title">{{ group.year }}年</span><span class="year-sub">{{ group.items.length }}か月分</span></summary>
+                <mat-list>
+                  @for (slip of group.items; track slip.yearMonth) {
+                    <mat-list-item class="payslip-item" (click)="viewPayslip(slip.yearMonth)">
+                      <mat-icon matListItemIcon>description</mat-icon>
+                      <div matListItemTitle>{{ slip.yearMonth }}</div>
+                      <div matListItemLine>支給：{{ slip.totalSalary === null ? '未登録' : (slip.totalSalary | number) + ' 円' }} ／ 同月分社会保険料：{{ slip.insurance?.totalEmployee == null ? '未確定' : (slip.insurance!.totalEmployee | number) + ' 円' }}</div>
+                    </mat-list-item>
+                  }
+                </mat-list>
+              </details>
+            }
             @if (hasMore()) { <button mat-stroked-button (click)="load(true)" [disabled]="loading()">{{ loading() ? '読み込み中...' : '過去の月を読み込む' }}</button> }
           </mat-card>
         </div>
@@ -106,6 +111,14 @@ import { PortalRequestsComponent } from './portal-requests';
     .payslip-card { padding: 24px; }
     .payslip-card h2 { margin: 0 0 16px; font-size: 16px; font-weight: 500; }
     .payslip-item { cursor: pointer; }
+    /* 年ごとに開閉する（いちばん新しい年だけ開いておく） */
+    .year { border-top: 1px solid var(--app-color-border); }
+    .year summary { display: flex; align-items: baseline; gap: 12px; padding: 12px 4px; cursor: pointer; list-style: none; }
+    .year summary::-webkit-details-marker { display: none; }
+    .year summary::before { content: '▸'; color: var(--app-color-text-sub); width: 1em; }
+    .year[open] summary::before { content: '▾'; }
+    .year-title { font-weight: 600; }
+    .year-sub { color: var(--app-color-text-sub); font-size: 13px; }
     .loading-container { display: flex; justify-content: center; padding: 32px; }
     .empty-state { text-align: center; padding: 32px; color: #666; }
     .empty-state mat-icon { font-size: 40px; width: 40px; height: 40px; color: #ccc; }
@@ -145,6 +158,7 @@ export class PortalComponent implements OnInit {
 
   profile = signal<PortalProfile | null>(null);
   payslips = signal<PortalPayslip[]>([]);
+  payslipYears = computed(() => groupByYear(this.payslips()));
   linked = signal<boolean | null>(null);
   loading = signal(false);
   error = signal('');

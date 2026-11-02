@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { groupByYear } from './portal.types';
 
 interface PremiumMonth {
   yearMonth: string; standardRemuneration: number | null; health: number; childSupport: number; longTermCare: number | null;
@@ -61,21 +62,27 @@ const PROFILE_LABELS: [string, string][] = [
       @if (d.premiums; as p) {
         <section class="card">
           <h2>保険料の明細（本人負担）</h2>
-          <div class="annual">@for (y of p.annual; track y.year) { <span>{{ y.year }}年：<b>{{ y.total | number }}円</b>（{{ y.months }}か月）</span> }</div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>月</th><th>標準報酬月額</th><th>健康保険</th><th>支援金</th><th>介護保険</th><th>厚生年金</th><th>合計</th></tr></thead>
-            <tbody>
-              @for (m of p.months; track m.yearMonth) {
-                <tr [class.changed]="m.changeReason">
-                  <td>{{ m.yearMonth }}@if (m.changeReason) { <span class="reason">{{ m.changeReason }}（{{ (m.change ?? 0) >= 0 ? '+' : '' }}{{ m.change | number }}円）</span> }
-                    @if (m.corrected) { <span class="reason">訂正済み：{{ m.corrected }}</span> }</td>
-                  <td>{{ m.standardRemuneration | number }}</td><td>{{ m.health | number }}</td><td>{{ m.childSupport | number }}</td>
-                  <td>{{ m.longTermCare === null ? '—' : (m.longTermCare | number) }}</td><td>{{ m.pension | number }}</td>
-                  <td><b>{{ m.total | number }}</b>@if (m.isExempted) { （免除）}</td>
-                </tr>
-              } @empty { <tr><td colspan="7">確定した保険料はまだありません。</td></tr> }
-            </tbody>
-          </table></div>
+          @for (group of premiumYears(p); track group.year) {
+            <details class="year" [open]="$first">
+              <summary><span class="year-title">{{ group.year }}年</span>
+                @if (annualOf(p, group.year); as y) { <span>本人負担 <b>{{ y.total | number }}円</b>（{{ y.months }}か月）</span> }
+                @if (changedCount(group.items); as n) { <span class="reason-count">変わった月 {{ n }}</span> }</summary>
+              <div class="table-wrap"><table>
+                <thead><tr><th>月</th><th>標準報酬月額</th><th>健康保険</th><th>支援金</th><th>介護保険</th><th>厚生年金</th><th>合計</th></tr></thead>
+                <tbody>
+                  @for (m of group.items; track m.yearMonth) {
+                    <tr [class.changed]="m.changeReason">
+                      <td>{{ m.yearMonth }}@if (m.changeReason) { <span class="reason">{{ m.changeReason }}（{{ (m.change ?? 0) >= 0 ? '+' : '' }}{{ m.change | number }}円）</span> }
+                        @if (m.corrected) { <span class="reason">訂正済み：{{ m.corrected }}</span> }</td>
+                      <td>{{ m.standardRemuneration | number }}</td><td>{{ m.health | number }}</td><td>{{ m.childSupport | number }}</td>
+                      <td>{{ m.longTermCare === null ? '—' : (m.longTermCare | number) }}</td><td>{{ m.pension | number }}</td>
+                      <td><b>{{ m.total | number }}</b>@if (m.isExempted) { （免除）}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table></div>
+            </details>
+          } @empty { <p class="sub">確定した保険料はまだありません。</p> }
         </section>
       }
 
@@ -108,7 +115,15 @@ const PROFILE_LABELS: [string, string][] = [
     .rows { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: var(--app-font-sm); }
     dt { color: var(--app-color-text-sub); }
     dd { margin: 0; }
-    .annual { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: var(--app-space-2); font-size: var(--app-font-sm); }
+    /* 年ごとに開閉する（いちばん新しい年だけ開いておく） */
+    .year { border-top: 1px solid var(--app-color-border); }
+    .year summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; padding: var(--app-space-2) 4px; cursor: pointer; font-size: var(--app-font-sm); list-style: none; }
+    .year summary::-webkit-details-marker { display: none; }
+    .year summary::before { content: '▸'; color: var(--app-color-text-sub); width: 1em; }
+    .year[open] summary::before { content: '▾'; }
+    .year[open] summary { margin-bottom: var(--app-space-2); }
+    .year-title { font-weight: 600; font-size: var(--app-font-md); }
+    .reason-count { color: var(--app-status-attention-fg); font-size: var(--app-font-xs); }
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: var(--app-font-sm); }
     th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--app-color-border); white-space: nowrap; }
@@ -135,6 +150,12 @@ export class PortalInfoComponent implements OnInit {
       this.error.set(e?.message ?? '情報を読み込めませんでした');
     }
   }
+
+  premiumYears(p: NonNullable<PortalDetails['premiums']>) { return groupByYear(p.months); }
+
+  annualOf(p: NonNullable<PortalDetails['premiums']>, year: string) { return p.annual.find((y) => y.year === year) ?? null; }
+
+  changedCount(months: PremiumMonth[]) { return months.filter((m) => m.changeReason).length; }
 
   profileRows(d: PortalDetails): [string, string | null][] {
     return PROFILE_LABELS.filter(([k]) => k in d.profile).map(([k, label]) => [label, d.profile[k]]);

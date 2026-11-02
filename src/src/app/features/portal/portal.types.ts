@@ -24,6 +24,16 @@ export interface PortalProfile {
   departmentName: string | null;
   isActive: boolean;
 }
+/** 'YYYY-MM' の並び（新しい月から）を、順番を保ったまま年ごとに分ける */
+export function groupByYear<T extends { yearMonth: string }>(items: T[]): { year: string; items: T[] }[] {
+  const groups: { year: string; items: T[] }[] = [];
+  for (const item of items) {
+    const year = item.yearMonth.slice(0, 4);
+    const last = groups[groups.length - 1];
+    if (last?.year === year) last.items.push(item); else groups.push({ year, items: [item] });
+  }
+  return groups;
+}
 export interface PortalOverview {
   linked: boolean;
   profile: PortalProfile | null;
