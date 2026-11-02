@@ -15,6 +15,8 @@ export interface HomeTodo {
   officeName: string;
   deadline: string | null;
   tone: TodoTone;
+  /** 承認を頼まれている件（承認者がやること）。担当者の作業ではない */
+  approve?: boolean;
   route: string;
   queryParams: Record<string, string>;
   updatedAt: string | null;
@@ -34,3 +36,6 @@ export function sortTodos(items: HomeTodo[]) {
   return [...items].sort((a, b) =>
     (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999') || TONE_ORDER[a.tone] - TONE_ORDER[b.tone] || a.title.localeCompare(b.title, 'ja'));
 }
+
+/** 担当者でない人（承認者だけ）に出すのは、自分が承認を頼まれている件だけ。担当者の作業（「あなたの番」でも）は出さない */
+export const forApprover = (t: Pick<HomeTodo, 'tone' | 'approve'>) => t.tone === 'yours' && t.approve === true;
