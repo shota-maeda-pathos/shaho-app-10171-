@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
+import { MatIconModule } from '@angular/material/icon';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
@@ -13,18 +14,29 @@ import { LIFE_EVENTS, LifeEvent, LifeEventCardsComponent } from './life-events';
 
 interface Employee { id: string; lastName: string; firstName: string; employeeNumber: string }
 
-/** 手続きを始める。何が起きたかをカードで選び、従業員を選ぶ業務ならその人を選んで進む */
+/** 手続きを始める。①何が起きたかをカードで選び、②従業員を選ぶ業務ならカードの一覧をその人を選ぶ画面に切り替えて進む */
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatRadioModule, LifeEventCardsComponent],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatRadioModule, MatIconModule, LifeEventCardsComponent],
   template: `<section class="start">
     <h1>手続きを始める</h1>
-    <p class="lead">何が起きたかを選んでください。必要な入力画面へ案内します。</p>
-    <app-life-event-cards [selected]="type()" [handlesPick]="true" (pick)="pick($event)" />
+    <ol class="steps" aria-label="手順">
+      <li [class.on]="!event()" [class.done]="!!event()">@if (event()) { <mat-icon aria-hidden="true">check</mat-icon> }1 何が起きたか</li>
+      <li [class.on]="!!event()">2 だれの手続きか</li>
+    </ol>
 
-    @if (event(); as e) {
+    @if (!event()) {
+      <p class="lead">何が起きたかを選んでください。必要な入力画面へ案内します。</p>
+      <app-life-event-cards [selected]="type()" [handlesPick]="true" (pick)="pick($event)" />
+    } @else {
+      @let e = event()!;
+      <div class="chosen">
+        <mat-icon aria-hidden="true">{{ e.icon }}</mat-icon>
+        <div><b>{{ e.label }}</b><span>{{ e.hint }}</span></div>
+        <button mat-button type="button" (click)="reset()">変更する</button>
+      </div>
       <section class="employee" aria-labelledby="employee-heading">
-        <h2 id="employee-heading">「{{e.label}}」の対象の従業員を選ぶ</h2>
+        <h2 id="employee-heading">対象の従業員を選ぶ</h2>
         <mat-form-field appearance="outline"><mat-label>社員番号・氏名で探す</mat-label><input matInput [(ngModel)]="keyword" (ngModelChange)="employeeId = ''"></mat-form-field>
         @if (loading()) { <p role="status">従業員を読み込んでいます…</p> }
         <ul class="matches" role="listbox" aria-label="対象の従業員">
@@ -61,7 +73,10 @@ interface Employee { id: string; lastName: string; firstName: string; employeeNu
           <p class="note">40歳・65歳は届出がなく、介護保険料は毎月の計算で自動で変わります。ホームの「やること」に事前に出ます。</p>
         }
         <p class="note">この画面では従業員の情報を変更しません。次の画面で入力・確認してから登録します。</p>
-        <button mat-flat-button (click)="start()" [disabled]="!canStart() || starting()">入力画面へ進む</button>
+        <div class="actions">
+          <button mat-button type="button" (click)="reset()"><mat-icon>arrow_back</mat-icon>手続きを選び直す</button>
+          <button mat-flat-button (click)="start()" [disabled]="!canStart() || starting()">入力画面へ進む</button>
+        </div>
       </section>
     }
   </section>`,
@@ -69,7 +84,19 @@ interface Employee { id: string; lastName: string; firstName: string; employeeNu
     .start { max-width: 960px; margin: 0 auto; padding: var(--app-space-5); }
     h1 { margin: 0 0 var(--app-space-2); font-size: var(--app-font-title); font-weight: 500; }
     .lead { margin: 0 0 var(--app-space-5); color: var(--app-color-text-sub); }
-    .employee { margin-top: var(--app-space-5); padding: var(--app-space-5); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); background: var(--app-color-surface); }
+    .steps { display: flex; gap: var(--app-space-2); list-style: none; margin: 0 0 var(--app-space-4); padding: 0; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
+    .steps li { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; }
+    .steps li + li::before { content: '→'; margin-right: var(--app-space-2); color: var(--app-color-text-sub); }
+    .steps li.on { background: var(--app-status-yours-bg); color: var(--app-status-yours-fg); font-weight: 600; }
+    .steps li.done { color: var(--app-status-done-fg); }
+    .steps mat-icon { font-size: 16px; width: 16px; height: 16px; }
+    .chosen { display: flex; align-items: center; gap: var(--app-space-3); padding: var(--app-space-3) var(--app-space-4); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); background: var(--app-color-surface); }
+    .chosen > mat-icon { color: var(--app-color-link); font-size: 28px; width: 28px; height: 28px; }
+    .chosen > div { flex: 1; display: flex; flex-direction: column; }
+    .chosen b { font-size: var(--app-font-lg); font-weight: 600; }
+    .chosen span { font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
+    .actions { display: flex; justify-content: space-between; align-items: center; gap: var(--app-space-3); margin-top: var(--app-space-4); }
+    .employee { margin-top: var(--app-space-4); padding: var(--app-space-5); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); background: var(--app-color-surface); }
     .employee h2 { margin: 0 0 var(--app-space-4); font-size: var(--app-font-lg); }
     .employee mat-form-field { display: block; max-width: 420px; }
     .matches { list-style: none; margin: 0 0 var(--app-space-3); padding: 0; max-height: 280px; overflow-y: auto; border: 1px solid var(--app-color-border); border-radius: var(--app-radius); }
@@ -104,7 +131,18 @@ export class ProcedureStartComponent implements OnInit {
     this.type.set(event.type);
     void this.router.navigate([], { queryParams: { type: event.type }, queryParamsHandling: 'merge', replaceUrl: true });
     if (!this.employees().length) void this.loadEmployees();
+    this.scrollTop();
   }
+
+  /** ①に戻って手続きを選び直す */
+  reset() {
+    this.type.set(''); this.employeeId = ''; this.keyword = ''; this.error.set('');
+    void this.router.navigate([], { queryParams: { type: null, employeeId: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    this.scrollTop();
+  }
+
+  /** 切り替えた画面を上から見せる（画面の本文は .content の中でスクロールする） */
+  private scrollTop() { document.querySelector('.content')?.scrollTo({ top: 0 }); }
 
   matches() {
     const term = this.keyword.replace(/\s/g, '');
