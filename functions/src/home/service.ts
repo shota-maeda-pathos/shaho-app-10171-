@@ -16,7 +16,7 @@ import { currentTransferStep } from '../transfer/service';
 import { deadlineOf, FILING_LABEL as AGE_FILING_LABEL, KIND_LABEL as AGE_KIND_LABEL, milestonesBetween } from '../age-event/rules';
 import { FILING_LABEL } from '../leave-procedure/rules';
 import { mapConcurrent } from '../utils/parallel';
-import { HomeTodo, TodoTone, payDateOf, sortTodos } from './rules';
+import { HomeTodo, TodoTone, forApprover, payDateOf, sortTodos } from './rules';
 import { monthlyProgress } from './monthly-progress';
 import { santeiOverview, santeiRunId } from '../santei/service';
 import { santeiProgress } from '../santei/progress';
@@ -79,7 +79,7 @@ async function onboardingTodo(p: ProcedureDoc & { id: string }, auth: AuthContex
       return { ...base, next: '差し戻された資格取得届を直す', detail: approval.comment ? `理由：${approval.comment}` : null, tone: 'action', deadline };
     }
     const tone = approvalTone(auth, approval?.requestedBy);
-    return { ...base, next: tone === 'yours' ? '資格取得届を承認する' : '承認者の確認を待っています', detail: null, tone, deadline };
+    return { ...base, next: tone === 'yours' ? '資格取得届を承認する' : '承認者の確認を待っています', detail: null, tone, approve: tone === 'yours', deadline };
   }
   const returned = p.steps.find(s => s.status === 'returned');
   if (returned) return { ...base, next: '返戻された資格取得届を直す', detail: returned.statusDetail, tone: 'action', deadline };
@@ -117,7 +117,7 @@ async function wizardTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, o
       return { ...o.base, next: `差し戻された${o.filingName}を直す`, detail: approval.comment ? `理由：${approval.comment}` : null, tone: 'action', deadline };
     }
     const tone = approvalTone(auth, approval?.requestedBy);
-    return { ...o.base, next: tone === 'yours' ? `${o.filingName}を承認する` : '承認者の確認を待っています', detail: o.detail, tone, deadline };
+    return { ...o.base, next: tone === 'yours' ? `${o.filingName}を承認する` : '承認者の確認を待っています', detail: o.detail, tone, approve: tone === 'yours', deadline };
   }
   const returned = p.steps.find(s => s.status === 'returned');
   if (returned) return { ...o.base, next: `返戻された${o.filingName}を直す`, detail: returned.statusDetail, tone: 'action', deadline };
@@ -250,7 +250,7 @@ async function employmentChangeTodo(p: ProcedureDoc & { id: string }, auth: Auth
     if (a?.status === 'rejected') return { ...base, next: '差し戻された雇用条件を直す', detail: a.comment ? `理由：${a.comment}` : detail, tone: 'action', deadline: null };
     if (a?.status === 'approved') return { ...base, next: '承認された雇用条件を台帳に反映する', detail, tone: 'yours', deadline: null };
     const tone = approvalTone(auth, a?.requestedBy);
-    return { ...base, next: tone === 'yours' ? '雇用条件を承認する' : '承認者の確認を待っています', detail, tone, deadline: null };
+    return { ...base, next: tone === 'yours' ? '雇用条件を承認する' : '承認者の確認を待っています', detail, tone, approve: tone === 'yours', deadline: null };
   }
   return wizardTodo(p, auth, { base, step, next: CHANGE_NEXT, filingName: ec.effect === 'acquire' ? '資格取得届' : '資格喪失届', detail });
 }
@@ -354,7 +354,7 @@ function procedureTodo(p: ProcedureDoc & { id: string }, auth: AuthContext, offi
   return {
     id: `procedure-${p.id}`, kind: 'procedure', title: p.title, officeName,
     next: step.status === 'returned' ? `${step.label}（差し戻し）` : tone === 'waiting' ? '承認者の確認を待っています' : step.label,
-    detail: step.statusDetail ?? (p.statusReason || null), tone, deadline: date(p.deadline),
+    detail: step.statusDetail ?? (p.statusReason || null), tone, approve: step.type === 'approval' && tone === 'yours', deadline: date(p.deadline),
     route: `/procedures/${p.id}`, queryParams: { officeId: p.officeId }, updatedAt: iso(p.updatedAt),
   };
 }
@@ -447,7 +447,7 @@ export async function bulkTodo(auth: AuthContext, target: BulkTarget): Promise<H
   const todo = target.kind === 'monthly' ? await monthlyTodo(auth, office, target.period)
     : target.kind === 'santei' ? await santeiTodo(auth, office, Number(target.period))
     : await bonusTodo(auth, office, target.period);
-  return todo && (isOperator(auth) || todo.tone === 'yours') ? todo : null;
+  return todo && (isOperator(auth) || forApprover(todo)) ? todo : null;
 }
 
 /** 毎月の処理の1件。毎月の処理の画面と同じ判定で全員分の状況から決める（最後の一括処理からの推測はしない） */
@@ -548,7 +548,7 @@ export async function listHomeTodos(auth: AuthContext, officeId?: string, deferB
     const bulkItems = await mapConcurrent(bulk, 6, t => bulkTodo(auth, t));
     items = [...items, ...bulkItems.filter((t): t is HomeTodo => t !== null)];
   }
-  if (!isOperator(auth)) items = items.filter(t => t.tone === 'yours');
+  if (!isOperator(auth)) items = items.filter(forApprover);
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
   return { today, items: sortTodos(items), bulk: deferBulk ? bulk.map(t => ({ ...t, officeName: names.get(t.officeId) ?? '' })) : [] };
 }

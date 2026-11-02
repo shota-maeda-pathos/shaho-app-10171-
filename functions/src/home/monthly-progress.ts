@@ -68,7 +68,7 @@ export interface MonthlyProgressInput {
  * 承認を頼まれていればその確認、なければ自分がやることのある最初のステップ、それもなければ他の人を待っている最初のステップ。
  * 全員が終わっていれば null
  */
-export function monthlyProgress({ rows, reviews, canApprove }: MonthlyProgressInput): { next: string; tone: TodoTone; detail: string | null } | null {
+export function monthlyProgress({ rows, reviews, canApprove }: MonthlyProgressInput): { next: string; tone: TodoTone; approve?: boolean; detail: string | null } | null {
   const active = rows.filter(r => !r.hold);
   const approves = (step: StepKey) =>
     canApprove && ((step === 'salaryReview' && !reviews.salary?.mine) || (step === 'premiumReview' && !reviews.premium?.mine));
@@ -83,7 +83,7 @@ export function monthlyProgress({ rows, reviews, canApprove }: MonthlyProgressIn
   const review = sums.find(s => approves(s.step) && s.waiting > 0);
   if (review) {
     const what = review.step === 'salaryReview' ? '給与' : '保険料';
-    return { next: `${what}を承認する（${review.waiting}名）`, tone: 'yours', detail: heldNote };
+    return { next: `${what}を承認する（${review.waiting}名）`, tone: 'yours', approve: true, detail: heldNote };
   }
   const todo = sums.find(s => s.action + s.yours > 0);
   if (todo) {

@@ -31,7 +31,7 @@ export function santeiStepState(step: Exclude<SanteiStepKey, 'submit'>, r: Pick<
  */
 export function santeiProgress(input: {
   rows: SanteiOverviewRow[]; filings: SanteiFilingSummary[]; canApprove: boolean; uid: string;
-}): { next: string; tone: 'action' | 'yours' | 'waiting'; detail: string | null } | null {
+}): { next: string; tone: 'action' | 'yours' | 'waiting'; approve?: boolean; detail: string | null } | null {
   const rows = input.rows.filter(r => !r.hold);
   const count = (step: Exclude<SanteiStepKey, 'submit'>, tone: SanteiTone) => rows.filter(r => santeiStepState(step, r)?.tone === tone).length;
   const target = count('target', 'action');
@@ -40,7 +40,7 @@ export function santeiProgress(input: {
   if (toRequest) return { next: '等級の承認を依頼する', tone: 'action', detail: `${toRequest}名が依頼前・差し戻し` };
   const waitingGrades = rows.filter(r => r.approval.status === 'pending');
   const forMe = waitingGrades.filter(r => r.approval.requestedBy !== input.uid);
-  if (input.canApprove && forMe.length) return { next: '等級を承認する', tone: 'yours', detail: `${forMe.length}名の承認を頼まれています` };
+  if (input.canApprove && forMe.length) return { next: '等級を承認する', tone: 'yours', approve: true, detail: `${forMe.length}名の承認を頼まれています` };
   const toFile = count('filing', 'action');
   if (toFile) return { next: '算定基礎届を作る', tone: 'action', detail: `${toFile}名がまだ届出に載っていません` };
   const active = input.filings.filter(f => f.status !== 'cancelled');
@@ -51,7 +51,7 @@ export function santeiProgress(input: {
   if (approved) return { next: approved.mockStatus === 'returned' ? '返戻された算定基礎届を直す' : approved.mockStatus === 'failed' ? '算定基礎届を送り直す' : '算定基礎届を提出する', tone: 'action', detail: `${approved.personCount}名` };
   if (sending) return { next: '模擬電子申請の処理を待っています', tone: 'waiting', detail: `${sending.personCount}名の算定基礎届` };
   const pending = active.find(f => f.status === 'pending');
-  if (pending && input.canApprove && !pending.mine) return { next: '届出を承認する', tone: 'yours', detail: `${pending.personCount}名の算定基礎届` };
+  if (pending && input.canApprove && !pending.mine) return { next: '届出を承認する', tone: 'yours', approve: true, detail: `${pending.personCount}名の算定基礎届` };
   if (pending) return { next: '届出の承認を待っています', tone: 'waiting', detail: null };
   if (waitingGrades.length) return { next: '等級の承認を待っています', tone: 'waiting', detail: `${waitingGrades.length}名` };
   return null;

@@ -92,10 +92,13 @@ export async function rejectApprovalRequest(
   await refreshEmployeeProcedures(auth.companyId, input.employeeId);
 
   const { notify } = await import('../../utils/notify');
+  const { employeeNoticeContext } = await import('../../utils/notice-context');
+  const who = await employeeNoticeContext(auth.companyId, input.employeeId);
   await notify({
     companyId: auth.companyId,
+    officeId: who.officeId,
     title: '差し戻されました',
-    body: `承認の依頼が差し戻されました。理由：${input.comment}`,
+    body: `${who.name}さんの承認の依頼が差し戻されました。理由：${input.comment}`,
     category: 'approval',
     targetType: 'approvalRequest',
     targetId: result,

@@ -374,7 +374,7 @@ export async function saveEntry(input: EntryInput, auth: AuthContext) {
       body: facts.filingDeadline
         ? `${proc.employeeName}さんの退職を登録しました（喪失日 ${facts.lossDate}）。資格喪失届の期限は ${facts.filingDeadline} です`
         : `${proc.employeeName}さんの退職を登録しました（社会保険に加入していないため届出はありません）`,
-      category: 'filing', targetType: 'procedure', targetId: input.procedureId, createdBy: auth.uid,
+      category: 'filing', targetType: 'procedure', targetId: input.procedureId, createdBy: auth.uid, officeId: proc.officeId ?? null,
     });
   }
   return { success: true, facts };
@@ -434,7 +434,7 @@ export async function saveSettlement(input: { companyId: string; procedureId: st
       companyId: input.companyId,
       title: plan.totals.transfer > 0 ? '退職者の保険料の別途回収が必要です' : '退職者への保険料の返金が必要です',
       body: `${proc.employeeName}さん：${detail}。回収・返金したら、毎月の処理の「徴収を記録」で記録してください`,
-      category: 'salary', targetType: 'procedure', targetId: input.procedureId, createdBy: auth.uid,
+      category: 'salary', targetType: 'procedure', targetId: input.procedureId, createdBy: auth.uid, officeId: proc.officeId ?? null,
     });
   }
   return { success: true, plan };
