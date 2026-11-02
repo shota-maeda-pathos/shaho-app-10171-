@@ -77,7 +77,7 @@ const STATUS_LABELS: Record<string, string> = { submitted: '受付待ち', inPro
             }
             @case ('leave') {
               <mat-form-field appearance="outline"><mat-label>休業の種類</mat-label>
-                <mat-select [(ngModel)]="f['kind']" name="kind"><mat-option value="maternity">産前産後休業</mat-option><mat-option value="childcare">育児休業</mat-option></mat-select></mat-form-field>
+                <mat-select [(ngModel)]="f['kind']" name="kind">@if (canRequestMaternity()) {<mat-option value="maternity">産前産後休業</mat-option>}<mat-option value="childcare">育児休業</mat-option></mat-select></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>開始日</mat-label><input matInput type="date" [(ngModel)]="f['startDate']" name="ls"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>終了予定日</mat-label><input matInput type="date" [(ngModel)]="f['endDate']" name="le"></mat-form-field>
               @if (f['kind'] === 'maternity') { <mat-form-field appearance="outline"><mat-label>出産予定日</mat-label><input matInput type="date" [(ngModel)]="f['expectedBirthDate']" name="eb"></mat-form-field> }
@@ -136,6 +136,8 @@ export class PortalRequestsComponent implements OnInit {
   files: File[] = [];
   busy = signal(false);
   mine = signal<MyRequest[]>([]);
+  /** 産休を選べるか（台帳の性別が男性なら出さない。サーバーも申請を断る） */
+  canRequestMaternity = signal(true);
 
   ngOnInit() { void this.loadMine(); }
 
@@ -145,8 +147,9 @@ export class PortalRequestsComponent implements OnInit {
 
   async loadMine() {
     try {
-      const { data } = await httpsCallable<object, { items: MyRequest[] }>(this.functions, 'portalRequestMine')({ companyId: this.auth.companyId });
+      const { data } = await httpsCallable<object, { items: MyRequest[]; canRequestMaternity?: boolean }>(this.functions, 'portalRequestMine')({ companyId: this.auth.companyId });
       this.mine.set(data.items);
+      this.canRequestMaternity.set(data.canRequestMaternity !== false);
     } catch { /* 一覧が読めなくても申請はできる */ }
   }
 

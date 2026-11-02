@@ -77,12 +77,20 @@ function toItem(d: FirebaseFirestore.DocumentSnapshot): PortalRequestItem {
   };
 }
 
+export const MATERNITY_ONLY_FEMALE = '産休は出産する本人が取る休業です。配偶者の出産で休むときは育休で申請してください';
+
+/** 産休の申請は、台帳の性別が男性なら受け付けない（受付で断っていたものを申請の時点で断る） */
+export function maternityBlocked(request: { type: string; kind?: string }, gender: unknown): boolean {
+  return request.type === 'leave' && request.kind === 'maternity' && gender === 'male';
+}
+
 /** 本人が申請する。退職日の翌日からは閲覧だけで申請できない */
 export async function createRequest(input: z.infer<typeof RequestCreateInput>, auth: AuthContext) {
   requireNotSuspended(auth);
   const employee = await self(auth);
   if (!employee) throw new HttpsError('failed-precondition', '従業員との紐付けがありません。管理者に確認してください');
   const { type, ...detail } = input.request;
+  if (maternityBlocked(input.request, employee.data.gender)) throw new HttpsError('invalid-argument', MATERNITY_ONLY_FEMALE);
   const now = Timestamp.now();
   const ref = col(auth.companyId).doc();
   const batch = db.batch();
@@ -118,9 +126,13 @@ export async function attachToRequest(input: z.infer<typeof RequestAttachSchema>
   return { success: true };
 }
 
-export async function listMyRequests(auth: AuthContext): Promise<{ items: PortalRequestItem[] }> {
-  const snap = await col(auth.companyId).where('userId', '==', auth.uid).get();
-  return { items: snap.docs.map(toItem).sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')) };
+export async function listMyRequests(auth: AuthContext): Promise<{ items: PortalRequestItem[]; canRequestMaternity: boolean }> {
+  const [snap, employee] = await Promise.all([col(auth.companyId).where('userId', '==', auth.uid).get(), self(auth).catch(() => null)]);
+  return {
+    items: snap.docs.map(toItem).sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')),
+    // 申請の画面で産休を選べるか（台帳の性別が男性なら出さない）
+    canRequestMaternity: employee?.data.gender !== 'male',
+  };
 }
 
 /** 担当者が見る申請の一覧（担当事業所のもの。終わったものは除く） */

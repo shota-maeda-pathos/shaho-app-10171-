@@ -114,22 +114,9 @@ export const routes: Routes = [
         canActivate: [roleGuard('admin', 'operator')],
         data: { title: '保険料' },
         children: [
-          {
-            path: 'monthly',
-            data: { title: '月額保険料' },
-            loadComponent: () =>
-              import('./features/premium/premium-monthly/premium-monthly').then(
-                (m) => m.PremiumMonthlyComponent,
-              ),
-          },
-          {
-            path: 'collection',
-            data: { title: '徴収' },
-            loadComponent: () =>
-              import('./features/premium/premium-collection/premium-collection').then(
-                (m) => m.PremiumCollectionComponent,
-              ),
-          },
+          // 旧い月額保険料・徴収の画面は、毎月の処理（一括型）に移した
+          { path: 'monthly', redirectTo: '/monthly', pathMatch: 'full' },
+          { path: 'collection', redirectTo: '/monthly', pathMatch: 'full' },
           // 旧い賞与保険料の画面は、賞与（一括型）に移した
           { path: 'bonus', redirectTo: '/bonus', pathMatch: 'full' },
         ],
