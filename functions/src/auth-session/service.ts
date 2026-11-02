@@ -7,6 +7,7 @@ import type { InvitationDoc, UserDoc } from '../types/firestore';
 import { checkPassword } from './identity';
 import { emailKey, hashPassword, matchesHash } from './passwords';
 import {
+  IDLE_MINUTES,
   LOCK_MINUTES,
   LoginGuard,
   MAX_FAILURES,
@@ -211,12 +212,14 @@ export interface SessionItem {
   current: boolean;
 }
 
-/** 本人の、今使えるセッション（ログイン中の端末）の一覧 */
+/** 本人の、今使えるセッション（ログイン中の端末）の一覧。8時間を過ぎたものと、30分操作がなく切れたものは出さない */
 export async function listSessions(auth: AuthContext, sessionId: string): Promise<{ items: SessionItem[] }> {
   const since = Timestamp.fromMillis(Date.now() - SESSION_HOURS * 60 * 60 * 1000);
+  const activeSince = Date.now() - IDLE_MINUTES * 60 * 1000;
   const snap = await db.collection(`${base(auth.companyId)}/sessions`).where('uid', '==', auth.uid).get();
   const items = snap.docs
     .filter((d) => !d.data().revokedAt && (d.data().createdAt as Timestamp).toMillis() >= since.toMillis())
+    .filter((d) => d.id === sessionId || ((d.data().lastActiveAt as Timestamp | undefined)?.toMillis() ?? 0) >= activeSince)
     .map((d) => ({
       id: d.id,
       method: d.data().method,

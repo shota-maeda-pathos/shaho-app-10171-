@@ -51,7 +51,8 @@ const FIELD_LABELS: Record<string, string> = {
           <h2>初期セットアップ</h2>
           <p>会社情報・事業所・保険料率のサンプルデータを一括登録します。</p>
           <button mat-flat-button color="primary" (click)="runSetup()" [disabled]="seeding()">
-            @if (seeding()) { <mat-spinner diameter="20" /> } @else { <mat-icon>play_arrow</mat-icon> セットアップ実行 }
+            @if (seeding()) { <mat-spinner diameter="20" /> } @else { <mat-icon>play_arrow</mat-icon> }
+            @if (!seeding()) { セットアップ実行 }
           </button>
         </mat-card>
       }
@@ -85,15 +86,9 @@ const FIELD_LABELS: Record<string, string> = {
               <mat-label>メールアドレス</mat-label>
               <input matInput [(ngModel)]="company.email" [readonly]="!editing()">
             </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>健保記号</mat-label>
-              <input matInput [(ngModel)]="company.healthInsurerId" [readonly]="!editing()">
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>年金コード</mat-label>
-              <input matInput [(ngModel)]="company.pensionCode" [readonly]="!editing()">
-            </mat-form-field>
           </div>
+          <!-- 保険者番号・事業所整理記号・事業所番号は事業所ごとに「事業所管理」で登録する（届出はそちらを使う） -->
+          <p class="sub">保険者番号・事業所整理記号・事業所番号は、事業所ごとに「事業所管理」で登録します。</p>
           <mat-form-field appearance="outline" class="domains">
             <mat-label>Google ログインを許可するドメイン</mat-label>
             <input matInput [(ngModel)]="company.allowedGoogleDomains" [readonly]="!editing()" placeholder="example.com, example.co.jp">

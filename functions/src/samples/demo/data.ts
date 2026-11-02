@@ -176,6 +176,7 @@ export function buildDemoEmployees(): DemoEmployee[] {
   const players = new Map(samplePlayers.map(p => [p.n, p]));
   const counts: Record<string, number> = {};
   const people: DemoEmployee[] = [];
+  const usedNames = new Set<string>();
   const others = OFFICE_SIZE['office-hq'] + OFFICE_SIZE['office-osaka'] + OFFICE_SIZE['office-union'] - 11;
   let j = 0;
   for (let n = 1; people.length < others + 11; n++) {
@@ -213,7 +214,11 @@ export function buildDemoEmployees(): DemoEmployee[] {
       officeId = k < hqOthers ? 'office-hq' : k < hqOthers + osakaOthers ? 'office-osaka' : 'office-union';
       gender = k % 5 === 1 || k % 5 === 3 ? 'female' : 'male';
       const firsts = gender === 'male' ? MALE : FEMALE;
-      name = { last: LAST[(k * 7) % LAST.length], first: firsts[Math.floor(k / LAST.length + k * 3) % firsts.length] };
+      // 同姓同名にならないように、使った名前なら次の名にずらす（評価で人を取り違えないため）
+      const last = LAST[(k * 7) % LAST.length];
+      let fi = Math.floor(k / LAST.length + k * 3) % firsts.length;
+      for (let t = 0; t < firsts.length && usedNames.has(`${last[0]} ${firsts[fi][0]}`); t++) fi = (fi + 1) % firsts.length;
+      name = { last, first: firsts[fi] };
       const special = SPECIAL[k];
       birthDate = special?.birthDate ?? `${1960 + (k * 7) % 44}-${pad((k * 5) % 12 + 1)}-${pad((k * 3) % 28 + 1)}`;
       note = special?.note ?? '';
@@ -242,6 +247,7 @@ export function buildDemoEmployees(): DemoEmployee[] {
     // 重みの数だけ並べた中から順に割り振る（営業部・開発部に多めに入る）
     const slots = DEMO_DEPARTMENTS.filter(d => d.officeId === officeId).flatMap(d => Array.from({ length: d.weight }, () => d.id));
     const departmentId = ACCOUNT_DEPARTMENT[n] ?? slots[(k * 7 + 3) % slots.length];
+    usedNames.add(`${name.last[0]} ${name.first[0]}`);
     people.push({
       id: `demo-${pad(n, 4)}`, n, employeeNumber: pad(n, 4), email: `test${n}@example.com`, officeId, departmentId,
       lastName, firstName: name.first[0], lastNameKana, firstNameKana: name.first[1], gender, birthDate,

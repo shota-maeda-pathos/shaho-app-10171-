@@ -32,6 +32,15 @@ export function baseSalaryIn(e: DemoEmployee, yearMonth: string): number {
   return yearMonth < '2026-04' ? Math.round(e.baseSalary * 0.97 / 1000) * 1000 : e.baseSalary;
 }
 
+/** 雇用条件の履歴。2026年4月より前に入社した人は、入社時の基本給（昇給前）と2026年4月1日の昇給の2件 */
+export function demoEmployments(e: DemoEmployee): { id: string; effectiveDate: string; baseSalary: number }[] {
+  if (e.hireDate >= '2026-04-01') return [{ id: 'demo-initial', effectiveDate: e.hireDate, baseSalary: e.baseSalary }];
+  return [
+    { id: 'demo-initial', effectiveDate: e.hireDate, baseSalary: baseSalaryIn(e, '2026-03') },
+    { id: 'demo-raise-2026-04', effectiveDate: '2026-04-01', baseSalary: e.baseSalary },
+  ];
+}
+
 /** 1か月分の給与。月給の人は暦日数、パート・短時間は出勤日数を支払基礎日数にする */
 export function salaryIn(e: DemoEmployee, yearMonth: string) {
   const [y, m] = yearMonth.split('-').map(Number);

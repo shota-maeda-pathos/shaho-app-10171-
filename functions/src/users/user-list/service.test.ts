@@ -42,6 +42,9 @@ jest.mock('../../config', () => {
         }
         return buildQuery(mockUserQueryDocs);
       }),
+      // ログインのロックの状態（loginGuards）。テストではだれもロックされていない
+      doc: jest.fn((path: string) => ({ path })),
+      getAll: jest.fn(async (...refs: any[]) => refs.map(() => ({ exists: false, data: () => undefined }))),
     },
   };
 });
@@ -50,6 +53,7 @@ import { listUsers } from './service';
 
 beforeEach(() => {
   mockUserQueryDocs.mockResolvedValue({
+    empty: false,
     docs: [
       { id: 'user-001', data: () => user1 },
       { id: 'user-002', data: () => user2 },

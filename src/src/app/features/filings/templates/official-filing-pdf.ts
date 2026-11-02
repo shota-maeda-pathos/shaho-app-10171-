@@ -210,7 +210,7 @@ function header(w: Writer, key: string, fd: Data, meta: FilingPrintMeta) {
   } else w.warnings.add('事業所整理記号が未登録です。');
   if (h.number) w.digits(fd['事業所番号'] || meta.officeCode,h.number,5,'事業所番号',true);
   w.text(fd['事業所所在地'] ?? meta.officeAddress,h.address,'事業所所在地',{ required:true });
-  w.text(fd['事業所名称'] ?? meta.officeName,h.name,'事業所名称',{ required:true });
+  w.text(officeTitle(fd, meta),h.name,'事業所名称',{ required:true });
   w.text(fd['事業主氏名'] ?? meta.representativeName,h.representative,'事業主氏名',{ required:true });
   const phone = String(fd['電話番号'] ?? meta.officePhone ?? '').split('-');
   if (phone.length === 3) {
@@ -221,6 +221,14 @@ function header(w: Writer, key: string, fd: Data, meta: FilingPrintMeta) {
   const consultant = fd['社会保険労務士'] ?? meta.laborConsultant;
   const box = CONSULTANT[key === 'childcare-end' ? 'childcare' : key];
   if (consultant && box) w.text(consultant, box, '社会保険労務士', { size: 9 });
+}
+
+/** 事業所名称は「会社名＋事業所名」（例：株式会社〇〇 本社）。事業所名に会社名が入っていればそのまま */
+export function officeTitle(fd: Data, meta: FilingPrintMeta): string {
+  const office = String(fd['事業所名称'] ?? meta.officeName ?? '').trim();
+  const company = String(fd['会社名'] || meta.companyName || '').trim();
+  if (!company || office.includes(company)) return office;
+  return office ? `${company}　${office}` : company;
 }
 
 function insuredNumber(w: Writer, value: unknown, box: Box) {
@@ -413,6 +421,8 @@ export interface BonusPrintPerson {
   賞与額_通貨: number; 賞与額_現物: number; 賞与額_合計: number;
   /** 1=70歳以上被用者 3=同一月内の賞与合算 */
   備考区分?: number[]; 初回支払日?: number | null;
+  /** ⑦ 70歳以上被用者だけ。個人番号は載せないので基礎年金番号を書く */
+  基礎年金番号?: string;
 }
 
 /** 1枚に記入する人数と、1人分の欄の高さ（原票を160%で測った値） */
@@ -437,7 +447,11 @@ function bonusRow(w: Writer, p: BonusPrintPerson, offset: number, commonDate: un
     if (mark) w.circle(mark[0], mark[1] + offset, 12, 11);
   }
   if (p.初回支払日) w.text(p.初回支払日,[864,531+offset,23,14],'初回支払日',{size:7,center:true});
-  if (p.備考区分?.includes(1)) w.warnings.add('70歳以上被用者の人は、個人番号（または基礎年金番号）の欄を原票に記入してください。');
+  if (p.備考区分?.includes(1)) {
+    // ⑦ 個人番号の12桁の枠に、基礎年金番号（10桁）を左から詰めて書く
+    if (p.基礎年金番号) w.digits(p.基礎年金番号,[685,477+offset,216*10/12,27],10,'基礎年金番号');
+    else w.warnings.add('70歳以上被用者の人は、個人番号（または基礎年金番号）の欄を原票に記入してください。');
+  }
 }
 
 function bonus(w: Writer, fd: Data) {

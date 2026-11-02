@@ -93,7 +93,7 @@ type Who = 'all' | 'mine' | 'waiting';
                     <td>{{ t.next }}@if (t.detail) {<div class="sub">{{ t.detail }}</div>}</td>
                     <td>{{ t.tone === 'waiting' ? waitingWho(t) : 'あなた' }}</td>
                     <td><span class="due" [class.over]="overdue(t)" [class.soon]="soon(t)">{{ t.deadline ? shortDate(t.deadline) : '—' }}</span></td>
-                    <td><app-status-badge [tone]="toneOf(t)" [label]="toneOf(t) === 'attention' ? '要確認' : t.tone === 'waiting' ? '待ち' : 'あなたの番'" /></td>
+                    <td><app-status-badge [tone]="toneOf(t)" [label]="toneOf(t) === 'attention' ? '要確認' : t.tone === 'waiting' ? (isNoticeOnly(t) ? 'お知らせ' : '待ち') : 'あなたの番'" /></td>
                   </tr>
                 }
               </tbody>
@@ -210,8 +210,11 @@ export class ProcedureListComponent {
   kindLabel(kind: string) { return KIND_LABELS[kind] ?? kind; }
   typeLabel(type: string) { return TYPE_LABELS[type] ?? type; }
   toneOf(t: Todo): StatusTone { return t.tone === 'action' ? 'attention' : t.tone; }
+  /** 40歳・65歳到達のように、届出がなく確かめるだけの件（だれも待っていない） */
+  isNoticeOnly(t: Todo) { return /確かめるだけ/.test(t.next); }
   /** 待っている相手（「承認者の確認を待っています」などの文言から短く） */
   waitingWho(t: Todo) {
+    if (/確かめるだけ/.test(t.next)) return '—';
     return /本人/.test(t.next) ? '本人' : /承認/.test(t.next) ? '承認者' : /処理しています/.test(t.next) ? 'システム' : 'ほかの人';
   }
 
@@ -263,7 +266,7 @@ export class ProcedureListComponent {
     }
   }
 
-  open(t: Todo) { void this.router.navigate([t.route], { queryParams: t.queryParams }); }
+  open(t: Todo) { void this.router.navigate([t.route], { queryParams: this.office.openParams(t.route, t.queryParams) }); }
   /** 完了した手続きは手続きの詳細を開く（ウィザード方式はそこから、それぞれの画面へ移る） */
   openDoneRow(r: DoneRow) { void this.router.navigate(['/procedures', r.id]); }
 

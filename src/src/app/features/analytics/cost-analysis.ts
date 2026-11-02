@@ -76,7 +76,8 @@ const FACTOR_LABELS: Record<string, string> = { joined: '入社', left: '退職'
             <tr><td>実績（確定 {{ a.annual.confirmedMonths }}か月＋賞与）</td><td class="num">{{ a.annual.actual | number }}円</td></tr>
             <tr><td>見込み（直近の月が年度末まで続くと仮定）</td><td class="num"><b>{{ a.annual.forecast | number }}円</b></td></tr>
             <tr><td>前年度の実績（確定 {{ a.previousAnnual.confirmedMonths }}か月＋賞与）</td><td class="num">{{ a.previousAnnual.actual | number }}円</td></tr>
-            @if (a.previousAnnual.actual > 0) { <tr><td>前年度との差（見込み−前年度実績）</td><td class="num">{{ sign(a.annual.forecast - a.previousAnnual.actual) }}{{ a.annual.forecast - a.previousAnnual.actual | number }}円</td></tr> }
+            @if (a.previousAnnual.actual > 0 && a.previousAnnual.confirmedMonths >= 12) { <tr><td>前年度との差（見込み−前年度実績）</td><td class="num">{{ sign(a.annual.forecast - a.previousAnnual.actual) }}{{ a.annual.forecast - a.previousAnnual.actual | number }}円</td></tr> }
+            @else if (a.previousAnnual.actual > 0) { <tr><td>前年度との差</td><td class="num sub">前年度の確定が{{ a.previousAnnual.confirmedMonths }}か月分のため比べません</td></tr> }
           </tbody></table>
         </section>
         <section class="card">

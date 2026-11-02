@@ -4,6 +4,7 @@ import { AuthContext } from '../../middleware/auth';
 import { invalidArg } from '../../utils/errors';
 import { addDays } from '../summary/rules';
 import { CalendarEvent, DEFAULT_REMINDER_DAYS, annualEvents, bonusEvents, monthlyChecklist } from './rules';
+import { listHomeTodos } from '../../home/service';
 
 const FILING_LABELS: Record<string, string> = {
   acquisitionNotification: '資格取得届', lossNotification: '資格喪失届', remunerationMonthlyAlgorithm: '算定基礎届',
@@ -15,7 +16,7 @@ async function officesInScope(auth: AuthContext) {
   return snap.docs.filter(o => auth.roles.includes('admin') || auth.officeIds.includes(o.id));
 }
 
-/** その年のカレンダー：毎年の予定・賞与の予定月・まだ出していない届出の期限 */
+/** その年のカレンダー：毎年の予定・賞与の予定月・まだ出していない届出の期限・進行中の手続きの期限（ホームの「今後の期限」と同じ） */
 export async function getCalendar(auth: AuthContext, year: number): Promise<{ events: CalendarEvent[] }> {
   const offices = await officesInScope(auth);
   const ids = new Set(offices.map(o => o.id));
@@ -23,7 +24,11 @@ export async function getCalendar(auth: AuthContext, year: number): Promise<{ ev
   const deadlines: CalendarEvent[] = filings.docs.map(d => d.data())
     .filter(f => ids.has(f.officeId) && typeof f.deadline === 'string' && f.deadline.startsWith(String(year)))
     .map(f => ({ start: f.deadline, end: null, title: `${FILING_LABELS[f.filingType] ?? f.filingType}の期限（${f.employeeName || `${f.personCount}名`}）`, kind: 'deadline' as const, officeName: f.officeName }));
-  const events = [...annualEvents(year), ...bonusEvents(year, offices.map(o => ({ name: o.data().name, bonusMonths: o.data().bonusMonths }))), ...deadlines];
+  const todos = await listHomeTodos(auth);
+  const procedures: CalendarEvent[] = todos.items
+    .filter(t => typeof t.deadline === 'string' && t.deadline.startsWith(String(year)))
+    .map(t => ({ start: t.deadline!, end: null, title: `${t.title}：${t.next}`, kind: 'deadline' as const, officeName: t.officeName }));
+  const events = [...annualEvents(year), ...bonusEvents(year, offices.map(o => ({ name: o.data().name, bonusMonths: o.data().bonusMonths }))), ...deadlines, ...procedures];
   return { events: events.sort((a, b) => a.start.localeCompare(b.start)) };
 }
 

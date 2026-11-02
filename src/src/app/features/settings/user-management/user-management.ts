@@ -23,6 +23,7 @@ interface UserRow {
   roles: string[];
   officeIds: string[];
   isSuspended: boolean;
+  isLocked?: boolean;
 }
 
 interface InvitationRow {
@@ -34,7 +35,7 @@ interface InvitationRow {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  admin: '管理者', approver: '承認者', operator: '操作担当',
+  admin: '管理者', approver: '承認者', operator: '担当者',
   viewer: '閲覧者', employee: '従業員',
 };
 
@@ -69,7 +70,7 @@ const ROLE_LABELS: Record<string, string> = {
               <mat-select [(ngModel)]="inviteRoles" multiple>
                 <mat-option value="admin">管理者</mat-option>
                 <mat-option value="approver">承認者</mat-option>
-                <mat-option value="operator">操作担当</mat-option>
+                <mat-option value="operator">担当者</mat-option>
                 <mat-option value="viewer">閲覧者</mat-option>
                 <mat-option value="employee">従業員</mat-option>
               </mat-select>
@@ -155,7 +156,7 @@ const ROLE_LABELS: Record<string, string> = {
                     権限を変更
                   </button>
                 }
-                <button mat-button (click)="unlock(row)" [attr.aria-label]="row.displayName + 'のログインのロックを解除'">ロック解除</button>
+                @if (row.isLocked) { <button mat-button (click)="unlock(row)" [attr.aria-label]="row.displayName + 'のログインのロックを解除'">ロック解除</button> }
               </td>
             </ng-container>
 
@@ -298,6 +299,7 @@ export class UserManagementComponent implements OnInit {
     try {
       const { data } = await httpsCallable<object, { wasLocked: boolean }>(this.functions, 'authUnlock')({ companyId: this.auth.companyId, email: user.email });
       this.snackBar.open(data.wasLocked ? `${user.displayName}さんのロックを解除しました` : `${user.displayName}さんはロックされていません`, '閉じる', { duration: 4000 });
+      this.users.update(list => list.map(u => u.id === user.id ? { ...u, isLocked: false } : u));
     } catch (e: any) {
       this.snackBar.open(`解除できませんでした：${e?.message ?? ''}`, '閉じる', { duration: 6000 });
     }

@@ -37,8 +37,8 @@ const GROUPS: { label: string; cards: [key: string, short: string][] }[] = [
           <div class="group">
             <h3>{{ g.label }}</h3>
             @for (c of g.cards; track c.key) {
-              <button type="button" class="row" [class.urgent]="c.urgent && c.count > 0" [class.zero]="c.count === 0" [title]="c.label" (click)="open(c)">
-                <span class="l">{{ c.short }}</span><span class="n">{{ c.count }}</span>
+              <button type="button" class="row" [class.urgent]="c.urgent && c.count > 0" [class.zero]="!computedAt() || c.count === 0" [title]="c.label" (click)="open(c)">
+                <span class="l">{{ c.short }}</span><span class="n">{{ computedAt() ? c.count : '—' }}</span>
               </button>
             }
           </div>
@@ -84,6 +84,7 @@ export class SummaryCardsComponent {
   computedAt = signal<string | null>(null);
   loading = signal(false);
   canRefresh = this.auth.hasAnyRole('admin', 'operator');
+  private autoRefreshed = false;
 
   constructor() {
     effect(() => {
@@ -102,6 +103,8 @@ export class SummaryCardsComponent {
       });
       this.cards.set(data.cards);
       this.computedAt.set(data.computedAt);
+      // まだ一度も数えていなければ、数えられる人が開いたときに自動で数える（0件と見分けがつかないため）
+      if (!data.computedAt && name === 'dashboardSummary' && this.canRefresh && !this.autoRefreshed) { this.autoRefreshed = true; queueMicrotask(() => this.refresh()); }
     } catch { /* カードが読めなくても、やることリストは使える */ } finally {
       this.loading.set(false);
     }

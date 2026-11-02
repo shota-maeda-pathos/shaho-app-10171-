@@ -29,7 +29,7 @@ interface VerifyResult { checked: number; ok: boolean; problems: string[]; unsea
 const ENTITY_LABELS: Record<string, string> = {
   auth: 'ログイン', employee: '従業員', employeeMyNumber: '個人番号', company: '会社情報', filing: '届出',
   filingArchive: '保存原本', approvalRequest: '承認', invitation: '招待', user: '利用者', auditLog: '監査ログ',
-  salary: '給与', bonus: '賞与', grade: '等級', dependent: '扶養',
+  salary: '給与', bonus: '賞与', grade: '等級', dependent: '扶養', report: '帳票', procedure: '手続き', office: '事業所',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -97,8 +97,8 @@ const KINDS: { value: string; label: string }[] = [
             <tr>
               <td class="nowrap">{{ row.performedAt | date: 'yyyy/MM/dd HH:mm:ss' }}</td>
               <td>{{ row.performedByName || (row.performedBy === 'anonymous' ? '（ログイン前）' : row.performedBy) }}</td>
-              <td class="nowrap">{{ entityLabel(row.entity) }}・{{ actionLabel(row.action) }}</td>
-              <td class="small">{{ row.entityId }}</td>
+              <td class="nowrap">{{ operationLabel(row) }}</td>
+              <td class="small">{{ targetLabel(row) }}</td>
               <td class="small">{{ summary(row.changes) }}</td>
               <td class="small">{{ row.ip }}</td>
             </tr>
@@ -157,6 +157,17 @@ export class AuditLogComponent implements OnInit {
 
   entityLabel(e: string) { return ENTITY_LABELS[e] ?? e; }
   actionLabel(a: string) { return ACTION_LABELS[a] ?? a; }
+  /** 「ログイン・ログイン」のように重なるときは操作の名前だけ */
+  operationLabel(row: AuditLogRow) {
+    const entity = this.entityLabel(row.entity), action = this.actionLabel(row.action);
+    return action.startsWith(entity) ? action : `${entity}・${action}`;
+  }
+  /** 対象が利用者のIDなら名前を出す（ログイン前の失敗は「—」） */
+  targetLabel(row: AuditLogRow) {
+    if (row.entityId === 'anonymous') return '—';
+    const user = this.users().find(u => u.id === row.entityId);
+    return user ? user.displayName : row.entityId;
+  }
 
   /** 内容の短い要約（変更は「項目：前→後」、ほかは値を並べる） */
   summary(changes: Record<string, unknown>): string {

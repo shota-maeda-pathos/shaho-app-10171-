@@ -259,6 +259,7 @@ export class BonusComponent implements OnInit {
   ngOnInit() {
     const month = this.route.snapshot.queryParamMap.get('month');
     if (month && /^\d{4}-(0[1-9]|1[0-2])$/.test(month)) this.payMonth = month;
+    else this.pickScheduledMonth = true;
     this.destroyRef.onDestroy(() => this.stopPolling());
   }
 
@@ -288,6 +289,8 @@ export class BonusComponent implements OnInit {
 
   private loadSeq = 0;
 
+  private pickScheduledMonth = false;
+
   async load() {
     if (!this.office.selected()) return;
     const seq = ++this.loadSeq;
@@ -297,6 +300,12 @@ export class BonusComponent implements OnInit {
       const { data } = await this.call<Overview>('bonusRunOverview', {}, 120_000);
       // 続けて読み込み直したときは、最後に頼んだ結果だけを使う
       if (seq !== this.loadSeq) return;
+      // 月を指定せずに開いて今月が支給予定月でなければ、直近の支給予定月（今月より前）を開く
+      if (this.pickScheduledMonth) {
+        this.pickScheduledMonth = false;
+        const recent = recentScheduledMonth(this.payMonth, data.office.bonusMonths);
+        if (recent && recent !== this.payMonth) { this.loading.set(false); await this.changeMonth(recent); return; }
+      }
       this.data.set(data);
       this.job.set(data.job);
       if (data.job?.status === 'running') this.startPolling(data.job.id);
@@ -653,4 +662,16 @@ function csvCell(v: string) {
 
 export function message(e: unknown, fallback: string) {
   return e instanceof Error && e.message && e.message !== 'INTERNAL' ? e.message : fallback;
+}
+
+/** 支給予定月のうち、今月（含む）から遡っていちばん近い月（YYYY-MM）。予定月がなければ null */
+function recentScheduledMonth(current: string, months: number[]): string | null {
+  if (!months?.length) return null;
+  let [y, m] = current.split('-').map(Number);
+  for (let i = 0; i < 12; i++) {
+    if (months.includes(m)) return `${y}-${String(m).padStart(2, '0')}`;
+    m -= 1;
+    if (m === 0) { m = 12; y -= 1; }
+  }
+  return null;
 }

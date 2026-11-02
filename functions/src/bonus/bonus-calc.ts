@@ -189,10 +189,13 @@ export interface BonusFilingPerson {
   備考区分: number[];
   /** 同一月内の賞与合算のときの初回の支払日（日） */
   初回支払日: number | null;
+  /** ⑦ 70歳以上被用者だけ（個人番号は載せず基礎年金番号を書く） */
+  基礎年金番号?: string;
 }
 
 export function bonusFilingPerson(input: {
   employeeId: string; insuredPersonNumber: string; name: string; birthDate: string; age70: boolean; payments: BonusPayment[];
+  basicPensionNumber?: string;
 }): BonusFilingPerson {
   const s = summarizePayments(input.payments);
   const notes: number[] = [];
@@ -202,6 +205,7 @@ export function bonusFilingPerson(input: {
     employeeId: input.employeeId, 被保険者整理番号: input.insuredPersonNumber, 被保険者氏名: input.name, 生年月日: input.birthDate,
     賞与支払年月日: s.firstPaymentDate ?? '', 賞与額_通貨: s.cash, 賞与額_現物: s.inKind, 賞与額_合計: s.total, 標準賞与額: s.standard,
     備考区分: notes, 初回支払日: s.combined && s.firstPaymentDate ? Number(s.firstPaymentDate.slice(8, 10)) : null,
+    ...(input.age70 && input.basicPensionNumber ? { 基礎年金番号: input.basicPensionNumber } : {}),
   };
 }
 

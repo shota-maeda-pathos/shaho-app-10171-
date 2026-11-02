@@ -9,3 +9,10 @@ export const sampleDemoCreate = onCall({ timeoutSeconds: 540, memory: '1GiB', ma
   const input = validate(z.object({ companyId: z.string().min(1), sampleSet: z.literal('demo-v1') }).strict(), request.data);
   return seedDemoData(await getAuthContext(request, input.companyId));
 });
+
+/** 評価用のテストデータの直し（2026-11-02 の一周で見つけたもの）。既定は dry で、apply: true のときだけ書く（管理者だけ） */
+export const sampleDemoRepair = onCall({ timeoutSeconds: 540, memory: '1GiB', maxInstances: 1, concurrency: 1 }, async request => {
+  const input = validate(z.object({ companyId: z.string().min(1), apply: z.boolean().optional() }).strict(), request.data);
+  const { repairDemoData } = await import('./repair');
+  return repairDemoData(await getAuthContext(request, input.companyId), input.apply !== true);
+});

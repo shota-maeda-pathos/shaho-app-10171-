@@ -1,6 +1,7 @@
 import { db } from '../../config';
 import { AuthContext, requireOffice } from '../../middleware/auth';
 import { mapConcurrent } from '../../utils/parallel';
+import { getAllChunked } from '../../monthly/service';
 import { DashboardAnalyticsInput } from './schema';
 
 interface MonthlyTrend {
@@ -70,56 +71,53 @@ export async function getDashboardAnalytics(
     (!input.officeId || doc.data().officeId === input.officeId) && (auth.roles.includes('admin') || auth.officeIds.includes(doc.data().officeId)),
   );
 
-  const trends: MonthlyTrend[] = await mapConcurrent(monthKeys, 4, async (ym) => {
+  // 月ごとに全員分の保険料をまとめて読む（1人ずつ読むと300人×6か月で20秒ほどかかっていた）
+  const trends: MonthlyTrend[] = await mapConcurrent(monthKeys, 3, async (ym) => {
     let totalEmployee = 0;
     let totalEmployer = 0;
     let healthTotal = 0;
     let pensionTotal = 0;
     let count = 0;
 
-    await mapConcurrent(employees, 8, async (empDoc) => {
-      const insSnap = await db.doc(`${base}/employees/${empDoc.id}/monthlyInsurance/${ym}`).get();
-      if (!insSnap.exists) return;
+    const snaps = await getAllChunked(employees.map(empDoc => db.doc(`${base}/employees/${empDoc.id}/monthlyInsurance/${ym}`)));
+    for (const insSnap of snaps) {
+      if (!insSnap.exists) continue;
       const ins = insSnap.data()!;
-      if (ins.isConfirmed !== true) return;
+      if (ins.isConfirmed !== true) continue;
       totalEmployee += ins.totalEmployeeAmount ?? 0;
       totalEmployer += ins.totalEmployerAmount ?? 0;
       healthTotal += (ins.healthInsurance?.employeeAmount ?? 0) + (ins.healthInsurance?.employerAmount ?? 0);
       pensionTotal += (ins.pensionInsurance?.employeeAmount ?? 0) + (ins.pensionInsurance?.employerAmount ?? 0);
       count++;
-    });
+    }
 
     return { yearMonth: ym, totalEmployee, totalEmployer, healthTotal, pensionTotal, employeeCount: count };
   });
 
-  // Filing stats
+  // Filing stats（1人1回だけ読んで数える。届出のない人がほとんどなので、状態ごとに数を問い合わせるより速い）
   const filingStats: FilingStats = { total: 0, draft: 0, pending: 0, approved: 0, submitted: 0, accepted: 0 };
   const recentFilings: DashboardAnalyticsResponse['recentFilings'] = [];
 
-  await mapConcurrent(employees, 8, async (empDoc) => {
-    const collection=db.collection(`${base}/employees/${empDoc.id}/filings`);
-    const counts=await Promise.all([collection.count().get(),
-      collection.where('workflowStatus','==','draft').count().get(),collection.where('workflowStatus','==','pending').count().get(),collection.where('workflowStatus','==','approved').count().get(),
-      collection.where('submissionStatus','==','submitted').count().get(),collection.where('submissionStatus','==','accepted').count().get()]);
-    const keys=['total','draft','pending','approved','submitted','accepted'] as const;
-    keys.forEach((key,index)=>filingStats[key]+=counts[index].data().count);
-    const filingsSnap = await collection
-      .orderBy('createdAt', 'desc').limit(10).get();
-
+  await mapConcurrent(employees, 32, async (empDoc) => {
+    const filingsSnap = await db.collection(`${base}/employees/${empDoc.id}/filings`)
+      .select('filingType', 'workflowStatus', 'submissionStatus', 'effectiveDate', 'createdAt').get();
+    const emp = empDoc.data();
     for (const fDoc of filingsSnap.docs) {
       const f = fDoc.data();
-
-      {
-        const emp = empDoc.data();
-        recentFilings.push({
-          id: fDoc.id,
-          employeeId: empDoc.id,
-          employeeName: `${emp.lastName} ${emp.firstName}`,
-          filingType: f.filingType,
-          status: f.submissionStatus !== 'notSubmitted' ? f.submissionStatus : f.workflowStatus,
-          effectiveDate: f.effectiveDate,
-        });
-      }
+      filingStats.total++;
+      if (f.workflowStatus === 'draft') filingStats.draft++;
+      if (f.workflowStatus === 'pending') filingStats.pending++;
+      if (f.workflowStatus === 'approved') filingStats.approved++;
+      if (f.submissionStatus === 'submitted') filingStats.submitted++;
+      if (f.submissionStatus === 'accepted') filingStats.accepted++;
+      recentFilings.push({
+        id: fDoc.id,
+        employeeId: empDoc.id,
+        employeeName: `${emp.lastName} ${emp.firstName}`,
+        filingType: f.filingType,
+        status: f.submissionStatus !== 'notSubmitted' ? f.submissionStatus : f.workflowStatus,
+        effectiveDate: f.effectiveDate,
+      });
     }
   });
 

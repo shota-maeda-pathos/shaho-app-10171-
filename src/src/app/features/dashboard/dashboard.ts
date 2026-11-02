@@ -218,7 +218,8 @@ export class DashboardComponent {
   private sequence = 0;
 
   mine = computed(() => (this.todos() ?? []).filter(t => t.tone !== 'waiting'));
-  waiting = computed(() => (this.todos() ?? []).filter(t => t.tone === 'waiting'));
+  /** ほかの人の作業待ち（40歳・65歳到達のように確かめるだけの件は、だれも待っていないので数えない） */
+  waiting = computed(() => (this.todos() ?? []).filter(t => t.tone === 'waiting' && !/確かめるだけ/.test(t.next)));
   dueSoon = computed(() => this.mine().filter(t => t.deadline && this.days(t.deadline) <= 7).length);
   /** 期限で分ける：期限切れ・今日／今週（7日以内）／それ以降／期限なし。中は期限の近い順 */
   groups = computed<Group[]>(() => {
@@ -301,7 +302,7 @@ export class DashboardComponent {
     }
   }
 
-  open(todo: HomeTodo) { void this.router.navigate([todo.route], { queryParams: todo.queryParams }); }
+  open(todo: HomeTodo) { void this.router.navigate([todo.route], { queryParams: this.office.openParams(todo.route, todo.queryParams) }); }
 
   private days(deadline: string) {
     return Math.round((Date.parse(deadline) - Date.parse(this.today())) / 86_400_000);

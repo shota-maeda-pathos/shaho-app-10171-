@@ -63,7 +63,8 @@ export async function listOffices(
     const o = d.data() as OfficeDoc;
     return toOfficeResponse(d.id, o, input.withSetup ? await officeSetupIssues(auth.companyId, o) : (o.abolishedOn ? ['廃止済み'] : fieldIssues(o)));
   })))
-    .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    // 適用年月日の古い順（本社が先に来る）。適用年月日がなければ後ろ、同じなら名前の順
+    .sort((a, b) => (a.appliedDate ?? '9999').localeCompare(b.appliedDate ?? '9999') || a.name.localeCompare(b.name, 'ja'));
 
   return { items };
 }

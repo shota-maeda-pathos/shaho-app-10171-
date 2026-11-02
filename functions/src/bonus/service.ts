@@ -680,6 +680,7 @@ export async function createBonusFiling(input: BonusRunInput, auth: AuthContext)
     return bonusFilingPerson({
       employeeId: r.employeeId, insuredPersonNumber: e.insuredPersonNumber ?? '', name: nameOf(e),
       birthDate: toDateString(e.birthDate) ?? '', age70: r.age70, payments: r.bonus!.payments,
+      basicPensionNumber: e.basicPensionNumber ?? '',
     });
   });
   const firstDates = details.map(p => p.賞与支払年月日).sort();

@@ -197,10 +197,12 @@ export class TargetDetailDirective {
         </button>
       }
       @if (primaryAction(); as a) {
+        @if (targetsOf(a).length > 0 || attention().length > 0) {
         <button mat-flat-button type="button" (click)="runAction(a)" [disabled]="busy() || targetsOf(a).length === 0">
           @if (busy()) { <mat-spinner diameter="18"></mat-spinner> }
           {{ a.label }}（{{ targetsOf(a).length }}名）<mat-icon iconPositionEnd>arrow_forward</mat-icon>
         </button>
+        }
       }
     </app-action-bar>
     }
@@ -255,7 +257,10 @@ export class TargetListComponent {
 
   cell = contentChild(TargetCellDirective);
   detail = contentChild(TargetDetailDirective);
-  filter = linkedSignal<Filter>(() => this.defaultFilter());
+  /** 要対応が0人なら（終わった月など）最初から「すべて」を見せる。空の表だけが出ないように */
+  private initialFilter = computed<Filter>(() =>
+    this.defaultFilter() === 'attention' && this.rows().length > 0 && this.attention().length === 0 ? 'all' : this.defaultFilter());
+  filter = linkedSignal<Filter>(() => this.initialFilter());
   query = signal('');
   selected = signal<ReadonlySet<string>>(new Set());
   panelId = signal<string | null>(null);

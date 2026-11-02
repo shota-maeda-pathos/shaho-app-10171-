@@ -26,7 +26,10 @@ interface Exemption {
   standalone: true,
   imports: [MatDatepickerModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   template: `
-    <h2>保険料免除管理</h2>
+    <h2>保険料の免除</h2>
+    <p class="lead">産休・育休の免除は、産休・育休の手続き（申出書の承認）で自動で登録され、下の履歴に出ます。ふだんはここで入力する必要はありません。</p>
+    <details class="manual">
+    <summary>手続きを使わずに免除を記録する（過去の分の取り込みなど）</summary>
     <form #form="ngForm" (ngSubmit)="register()">
       <div class="fields">
         <mat-form-field appearance="outline">
@@ -64,6 +67,7 @@ interface Exemption {
         {{ saving() ? '登録中...' : '免除期間を登録' }}
       </button>
     </form>
+    </details>
     <h3>免除の登録履歴</h3>
     @if (error()) {
       <p role="alert">{{ error() }}</p>
@@ -114,6 +118,8 @@ interface Exemption {
     }
   `,
   styles: [`
+    .lead { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
+    .manual { margin: 8px 0 16px; } .manual summary { cursor: pointer; color: var(--app-color-link); font-size: var(--app-font-sm); margin-bottom: 8px; }
     :host { display: block; }
     .fields { display: flex; flex-wrap: wrap; gap: 16px; }
     .record { display: flex; flex-wrap: wrap; gap: 20px; padding: 16px 0; border-bottom: 1px solid #ddd; }

@@ -124,11 +124,16 @@ export class MonthlyComponent implements OnInit {
     return { key: step.key, total: rows.length, todo, attention, waiting, done: rows.length > 0 && todo === 0 && waiting === 0, empty: rows.length === 0 };
   }));
   /** 横並びのステップ。数字は1つだけ（要確認 → 残り → 承認待ち → 完了 → —） */
-  stepItems = computed<StepperItem[]>(() => this.summaries().map((s, i) => ({
-    key: s.key, label: STEPS[i].label,
-    state: s.attention ? 'attention' : s.done ? 'done' : !s.todo && s.waiting ? 'waiting' : 'todo',
-    note: s.attention ? `要確認 ${s.attention}名` : s.todo ? `残り ${s.todo}名` : s.waiting ? `承認待ち ${s.waiting}名` : s.done ? '完了' : '—',
-  })));
+  stepItems = computed<StepperItem[]>(() => this.summaries().map((s, i, all) => {
+    // 手前のステップが終わっていないうちは、後ろのステップの「承認待ち」は前の承認を待っているだけなので出さない
+    const before = all.slice(0, i).some(p => !p.done && !p.empty);
+    const waiting = before ? 0 : s.waiting;
+    return {
+      key: s.key, label: STEPS[i].label,
+      state: s.attention ? 'attention' : s.done ? 'done' : !s.todo && waiting ? 'waiting' : 'todo',
+      note: s.attention ? `要確認 ${s.attention}名` : s.todo ? `残り ${s.todo}名` : waiting ? `承認待ち ${waiting}名` : s.done ? '完了' : '—',
+    };
+  }));
   /**
    * 開くステップ。承認者に承認を頼まれていればその確認のステップ、なければ自分がやることのある最初のステップ、
    * それもなければ（他の人の承認待ちだけなら）最初の未完了ステップ。全部終わっていれば最後

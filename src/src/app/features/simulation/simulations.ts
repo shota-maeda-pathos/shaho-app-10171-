@@ -10,6 +10,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { lookupEmployeeId } from '../../core/services/employee-lookup';
 type Kind = 'raise' | 'hire' | 'annual' | 'rateChange' | 'bonus';
 const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHire', annual: 'simulationAnnual', rateChange: 'simulationRateChange', bonus: 'simulationBonus' };
 
@@ -31,7 +32,7 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
           <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>方法</mat-label><mat-select [(ngModel)]="method" name="method"><mat-option value="amount">一律の金額</mat-option><mat-option value="rate">一律の率</mat-option><mat-option value="individual">1人ずつ</mat-option></mat-select></mat-form-field>
           @if (method === 'amount') { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>昇給額（円）</mat-label><input matInput type="number" [(ngModel)]="amount" name="amount"></mat-form-field> }
           @if (method === 'rate') { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>昇給率（%）</mat-label><input matInput type="number" step="0.1" [(ngModel)]="rate" name="rate"></mat-form-field> }
-          @if (method === 'individual') { <mat-form-field appearance="outline" subscriptSizing="dynamic" class="wide"><mat-label>社員ごとの新しい報酬（1行に「従業員ID,金額」）</mat-label><textarea matInput rows="4" [(ngModel)]="individualText" name="ind"></textarea></mat-form-field> }
+          @if (method === 'individual') { <mat-form-field appearance="outline" subscriptSizing="dynamic" class="wide"><mat-label>社員ごとの新しい報酬（1行に「社員番号,金額」）</mat-label><textarea matInput rows="4" [(ngModel)]="individualText" name="ind"></textarea></mat-form-field> }
         }
         @case ('hire') {
           @if (!officeId()) { <p class="warn">上で事業所を1つ選んでください。</p> }
@@ -49,8 +50,8 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
         }
         @case ('bonus') {
           @if (!officeId()) { <p class="warn">上で事業所を1つ選んでください。</p> }
-          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>従業員ID（任意）</mat-label><input matInput [(ngModel)]="employeeId" name="eid"><mat-hint>入れると今年度の累計で上限を判定</mat-hint></mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>生年月日</mat-label><input matInput [(ngModel)]="birthDate" name="bd2" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 startView="multi-year" /><mat-hint>従業員IDがないとき</mat-hint></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>社員番号または氏名（任意）</mat-label><input matInput [(ngModel)]="employeeId" name="eid"><mat-hint>入れると今年度の累計で上限を判定</mat-hint></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>生年月日</mat-label><input matInput [(ngModel)]="birthDate" name="bd2" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 startView="multi-year" /><mat-hint>社員番号がないとき</mat-hint></mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>賞与額（円）</mat-label><input matInput type="number" min="0" [(ngModel)]="bonusAmount" name="ba"></mat-form-field>
         }
       }
@@ -142,13 +143,15 @@ export class SimulationsComponent {
   officeId() { return this.office.selected() || null; }
   sign(n: number) { return n > 0 ? '+' : ''; }
 
-  private input(): Record<string, unknown> {
+  private async input(): Promise<Record<string, unknown>> {
+    const lookup = (text: string) => lookupEmployeeId(this.functions, this.auth.companyId, text);
     const base = { companyId: this.auth.companyId, yearMonth: this.yearMonth, ...(this.officeId() ? { officeId: this.officeId() } : {}) };
     const num = (v: unknown) => Number(v);
     switch (this.kind) {
       case 'raise': {
         if (this.method === 'individual') {
-          const individual = Object.fromEntries(this.individualText.split(/\r?\n/).map(l => l.split(/[,\t]/).map(s => s.trim())).filter(p => p[0] && p[1]).map(([id, v]) => [id, num(v.replace(/,/g, ''))]));
+          const lines = this.individualText.split(/\r?\n/).map(l => l.split(/[,\t]/).map(s => s.trim())).filter(p => p[0] && p[1]);
+          const individual = Object.fromEntries(await Promise.all(lines.map(async ([who, ...v]) => [await lookup(who), num(v.join('').replace(/,/g, ''))])));
           return { ...base, method: 'individual', individual };
         }
         return { ...base, method: this.method, ...(this.method === 'amount' ? { amount: num(this.amount) } : { rate: num(this.rate) }) };
@@ -156,7 +159,7 @@ export class SimulationsComponent {
       case 'hire': return { ...base, monthlyRemuneration: num(this.remuneration), birthDate: this.birthDate };
       case 'annual': return { ...base, bonusPerPayment: num(this.bonusPerPayment), bonusTimes: num(this.bonusTimes) };
       case 'rateChange': return { ...base, ...(this.healthRate !== null && `${this.healthRate}` !== '' ? { health: num(this.healthRate) } : {}), ...(this.careRate !== null && `${this.careRate}` !== '' ? { longTermCare: num(this.careRate) } : {}), ...(this.pensionRate !== null && `${this.pensionRate}` !== '' ? { pension: num(this.pensionRate) } : {}) };
-      case 'bonus': return { ...base, amount: num(this.bonusAmount), ...(this.employeeId ? { employeeId: this.employeeId.trim() } : { birthDate: this.birthDate }) };
+      case 'bonus': return { ...base, amount: num(this.bonusAmount), ...(this.employeeId.trim() ? { employeeId: await lookup(this.employeeId) } : { birthDate: this.birthDate }) };
     }
   }
 
@@ -165,7 +168,7 @@ export class SimulationsComponent {
     this.busy.set(true);
     this.error.set('');
     try {
-      const { data } = await httpsCallable(this.functions, FN[this.kind], { timeout: 120_000 })(this.input());
+      const { data } = await httpsCallable(this.functions, FN[this.kind], { timeout: 120_000 })(await this.input());
       this.result.set(data);
     } catch (e: any) {
       this.error.set(e?.message ?? '試算できませんでした');

@@ -10,6 +10,7 @@ import { resolveGradeTable, splitPremium } from '../insurance/calculator';
 import { splitCsvLine } from '../monthly/rules';
 import { CSV_HEADER, RATE_TYPE_LABELS, RateRow, parseRateCsv, previousMonth } from './rules';
 import { missingKyokaiCsv } from './kyokai-rates';
+import { calculateChildSupportPayment } from '../utils/child-support-payment';
 
 /**
  * 料率の CSV 取込と切替（カタログ1章・6章）。取り込む前に今の料率との差を見せ、
@@ -158,10 +159,14 @@ export async function gradeTableView(auth: AuthContext, prefectureCode: string, 
   const pensionTable = rates.pension ? resolveGradeTable('pension', rates.pension.gradeTable) : [];
   const half = (std: number, r: InsuranceRateDoc | null) => (r ? splitPremium(std, r.employeeRate, r.employerRate, 'statutory', r.totalRate).employeeAmount : null);
   const full = (std: number, r: InsuranceRateDoc | null) => (r ? Math.round((std * r.totalRate) / 10) / 100 : null);
+  // 子ども・子育て支援金（2026年4月分から。健康保険料と一緒に控除する）。料率がない年度は列を出さない
+  const supportRate = yearMonth < '2026-04' ? null
+    : rates.childSupportPayment ?? (yearMonth <= '2027-03' ? { employeeRate: 1.15, employerRate: 1.15 } : null);
+  const supportTotal = supportRate ? supportRate.employeeRate + supportRate.employerRate : null;
   const careTotal = rates.health && rates.longTermCare ? { ...rates.health, totalRate: rates.health.totalRate + rates.longTermCare.totalRate, employeeRate: rates.health.employeeRate + rates.longTermCare.employeeRate, employerRate: rates.health.employerRate + rates.longTermCare.employerRate } : null;
   return {
     yearMonth, prefectureCode,
-    rates: { health: rates.health.totalRate, longTermCare: rates.longTermCare?.totalRate ?? null, pension: rates.pension?.totalRate ?? null, healthFrom: rates.health.appliedFrom },
+    rates: { health: rates.health.totalRate, longTermCare: rates.longTermCare?.totalRate ?? null, pension: rates.pension?.totalRate ?? null, healthFrom: rates.health.appliedFrom, support: supportTotal },
     rows: healthTable.map(g => {
       const p = pensionTable.find(x => x.standardRemuneration === g.standardRemuneration) ?? (g.standardRemuneration < (pensionTable[0]?.standardRemuneration ?? 0) ? pensionTable[0] : g.standardRemuneration > (pensionTable.at(-1)?.standardRemuneration ?? Infinity) ? pensionTable.at(-1) : null);
       return {
@@ -169,6 +174,8 @@ export async function gradeTableView(auth: AuthContext, prefectureCode: string, 
         healthGrade: g.gradeNumber, pensionGrade: p?.gradeNumber ?? null, standardRemuneration: g.standardRemuneration, lowerBound: g.lowerBound, upperBound: Number.isFinite(g.upperBound) ? g.upperBound : null,
         healthFull: full(g.standardRemuneration, rates.health), healthHalf: half(g.standardRemuneration, rates.health),
         careFull: full(g.standardRemuneration, careTotal), careHalf: half(g.standardRemuneration, careTotal),
+        supportFull: supportTotal === null ? null : Math.round((g.standardRemuneration * supportTotal) / 10) / 100,
+        supportHalf: supportRate ? calculateChildSupportPayment(g.standardRemuneration, yearMonth, false, 'statutory', supportRate).employeeAmount : null,
         pensionFull: p ? full(p.standardRemuneration, rates.pension) : null, pensionHalf: p ? half(p.standardRemuneration, rates.pension) : null,
       };
     }),

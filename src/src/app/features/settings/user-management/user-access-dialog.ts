@@ -15,7 +15,7 @@ export interface AccessOffice {
 
 export const USER_ROLES = [
   { value: 'admin', label: '管理者', description: '全事業所の管理とユーザーの権限設定' },
-  { value: 'operator', label: '操作担当', description: '担当事業所の登録・計算・申請・承認' },
+  { value: 'operator', label: '担当者', description: '担当事業所の登録・計算・届出の作成（ほかの人が依頼したものは承認もできる）' },
   { value: 'approver', label: '承認者', description: '担当事業所の申請の確認・承認' },
   { value: 'viewer', label: '閲覧者', description: '担当事業所の閲覧（対応する画面のみ）' },
   { value: 'employee', label: '従業員', description: '本人ポータルの利用' },

@@ -98,6 +98,12 @@ describe('届出', () => {
     expect(p.備考区分).toEqual([1, 3]);
     expect(p.初回支払日).toBe(5);
   });
+  it('⑦ 基礎年金番号は70歳以上被用者だけ載せる', () => {
+    const payments = [{ date: '2026-12-10', cash: 100_000, inKind: 0 }];
+    const common = { employeeId: 'e1', insuredPersonNumber: '12', name: '山田 一郎', birthDate: '1950-01-01', payments, basicPensionNumber: '1234-567890' };
+    expect(bonusFilingPerson({ ...common, age70: true }).基礎年金番号).toBe('1234-567890');
+    expect(bonusFilingPerson({ ...common, age70: false }).基礎年金番号).toBeUndefined();
+  });
   it('共通の支払日はいちばん多い日', () => {
     expect(commonPaymentDate(['2026-12-10', '2026-12-25', '2026-12-25'])).toBe('2026-12-25');
     expect(commonPaymentDate([])).toBeNull();

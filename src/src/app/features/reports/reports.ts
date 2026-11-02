@@ -12,6 +12,7 @@ import { ReportTable, createReportPdf, reportCsv } from './report-pdf';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { lookupEmployeeId } from '../../core/services/employee-lookup';
 type Kind = 'employeePremium' | 'officeMonthly' | 'gradeList' | 'filingStatus' | 'dependents';
 
 const KINDS: { kind: Kind; label: string; note: string; needs: ('month' | 'employee' | 'year')[] }[] = [
@@ -39,7 +40,7 @@ const KINDS: { kind: Kind; label: string; note: string; needs: ('month' | 'emplo
       <section class="card">
         <div class="head"><h2>{{ k.label }}</h2><span class="sub">{{ k.note }}</span></div>
         <div class="form">
-          @if (k.needs.includes('employee')) { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>従業員ID</mat-label><input matInput [(ngModel)]="employeeId" [name]="'e' + k.kind" placeholder="例：sample-bonus-0003"></mat-form-field> }
+          @if (k.needs.includes('employee')) { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>社員番号または氏名</mat-label><input matInput [(ngModel)]="employeeId" [name]="'e' + k.kind" placeholder="例：0004"></mat-form-field> }
           @if (k.needs.includes('month')) { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>{{ k.kind === 'employeePremium' ? '年度に含まれる月' : '月' }}</mat-label><input matInput type="month" [(ngModel)]="yearMonth" [name]="'m' + k.kind"></mat-form-field> }
           @if (k.needs.includes('year')) { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>作成した年</mat-label><input matInput type="number" min="2000" max="2100" [(ngModel)]="year" [name]="'y' + k.kind"></mat-form-field> }
           <button mat-flat-button color="primary" type="button" (click)="output(k.kind, 'pdf')" [disabled]="busy()">PDF</button>
@@ -99,10 +100,11 @@ export class ReportsComponent {
   async output(kind: Kind, format: 'pdf' | 'csv') {
     this.busy.set(true);
     try {
+      const employeeId = kind === 'employeePremium' ? await lookupEmployeeId(this.functions, this.auth.companyId, this.employeeId) : '';
       const { data } = await httpsCallable<object, ReportTable>(this.functions, 'reportData', { timeout: 120_000 })({
         companyId: this.auth.companyId, kind, format, ...this.office.params(),
         ...(kind === 'filingStatus' ? { yearMonth: `${this.year}-01` } : kind === 'dependents' ? {} : { yearMonth: this.yearMonth }),
-        ...(kind === 'employeePremium' ? { employeeId: this.employeeId.trim() } : {}),
+        ...(kind === 'employeePremium' ? { employeeId } : {}),
         ...(this.departmentId && ['officeMonthly', 'gradeList', 'dependents'].includes(kind) ? { departmentId: this.departmentId } : {}),
       });
       if (!data.rows.length) this.snackBar.open('当てはまるデータがありません（空の帳票を出します）', '閉じる', { duration: 4000 });

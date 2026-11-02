@@ -25,6 +25,7 @@ interface Employee {
   lastNameKana: string;
   firstNameKana: string;
   officeId: string;
+  departmentId?: string | null;
   hireDate: string;
   resignationDate: string | null;
   employmentType?: string | null;
@@ -116,6 +117,11 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
           <td mat-cell *matCellDef="let e">{{ e.lastNameKana }} {{ e.firstNameKana }}</td>
         </ng-container>
 
+        <ng-container matColumnDef="office">
+          <th mat-header-cell *matHeaderCellDef>事業所・部署</th>
+          <td mat-cell *matCellDef="let e">{{ officeName(e.officeId) }}@if (departmentName(e.departmentId); as d) {<span class="dept">{{ d }}</span>}</td>
+        </ng-container>
+
         <ng-container matColumnDef="employmentType">
           <th mat-header-cell *matHeaderCellDef>雇用形態</th>
           <td mat-cell *matCellDef="let e">{{ typeLabel(e.employmentType) }}</td>
@@ -171,6 +177,7 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
     .filters .keyword { width: 300px; }
     .filters mat-form-field { width: 220px; }
     .filters .count { color: var(--app-color-text-sub); }
+    .dept { display: block; font-size: 12px; color: var(--app-color-text-sub); }
     .state { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; background: var(--app-status-done-bg); color: var(--app-status-done-fg); }
     .state[data-kind=resigned] { background: var(--app-status-waiting-bg); color: var(--app-status-waiting-fg); }
     .state[data-kind=sickLeave], .state[data-kind=maternityLeave], .state[data-kind=childcareLeave], .state[data-kind=careLeave] { background: var(--app-status-yours-bg); color: var(--app-status-yours-fg); }
@@ -192,7 +199,10 @@ export class EmployeeListComponent implements OnInit {
   hasMore = signal(false);
   private lastDocId: string | null = null;
 
-  displayedColumns = ['employeeNumber', 'name', 'nameKana', 'employmentType', 'hireDate', 'status'];
+  displayedColumns = ['employeeNumber', 'name', 'nameKana', 'office', 'employmentType', 'hireDate', 'status'];
+  private departments = signal<Map<string, string>>(new Map());
+  officeName = (id: string | null | undefined) => this.office.offices().find(o => o.id === id)?.name ?? '—';
+  departmentName = (id: string | null | undefined) => (id ? this.departments().get(id) ?? '' : '');
   employmentTypes = Object.entries(EMPLOYMENT_TYPE_LABELS);
   keyword = '';
   employmentType = '';
@@ -212,6 +222,9 @@ export class EmployeeListComponent implements OnInit {
 
   ngOnInit() {
     this.loadEmployees();
+    httpsCallable<object, { items: { id: string; name: string }[] }>(this.functions, 'departmentList')({ companyId: this.auth.companyId, includeInactive: true })
+      .then(({ data }) => this.departments.set(new Map(data.items.map(d => [d.id, d.name]))))
+      .catch(() => { /* 部署名が出なくても一覧は使える */ });
   }
 
   async loadEmployees() {

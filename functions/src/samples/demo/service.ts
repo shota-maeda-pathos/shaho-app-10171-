@@ -9,7 +9,7 @@ import { encryptMyNumber } from '../../utils/kms';
 import { mapConcurrent } from '../../utils/parallel';
 import { AllRates, findAllRates } from '../../utils/insurance-rate';
 import { buildDemoEmployees, DEMO_ACCOUNTS, DEMO_COMPANY, DEMO_DEPARTMENTS, DEMO_OFFICES, DEMO_SET_ID } from './data';
-import { addMonths, bonusMonthsFor, CURRENT_PAY_MONTH, demoBonus, demoBonusPremium, demoGrades, demoPremium, demoSchedule, gradeFor, HISTORY_FROM, monthsBetween, salaryIn } from './history';
+import { addMonths, bonusMonthsFor, CURRENT_PAY_MONTH, demoBonus, demoBonusPremium, demoEmployments, demoGrades, demoPremium, demoSchedule, gradeFor, HISTORY_FROM, monthsBetween, salaryIn } from './history';
 
 const conflict = (message: string) => new HttpsError('failed-precondition', message);
 
@@ -126,13 +126,14 @@ export async function seedDemoData(auth: AuthContext) {
       myNumberCipher: ciphers[i], myNumberUpdatedAt: now, version: 1, createdAt: now, updatedAt: now, updatedBy: auth.uid,
     } });
     const general = e.insuredCategory === 'general';
-    writes.push({ ref: db.doc(`${ref.path}/employments/demo-initial`), data: {
-      ...shared, effectiveDate: e.hireDate, employmentType: general ? 'regular' : 'partTime', workStyle: general ? 'fullTime' : e.insuredCategory === 'partTimer' ? 'partTime' : 'shortTime',
-      weeklyHours: e.weeklyHours, weeklyDays: general ? 5 : 4, monthlyDays: general ? 21 : 17, wageType: 'monthly', wageAmount: null, baseSalary: e.baseSalary,
+    // 雇用条件：入社時（昇給前の基本給）と、2026年4月より前に入社した人は4月1日の昇給
+    for (const emp of demoEmployments(e)) writes.push({ ref: db.doc(`${ref.path}/employments/${emp.id}`), data: {
+      ...shared, effectiveDate: emp.effectiveDate, employmentType: general ? 'regular' : 'partTime', workStyle: general ? 'fullTime' : e.insuredCategory === 'partTimer' ? 'partTime' : 'shortTime',
+      weeklyHours: e.weeklyHours, weeklyDays: general ? 5 : 4, monthlyDays: general ? 21 : 17, wageType: 'monthly', wageAmount: null, baseSalary: emp.baseSalary,
       contractType: e.contract.type, contractStartDate: e.contract.type === 'fixed' ? '2026-04-01' : null, contractEndDate: e.contract.endDate, renewalExpected: e.contract.type === 'fixed',
       healthInsuranceEnrolled: true, pensionEnrolled: true, socialInsuranceEnrolled: true, insuredCategory: e.insuredCategory,
       applicabilityReason: e.insuredCategory === 'shortTime' ? 'specificShortTime' : 'standard', isStudent: false,
-      longTermCareEnrolled: e.longTermCare, note: '評価用', version: 1,
+      longTermCareEnrolled: e.longTermCare, note: emp.id === 'demo-initial' ? '評価用' : '評価用（2026年4月の昇給）', version: 1,
     } });
     const h = history[i];
     for (const g of h.grades) {
