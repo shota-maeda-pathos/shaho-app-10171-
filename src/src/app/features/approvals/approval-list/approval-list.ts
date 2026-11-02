@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
+import { canOpenRoute } from '../../../core/utils/route-access';
 import { OfficeContextService } from '../../../core/services/office-context.service';
 import { ApprovalBadgeService } from '../../../core/services/approval-badge.service';
 import { EmptyStateComponent, ErrorStateComponent, LoadingStateComponent, PageHeadComponent, StatusBadgeComponent, StatusTone } from '../../../shared/ui';
@@ -376,7 +377,13 @@ export class ApprovalListComponent {
   statusOf2 = (s: string) => STATUS[s]?.label ?? s;
   entries = (o: Record<string, unknown>) => Object.entries(o).filter(([, v]) => typeof v !== 'object' || v === null).map(([k, v]) => [k, v === null || v === '' ? '—' : typeof v === 'number' ? v.toLocaleString('ja-JP') : String(v)]);
 
+  /** 自分のロールで開ける画面へのリンクだけを出す（承認者は届出・従業員の画面を開けない） */
   linkOf(i: ApprovalItem): { path: string[]; query: Record<string, unknown>; label: string } | null {
+    const link = this.targetLink(i);
+    return link && canOpenRoute(link.path.join('/'), this.auth) ? link : null;
+  }
+
+  private targetLink(i: ApprovalItem): { path: string[]; query: Record<string, unknown>; label: string } | null {
     if (i.kind === 'runFiling' && i.source === 'santei') return { path: ['/santei'], query: { officeId: i.officeId, year: i.year }, label: '算定基礎届の画面で内容とPDFを確かめる' };
     if (i.kind === 'runFiling') return { path: ['/bonus'], query: { officeId: i.officeId, month: i.payMonth }, label: '賞与の画面で内容とPDFを確かめる' };
     if (i.requestType === 'filing' && i.filingId) return { path: ['/filings', i.filingId], query: { employeeId: i.employeeId }, label: '届出の画面でPDFを確かめる' };

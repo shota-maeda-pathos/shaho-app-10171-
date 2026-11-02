@@ -214,7 +214,7 @@ export class TargetDetailDirective {
           <ng-container *ngTemplateOutlet="d.template; context: { $implicit: row }" />
         }
         <ng-container ngProjectAs="[panelFoot]">
-          @if (panelRow(); as row) {
+          @if (allowHold() && panelRow(); as row) {
             @if (row.held) {
               <button mat-stroked-button type="button" (click)="release.emit(row.id)" [disabled]="busy()">保留を解除する</button>
             } @else {

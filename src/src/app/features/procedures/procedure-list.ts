@@ -110,7 +110,7 @@ type Who = 'all' | 'mine' | 'waiting';
               <thead><tr><th>種類</th><th>手続き</th><th>完了した日</th><th></th></tr></thead>
               <tbody>
                 @for (r of visibleDone(); track r.id) {
-                  <tr (click)="openDoneRow(r)" tabindex="0" (keydown.enter)="openDoneRow(r)">
+                  <tr (click)="openDoneRow(r)" [attr.tabindex]="canOpenDone ? 0 : null" [class.static]="!canOpenDone" (keydown.enter)="openDoneRow(r)">
                     <td><span class="kind">{{ typeLabel(r.procedureType) }}</span></td>
                     <td class="who"><b>{{ r.title }}</b></td>
                     <td>{{ shortDate(r.updatedAt.slice(0, 10)) }}</td>
@@ -145,6 +145,7 @@ type Who = 'all' | 'mine' | 'waiting';
     .list th, .list td { padding: var(--app-space-2) var(--app-space-3); border-top: 1px solid var(--app-color-border); vertical-align: top; }
     .list th:first-child, .list td:first-child { padding-left: var(--app-space-5); }
     .list tbody tr { cursor: pointer; }
+    .list tbody tr.static { cursor: default; }
     .list tbody tr:hover td { background: #fafbfd; }
     .list tbody tr:focus-visible { outline: 2px solid var(--app-color-link); outline-offset: -2px; }
     .kind { font-size: var(--app-font-xs); font-weight: 600; padding: 1px 7px; border-radius: 4px; background: var(--app-status-waiting-bg); color: var(--app-color-text-sub); white-space: nowrap; }
@@ -273,7 +274,9 @@ export class ProcedureListComponent {
     void this.router.navigate([t.route], { queryParams: this.office.openParams(t.route, t.queryParams) });
   }
   /** 完了した手続きは手続きの詳細を開く（ウィザード方式はそこから、それぞれの画面へ移る） */
-  openDoneRow(r: DoneRow) { void this.router.navigate(['/procedures', r.id]); }
+  /** 手続きの詳細（ウィザード）は担当者だけが開ける。承認者には完了の一覧を見せるだけにする */
+  readonly canOpenDone = canOpenRoute('/procedures/x', this.auth);
+  openDoneRow(r: DoneRow) { if (this.canOpenDone) void this.router.navigate(['/procedures', r.id]); }
 
   private days(d: string) { return Math.round((Date.parse(d) - Date.parse(this.today())) / 86_400_000); }
   overdue(t: Todo) { return !!t.deadline && this.days(t.deadline) < 0; }

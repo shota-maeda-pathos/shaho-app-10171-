@@ -261,7 +261,7 @@
 
         <!-- 対象者の表と、下に固定の操作バー -->
         <app-target-list [rows]="targetRows()" [actions]="actions()" [busy]="busy() || loading()" [loading]="loading()" [cellHeader]="cellHeader()" [includeYours]="true"
-                         [emptyInfo]="barInfo()"
+                         [emptyInfo]="barInfo()" [allowHold]="isStaff"
                          (run)="run($event)" (retryFailed)="retry($event)" (hold)="hold($event.id, $event.reason)" (release)="hold($event, null)">
           <ng-template appTargetCell let-t>
             @if (row(t.id); as r) {
