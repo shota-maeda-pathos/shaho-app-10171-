@@ -1,6 +1,6 @@
 import { db } from '../../config';
 import { AuthContext } from '../../middleware/auth';
-import { staffCanSee } from './rules';
+import { NoticeLink, noticeLink, staffCanSee } from './rules';
 
 export interface StaffNotice {
   id: string;
@@ -9,6 +9,8 @@ export interface StaffNotice {
   category: string;
   isRead: boolean;
   createdAt: string;
+  /** 押したときに開く画面（なければ null） */
+  link: NoticeLink | null;
 }
 
 /** スタッフ向けのお知らせの新しいもの（直近200件から、見せてよいものを limit 件） */
@@ -25,6 +27,7 @@ export async function listStaffNotifications(auth: AuthContext, limit: number): 
     return {
       id: d.id, title: String(n.title ?? ''), body: String(n.body ?? ''), category: String(n.category ?? 'system'),
       isRead: readIds.has(d.id), createdAt: n.createdAt?.toDate?.()?.toISOString?.() ?? '',
+      link: noticeLink(n),
     };
   });
   return { items, unread: visible.filter(d => !readIds.has(d.id)).length };

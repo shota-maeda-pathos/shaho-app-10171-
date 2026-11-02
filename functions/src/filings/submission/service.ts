@@ -100,6 +100,7 @@ async function afterChange(path: string, before: MockState | null, after: MockSt
     const who = src.source === 'employee' ? await employeeNoticeContext(src.companyId, src.parentId) : null;
     await notify({
       officeId: who ? who.officeId : src.parentId.replace(/_[^_]+$/, ''),
+      link: src.source === 'employee' ? { route: `/filings/${src.filingId}`, queryParams: { employeeId: src.parentId } } : null,
       companyId: src.companyId, category: 'filing', targetType: src.source === 'employee' ? 'filing' : `${src.source}Run`,
       targetId: src.source === 'employee' ? src.filingId : src.parentId, createdBy: by,
       title: after.status === 'completed' ? '模擬電子申請が完了しました' : '模擬電子申請が返戻されました',

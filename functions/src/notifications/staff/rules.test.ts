@@ -1,4 +1,4 @@
-import { noticeOfficeId, staffCanSee } from './rules';
+import { noticeLink, noticeOfficeId, staffCanSee } from './rules';
 
 const admin = { roles: ['admin'], officeIds: [] };
 const operator = { roles: ['operator'], officeIds: ['tigers'] };
@@ -22,4 +22,15 @@ test('管理者はすべて、担当者・承認者は担当事業所だけ、�
   expect(staffCanSee(own, viewer)).toBe(false);
   expect(staffCanSee({ targetType: 'all' }, admin)).toBe(false);
   expect(staffCanSee({ targetType: 'employee', targetId: 'e1' }, admin)).toBe(false);
+});
+
+test('お知らせを押したときに開く画面', () => {
+  expect(noticeLink({ link: { route: '/filings/f1', queryParams: { employeeId: 'e1' } }, targetType: 'filing' })).toEqual({ route: '/filings/f1', queryParams: { employeeId: 'e1' } });
+  expect(noticeLink({ targetType: 'procedure', targetId: 'p1' })).toEqual({ route: '/procedures/p1', queryParams: {} });
+  expect(noticeLink({ targetType: 'santeiRun', targetId: 'sample-santei-office_2026' })).toEqual({ route: '/santei', queryParams: { officeId: 'sample-santei-office', year: '2026' } });
+  expect(noticeLink({ targetType: 'bonusRun', targetId: 'sample-bonus-office_2026-12' })).toEqual({ route: '/bonus', queryParams: { officeId: 'sample-bonus-office', month: '2026-12' } });
+  expect(noticeLink({ targetType: 'monthlyRun', targetId: 'tigers_2026-10' })).toEqual({ route: '/monthly', queryParams: { officeId: 'tigers', payMonth: '2026-10' } });
+  expect(noticeLink({ targetType: 'approvalRequest', targetId: 'r1' })?.route).toBe('/approvals');
+  expect(noticeLink({ targetType: 'approvalAutoCancel' })?.route).toBe('/filings');
+  expect(noticeLink({ targetType: 'something' })).toBeNull();
 });

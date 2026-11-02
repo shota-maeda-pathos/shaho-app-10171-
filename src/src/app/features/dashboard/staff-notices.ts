@@ -1,13 +1,18 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 
-interface StaffNotice { id: string; title: string; body: string; category: string; isRead: boolean; createdAt: string }
+interface StaffNotice {
+  id: string; title: string; body: string; category: string; isRead: boolean; createdAt: string;
+  /** 押したときに開く画面（なければ既読にするだけ） */
+  link: { route: string; queryParams: Record<string, string> } | null;
+}
 
 /**
  * ホームの「お知らせ」：承認の依頼・承認・差戻し・模擬電子申請の結果・承認の自動取消など（サーバーの staffNotificationList）。
- * 管理者はすべて、担当者・承認者は担当事業所のものだけ。押すと既読にする
+ * 管理者はすべて、担当者・承認者は担当事業所のものだけ。押すと既読にし、関係する画面があればそこを開く
  */
 @Component({
   selector: 'app-staff-notices',
@@ -25,10 +30,10 @@ interface StaffNotice { id: string; title: string; body: string; category: strin
           <ul class="card-body list">
             @for (n of list; track n.id) {
               <li [class.unread]="!n.isRead">
-                <button type="button" (click)="read(n)" [attr.aria-label]="(n.isRead ? '' : '未読：') + n.title">
+                <button type="button" (click)="open(n)" [attr.aria-label]="(n.isRead ? '' : '未読：') + n.title + (n.link ? '（開く）' : '')">
                   <span class="t">{{ n.title }}</span>
                   <span class="b">{{ n.body }}</span>
-                  <span class="d">{{ n.createdAt | date:'M/d H:mm' }}</span>
+                  <span class="d">{{ n.createdAt | date:'M/d H:mm' }}@if (n.link) {<span class="go">・開く →</span>}</span>
                 </button>
               </li>
             }
@@ -58,12 +63,14 @@ interface StaffNotice { id: string; title: string; body: string; category: strin
     .t { font-size: 13px; }
     .b { font-size: 12px; color: var(--app-color-text-sub); line-height: 1.5; white-space: pre-line; }
     .d { font-size: 11px; color: var(--app-color-text-sub); }
+    .go { color: var(--app-color-primary); }
     .unread .t { font-weight: 700; }
     .unread .t::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--app-color-primary); vertical-align: middle; }
   `],
 })
 export class StaffNoticesComponent implements OnInit {
   private functions = inject(Functions);
+  private router = inject(Router);
   private auth = inject(AuthService);
   items = signal<StaffNotice[] | null>(null);
   unread = signal(0);
@@ -83,9 +90,10 @@ export class StaffNoticesComponent implements OnInit {
     }
   }
 
-  async read(n: StaffNotice) {
-    if (n.isRead) return;
-    await this.mark([n.id]);
+  /** 既読にして、関係する画面があれば開く（既読にできなくても開く） */
+  async open(n: StaffNotice) {
+    if (!n.isRead) await this.mark([n.id]).catch(() => undefined);
+    if (n.link) void this.router.navigate([n.link.route], { queryParams: n.link.queryParams });
   }
 
   async markAll() {

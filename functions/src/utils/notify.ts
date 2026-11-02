@@ -11,6 +11,8 @@ export interface NotifyParams {
   createdBy: string;
   /** スタッフ向けのお知らせを見せる事業所（担当者・承認者は自分の担当事業所のものだけ見る。管理者はすべて） */
   officeId?: string | null;
+  /** 押したときに開く画面（種類と ID から決まらないときだけ残す。決まるものは notifications/staff/rules.ts の noticeLink） */
+  link?: { route: string; queryParams?: Record<string, string> } | null;
 }
 
 
@@ -25,6 +27,7 @@ export async function notify(params: NotifyParams): Promise<string> {
     targetId: params.targetId ?? null,
     createdBy: params.createdBy,
     officeId: params.officeId ?? null,
+    link: params.link ?? null,
     isRead: false,
     createdAt: now,
     updatedAt: now,
