@@ -41,7 +41,7 @@
           <h3>新しい雇用条件</h3>
           <fieldset class="form-grid" [disabled]="locked()">
             <mat-form-field appearance="outline"><mat-label>新しい条件の初日</mat-label>
-              <input matInput type="date" [(ngModel)]="effectiveDate" (ngModelChange)="changed()" name="effectiveDate"></mat-form-field>
+              <input matInput [(ngModel)]="effectiveDate" (ngModelChange)="changed()" name="effectiveDate" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
             <mat-form-field appearance="outline"><mat-label>雇用区分</mat-label>
               <mat-select [(ngModel)]="form.employmentType" (ngModelChange)="changed()" name="employmentType" [disabled]="locked()">
                 @for (t of employmentTypes; track t.value) { <mat-option [value]="t.value">{{ t.label }}</mat-option> }
@@ -52,7 +52,7 @@
               </mat-select></mat-form-field>
             @if (form.contractType === 'fixed') {
               <mat-form-field appearance="outline"><mat-label>契約の終了日</mat-label>
-                <input matInput type="date" [(ngModel)]="form.contractEndDate" (ngModelChange)="changed()" name="contractEnd"></mat-form-field>
+                <input matInput [(ngModel)]="form.contractEndDate" (ngModelChange)="changed()" name="contractEnd" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 /></mat-form-field>
               <mat-checkbox [(ngModel)]="form.renewalExpected" (ngModelChange)="changed()" name="renewal" [disabled]="locked()">更新する見込みがある</mat-checkbox>
             }
             <mat-form-field appearance="outline"><mat-label>週の所定労働時間</mat-label>

@@ -12,6 +12,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { TermComponent } from '../../shared/ui';
 import { MonthlyRow, StepKey } from './monthly.types';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 const METHOD_LABELS: Record<string, string> = { payroll: '給与から控除', transfer: '別途入金', refund: '返金', legacy: '記録' };
 
 /** 無給として記録するときの理由 */
@@ -47,7 +48,7 @@ export class NoPayDialogComponent {
 @Component({
   selector: 'app-monthly-person',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [MatDatepickerModule, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   template: `
       @let r = row();
       @if (r.hold) { <p class="hold">保留中：{{ r.hold.reason }}</p> }
@@ -127,7 +128,7 @@ export class NoPayDialogComponent {
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>日付</mat-label>
-            <input matInput type="date" [ngModel]="date()" (ngModelChange)="date.set($event)" name="date" required>
+            <input matInput [ngModel]="date()" (ngModelChange)="date.set($event)" name="date" required [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 />
           </mat-form-field>
           <mat-form-field appearance="outline" class="wide">
             <mat-label>メモ</mat-label>

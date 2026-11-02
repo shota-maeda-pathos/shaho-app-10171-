@@ -18,6 +18,7 @@ import {
 import { errorMessage } from '../onboarding/onboarding.types';
 import { EVENT_LABEL, EventResult, LeaveEventType, LeaveKey, LeaveView, monthLabel, monthsText, PlanForm, PlanResult } from './leave.types';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 const KEYS: LeaveKey[] = ['plan', 'filing', 'approval', 'submit', 'during', 'confirm'];
 
 /**
@@ -27,7 +28,7 @@ const KEYS: LeaveKey[] = ['plan', 'filing', 'approval', 'submit', 'during', 'con
 @Component({
   selector: 'app-leave-wizard',
   standalone: true,
-  imports: [
+  imports: [MatDatepickerModule,
     FilingSubmissionComponent, DatePipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule, MatInputModule, MatRadioModule,
     WizardComponent, TermComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],

@@ -240,16 +240,33 @@ function acquisition(w: Writer, fd: Data) {
   else w.warnings.add('被保険者種別を確認してください。');
   identifier(w,fd,[210.13,409.72,331.77,50.3]);
   dateParts(w,fd['資格取得年月日'],[[624.85,409.72,41.47,50.3],[666.32,409.72,41.47,50.3],[707.79,409.72,41.47,50.3]],'資格取得年月日');
-  const category = String(fd['取得区分'] ?? '');
-  if (['1','3','4'].includes(category)) w.circle(119,category==='1'?417:category==='3'?434:447,12,11);
+  const category = ACQUISITION_CATEGORY[String(fd['取得区分'] ?? '')];
+  if (category) w.circle(119,category==='1'?417:category==='3'?434:447,12,11);
   else w.warnings.add('取得区分の選択を確認してください（一般・新規などの文字は区分番号として記入しません）。');
+  if (fd['被扶養者'] === '無') w.circle(ACQUISITION_DEPENDENT.none,ACQUISITION_DEPENDENT.top,12,11);
+  else if (fd['被扶養者'] === '有') w.circle(ACQUISITION_DEPENDENT.some,ACQUISITION_DEPENDENT.top,12,11);
   w.money(fd['報酬月額_通貨'],[159,465,147,15],'報酬月額（通貨）',false,true);
   w.money(fd['報酬月額_現物'],[159,486,147,15],'報酬月額（現物）');
   const total = fd['報酬月額_合計'];
   if (typeof total === 'number' && Number.isSafeInteger(total) && total >= 0) w.cells(total,[334.06,477.11,186.62,26.11],9,'報酬月額合計',true);
   else w.warnings.add('報酬月額合計が未登録、または整数の金額ではありません。');
-  w.text(fd['被保険者住所'] ?? fd['住所'],[132,527,395,14],'被保険者住所');
+  for (const item of Array.isArray(fd['備考項目']) ? fd['備考項目'] : []) {
+    const mark = ACQUISITION_REMARKS[String(item)];
+    if (mark) w.circle(mark[0],mark[1],12,11);
+  }
+  const address = fd['被保険者住所'] ?? fd['住所'];
+  w.text(address,[132,527,395,14],'被保険者住所');
+  if (!fd['個人番号'] && !address) w.warnings.add('個人番号を記入しない場合は、被保険者の住所が必要です。');
 }
+
+/** 取得区分の番号。手続きの画面では加入する保険の文字で持つため、様式の番号（1. 健保・厚年 3. 共済出向 4. 船保任継）に直す */
+const ACQUISITION_CATEGORY: Record<string, '1' | '3' | '4'> = {
+  '1': '1', '3': '3', '4': '4', '健保・厚年': '1', '健保のみ': '1', '厚年のみ': '1', '新規': '1', '共済出向': '3', '船保任継': '4',
+};
+/** 被扶養者「0. 無」「1. 有」の丸の位置 */
+const ACQUISITION_DEPENDENT = { none: 811, some: 880, top: 434 };
+/** 備考「1. 70歳以上被用者該当」「2. 二以上事業所勤務者の取得」「3. 短時間労働者の取得」「4. 退職後の継続再雇用者の取得」の丸の位置 */
+const ACQUISITION_REMARKS: Record<string, [number, number]> = { '1': [604, 475], '2': [604, 486], '3': [604, 497], '4': [777, 475] };
 
 /** 喪失原因「7. 75歳到達（健康保険のみ喪失）」の丸の位置 */
 const LOSS_75_MARK: [number, number] = [705, 441];

@@ -10,6 +10,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 type RequestType = 'address' | 'name' | 'dependentAdd' | 'dependentRemove' | 'leave';
 
 interface MyRequest { id: string; typeLabel: string; status: string; createdAt: string | null; comment: string | null; attachments: { name: string }[] }
@@ -20,7 +21,7 @@ const STATUS_LABELS: Record<string, string> = { submitted: '受付待ち', inPro
 @Component({
   selector: 'app-portal-requests',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule],
+  imports: [MatDatepickerModule, DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatCheckboxModule],
   template: `
     <section class="card">
       <h2>申請する</h2>
@@ -46,19 +47,19 @@ const STATUS_LABELS: Record<string, string> = { submitted: '受付待ち', inPro
               <mat-form-field appearance="outline"><mat-label>市区町村</mat-label><input matInput [(ngModel)]="f['city']" name="city"></mat-form-field>
               <mat-form-field appearance="outline" class="wide"><mat-label>番地</mat-label><input matInput [(ngModel)]="f['addressLine']" name="addressLine"></mat-form-field>
               <mat-form-field appearance="outline" class="wide"><mat-label>建物名・部屋番号（任意）</mat-label><input matInput [(ngModel)]="f['building']" name="building"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>引っ越した日</mat-label><input matInput type="date" [(ngModel)]="f['movedOn']" name="movedOn"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>引っ越した日</mat-label><input matInput [(ngModel)]="f['movedOn']" name="movedOn" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
             }
             @case ('name') {
               <mat-form-field appearance="outline"><mat-label>新しい姓</mat-label><input matInput [(ngModel)]="f['lastName']" name="lastName"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>新しい名</mat-label><input matInput [(ngModel)]="f['firstName']" name="firstName"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>姓（カナ）</mat-label><input matInput [(ngModel)]="f['lastNameKana']" name="lastNameKana"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>名（カナ）</mat-label><input matInput [(ngModel)]="f['firstNameKana']" name="firstNameKana"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>変わった日</mat-label><input matInput type="date" [(ngModel)]="f['changedOn']" name="changedOn"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>変わった日</mat-label><input matInput [(ngModel)]="f['changedOn']" name="changedOn" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 /></mat-form-field>
             }
             @case ('dependentAdd') {
               <mat-form-field appearance="outline"><mat-label>姓</mat-label><input matInput [(ngModel)]="f['lastName']" name="dLast"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>名</mat-label><input matInput [(ngModel)]="f['firstName']" name="dFirst"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>生年月日</mat-label><input matInput type="date" [(ngModel)]="f['birthDate']" name="dBirth"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>生年月日</mat-label><input matInput [(ngModel)]="f['birthDate']" name="dBirth" [matDatepicker]="dp3" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp3" /><mat-datepicker #dp3 startView="multi-year" /></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>性別</mat-label>
                 <mat-select [(ngModel)]="f['gender']" name="dGender"><mat-option value="female">女</mat-option><mat-option value="male">男</mat-option></mat-select></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>続柄</mat-label>
@@ -67,24 +68,24 @@ const STATUS_LABELS: Record<string, string> = { submitted: '受付待ち', inPro
                   <mat-option value="grandparent">祖父母</mat-option><mat-option value="sibling">兄弟姉妹</mat-option><mat-option value="grandchild">孫</mat-option><mat-option value="other">その他</mat-option>
                 </mat-select></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>年収の見込み（円）</mat-label><input matInput type="number" [(ngModel)]="f['annualIncome']" name="income"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>扶養に入れたい日</mat-label><input matInput type="date" [(ngModel)]="f['since']" name="since"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>扶養に入れたい日</mat-label><input matInput [(ngModel)]="f['since']" name="since" [matDatepicker]="dp4" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp4" /><mat-datepicker #dp4 /></mat-form-field>
               <mat-checkbox [(ngModel)]="f['coResident']" name="co">一緒に住んでいる</mat-checkbox>
             }
             @case ('dependentRemove') {
               <mat-form-field appearance="outline"><mat-label>外したい家族の氏名</mat-label><input matInput [(ngModel)]="f['dependentName']" name="dn"></mat-form-field>
               <mat-form-field appearance="outline" class="wide"><mat-label>理由（就職した・収入が増えた など）</mat-label><input matInput [(ngModel)]="f['reason']" name="reason"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>外れる日</mat-label><input matInput type="date" [(ngModel)]="f['since']" name="since2"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>外れる日</mat-label><input matInput [(ngModel)]="f['since']" name="since2" [matDatepicker]="dp5" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp5" /><mat-datepicker #dp5 /></mat-form-field>
             }
             @case ('leave') {
               <mat-form-field appearance="outline"><mat-label>休業の種類</mat-label>
                 <mat-select [(ngModel)]="f['kind']" name="kind">@if (canRequestMaternity()) {<mat-option value="maternity">産前産後休業</mat-option>}<mat-option value="childcare">育児休業</mat-option></mat-select></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>開始日</mat-label><input matInput type="date" [(ngModel)]="f['startDate']" name="ls"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>終了予定日</mat-label><input matInput type="date" [(ngModel)]="f['endDate']" name="le"></mat-form-field>
-              @if (f['kind'] === 'maternity') { <mat-form-field appearance="outline"><mat-label>出産予定日</mat-label><input matInput type="date" [(ngModel)]="f['expectedBirthDate']" name="eb"></mat-form-field> }
+              <mat-form-field appearance="outline"><mat-label>開始日</mat-label><input matInput [(ngModel)]="f['startDate']" name="ls" [matDatepicker]="dp6" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp6" /><mat-datepicker #dp6 /></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>終了予定日</mat-label><input matInput [(ngModel)]="f['endDate']" name="le" [matDatepicker]="dp7" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp7" /><mat-datepicker #dp7 /></mat-form-field>
+              @if (f['kind'] === 'maternity') { <mat-form-field appearance="outline"><mat-label>出産予定日</mat-label><input matInput [(ngModel)]="f['expectedBirthDate']" name="eb" [matDatepicker]="dp8" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp8" /><mat-datepicker #dp8 /></mat-form-field> }
               @if (f['kind'] === 'childcare') {
                 <mat-form-field appearance="outline"><mat-label>子の姓</mat-label><input matInput [(ngModel)]="f['childLastName']" name="cl"></mat-form-field>
                 <mat-form-field appearance="outline"><mat-label>子の名</mat-label><input matInput [(ngModel)]="f['childFirstName']" name="cf"></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>子の生年月日</mat-label><input matInput type="date" [(ngModel)]="f['childBirthDate']" name="cb"></mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>子の生年月日</mat-label><input matInput [(ngModel)]="f['childBirthDate']" name="cb" [matDatepicker]="dp9" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp9" /><mat-datepicker #dp9 /></mat-form-field>
               }
             }
           }

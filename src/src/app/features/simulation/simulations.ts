@@ -6,6 +6,10 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 type Kind = 'raise' | 'hire' | 'annual' | 'rateChange' | 'bonus';
 const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHire', annual: 'simulationAnnual', rateChange: 'simulationRateChange', bonus: 'simulationBonus' };
 
@@ -13,7 +17,7 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
 @Component({
   selector: 'app-simulations',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, MatButtonModule],
+  imports: [MatDatepickerModule, MatFormFieldModule, MatInputModule, MatSelectModule, DecimalPipe, FormsModule, MatButtonModule],
   template: `
     <div class="kinds">
       @for (k of kinds; track k[0]) { <button type="button" [class.on]="kind === k[0]" (click)="kind = k[0]; result.set(null); error.set('')">{{ k[1] }}</button> }
@@ -21,33 +25,33 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
     <p class="sub">試算の結果は保存されません。実際の等級・保険料は変わりません。{{ office.label() }}の従業員が対象です（上の事業所の切り替えで絞れます）。</p>
 
     <div class="form">
-      <label>対象の月 <input type="month" [(ngModel)]="yearMonth" name="ym"></label>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>対象の月</mat-label><input matInput type="month" [(ngModel)]="yearMonth" name="ym"></mat-form-field>
       @switch (kind) {
         @case ('raise') {
-          <label>方法 <select [(ngModel)]="method" name="method"><option value="amount">一律の金額</option><option value="rate">一律の率</option><option value="individual">1人ずつ</option></select></label>
-          @if (method === 'amount') { <label>昇給額（円） <input type="number" [(ngModel)]="amount" name="amount"></label> }
-          @if (method === 'rate') { <label>昇給率（%） <input type="number" step="0.1" [(ngModel)]="rate" name="rate"></label> }
-          @if (method === 'individual') { <label class="wide">社員ごとの新しい報酬（1行に「従業員ID,金額」） <textarea rows="4" [(ngModel)]="individualText" name="ind"></textarea></label> }
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>方法</mat-label><mat-select [(ngModel)]="method" name="method"><mat-option value="amount">一律の金額</mat-option><mat-option value="rate">一律の率</mat-option><mat-option value="individual">1人ずつ</mat-option></mat-select></mat-form-field>
+          @if (method === 'amount') { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>昇給額（円）</mat-label><input matInput type="number" [(ngModel)]="amount" name="amount"></mat-form-field> }
+          @if (method === 'rate') { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>昇給率（%）</mat-label><input matInput type="number" step="0.1" [(ngModel)]="rate" name="rate"></mat-form-field> }
+          @if (method === 'individual') { <mat-form-field appearance="outline" subscriptSizing="dynamic" class="wide"><mat-label>社員ごとの新しい報酬（1行に「従業員ID,金額」）</mat-label><textarea matInput rows="4" [(ngModel)]="individualText" name="ind"></textarea></mat-form-field> }
         }
         @case ('hire') {
           @if (!officeId()) { <p class="warn">上で事業所を1つ選んでください。</p> }
-          <label>想定の報酬月額（円） <input type="number" min="0" [(ngModel)]="remuneration" name="rem"></label>
-          <label>生年月日 <input type="date" [(ngModel)]="birthDate" name="bd"></label>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>想定の報酬月額（円）</mat-label><input matInput type="number" min="0" [(ngModel)]="remuneration" name="rem"></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>生年月日</mat-label><input matInput [(ngModel)]="birthDate" name="bd" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 startView="multi-year" /></mat-form-field>
         }
         @case ('annual') {
-          <label>賞与1回の想定額（円） <input type="number" min="0" [(ngModel)]="bonusPerPayment" name="bpp"></label>
-          <label>賞与の回数 <input type="number" min="0" max="4" [(ngModel)]="bonusTimes" name="bt"></label>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>賞与1回の想定額（円）</mat-label><input matInput type="number" min="0" [(ngModel)]="bonusPerPayment" name="bpp"></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>賞与の回数</mat-label><input matInput type="number" min="0" max="4" [(ngModel)]="bonusTimes" name="bt"></mat-form-field>
         }
         @case ('rateChange') {
-          <label>健康保険料率（‰、例 99.1） <input type="number" step="0.01" [(ngModel)]="healthRate" name="hr"></label>
-          <label>介護保険料率（‰） <input type="number" step="0.01" [(ngModel)]="careRate" name="cr"></label>
-          <label>厚生年金保険料率（‰） <input type="number" step="0.01" [(ngModel)]="pensionRate" name="pr"></label>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>健康保険料率（‰、例 99.1）</mat-label><input matInput type="number" step="0.01" [(ngModel)]="healthRate" name="hr"></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>介護保険料率（‰）</mat-label><input matInput type="number" step="0.01" [(ngModel)]="careRate" name="cr"></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>厚生年金保険料率（‰）</mat-label><input matInput type="number" step="0.01" [(ngModel)]="pensionRate" name="pr"></mat-form-field>
         }
         @case ('bonus') {
           @if (!officeId()) { <p class="warn">上で事業所を1つ選んでください。</p> }
-          <label>従業員ID（任意。入れると今年度の累計で上限を判定） <input [(ngModel)]="employeeId" name="eid"></label>
-          <label>生年月日（従業員IDがないとき） <input type="date" [(ngModel)]="birthDate" name="bd2"></label>
-          <label>賞与額（円） <input type="number" min="0" [(ngModel)]="bonusAmount" name="ba"></label>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>従業員ID（任意。入れると今年度の累計で上限を判定）</mat-label><input matInput [(ngModel)]="employeeId" name="eid"></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>生年月日（従業員IDがないとき）</mat-label><input matInput [(ngModel)]="birthDate" name="bd2" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 startView="multi-year" /></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>賞与額（円）</mat-label><input matInput type="number" min="0" [(ngModel)]="bonusAmount" name="ba"></mat-form-field>
         }
       }
       <button mat-flat-button color="primary" type="button" (click)="run()" [disabled]="busy()">{{ busy() ? '計算しています…' : '試算する' }}</button>
@@ -104,7 +108,7 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
     .kinds button.on { background: var(--app-color-link); color: #fff; border-color: var(--app-color-link); }
     .form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 12px 0; }
     .form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
-    .form input, .form select, .form textarea { padding: 6px 8px; font: inherit; border: 1px solid var(--app-color-border); border-radius: 6px; }
+    .form input:not(.mat-mdc-input-element), .form textarea:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; border: 1px solid var(--app-color-border); border-radius: 6px; }
     .wide { flex: 1 1 100%; }
     .result { background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); padding: 16px; }
     .big { font-size: 18px; font-weight: 700; }

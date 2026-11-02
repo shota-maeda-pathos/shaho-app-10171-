@@ -44,7 +44,7 @@
                     </mat-select></mat-form-field>
                 }
                 <mat-form-field appearance="outline"><mat-label>{{ eventLabel(item.kind) }}</mat-label>
-                  <input matInput type="date" [(ngModel)]="item.eventDate" (ngModelChange)="changed()" required></mat-form-field>
+                  <input matInput [(ngModel)]="item.eventDate" (ngModelChange)="changed()" required [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
                 @if (item.kind === 'remove') {
                   <mat-form-field appearance="outline"><mat-label>外す理由</mat-label>
                     <mat-select [(ngModel)]="item.reason" (ngModelChange)="changed()" [disabled]="v.locked">
@@ -64,7 +64,7 @@
                 <mat-form-field appearance="outline"><mat-label>姓（フリガナ）</mat-label><input matInput [(ngModel)]="item.lastNameKana" (ngModelChange)="dirty.set(true)" [readonly]="item.kind === 'remove'"></mat-form-field>
                 <mat-form-field appearance="outline"><mat-label>名（フリガナ）</mat-label><input matInput [(ngModel)]="item.firstNameKana" (ngModelChange)="dirty.set(true)" [readonly]="item.kind === 'remove'"></mat-form-field>
                 @if (item.kind !== 'remove') {
-                  <mat-form-field appearance="outline"><mat-label>生年月日</mat-label><input matInput type="date" [(ngModel)]="item.birthDate" (ngModelChange)="changed()"></mat-form-field>
+                  <mat-form-field appearance="outline"><mat-label>生年月日</mat-label><input matInput [(ngModel)]="item.birthDate" (ngModelChange)="changed()" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 startView="multi-year" /></mat-form-field>
                   <mat-form-field appearance="outline"><mat-label>性別</mat-label>
                     <mat-select [(ngModel)]="item.gender" (ngModelChange)="dirty.set(true)" [disabled]="v.locked"><mat-option value="male">男</mat-option><mat-option value="female">女</mat-option></mat-select></mat-form-field>
                 }

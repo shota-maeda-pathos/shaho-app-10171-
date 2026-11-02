@@ -151,7 +151,7 @@ export async function resignEmployee(
           '生年月日': current.birthDate ? toDateString(current.birthDate) : '',
           '性別': current.gender === 'male' ? '男' : '女',
           '個人番号': '',
-          '基礎年金番号': '',
+          '基礎年金番号': current.basicPensionNumber ?? '',
           '届出区分': '資格喪失届',
           '資格喪失年月日': lossDate,
           '喪失原因': '退職等',

@@ -11,6 +11,7 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { ErrorStateComponent, LoadingStateComponent } from '../../shared/ui';
 import { errorMessage, RELATIONSHIPS, SelfInput } from '../onboarding/onboarding.types';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 interface InviteInfo {
   companyName: string;
   plannedName: string;
@@ -29,7 +30,7 @@ const KANA = /^[ァ-ヶー\s　]+$/;
 @Component({
   selector: 'app-onboard-form',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule, LoadingStateComponent, ErrorStateComponent],
+  imports: [MatDatepickerModule, DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule, LoadingStateComponent, ErrorStateComponent],
   template: `
     <main class="page">
       @if (loading()) {
@@ -80,7 +81,7 @@ const KANA = /^[ァ-ヶー\s　]+$/;
               <mat-form-field appearance="outline"><mat-label>名</mat-label><input matInput [(ngModel)]="f.firstName" required autocomplete="given-name"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>姓（フリガナ・カタカナ）</mat-label><input matInput [(ngModel)]="f.lastNameKana" required></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>名（フリガナ・カタカナ）</mat-label><input matInput [(ngModel)]="f.firstNameKana" required></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>生年月日</mat-label><input matInput type="date" [(ngModel)]="f.birthDate" required autocomplete="bday"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>生年月日</mat-label><input matInput [(ngModel)]="f.birthDate" required autocomplete="bday" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 startView="multi-year" /></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>性別</mat-label>
                 <mat-select [(ngModel)]="f.gender"><mat-option value="male">男</mat-option><mat-option value="female">女</mat-option></mat-select>
                 <mat-hint>健康保険証などの記載に使います</mat-hint></mat-form-field>
@@ -105,7 +106,7 @@ const KANA = /^[ァ-ヶー\s　]+$/;
                   <mat-select [(ngModel)]="d.relationship">
                     @for (r of relationshipKeys; track r) { <mat-option [value]="r">{{ relationships[r] }}</mat-option> }
                   </mat-select></mat-form-field>
-                <mat-form-field appearance="outline"><mat-label>生年月日</mat-label><input matInput type="date" [(ngModel)]="d.birthDate"></mat-form-field>
+                <mat-form-field appearance="outline"><mat-label>生年月日</mat-label><input matInput [(ngModel)]="d.birthDate" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 startView="multi-year" /></mat-form-field>
                 <button mat-button type="button" class="remove" (click)="f.dependents.splice($index, 1)"><mat-icon>delete</mat-icon>この人を外す</button>
               </div>
             }

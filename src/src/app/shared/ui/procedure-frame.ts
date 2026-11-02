@@ -99,15 +99,21 @@ export interface StepperItem {
     </nav>
   `,
   styles: [`
+    /* ステップは矢印の形でつなぐ。枠の色（背景）が矢印の間の 2px からのぞいて区切り線になる */
     .stepper {
+      --tip: 14px;
       display: flex; align-items: stretch; margin-bottom: var(--app-space-4); overflow-x: auto;
-      background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius);
+      background: var(--app-color-border); border: 1px solid var(--app-color-border); border-radius: var(--app-radius);
     }
     button {
-      flex: 1 1 0; display: flex; align-items: center; gap: 8px; min-width: 104px; padding: 10px 12px; position: relative;
-      border: 0; background: none; font: inherit; text-align: left; color: var(--app-color-text); cursor: pointer;
+      flex: 1 1 0; display: flex; align-items: center; gap: 8px; min-width: 120px; padding: 10px 12px 10px calc(12px + var(--tip)); position: relative;
+      border: 0; background: var(--app-color-surface); font: inherit; text-align: left; color: var(--app-color-text); cursor: pointer;
+      clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%, var(--tip) 50%);
     }
-    button + button { border-left: 1px solid var(--app-color-border); }
+    button:first-child { padding-left: 12px; clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%); }
+    button:last-child { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, var(--tip) 50%); }
+    button:only-child { clip-path: none; }
+    button + button { margin-left: calc(2px - var(--tip)); }
     button:hover:not(:disabled) { background: var(--app-color-surface-sub); }
     button:disabled { cursor: default; color: var(--app-color-text-sub); }
     button:focus-visible { outline: 2px solid var(--app-color-link); outline-offset: -2px; }
@@ -118,8 +124,7 @@ export interface StepperItem {
     .dot mat-icon { font-size: 16px; width: 16px; height: 16px; }
     [data-state='done'] .dot { background: var(--app-status-done-bg); color: var(--app-status-done-fg); }
     [data-state='attention'] .note { color: var(--app-status-attention-fg); font-weight: 600; }
-    .cur { background: var(--app-status-yours-bg); }
-    .cur::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--app-status-yours-fg); }
+    .cur, .cur:hover:not(:disabled) { background: var(--app-status-yours-bg); }
     .cur .dot { background: var(--app-status-yours-fg); color: #fff; }
     .cur b { color: var(--app-status-yours-fg); }
     .t { min-width: 0; }

@@ -323,7 +323,7 @@ export async function submitDependentFiling(input: { companyId: string; procedur
     '生年月日': e.birthDate ? toDateString(e.birthDate) : '',
     '性別': gender(e.gender),
     '個人番号': '',
-    '基礎年金番号': '',
+    '基礎年金番号': e.basicPensionNumber ?? '',
     '届出区分': '被扶養者（異動）届',
     '届出年月日': [...dc.items.map(i => i.eventDate)].sort()[0],
     '被扶養者一覧': dc.items.map((i, n) => ({

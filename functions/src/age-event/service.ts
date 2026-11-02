@@ -265,7 +265,7 @@ function formDataOf(proc: AgeProc, e: EmployeeDoc, office: OfficeDoc, grade: Gra
     '生年月日': ae.birthDate,
     '性別': e.gender === 'male' ? '男' : '女',
     '個人番号': '',
-    '基礎年金番号': '',
+    '基礎年金番号': e.basicPensionNumber ?? '',
     '資格喪失年月日': ae.lossDate,
   };
   if (ae.kind === 'health75') {

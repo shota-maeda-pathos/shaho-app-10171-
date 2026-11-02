@@ -14,6 +14,8 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import { OfficeContextService } from '../../../core/services/office-context.service';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 interface PremiumRow {
   employeeId: string;
   employeeName: string;
@@ -37,7 +39,7 @@ interface PremiumRow {
 @Component({
   selector: 'app-premium-monthly',
   standalone: true,
-  imports: [
+  imports: [MatFormFieldModule, MatInputModule,
     CommonModule, FormsModule,
     MatTableModule, MatButtonModule, MatIconModule, MatCardModule,
     MatStepperModule, MatCheckboxModule, MatProgressSpinnerModule,
@@ -46,7 +48,7 @@ interface PremiumRow {
   template: `
     <div class="page-container">
       <h1>月次保険料計算</h1>
-      <label>計算対象月 <input type="month" [ngModel]="yearMonth" (ngModelChange)="changeMonth($event, stepper)" [disabled]="calculating() || submitting()"></label>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>計算対象月</mat-label><input matInput type="month" [ngModel]="yearMonth" (ngModelChange)="changeMonth($event, stepper)" [disabled]="calculating() || submitting()"></mat-form-field>
       @if (error()) { <p role="alert">{{ error() }}</p> }
       @for (message of failures(); track $index) { <p role="alert">{{ message }}</p> }
 

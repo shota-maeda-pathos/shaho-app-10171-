@@ -139,21 +139,39 @@ body {
 .main-area > .content > router-outlet + * {
   display: block; box-sizing: border-box; width: 100%; max-width: 1280px; margin: 0 auto; padding: var(--app-space-5) 28px var(--app-space-6);
 }
-.main-area > .content .app-page { padding: 0; max-width: none; }
+// 画面の中に入れ子にした app-page だけ余白を消す（画面そのもの＝router-outlet の次の要素は上の余白と幅を使う）
+.main-area > .content > router-outlet + * .app-page { padding: 0; max-width: none; }
 @media (max-width: 960px) {
   .main-area > .content > router-outlet + * { padding: var(--app-space-4) var(--app-space-4) var(--app-space-6); }
 }
 
-// 画面の共通の枠
-.app-page {
-  padding: var(--app-space-5) 28px var(--app-space-6); max-width: 1280px; margin: 0 auto;
-  // 本文の入力欄・選択肢・ボタンは、画面の文字（14px）に合わせて詰める（Material の既定は1段大きい）
+// 本文の入力欄・選択肢・ボタンは、画面の文字（14px）に合わせて詰める（Material の既定は1段大きい）。
+// app-page を使っていない画面とダイアログも同じ高さにそろえる
+.main-area > .content, .mat-mdc-dialog-container, .app-page {
   @include mat.theme((density: -3));
   @include mat.form-field-overrides((
     container-text-size: var(--app-font-md),
     outlined-label-text-size: var(--app-font-md),
     container-vertical-padding: 10px,
   ));
+  @include mat.select-overrides((trigger-text-size: var(--app-font-md)));
+}
+
+// 注記（mat-hint）のある入力欄は、下の行のラベルとぶつからないよう下を空ける
+.mat-mdc-form-field:has(.mat-mdc-form-field-hint) { margin-bottom: var(--app-space-2); }
+
+// 一覧の上の検索欄（虫眼鏡つき）の幅をそろえる
+.search-field { width: 280px; max-width: 100%; }
+
+// 日付ピッカー・プルダウンの選択肢は白いカードの上に開くので、影と枠で境目を見せる
+.mat-datepicker-content, .mat-mdc-select-panel {
+  border: 1px solid var(--app-color-border);
+  box-shadow: 0 8px 24px rgba(16, 24, 40, .12), 0 2px 6px rgba(16, 24, 40, .08) !important;
+}
+
+// 画面の共通の枠
+.app-page {
+  padding: var(--app-space-5) 28px var(--app-space-6); max-width: 1280px; margin: 0 auto;
 }
 .app-page-title { margin: 0 0 var(--app-space-2); font-size: 22px; font-weight: 700; letter-spacing: .01em; }
 .app-page-guide { margin: 0 0 var(--app-space-4); color: var(--app-color-text-sub); line-height: 1.7; max-width: 900px; }

@@ -5,6 +5,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 interface Department { id: string; name: string; officeId: string; sortOrder: number; isActive: boolean }
 interface Office { id: string; name: string }
 
@@ -12,15 +15,14 @@ interface Office { id: string; name: string }
 @Component({
   selector: 'app-department-management',
   standalone: true,
-  imports: [FormsModule, MatButtonModule],
+  imports: [MatFormFieldModule, MatInputModule, MatSelectModule, FormsModule, MatButtonModule],
   template: `
     <div class="section">
       <p class="sub">事業所ごとに部署を作ります。従業員の画面で所属部署を選ぶと、保険料の分析の部署別と、帳票の部署での絞り込みに使われます。</p>
       <div class="add">
-        <label>事業所
-          <select [(ngModel)]="officeId" name="office">@for (o of offices(); track o.id) { <option [value]="o.id">{{ o.name }}</option> }</select></label>
-        <label>部署名 <input [(ngModel)]="name" name="name" maxlength="50" placeholder="例：営業部"></label>
-        <label>並び順 <input type="number" [(ngModel)]="sortOrder" name="sortOrder" min="0" max="9999"></label>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>事業所</mat-label><mat-select [(ngModel)]="officeId" name="office">@for (o of offices(); track o.id) { <mat-option [value]="o.id">{{ o.name }}</mat-option> }</mat-select></mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>部署名</mat-label><input matInput [(ngModel)]="name" name="name" maxlength="50" placeholder="例：営業部"></mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>並び順</mat-label><input matInput type="number" [(ngModel)]="sortOrder" name="sortOrder" min="0" max="9999"></mat-form-field>
         <button mat-flat-button color="primary" type="button" (click)="add()" [disabled]="busy() || !officeId || !name.trim()">部署を作る</button>
       </div>
       @for (o of offices(); track o.id) {
@@ -49,7 +51,7 @@ interface Office { id: string; name: string }
     .sub { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
     .add { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin: 12px 0 20px; }
     .add label { display: flex; flex-direction: column; gap: 2px; font-size: var(--app-font-sm); }
-    input, select { padding: 6px 8px; font: inherit; }
+    input:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; }
     .short { width: 5em; }
     table { width: 100%; border-collapse: collapse; font-size: var(--app-font-sm); margin-bottom: 12px; }
     td, th { padding: 4px 6px; border-bottom: 1px solid var(--app-color-border); text-align: left; }

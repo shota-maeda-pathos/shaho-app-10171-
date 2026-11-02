@@ -13,6 +13,7 @@ import { refreshProcedure } from '../procedures/refresh';
 import { completed, latestApprovalId, requireVersion, setStep, statusReasonOf, stepOf, todayJst } from '../procedures/wizard';
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
 import { confirmProcedure } from '../procedures/procedure-action/service';
+import { acquisitionLedgerFields, acquisitionRemarkItems } from '../filings/acquisition-fields';
 import { changeEffect, changeNotes, EFFECT_LABEL, qualificationDateOf } from './rules';
 import { ChangeEntryInput, ChangePreviewInput } from './schema';
 
@@ -337,7 +338,7 @@ export async function submitChangeFiling(input: { companyId: string; procedureId
   const common = {
     '事業所整理記号': office.officeNumber ?? '', '事業所名称': office.name ?? '',
     '被保険者整理番号': e.insuredPersonNumber ?? '', '被保険者氏名': nameOf(e), '被保険者氏名フリガナ': `${e.lastNameKana} ${e.firstNameKana}`,
-    '生年月日': e.birthDate ? toDateString(e.birthDate) : '', '性別': e.gender === 'male' ? '男' : '女', '個人番号': '', '基礎年金番号': '',
+    '生年月日': e.birthDate ? toDateString(e.birthDate) : '', '性別': e.gender === 'male' ? '男' : '女', '個人番号': '', '基礎年金番号': e.basicPensionNumber ?? '',
   };
   const acquire = ec.effect === 'acquire';
   const effectiveMonth = qualificationDate.slice(0, 7);
@@ -350,6 +351,8 @@ export async function submitChangeFiling(input: { companyId: string; procedureId
     '健康保険_等級': j.chosen.health ? j.healthGrade.gradeNumber : null, '健康保険_標準報酬月額': j.chosen.health ? j.healthGrade.standardRemuneration : null,
     '厚生年金_等級': j.chosen.pension ? j.pensionGrade.gradeNumber : null, '厚生年金_標準報酬月額': j.chosen.pension ? j.pensionGrade.standardRemuneration : null,
     '備考': '労働条件の変更による取得',
+    '備考項目': acquisitionRemarkItems({ age70: j.ageNotes.some(n => n.startsWith('70歳以上')), otherEmployer: !!e.otherEmployer, shortTime: j.judgement.insuredCategory === 'shortTime' }),
+    ...(await acquisitionLedgerFields(input.companyId, proc.employeeId!, e)),
   } : {
     ...common,
     '届出区分': '資格喪失届', '資格喪失年月日': qualificationDate, '喪失原因': '退職等', '退職年月日': ec.effectiveDate,

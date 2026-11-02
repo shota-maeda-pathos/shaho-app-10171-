@@ -9,12 +9,15 @@ import { AuthService } from '../../core/services/auth.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
 import { SimulationsComponent } from '../simulation/simulations';
 import { CostAnalysisComponent } from './cost-analysis';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 interface Analytics {insuranceTrends:{yearMonth:string;totalEmployee:number;totalEmployer:number;healthTotal:number;pensionTotal:number;employeeCount:number}[];filingStats:{draft:number;pending:number;approved:number;submitted:number;accepted:number};forecast:{nextMonth:string;estimatedTotal:number;estimatedEmployee:number;estimatedEmployer:number;basis:string}|null;monthOverMonth:{currentTotal:number;previousTotal:number;changePercent:number|null}|null}
-@Component({standalone:true,imports:[CommonModule,FormsModule,RouterLink,MatTabsModule,MatButtonModule,SimulationsComponent,CostAnalysisComponent],template:`
+@Component({standalone:true,imports:[ MatFormFieldModule, MatInputModule, MatSelectModule, CommonModule,FormsModule,RouterLink,MatTabsModule,MatButtonModule,SimulationsComponent,CostAnalysisComponent],template:`
   <section class="analytics"><h1>集計・試算</h1><p>{{office.label()}}の確定済み保険料を表示しています。試算結果は実績に登録されません。<a routerLink="/reports">帳票（PDF・CSV）を出す</a></p>
     <mat-tab-group [selectedIndex]="tab" (selectedIndexChange)="changeTab($event)">
       <mat-tab label="保険料・届出の集計"><ng-template matTabContent>
-        <div class="filter"><label>表示期間 <select [(ngModel)]="months" (change)="load()"><option [ngValue]="6">直近6か月</option><option [ngValue]="12">直近12か月</option></select></label><button mat-stroked-button (click)="load()" [disabled]="loading()">再読み込み</button></div>
+        <div class="filter"><mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>表示期間</mat-label><mat-select [(ngModel)]="months" (selectionChange)="load()"><mat-option [value]="6">直近6か月</mat-option><mat-option [value]="12">直近12か月</mat-option></mat-select></mat-form-field><button mat-stroked-button (click)="load()" [disabled]="loading()">再読み込み</button></div>
         @if(error()) {<p role="alert">{{error()}}</p>}
         @if(loading()) {<p role="status">確定済み実績を集計しています…</p>}
         @if(data();as result) {

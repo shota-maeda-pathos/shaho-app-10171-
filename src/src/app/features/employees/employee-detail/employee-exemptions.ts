@@ -8,6 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 interface Exemption {
   id: string;
   exemptionTypeLabel: string;
@@ -23,7 +24,7 @@ interface Exemption {
 @Component({
   selector: 'app-employee-exemptions',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [MatDatepickerModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   template: `
     <h2>保険料免除管理</h2>
     <form #form="ngForm" (ngSubmit)="register()">
@@ -42,7 +43,7 @@ interface Exemption {
           <input matInput type="month" name="end" [(ngModel)]="end" [min]="start">
         </mat-form-field>
         <mat-form-field appearance="outline"><mat-label>届出承認日（未承認なら空欄）</mat-label>
-          <input matInput type="date" name="approved" [(ngModel)]="approvedDate">
+          <input matInput name="approved" [(ngModel)]="approvedDate" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 />
         </mat-form-field>
         <mat-form-field appearance="outline"><mat-label>月次保険料の免除</mat-label>
           <mat-select name="monthly" [(ngModel)]="monthly">
@@ -88,7 +89,7 @@ interface Exemption {
                   <input matInput type="month" name="updatedEndMonth" [(ngModel)]="edit.endMonth" [min]="exemption.startMonth">
                 </mat-form-field>
                 <mat-form-field appearance="outline"><mat-label>変更後の届出承認日（未承認なら空欄）</mat-label>
-                  <input matInput type="date" name="updatedApprovalDate" [(ngModel)]="edit.approvedDate">
+                  <input matInput name="updatedApprovalDate" [(ngModel)]="edit.approvedDate" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 />
                 </mat-form-field>
                 <mat-form-field appearance="outline"><mat-label>賞与保険料の免除</mat-label>
                   <mat-select name="updatedBonus" [(ngModel)]="edit.isBonusExempted">

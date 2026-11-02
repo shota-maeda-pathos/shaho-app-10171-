@@ -195,7 +195,8 @@ type Group = { key: string; label: string; items: HomeTodo[] };
     .sub { margin-top: 2px; font-size: var(--app-font-xs); color: var(--app-color-text-sub); }
     .card-foot { padding: var(--app-space-3) 18px; font-size: var(--app-font-sm); }
     .card-foot a { color: var(--app-color-link); }
-    .portal-banner { display: flex; align-items: center; gap: var(--app-space-4); padding: var(--app-space-5); background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); color: inherit; text-decoration: none; }
+    /* 上の「やること」などのカードと間を空ける */
+    .portal-banner { display: flex; align-items: center; gap: var(--app-space-4); margin-top: var(--app-space-4); padding: var(--app-space-5); box-shadow: var(--app-shadow); background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); color: inherit; text-decoration: none; }
     .portal-banner mat-icon:first-child { font-size: 40px; width: 40px; height: 40px; color: var(--app-color-link); }
     .portal-banner .chevron { margin-left: auto; color: var(--app-color-text-sub); }
   `],

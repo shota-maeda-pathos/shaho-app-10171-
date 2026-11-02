@@ -14,7 +14,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatNativeDateModule } from '@angular/material/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -156,7 +155,7 @@ interface OnboardResult {
     EmployeeLeavesComponent, EmployeeExemptionsComponent, EmployeeBonusComponent, EmployeeMyNumberComponent, EmployeeStatusComponent,
     DecimalPipe, FormsModule, RouterLink, MatCardModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatButtonModule, MatIconModule, MatDatepickerModule,
-    MatNativeDateModule, MatProgressSpinnerModule, MatSnackBarModule,
+    MatProgressSpinnerModule, MatSnackBarModule,
     MatTabsModule, MatTableModule, MatDividerModule, MatDialogModule, MatChipsModule,
     MatStepperModule, MatCheckboxModule, MatListModule,
   ],
@@ -205,7 +204,7 @@ interface OnboardResult {
               <mat-form-field appearance="outline"><mat-label>ほかの勤め先の名前</mat-label>
                 <input matInput [(ngModel)]="otherForm.name" name="otherName" maxlength="100"></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>勤め始めた日（任意）</mat-label>
-                <input matInput type="date" [(ngModel)]="otherForm.since" name="otherSince"></mat-form-field>
+                <input matInput [(ngModel)]="otherForm.since" name="otherSince" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>メモ（任意）</mat-label>
                 <input matInput [(ngModel)]="otherForm.note" name="otherNote" maxlength="200"></mat-form-field>
             </div>
@@ -228,7 +227,7 @@ interface OnboardResult {
           <div class="form-row">
             <mat-form-field appearance="outline">
               <mat-label>異動日</mat-label>
-              <input matInput [(ngModel)]="transferDate" name="transferDate" placeholder="YYYY-MM-DD" required>
+              <input matInput [(ngModel)]="transferDate" name="transferDate" [matDatepicker]="dpDate1" placeholder="YYYY/MM/DD" required><mat-datepicker-toggle matIconSuffix [for]="dpDate1" /><mat-datepicker #dpDate1 />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>異動先事業所</mat-label>
@@ -350,11 +349,11 @@ interface OnboardResult {
                   </mat-form-field>
                   <mat-form-field appearance="outline">
                     <mat-label>生年月日</mat-label>
-                    <input matInput [(ngModel)]="form.birthDate" name="birthDate" placeholder="YYYY-MM-DD">
+                    <input matInput [(ngModel)]="form.birthDate" name="birthDate" [matDatepicker]="dpBirth" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dpBirth" /><mat-datepicker #dpBirth startView="multi-year" />
                   </mat-form-field>
                   <mat-form-field appearance="outline">
                     <mat-label>入社日</mat-label>
-                    <input matInput [(ngModel)]="form.hireDate" name="hireDate" placeholder="YYYY-MM-DD" required>
+                    <input matInput [(ngModel)]="form.hireDate" name="hireDate" [matDatepicker]="dpDate2" placeholder="YYYY/MM/DD" required><mat-datepicker-toggle matIconSuffix [for]="dpDate2" /><mat-datepicker #dpDate2 />
                   </mat-form-field>
                   <mat-form-field appearance="outline">
                     <mat-label>事業所</mat-label>
@@ -479,14 +478,13 @@ interface OnboardResult {
 
                   <mat-form-field appearance="outline">
                     <mat-label>生年月日</mat-label>
-                    <input matInput [(ngModel)]="form.birthDate" name="birthDate"
-                           placeholder="YYYY-MM-DD">
+                    <input matInput [(ngModel)]="form.birthDate" name="birthDate" [matDatepicker]="dpBirth2" placeholder="YYYY/MM/DD">
+                    <mat-datepicker-toggle matIconSuffix [for]="dpBirth2" /><mat-datepicker #dpBirth2 startView="multi-year" />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
                     <mat-label>入社日</mat-label>
-                    <input matInput [(ngModel)]="form.hireDate" name="hireDate"
-                           placeholder="YYYY-MM-DD" required>
+                    <input matInput [(ngModel)]="form.hireDate" name="hireDate" [matDatepicker]="dpDate3" placeholder="YYYY/MM/DD" required><mat-datepicker-toggle matIconSuffix [for]="dpDate3" /><mat-datepicker #dpDate3 />
                   </mat-form-field>
 
                   <mat-form-field appearance="outline">
@@ -582,7 +580,7 @@ interface OnboardResult {
                     </mat-form-field>
                     <mat-form-field appearance="outline">
                       <mat-label>在留期間（満了日）</mat-label>
-                      <input matInput type="date" [(ngModel)]="form.residencePeriodEnd" name="residencePeriodEnd">
+                      <input matInput [(ngModel)]="form.residencePeriodEnd" name="residencePeriodEnd" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 />
                     </mat-form-field>
                     <mat-form-field appearance="outline">
                       <mat-label>在留カード番号</mat-label>
@@ -886,8 +884,8 @@ interface OnboardResult {
     .tab-content { padding: 24px 0; }
     .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 0 16px;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: var(--app-space-2) 20px;
     }
     .full-width { width: 100%; }
     .actions {

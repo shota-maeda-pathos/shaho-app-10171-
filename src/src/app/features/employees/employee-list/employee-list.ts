@@ -67,19 +67,19 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
     </app-page-head>
 
     <form class="filters" (ngSubmit)="search()">
-      <mat-form-field appearance="outline">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="keyword">
         <mat-label>氏名・カナ・社員番号で探す</mat-label>
         <input matInput name="keyword" [(ngModel)]="keyword">
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>
-      <mat-form-field appearance="outline">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
         <mat-label>雇用形態</mat-label>
         <mat-select name="employmentType" [(ngModel)]="employmentType" (selectionChange)="search()">
           <mat-option value="">すべて</mat-option>
           @for (t of employmentTypes; track t[0]) { <mat-option [value]="t[0]">{{ t[1] }}</mat-option> }
         </mat-select>
       </mat-form-field>
-      <mat-form-field appearance="outline">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
         <mat-label>在籍状態</mat-label>
         <mat-select name="status" [(ngModel)]="statusFilter" (selectionChange)="search()">
           <mat-option value="">退職者を除く</mat-option>
@@ -166,7 +166,8 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
       mat-icon { font-size: 48px; width: 48px; height: 48px; }
     }
     .load-more { text-align: center; margin-top: 16px; }
-    .filters { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: center; margin-bottom: 8px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
+    .filters .keyword { width: 300px; }
     .filters mat-form-field { width: 220px; }
     .filters .count { color: var(--app-color-text-sub); }
     .state { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; background: var(--app-status-done-bg); color: var(--app-status-done-fg); }

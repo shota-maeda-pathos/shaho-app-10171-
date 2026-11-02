@@ -6,6 +6,9 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import { PageHeadComponent } from '../../shared/ui';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 const PREFS = ['北海道', '青森', '岩手', '宮城', '秋田', '山形', '福島', '茨城', '栃木', '群馬', '埼玉', '千葉', '東京', '神奈川', '新潟', '富山', '石川', '福井', '山梨', '長野', '岐阜', '静岡', '愛知', '三重', '滋賀', '京都', '大阪', '兵庫', '奈良', '和歌山', '鳥取', '島根', '岡山', '広島', '山口', '徳島', '香川', '愛媛', '高知', '福岡', '佐賀', '長崎', '熊本', '大分', '宮崎', '鹿児島', '沖縄'];
 
 interface Row { healthGrade: number; pensionGrade: number | null; standardRemuneration: number; lowerBound: number; upperBound: number | null; healthFull: number | null; healthHalf: number | null; careFull: number | null; careHalf: number | null; pensionFull: number | null; pensionHalf: number | null }
@@ -15,12 +18,12 @@ interface Table { yearMonth: string; prefectureCode: string; rates: { health: nu
 @Component({
   selector: 'app-grade-table',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, MatButtonModule, PageHeadComponent],
+  imports: [MatFormFieldModule, MatInputModule, MatSelectModule, DecimalPipe, FormsModule, MatButtonModule, PageHeadComponent],
   template: `
     <app-page-head heading="保険料額表" />
     <div class="form">
-      <label>都道府県 <select [(ngModel)]="pref" name="pref">@for (p of prefs; track $index) { <option [value]="code($index)">{{ p }}</option> }</select></label>
-      <label>年月 <input type="month" [(ngModel)]="yearMonth" name="ym"></label>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>都道府県</mat-label><mat-select [(ngModel)]="pref" name="pref">@for (p of prefs; track $index) { <mat-option [value]="code($index)">{{ p }}</mat-option> }</mat-select></mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>年月</mat-label><input matInput type="month" [(ngModel)]="yearMonth" name="ym"></mat-form-field>
       <button mat-flat-button color="primary" type="button" (click)="load()" [disabled]="loading()">表示</button>
     </div>
     @if (error()) { <p class="error">{{ error() }}</p> }
@@ -43,7 +46,7 @@ interface Table { yearMonth: string; prefectureCode: string; rates: { health: nu
     :host { display: block; padding: var(--app-space-5); }
     .form { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 12px; flex-wrap: wrap; }
     .form label { display: flex; flex-direction: column; gap: 2px; font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
-    .form select, .form input { padding: 6px 8px; font: inherit; }
+    .form input:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; }
     .wrap { overflow-x: auto; }
     table { border-collapse: collapse; font-size: var(--app-font-sm); min-width: 820px; width: 100%; background: var(--app-color-surface); }
     td, th { padding: 3px 8px; border: 1px solid var(--app-color-border); }

@@ -25,6 +25,9 @@ import {
 } from './santei.types';
 import { SanteiFilingDialogComponent, SanteiInputDialogComponent, SanteiPersonComponent } from './santei-dialogs';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 /** ステップ。what は本体の見出しの横に出す1行。注意は操作バーの主ボタンの横に出す */
 interface StepDef { key: StepKey; label: string; what: string }
 
@@ -42,7 +45,7 @@ const STEPS: StepDef[] = [
 @Component({
   selector: 'app-santei',
   standalone: true,
-  imports: [
+  imports: [MatFormFieldModule, MatInputModule, MatSelectModule,
     DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule,
     TargetListComponent, TargetCellDirective, TargetDetailDirective, ErrorStateComponent, LoadingStateComponent, TermComponent, FilingSubmissionComponent, RunCorrectionComponent,
     FilingAttachmentsComponent, PageHeadComponent, StepperComponent, StepLeadComponent, SanteiPersonComponent,

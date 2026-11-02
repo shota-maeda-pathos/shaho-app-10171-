@@ -32,7 +32,7 @@
               <mat-radio-button value="death">亡くなった</mat-radio-button>
             </mat-radio-group>
             <mat-form-field appearance="outline"><mat-label>{{ reason === 'death' ? '亡くなった日' : '退職日（最後に在籍する日）' }}</mat-label>
-              <input matInput type="date" [(ngModel)]="resignationDate" (ngModelChange)="entryChanged()" required></mat-form-field>
+              <input matInput [(ngModel)]="resignationDate" (ngModelChange)="entryChanged()" required [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
             @if (reason === 'resignation') {
               <mat-form-field appearance="outline"><mat-label>退職理由のメモ（任意）</mat-label>
                 <input matInput [(ngModel)]="note" (ngModelChange)="entryDirty.set(true)" maxlength="200" placeholder="自己都合・定年・契約満了など">
@@ -124,7 +124,7 @@
             <p>本人のアカウント（{{ v.account.email }}）は、<strong>{{ v.account.viewOnlyFrom | date:'yyyy年M月d日' }}</strong>から申請などができなくなり、閲覧だけになります。
               閲覧できる最終日を過ぎると、ログインできなくなります。</p>
             <mat-form-field appearance="outline"><mat-label>閲覧できる最終日</mat-label>
-              <input matInput type="date" [(ngModel)]="accessUntil" [min]="v.entry?.resignationDate ?? ''">
+              <input matInput [(ngModel)]="accessUntil" [min]="v.entry?.resignationDate ?? ''" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 />
               <mat-hint>決まりでは退職日から3か月（{{ v.facts?.account?.accessUntil | date:'yyyy年M月d日' }}）です</mat-hint></mat-form-field>
             <p class="sub">再入社した場合は、利用者の管理画面で停止を解除できます。</p>
           }

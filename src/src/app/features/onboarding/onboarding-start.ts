@@ -14,13 +14,14 @@ import { OfficeContextService } from '../../core/services/office-context.service
 import { TermComponent } from '../../shared/ui';
 import { errorMessage } from './onboarding.types';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 interface Person { lastName: string; firstName: string; email: string | null }
 
 /** 「人が入社する」の入口。1人でも、新卒一斉入社のようにまとめてでも始められる */
 @Component({
   selector: 'app-onboarding-start',
   standalone: true,
-  imports: [
+  imports: [MatDatepickerModule,
     FormsModule, RouterLink, MatButtonModule, MatButtonToggleModule, MatFormFieldModule, MatIconModule,
     MatInputModule, MatRadioModule, MatSelectModule, TermComponent,
   ],
@@ -50,7 +51,7 @@ interface Person { lastName: string; firstName: string; email: string | null }
         </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>入社日（資格取得日）</mat-label>
-          <input matInput type="date" [(ngModel)]="hireDate" required>
+          <input matInput [(ngModel)]="hireDate" required [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 />
           <mat-hint>資格取得届はこの日の5日後までに出します</mat-hint>
         </mat-form-field>
       </section>

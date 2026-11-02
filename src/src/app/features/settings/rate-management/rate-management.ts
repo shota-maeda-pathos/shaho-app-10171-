@@ -7,6 +7,8 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import { ConfirmService } from '../../../shared/confirm-dialog/confirm-dialog';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 interface PreviewItem { line: number; typeLabel: string; prefectureCode: string; insurerId: string; appliedFrom: string; totalRate: number; employeeRate: number; employerRate: number; current: { totalRate: number; appliedFrom: string } | null; change: number | null; duplicate: boolean }
 interface ImpactRow { officeId: string; officeName: string; kind: 'monthly' | 'bonus'; yearMonth: string; unconfirmed: number; pending: number; confirmed: number }
 interface HistoryItem { typeLabel: string; prefectureCode: string; insurerId: string; appliedFrom: string; appliedUntil: string | null; totalRate: number; employeeRate: number; employerRate: number; note: string }
@@ -17,12 +19,12 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
 @Component({
   selector: 'app-rate-management',
   standalone: true,
-  imports: [FormsModule, RouterLink, MatButtonModule],
+  imports: [MatFormFieldModule, MatInputModule, FormsModule, RouterLink, MatButtonModule],
   template: `
     <div class="section">
       <p class="sub">新しい料率を CSV で取り込みます。料率は‰（例：健康保険 99.1）で書きます。本人・会社の欄が空なら折半です（子ども・子育て拠出金は会社だけ）。
         切り替えると、前の料率は「いつまで」が付いて履歴に残ります。<a routerLink="/grade-table">保険料額表を見る</a></p>
-      <label class="file">CSV ファイル <input type="file" accept=".csv,text/csv" (change)="pick($event)"></label>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="file"><mat-label>CSV ファイル</mat-label><input matInput type="file" accept=".csv,text/csv" (change)="pick($event)"></mat-form-field>
       <textarea rows="6" [(ngModel)]="csv" name="csv" [placeholder]="sample"></textarea>
       <div class="actions">
         <button mat-stroked-button type="button" (click)="csv = sample">書き方の例を入れる</button>
@@ -56,12 +58,12 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
       <h3>組合健保の料率を登録する</h3>
       <p class="sub">組合健保の事業所（設定の「事業所」で区分を組合健保にした事業所）は、ここで登録した保険者番号の料率だけで計算します。本人と会社の負担割合が折半でなければ、本人負担を入れます。</p>
       <div class="union">
-        <label>保険者番号 <input [(ngModel)]="union.insurerId" name="uInsurer" maxlength="20"></label>
-        <label>適用開始年月 <input [(ngModel)]="union.appliedFrom" name="uFrom" placeholder="2027-03" maxlength="7"></label>
-        <label>健康保険料率（‰） <input type="number" [(ngModel)]="union.healthTotal" name="uHealth" step="0.01"></label>
-        <label>うち本人負担（‰） <input type="number" [(ngModel)]="union.healthEmployee" name="uHealthEmp" step="0.01"></label>
-        <label>介護保険料率（‰、任意） <input type="number" [(ngModel)]="union.careTotal" name="uCare" step="0.01"></label>
-        <label>うち本人負担（‰） <input type="number" [(ngModel)]="union.careEmployee" name="uCareEmp" step="0.01"></label>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>保険者番号</mat-label><input matInput [(ngModel)]="union.insurerId" name="uInsurer" maxlength="20"></mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>適用開始年月</mat-label><input matInput [(ngModel)]="union.appliedFrom" name="uFrom" placeholder="2027-03" maxlength="7"></mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>健康保険料率（‰）</mat-label><input matInput type="number" [(ngModel)]="union.healthTotal" name="uHealth" step="0.01"></mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>うち本人負担（‰）</mat-label><input matInput type="number" [(ngModel)]="union.healthEmployee" name="uHealthEmp" step="0.01"></mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>介護保険料率（‰、任意）</mat-label><input matInput type="number" [(ngModel)]="union.careTotal" name="uCare" step="0.01"></mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>うち本人負担（‰）</mat-label><input matInput type="number" [(ngModel)]="union.careEmployee" name="uCareEmp" step="0.01"></mat-form-field>
       </div>
       @if (union.healthTotal && union.healthEmployee !== null) {
         <p class="sub">会社負担 {{ round(union.healthTotal - (union.healthEmployee ?? 0)) }}‰（本人：会社 ＝ {{ ratio(union.healthEmployee ?? 0, union.healthTotal) }}）</p>
@@ -89,7 +91,7 @@ const SAMPLE = '保険の種類,都道府県コード,保険者ID,適用開始�
     td.warn { color: var(--app-status-error-fg); font-weight: 600; }
     .union { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; margin: 8px 0; font-size: var(--app-font-sm); }
     .union label { display: flex; flex-direction: column; gap: 2px; }
-    .union input { padding: 6px 8px; font: inherit; }
+    .union input:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; }
     .errors { color: var(--app-status-error-fg); font-size: var(--app-font-sm); }
     h3 { margin: 24px 0 8px; }
   `],

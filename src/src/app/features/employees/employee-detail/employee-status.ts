@@ -9,6 +9,7 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import { errorMessage } from '../../onboarding/onboarding.types';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 interface Period {
   kind: string; label: string; start: string; end: string | null; source: 'leave' | 'absence' | 'resignation';
   id: string | null; note: string | null; planned: boolean;
@@ -22,7 +23,7 @@ interface StatusView { today: string; kind: string; label: string; note: string 
 @Component({
   selector: 'app-employee-status',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [MatDatepickerModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   template: `
     <section class="status" aria-label="在籍状態">
       <h3>在籍状態</h3>
@@ -62,8 +63,8 @@ interface StatusView { today: string; kind: string; label: string; note: string 
                   <mat-option value="injury">傷病休職</mat-option>
                   <mat-option value="personal">私傷病</mat-option>
                 </mat-select></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>開始日</mat-label><input matInput type="date" [(ngModel)]="form.startDate" name="absStart"></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>終了日（決まっていなければ空）</mat-label><input matInput type="date" [(ngModel)]="form.endDate" name="absEnd"></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>開始日</mat-label><input matInput [(ngModel)]="form.startDate" name="absStart" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>終了日（決まっていなければ空）</mat-label><input matInput [(ngModel)]="form.endDate" name="absEnd" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 /></mat-form-field>
               <mat-form-field appearance="outline" class="wide"><mat-label>メモ（任意）</mat-label><input matInput [(ngModel)]="form.note" name="absNote"></mat-form-field>
             </div>
             <button mat-flat-button type="button" (click)="save()" [disabled]="busy() || !form.startDate">{{ form.absenceId ? '直す' : '記録する' }}</button>

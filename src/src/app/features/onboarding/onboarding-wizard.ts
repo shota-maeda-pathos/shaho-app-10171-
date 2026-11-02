@@ -15,6 +15,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import {
   ErrorStateComponent, LoadingStateComponent, StatusBadgeComponent, TermComponent, WizardComponent, WizardStep, createDraftAutosave,
 } from '../../shared/ui';
@@ -41,7 +42,7 @@ const defaultContract = (): ContractForm => ({
 @Component({
   selector: 'app-onboarding-wizard',
   standalone: true,
-  imports: [
+  imports: [MatDatepickerModule,
     GroupNavComponent, FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule,
     MatInputModule, MatRadioModule, MatSelectModule, WizardComponent, TermComponent, StatusBadgeComponent,
     LoadingStateComponent, ErrorStateComponent,

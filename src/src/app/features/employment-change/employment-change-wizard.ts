@@ -19,6 +19,7 @@ import {
 import { ContractForm, EMPLOYMENT_TYPES, errorMessage } from '../onboarding/onboarding.types';
 import { ChangeJudgement, ChangeKey, ChangeView } from './employment-change.types';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 const KEYS: ChangeKey[] = ['entry', 'change_approval', 'filing', 'approval', 'submit', 'confirm'];
 
 const nextDay = (d: string) => {
@@ -34,7 +35,7 @@ const nextDay = (d: string) => {
 @Component({
   selector: 'app-employment-change-wizard',
   standalone: true,
-  imports: [
+  imports: [MatDatepickerModule,
     FilingSubmissionComponent, DatePipe, DecimalPipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule, MatInputModule,
     MatRadioModule, MatSelectModule, WizardComponent, TermComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent,
   ],

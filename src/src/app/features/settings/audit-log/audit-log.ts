@@ -9,6 +9,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 
+import { MatDatepickerModule } from '@angular/material/datepicker';
 interface AuditLogRow {
   id: string;
   seq: number | null;
@@ -55,14 +56,14 @@ const KINDS: { value: string; label: string }[] = [
 @Component({
   selector: 'app-audit-log',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [MatDatepickerModule, DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   template: `
     <div class="section">
       <div class="filters">
         <mat-form-field appearance="outline"><mat-label>開始日</mat-label>
-          <input matInput type="date" name="from" [(ngModel)]="from"></mat-form-field>
+          <input matInput name="from" [(ngModel)]="from" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
         <mat-form-field appearance="outline"><mat-label>終了日</mat-label>
-          <input matInput type="date" name="to" [(ngModel)]="to"></mat-form-field>
+          <input matInput name="to" [(ngModel)]="to" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 /></mat-form-field>
         <mat-form-field appearance="outline"><mat-label>操作者</mat-label>
           <mat-select name="actor" [(ngModel)]="actorUid">
             <mat-option value="">すべて</mat-option>

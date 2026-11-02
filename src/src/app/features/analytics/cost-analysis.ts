@@ -6,6 +6,9 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 type Pair = { employee: number; employer: number };
 interface Annual { actualMonthly: number; bonusEmployer: number; actual: number; confirmedMonths: number; forecast: number; remainingMonths: number }
 interface Analysis {
@@ -28,10 +31,10 @@ const FACTOR_LABELS: Record<string, string> = { joined: '入社', left: '退職'
 @Component({
   selector: 'app-cost-analysis',
   standalone: true,
-  imports: [DecimalPipe, FormsModule, MatButtonModule],
+  imports: [MatFormFieldModule, MatInputModule, MatSelectModule, DecimalPipe, FormsModule, MatButtonModule],
   template: `
     <div class="bar">
-      <label>年度 <select [(ngModel)]="fiscalYear" (change)="load()">@for (y of years; track y) { <option [ngValue]="y">{{ y }}年度（{{ y }}年4月〜{{ y + 1 }}年3月）</option> }</select></label>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>年度</mat-label><mat-select [(ngModel)]="fiscalYear" (selectionChange)="load()">@for (y of years; track y) { <mat-option [value]="y">{{ y }}年度（{{ y }}年4月〜{{ y + 1 }}年3月）</mat-option> }</mat-select></mat-form-field>
       <button mat-stroked-button type="button" (click)="exportCsv()" [disabled]="!a()">CSVで出力</button>
     </div>
     @if (error()) { <p class="error">{{ error() }}</p> }

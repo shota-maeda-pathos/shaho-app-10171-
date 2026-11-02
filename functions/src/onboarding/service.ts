@@ -8,6 +8,7 @@ import {
   EmployeeDoc, EmploymentDoc, FilingDoc, OfficeDoc, OnboardingState, ProcedureDoc, ProcedureStep,
 } from '../types/firestore';
 import { invalidArg, notFound } from '../utils/errors';
+import { acquisitionLedgerFields, acquisitionRemarkItems } from '../filings/acquisition-fields';
 import { toDateString, toTimestamp } from '../utils/firestore';
 import {
   acquisitionRemuneration, fiveDayDeadline, eligibilityByAge, judgeApplicability, lookupGrade, monthlyHoursFromWeekly,
@@ -645,7 +646,7 @@ export async function submitFiling(input: { companyId: string; procedureId: stri
     '生年月日': employee.birthDate ? toDateString(employee.birthDate) : '',
     '性別': employee.gender === 'male' ? '男' : '女',
     '個人番号': '',
-    '基礎年金番号': '',
+    '基礎年金番号': employee.basicPensionNumber ?? '',
     '届出区分': '資格取得届',
     '資格取得年月日': ob.hireDate,
     '取得区分': ev.chosen.health && ev.chosen.pension ? '健保・厚年' : ev.chosen.health ? '健保のみ' : '厚年のみ',
@@ -658,6 +659,8 @@ export async function submitFiling(input: { companyId: string; procedureId: stri
     '厚生年金_等級': ev.chosen.pension ? ev.pensionGrade.gradeNumber : null,
     '厚生年金_標準報酬月額': ev.chosen.pension ? ev.pensionGrade.standardRemuneration : null,
     '備考': [employment.insuredCategory === 'shortTime' ? '短時間労働者' : '', ...ev.ageNotes].filter(Boolean).join('／'),
+    '備考項目': acquisitionRemarkItems({ age70: ev.ageNotes.some(n => n.startsWith('70歳以上')), otherEmployer: !!employee.otherEmployer, shortTime: employment.insuredCategory === 'shortTime' }),
+    ...(await acquisitionLedgerFields(input.companyId, proc.employeeId, employee)),
   };
 
   const now = Timestamp.now();
