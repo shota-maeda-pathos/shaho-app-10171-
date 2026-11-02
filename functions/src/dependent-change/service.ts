@@ -65,7 +65,10 @@ export async function startDependentChange(input: { employeeId: string; sourcePr
     const p = d.data() as ProcedureDoc;
     return p.dependentChange && p.status === 'in_progress';
   });
-  if (open) return { procedureId: open.id, existing: true };
+  if (open) {
+    const prefilled = input.sourceRequestId ? await addRequestItem(auth.companyId, open.ref, input.employeeId, input.sourceRequestId) : false;
+    return { procedureId: open.id, existing: true, prefilled };
+  }
 
   // 入社の手続きから始めたときは、本人が申し出た家族を「扶養に入れる」として引き継ぐ
   let items: DependentChangeItem[] = [];
@@ -88,6 +91,7 @@ export async function startDependentChange(input: { employeeId: string; sourcePr
     const item = dependentItemFromRequest(req.type, req.detail, await currentDependents(auth.companyId, input.employeeId));
     if (item) items = [...items, item];
   }
+  const prefilled = !!input.sourceRequestId && items.length > 0;
 
   const name = nameOf(employee);
   const now = Timestamp.now();
@@ -107,7 +111,7 @@ export async function startDependentChange(input: { employeeId: string; sourcePr
     performedBy: auth.uid, performedAt: now, version: 1,
   });
   await batch.commit();
-  return { procedureId: ref.id, existing: false };
+  return { procedureId: ref.id, existing: false, prefilled };
 }
 
 // ── 読み取り ────────────────────────────────────────
@@ -138,6 +142,25 @@ export function currentDependentStep(proc: ProcedureDoc): DependentStepKey {
 async function currentDependents(companyId: string, employeeId: string) {
   const snap = await db.collection(`companies/${companyId}/employees/${employeeId}/dependents`).where('deletedAt', '==', null).get();
   return snap.docs.filter(d => !(d.data() as DependentDoc).disqualificationDate).map(d => dependentView(d.id, d.data() as DependentDoc));
+}
+
+/**
+ * 進行中の扶養の手続きに、本人からの申請の項目を足す。変わった内容をまだ保存していないときだけ足す
+ * （保存後・届出の作成後は、担当者がウィザードで手で入れる）。同じ人がもう入っていれば足さずに済ませる
+ */
+async function addRequestItem(companyId: string, ref: FirebaseFirestore.DocumentReference, employeeId: string, requestId: string) {
+  const { dependentItemFromRequest, loadRequestForHandoff } = await import('../portal/handoff');
+  const req = await loadRequestForHandoff(companyId, requestId, employeeId, ['dependentAdd', 'dependentRemove']);
+  const item = dependentItemFromRequest(req.type, req.detail, await currentDependents(companyId, employeeId));
+  if (!item) return false;
+  return db.runTransaction(async tx => {
+    const latest = (await tx.get(ref)).data() as DependentProcedure;
+    if (stepOf(latest, 'change').status === 'completed' || latest.dependentChange.filingId) return false;
+    const items = latest.dependentChange.items;
+    if (items.some(x => x.kind === item.kind && x.lastName === item.lastName && x.firstName === item.firstName)) return true;
+    tx.update(ref, { 'dependentChange.items': [...items, item], version: latest.version + 1, updatedAt: Timestamp.now() });
+    return true;
+  });
 }
 
 function judge(items: PreviewItem[]) {

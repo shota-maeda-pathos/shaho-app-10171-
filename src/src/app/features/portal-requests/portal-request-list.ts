@@ -147,11 +147,16 @@ export class PortalRequestListComponent implements OnInit {
     this.busy.set(true);
     try {
       const leave = r.type === 'leave';
-      const { data } = await httpsCallable<object, { procedureId: string }>(this.functions, leave ? 'leaveProcedureStart' : 'dependentChangeStart')({
+      const { data } = await httpsCallable<object, { procedureId: string; existing: boolean; prefilled: boolean }>(this.functions, leave ? 'leaveProcedureStart' : 'dependentChangeStart')({
         companyId: this.auth.companyId, employeeId: r.employeeId, sourceRequestId: r.id, ...(leave ? { kind: r.detail['kind'] } : {}),
       });
       await this.handle(r, 'inProgress');
-      this.snackBar.open('手続きを始めました。申請の内容を入れてあるので、確かめて進めてください', '閉じる', { duration: 6000 });
+      const message = data.prefilled
+        ? `${data.existing ? '進行中の手続きを開きました' : '手続きを始めました'}。申請の内容を入れてあるので、確かめて進めてください`
+        : data.existing
+          ? '進行中の手続きを開きました。内容を保存済みのため申請の内容は入れていません。申請を見ながら直してください'
+          : '手続きを始めました。申請の家族が台帳に見つからないため、申請を見ながら入れてください';
+      this.snackBar.open(message, '閉じる', { duration: 8000 });
       await this.router.navigate([leave ? '/leaves' : '/dependents', data.procedureId]);
     } catch (e: any) {
       this.snackBar.open(`始められませんでした：${e?.message ?? ''}`, '閉じる', { duration: 6000 });

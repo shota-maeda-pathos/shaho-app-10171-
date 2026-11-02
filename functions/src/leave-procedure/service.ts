@@ -28,6 +28,29 @@ const SHORT: Record<Kind, string> = { maternity: '産休', childcare: '育休' }
 
 // ── 開始 ────────────────────────────────────────────
 
+/**
+ * 進行中の休業の手続きに、本人からの申請の出産予定日・子・期間を入れる。期間をまだ保存していないときだけ、空いている項目にだけ入れる
+ * （保存後・届出の作成後は、担当者がウィザードで手で直す）
+ */
+async function fillFromRequest(companyId: string, ref: FirebaseFirestore.DocumentReference, employeeId: string, kind: Kind, requestId: string) {
+  const { leaveStateFromRequest, loadRequestForHandoff } = await import('../portal/handoff');
+  const req = await loadRequestForHandoff(companyId, requestId, employeeId, ['leave']);
+  if (req.detail.kind !== kind) throw invalidArg('申請の休業の種類と違います');
+  const s = leaveStateFromRequest(kind, req.detail);
+  return db.runTransaction(async tx => {
+    const latest = (await tx.get(ref)).data() as LeaveProc;
+    const lp = latest.leaveProcedure;
+    if (lp.period || lp.filingId) return false;
+    tx.update(ref, {
+      'leaveProcedure.expectedBirthDate': lp.expectedBirthDate ?? s.expectedBirthDate,
+      'leaveProcedure.child': lp.child ?? s.child,
+      'leaveProcedure.period': s.period,
+      version: latest.version + 1, updatedAt: Timestamp.now(),
+    });
+    return true;
+  });
+}
+
 export async function startLeave(input: { employeeId: string; kind: Kind; sourceProcedureId: string | null; sourceRequestId?: string | null }, auth: AuthContext) {
   const base = `companies/${auth.companyId}`;
   const empPath = `${base}/employees/${input.employeeId}`;
@@ -51,7 +74,10 @@ export async function startLeave(input: { employeeId: string; kind: Kind; source
     const p = d.data() as ProcedureDoc;
     return p.leaveProcedure?.kind === input.kind && p.status === 'in_progress';
   });
-  if (open) return { procedureId: open.id, existing: true };
+  if (open) {
+    const prefilled = input.sourceRequestId ? await fillFromRequest(auth.companyId, open.ref, input.employeeId, input.kind, input.sourceRequestId) : false;
+    return { procedureId: open.id, existing: true, prefilled };
+  }
 
   // 産休の手続きから続けて始めたときは、生まれた子と、産休の翌日からの期間を入れておく
   let period: LeavePeriodState | null = null;
@@ -104,7 +130,7 @@ export async function startLeave(input: { employeeId: string; kind: Kind; source
     performedBy: auth.uid, performedAt: now, version: 1,
   });
   await batch.commit();
-  return { procedureId: ref.id, existing: false };
+  return { procedureId: ref.id, existing: false, prefilled: !!input.sourceRequestId };
 }
 
 // ── 読み取り ────────────────────────────────────────
