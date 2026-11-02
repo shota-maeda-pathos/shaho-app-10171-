@@ -57,7 +57,7 @@ export const LIFE_EVENTS = LIFE_EVENT_GROUPS.flatMap(g => g.events);
       <!-- ホームの右側に置く短い一覧 -->
       <div class="start-list">
         @for (event of events; track event.type) {
-          <button type="button" (click)="open(event)" [title]="event.hint">{{ event.short }}</button>
+          <button type="button" (click)="open(event)" [title]="event.hint"><mat-icon aria-hidden="true">{{ event.icon }}</mat-icon>{{ event.short }}</button>
         }
       </div>
     } @else {
@@ -94,9 +94,11 @@ export const LIFE_EVENTS = LIFE_EVENT_GROUPS.flatMap(g => g.events);
     .hint { font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
     .start-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .start-list button {
+      display: flex; align-items: center; gap: 8px;
       padding: 9px 12px; border: 1px solid var(--app-color-border); border-radius: 8px; background: var(--app-color-surface);
       color: var(--app-color-text); font: inherit; font-size: var(--app-font-sm); font-weight: 600; text-align: left; cursor: pointer;
     }
+    .start-list mat-icon { flex: none; font-size: 18px; width: 18px; height: 18px; color: var(--app-color-link); }
     .start-list button:hover { background: var(--app-brand-tint); border-color: var(--app-brand-tint-2); color: var(--app-brand-strong); }
     .start-list button:focus-visible { outline: 2px solid var(--app-brand); outline-offset: 1px; }
   `],
