@@ -162,7 +162,7 @@ export class BonusPersonComponent {
         }
       }
       <p class="sub">
-        {{ f.header['事業所名称'] }}・賞与支払年月日（共通）{{ f.header['賞与支払年月日'] }}・期限 {{ f.deadline }}。中身は承認された賞与額から作っています。
+        {{ f.header['事業所名称'] }}・賞与支払年月日（共通）{{ f.header['賞与支払年月日'] }}@if (f.deadline) {・期限 {{ f.deadline }}}。中身は承認された賞与額から作っています。
         同じ月に2回以上支給した人は、初回の支給日と合算額を書き、備考に「同一月内の賞与合算」を付けます。
       </p>
       <div class="table-wrap">
