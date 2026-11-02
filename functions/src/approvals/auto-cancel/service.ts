@@ -33,9 +33,9 @@ export async function autoCancelApprovals(companyId: string, scope: { employeeId
       await cancelApproval({ companyId, target, reason }, auth);
       cancelled += 1;
     } catch (err) {
-      // 送信・提出済みは取り消せない（それで正しい）。それ以外の理由だけ知らせる
+      // 送信・提出済みは取り消せない（それで正しい）。いま承認済みでないもの（索引に残った古い依頼）は取り消す必要がない。それ以外の理由だけ知らせる
       const message = err instanceof Error ? err.message : String(err);
-      if (!/送信した届出|紙で提出した届出/.test(message)) kept.push(`${(e.filingType && FILING_LABELS[e.filingType]) || e.filingType || e.requestType}（${e.employeeName || e.officeName}）：${message}`);
+      if (!/送信した届出|紙で提出した届出|承認済みではありません|承認済み（提出前）の届出だけ/.test(message)) kept.push(`${(e.filingType && FILING_LABELS[e.filingType]) || e.filingType || e.requestType}（${e.employeeName || e.officeName}）：${message}`);
     }
   }
   if (cancelled || kept.length) {
