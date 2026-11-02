@@ -2,7 +2,7 @@ import { makeAuth, makeEmployeeDoc } from '../__tests__/helpers';
 const mockDocs = new Map<string, any>();
 const mockWrites = jest.fn();
 jest.mock('../config', () => {
-  const doc = (path: string) => ({ path, id: path.split('/').pop(), get: async () => snapshot(path) });
+  const doc = (path: string): any => ({ path, id: path.split('/').pop(), get: async () => snapshot(path), set: async (data: any) => { mockDocs.set(path, data); } });
   const snapshot = (path: string) => ({ exists: mockDocs.has(path), data: () => mockDocs.get(path) });
   return { db: {
     doc,
@@ -20,6 +20,8 @@ jest.mock('../config', () => {
     },
   } };
 });
+// 承認・差戻し後の手続きの更新はこのテストの対象外
+jest.mock('../procedures/hooks', () => ({ refreshEmployeeProcedures: jest.fn(async () => undefined) }));
 import { getMonthlyInsurance } from './monthly-insurance-get/service';
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
 import { approveApprovalRequest } from '../approvals/approval-request-approve/service';

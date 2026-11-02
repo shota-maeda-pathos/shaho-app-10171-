@@ -74,8 +74,8 @@ describe('autoGenerateFiling', () => {
     const filingData = mockSet.mock.calls[0][0];
     expect(filingData.filingType).toBe('acquisitionNotification');
     expect(filingData.workflowStatus).toBe('draft');
-    expect(filingData.formData.lastName).toBe('山田');
-    expect(filingData.formData.acquisitionDate).toBeDefined();
+    expect(filingData.formData['被保険者氏名']).toBe('山田 太郎');
+    expect(filingData.formData['資格取得年月日']).toBeDefined();
   });
 
   it('賞与支払届を自動生成できる', async () => {
@@ -110,8 +110,8 @@ describe('autoGenerateFiling', () => {
 
     expect(result.success).toBe(true);
     const filingData = mockSet.mock.calls[0][0];
-    expect(filingData.formData.totalAmount).toBe(500000);
-    expect(filingData.formData.healthInsuranceAmount).toBe(24950);
+    expect(filingData.formData['賞与額_合計']).toBe(500000);
+    expect(filingData.formData['健康保険料_被保険者']).toBe(24950);
   });
 
   it('従業員が見つからない場合はエラー', async () => {

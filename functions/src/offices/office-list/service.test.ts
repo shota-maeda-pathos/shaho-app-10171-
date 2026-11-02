@@ -43,8 +43,10 @@ describe('listOffices', () => {
     );
 
     expect(result.items).toHaveLength(2);
-    expect(result.items[0].name).toBe('本社');
-    expect(result.items[1].prefectureCode).toBe('27');
+    // 並び順は事業所名の日本語順（実装の sort）。名前で引いて確かめる
+    const names = result.items.map((item: any) => item.name);
+    expect(names).toEqual(['本社', '大阪支社'].sort((a, b) => a.localeCompare(b, 'ja')));
+    expect(result.items.find((item: any) => item.name === '大阪支社')?.prefectureCode).toBe('27');
   });
 
   it('担当事業所が空の operator は空の一覧を返す', async () => {

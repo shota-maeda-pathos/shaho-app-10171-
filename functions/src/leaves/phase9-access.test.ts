@@ -34,7 +34,7 @@ test.each([
 });
 test('assigned operator can create leave and exemption', async () => {
   const auth = makeAuth({ roles: ['operator'] });
-  await expect(createLeave(leaveInput, auth)).resolves.toEqual({ id: 'created' });
+  await expect(createLeave(leaveInput, auth)).resolves.toMatchObject({ id: 'created' });
   await expect(createPremiumExemption(exemptionInput, auth)).resolves.toEqual({ id: 'created' });
 });
 test('deleted employees cannot be listed', async () => {

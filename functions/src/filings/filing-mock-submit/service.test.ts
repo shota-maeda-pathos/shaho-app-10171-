@@ -20,6 +20,11 @@ jest.mock('../../config', () => ({
   },
 }));
 
+// 提出後の手続きの更新はこのテストの対象外
+jest.mock('../../procedures/hooks', () => ({
+  refreshEmployeeProcedures: jest.fn(async () => undefined),
+}));
+
 import { mockSubmitFiling } from './service';
 
 describe('mockSubmitFiling', () => {
@@ -27,8 +32,8 @@ describe('mockSubmitFiling', () => {
   const approvedFiling = makeFilingDoc({
     workflowStatus: 'approved',
     formData: {
-      lastName: '山田', firstName: '太郎', birthDate: '1990-01-15',
-      gender: '男', acquisitionDate: '2020-04-01',
+      被保険者氏名: '山田 太郎', 生年月日: '1990-01-15',
+      性別: '男', 資格取得年月日: '2020-04-01', 報酬月額_合計: 300000,
     },
   });
 
@@ -62,7 +67,7 @@ describe('mockSubmitFiling', () => {
   it('必須項目不足で模擬申請が失敗する', async () => {
     const incompleteFiling = makeFilingDoc({
       workflowStatus: 'approved',
-      formData: { lastName: '山田' },
+      formData: { 被保険者氏名: '山田 太郎' },
     });
     mockTxGet.mockImplementation(async (ref: any) => {
       if (ref.path.includes('/employees/') && !ref.path.includes('/filings/')) {
