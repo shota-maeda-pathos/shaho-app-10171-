@@ -5,7 +5,7 @@
   } @else if (loadError()) {
     <app-error-state [message]="loadError()" (retry)="load(true)" />
   } @else if (view(); as v) {
-    <app-wizard kicker="事業所間の異動" backLink="/procedures" backLabel="進行中の手続き"
+    <app-wizard [procedureId]="procedureId" kicker="事業所間の異動" backLink="/procedures" backLabel="進行中の手続き"
                 [heading]="v.procedure.title" [personName]="v.procedure.employeeName"
                 [subtitle]="'社員番号 ' + v.employee.employeeNumber + '・' + v.from.name + (v.to ? ' → ' + v.to.name : '')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"

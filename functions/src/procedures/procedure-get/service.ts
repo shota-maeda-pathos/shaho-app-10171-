@@ -47,6 +47,8 @@ export interface ProcedureGetResponse {
   effectiveDate: string | null;
   assignedTo: string;
   createdBy: string;
+  /** 始めた人の表示名（手続きをやめるボタンで「〇〇さんに頼んでください」と出すため。getProcedure だけが入れる） */
+  createdByName?: string | null;
   references: {
     type: string;
     documentId: string;
@@ -77,7 +79,8 @@ export async function getProcedure(
 
   requireProcedureAccess(auth, proc);
 
-  return toProcedureResponse(input.procedureId, proc);
+  const creator = proc.createdBy ? await db.doc(`companies/${auth.companyId}/users/${proc.createdBy}`).get() : null;
+  return { ...toProcedureResponse(input.procedureId, proc), createdByName: (creator?.data()?.displayName as string | undefined) ?? null };
 }
 
 export function toProcedureResponse(id: string, proc: ProcedureDoc): ProcedureGetResponse {

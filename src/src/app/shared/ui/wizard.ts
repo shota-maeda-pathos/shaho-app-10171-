@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ActionBarComponent, PageHeadComponent, StepLeadComponent, StepperComponent, StepperItem } from './procedure-frame';
+import { ProcedureCancelComponent } from './procedure-cancel';
 
 /**
  * ウィザードの1ステップ。label は動詞で書く（例：「資格取得届を作る」）。
@@ -38,14 +39,14 @@ export interface WizardStep {
 @Component({
   selector: 'app-wizard',
   standalone: true,
-  imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, PageHeadComponent, StepperComponent, StepLeadComponent, ActionBarComponent],
+  imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, PageHeadComponent, StepperComponent, StepLeadComponent, ActionBarComponent, ProcedureCancelComponent],
   template: `
     <app-page-head [heading]="displayHeading()" [kicker]="kicker()" [backLink]="backLink()" [backQuery]="backQuery()" [backLabel]="backLabel()">
       <ng-container ngProjectAs="[meta]">
         @if (subtitle()) { <span>{{ subtitle() }}</span> }
         <ng-content select="[meta]" />
       </ng-container>
-      <ng-container ngProjectAs="[actions]"><ng-content select="[headActions]" /></ng-container>
+      <ng-container ngProjectAs="[actions]"><ng-content select="[headActions]" /><app-procedure-cancel [procedureId]="procedureId()" /></ng-container>
     </app-page-head>
 
     <app-stepper [steps]="items()" [current]="step().key" [label]="displayHeading() + 'のステップ'" (select)="jump($event)" />
@@ -89,6 +90,8 @@ export class WizardComponent {
   subtitle = input<string>();
   /** 種類のタグ（例：「入社」） */
   kicker = input<string>();
+  /** 手続きの ID。渡すと見出しの右に「この手続きをやめる」を出す（ロールと始めた人で出し分ける） */
+  procedureId = input<string | null>(null);
   backLink = input<string | unknown[]>();
   backQuery = input<Record<string, string> | null>(null);
   backLabel = input('戻る');

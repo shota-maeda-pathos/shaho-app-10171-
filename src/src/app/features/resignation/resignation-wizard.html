@@ -5,7 +5,7 @@
   } @else if (loadError()) {
     <app-error-state [message]="loadError()" (retry)="load(true)" />
   } @else if (view(); as v) {
-    <app-wizard kicker="退職" backLink="/resignation" [backQuery]="{ officeId: v.procedure.officeId, key: (v.entry?.resignationDate ?? 'none') }" [backLabel]="groupBackLabel('loss', (v.entry?.resignationDate ?? 'none'))"
+    <app-wizard [procedureId]="procedureId" kicker="退職" backLink="/resignation" [backQuery]="{ officeId: v.procedure.officeId, key: (v.entry?.resignationDate ?? 'none') }" [backLabel]="groupBackLabel('loss', (v.entry?.resignationDate ?? 'none'))"
                 [heading]="v.procedure.title" [personName]="v.procedure.employeeName"
                 [subtitle]="v.procedure.officeName + '・社員番号 ' + v.employee.employeeNumber + (v.entry ? '・退職日 ' + (v.entry.resignationDate | date:'yyyy年M月d日') : '') + (v.facts?.filingDeadline ? '・資格喪失届の期限 ' + (v.facts!.filingDeadline | date:'M月d日') : '')"
                 [steps]="steps()" [current]="index()" (currentChange)="index.set($event)"
