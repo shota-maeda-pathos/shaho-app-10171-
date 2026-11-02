@@ -62,7 +62,8 @@ export async function updateEmployee(
       if (value === undefined) continue;
       const oldValue = current[key as keyof EmployeeDoc];
       updateData[key] = value;
-      changes[key] = { from: oldValue, to: value };
+      // 変わった項目だけを記録する。まだ入っていない項目は null（Firestore は undefined を書けない）
+      if (JSON.stringify(oldValue ?? null) !== JSON.stringify(value ?? null)) changes[key] = { from: oldValue ?? null, to: value ?? null };
     }
 
     for (const key of DATE_FIELDS) {
@@ -72,7 +73,8 @@ export async function updateEmployee(
       if (value === undefined) continue;
       const oldValue = current[key as keyof EmployeeDoc];
       updateData[key] = toTimestamp(value);
-      changes[key] = { from: oldValue, to: value };
+      const before = (oldValue as { toDate?: () => Date } | null | undefined)?.toDate?.().toISOString().slice(0, 10) ?? null;
+      if (before !== value.slice(0, 10)) changes[key] = { from: before, to: value };
     }
 
     tx.update(docRef, updateData);
