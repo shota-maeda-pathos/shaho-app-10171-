@@ -608,7 +608,7 @@ interface OnboardResult {
         @if (!isNew) {
           <mat-tab label="扶養家族">
             <ng-template matTabContent>
-            @if (tabLoading()['扶養家族']) {
+            @if (tabLoading()['扶養家族'] && tabMore()['扶養家族'] === undefined) {
               <div class="loading"><mat-spinner diameter="32" /></div>
             } @else if (tabErrors()['扶養家族']) {
               <p role="alert">{{ tabErrors()['扶養家族'] }}</p>
@@ -650,14 +650,14 @@ interface OnboardResult {
                 </div>
               }
             </div>
-                      @if (tabMore()['扶養家族']) { <button mat-stroked-button (click)="loadDependents(true)">さらに読み込む</button> }
+                      @if (tabMore()['扶養家族']) { <button mat-stroked-button (click)="loadDependents(true)" [disabled]="tabLoading()['扶養家族']">{{ tabLoading()['扶養家族'] ? '読み込み中…' : 'さらに読み込む' }}</button> }
             }
             </ng-template>
           </mat-tab>
 
           <mat-tab label="雇用条件">
             <ng-template matTabContent>
-            @if (tabLoading()['雇用条件']) {
+            @if (tabLoading()['雇用条件'] && tabMore()['雇用条件'] === undefined) {
               <div class="loading"><mat-spinner diameter="32" /></div>
             } @else if (tabErrors()['雇用条件']) {
               <p role="alert">{{ tabErrors()['雇用条件'] }}</p>
@@ -707,14 +707,14 @@ interface OnboardResult {
                 </div>
               }
             </div>
-                      @if (tabMore()['雇用条件']) { <button mat-stroked-button (click)="loadEmployments(true)">さらに読み込む</button> }
+                      @if (tabMore()['雇用条件']) { <button mat-stroked-button (click)="loadEmployments(true)" [disabled]="tabLoading()['雇用条件']">{{ tabLoading()['雇用条件'] ? '読み込み中…' : 'さらに読み込む' }}</button> }
             }
             </ng-template>
           </mat-tab>
 
           <mat-tab label="等級・報酬">
             <ng-template matTabContent>
-            @if (tabLoading()['等級・報酬']) {
+            @if (tabLoading()['等級・報酬'] && tabMore()['等級・報酬'] === undefined) {
               <div class="loading"><mat-spinner diameter="32" /></div>
             } @else if (tabErrors()['等級・報酬']) {
               <p role="alert">{{ tabErrors()['等級・報酬'] }}</p>
@@ -761,14 +761,14 @@ interface OnboardResult {
                 </div>
               }
             </div>
-                      @if (tabMore()['等級・報酬']) { <button mat-stroked-button (click)="loadGrades(true)">さらに読み込む</button> }
+                      @if (tabMore()['等級・報酬']) { <button mat-stroked-button (click)="loadGrades(true)" [disabled]="tabLoading()['等級・報酬']">{{ tabLoading()['等級・報酬'] ? '読み込み中…' : 'さらに読み込む' }}</button> }
             }
             </ng-template>
           </mat-tab>
 
           <mat-tab label="給与">
             <ng-template matTabContent>
-            @if (tabLoading()['給与']) {
+            @if (tabLoading()['給与'] && tabMore()['給与'] === undefined) {
               <div class="loading"><mat-spinner diameter="32" /></div>
             } @else if (tabErrors()['給与']) {
               <p role="alert">{{ tabErrors()['給与'] }}</p>
@@ -806,7 +806,7 @@ interface OnboardResult {
                 </div>
               }
             </div>
-                      @if (tabMore()['給与']) { <button mat-stroked-button (click)="loadSalaries(true)">さらに読み込む</button> }
+                      @if (tabMore()['給与']) { <button mat-stroked-button (click)="loadSalaries(true)" [disabled]="tabLoading()['給与']">{{ tabLoading()['給与'] ? '読み込み中…' : 'さらに読み込む' }}</button> }
             }
             </ng-template>
           </mat-tab>
@@ -824,7 +824,7 @@ interface OnboardResult {
           <mat-tab label="賞与">
             <ng-template matTabContent>
             <div class="tab-content"><app-employee-bonus [employeeId]="employeeId" (changed)="loadBonuses()" /></div>
-            @if (tabLoading()['賞与']) {
+            @if (tabLoading()['賞与'] && tabMore()['賞与'] === undefined) {
               <div class="loading"><mat-spinner diameter="32" /></div>
             } @else if (tabErrors()['賞与']) {
               <p role="alert">{{ tabErrors()['賞与'] }}</p>
@@ -862,7 +862,7 @@ interface OnboardResult {
                 </div>
               }
             </div>
-                      @if (tabMore()['賞与']) { <button mat-stroked-button (click)="loadBonuses(true)">さらに読み込む</button> }
+                      @if (tabMore()['賞与']) { <button mat-stroked-button (click)="loadBonuses(true)" [disabled]="tabLoading()['賞与']">{{ tabLoading()['賞与'] ? '読み込み中…' : 'さらに読み込む' }}</button> }
             }
             </ng-template>
           </mat-tab>

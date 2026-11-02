@@ -162,6 +162,9 @@ body {
 // グリッド・横並びで隣の欄に注記があっても、枠の高さを伸ばさない（伸ばすとプルダウンだけ縦に大きく見える）
 .mat-mdc-form-field .mat-mdc-text-field-wrapper { flex: none; }
 
+// 日付の欄（カレンダーのボタンつき）は、YYYY/MM/DD とボタンが入り切る幅より狭くしない（表の中・横並びでも）
+.mat-mdc-form-field:has(.mat-datepicker-toggle) { min-width: 160px; }
+
 // 一覧の上の検索欄（虫眼鏡つき）の幅をそろえる
 .search-field { width: 280px; max-width: 100%; }
 
@@ -208,6 +211,9 @@ html {
 }
 .mat-mdc-header-row { background: var(--app-color-surface-sub); }
 .mat-mdc-row:last-child .mat-mdc-cell { border-bottom: 0; }
+// 表の左右の端の余白は、設定などの白いカードの内側（24px）にそろえる
+.mat-mdc-table .mat-mdc-cell:first-child, .mat-mdc-table .mat-mdc-header-cell:first-child { padding-left: var(--app-space-5); }
+.mat-mdc-table .mat-mdc-cell:last-child, .mat-mdc-table .mat-mdc-header-cell:last-child { padding-right: var(--app-space-5); }
 
 /* Snackbar notification styles */
 .snack-success .mdc-snackbar__surface {

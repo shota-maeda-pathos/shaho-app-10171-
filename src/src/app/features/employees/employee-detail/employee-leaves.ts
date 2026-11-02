@@ -52,7 +52,7 @@ interface Leave {
     @if (error()) {
       <p role="alert">{{ error() }}</p>
       <button mat-stroked-button (click)="load()">再読み込み</button>
-    } @else if (loading()) {
+    } @else if (loading() && !leaves().length) {
       <p>読み込み中...</p>
     } @else {
       @for (leave of leaves(); track leave.id) {
@@ -86,7 +86,7 @@ interface Leave {
         <p>休業の登録はありません。</p>
       }
       @if (hasMore()) {
-        <button mat-stroked-button (click)="load(true)">さらに読み込む</button>
+        <button mat-stroked-button (click)="load(true)" [disabled]="loading()">{{ loading() ? '読み込み中…' : 'さらに読み込む' }}</button>
       }
     }
   `,

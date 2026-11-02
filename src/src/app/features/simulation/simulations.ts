@@ -49,8 +49,8 @@ const FN: Record<Kind, string> = { raise: 'simulationRaise', hire: 'simulationHi
         }
         @case ('bonus') {
           @if (!officeId()) { <p class="warn">上で事業所を1つ選んでください。</p> }
-          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>従業員ID（任意。入れると今年度の累計で上限を判定）</mat-label><input matInput [(ngModel)]="employeeId" name="eid"></mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>生年月日（従業員IDがないとき）</mat-label><input matInput [(ngModel)]="birthDate" name="bd2" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 startView="multi-year" /></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>従業員ID（任意）</mat-label><input matInput [(ngModel)]="employeeId" name="eid"><mat-hint>入れると今年度の累計で上限を判定</mat-hint></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>生年月日</mat-label><input matInput [(ngModel)]="birthDate" name="bd2" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 startView="multi-year" /><mat-hint>従業員IDがないとき</mat-hint></mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>賞与額（円）</mat-label><input matInput type="number" min="0" [(ngModel)]="bonusAmount" name="ba"></mat-form-field>
         }
       }

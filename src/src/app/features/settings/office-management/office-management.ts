@@ -57,6 +57,9 @@ interface OfficeEdit {
 
 type RoundingRule = 'statutory' | 'truncate' | 'round' | 'ceil';
 
+/** 一覧のプルダウンに出す短い名前（選ぶときは ROUNDING_LABELS の説明つきの名前を出す） */
+const ROUNDING_SHORT: Record<RoundingRule, string> = { statutory: '法定', truncate: '切捨て', round: '四捨五入', ceil: '切上げ' };
+
 const ROUNDING_LABELS: Record<RoundingRule, string> = {
   statutory: '法定（50銭以下切捨て・50銭超切上げ）',
   truncate: '切捨て（労使の取り決めがある場合）',
@@ -222,7 +225,7 @@ const PREFECTURES: Record<string, string> = {
         <mat-card>
           <table mat-table [dataSource]="offices()" class="full-width-table">
             <ng-container matColumnDef="officeNumber">
-              <th mat-header-cell *matHeaderCellDef>事業所番号</th>
+              <th mat-header-cell *matHeaderCellDef>整理記号</th>
               <td mat-cell *matCellDef="let row">{{ row.officeNumber }}</td>
             </ng-container>
             <ng-container matColumnDef="name">
@@ -246,8 +249,9 @@ const PREFECTURES: Record<string, string> = {
             <ng-container matColumnDef="rounding">
               <th mat-header-cell *matHeaderCellDef>端数処理 <app-term key="rounding" [showLabel]="false" /></th>
               <td mat-cell *matCellDef="let row">
-                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select [ngModel]="row.roundingRule ?? 'truncate'" (ngModelChange)="changeRounding(row, $event)"
-                        [disabled]="savingId() === row.id || row.version === undefined" [attr.aria-label]="row.name + 'の端数処理'">
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="rounding-field"><mat-select [ngModel]="row.roundingRule ?? 'truncate'" (ngModelChange)="changeRounding(row, $event)"
+                        [disabled]="savingId() === row.id || row.version === undefined" [attr.aria-label]="row.name + 'の端数処理'" [panelWidth]="null">
+                  <mat-select-trigger>{{ roundingShort(row.roundingRule ?? 'truncate') }}</mat-select-trigger>
                   @for (r of roundingOptions; track r.value) { <mat-option [value]="r.value">{{ r.label }}</mat-option> }
                 </mat-select></mat-form-field>
                 @if (row.version === undefined) { <div class="hint">サーバーの更新後に変更できます</div> }
@@ -323,7 +327,12 @@ const PREFECTURES: Record<string, string> = {
     .danger { color: var(--app-status-action-fg); }
     .months { display: flex; flex-wrap: wrap; gap: 2px 8px; max-width: 260px; margin-bottom: 4px; }
     .months label { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
-    .rounding-select { padding: 6px 8px; max-width: 260px; font: inherit; }
+    /* 短い値の列は折り返さない（所在地だけ折り返す） */
+    .mat-column-officeNumber, .mat-column-name, .mat-column-insurer, .mat-column-paymentInfo, .mat-column-bonusMonths, .mat-column-status { white-space: nowrap; }
+    .mat-column-address { min-width: 220px; }
+    /* 表の中のプルダウンは行の高さに合わせて低くする */
+    .rounding-field { width: 120px; --mat-form-field-container-height: 32px; --mat-form-field-container-vertical-padding: 4px;
+      --mat-form-field-filled-with-label-container-padding-top: 4px; --mat-form-field-filled-with-label-container-padding-bottom: 4px; }
     .hint { font-size: var(--app-font-xs); color: var(--app-color-text-sub); margin-top: 2px; }
     .migration { display: flex; align-items: center; gap: var(--app-space-3); flex-wrap: wrap; margin-bottom: var(--app-space-4);
       padding: var(--app-space-3) var(--app-space-4); border-radius: var(--app-radius); background: var(--app-status-yours-bg); line-height: 1.7; }
@@ -344,6 +353,7 @@ export class OfficeManagementComponent implements OnInit {
   savingId = signal('');
   migrating = signal(false);
 
+  roundingShort(rule: RoundingRule) { return ROUNDING_SHORT[rule] ?? rule; }
   readonly roundingOptions = (Object.keys(ROUNDING_LABELS) as RoundingRule[]).map(value => ({ value, label: ROUNDING_LABELS[value] }));
   /** 移行の対象（サーバーの migrateOfficeRoundingRule と同じ条件：切捨てか未設定） */
   needsMigration = computed(() => this.offices().filter(o => !o.roundingRule || o.roundingRule === 'truncate'));

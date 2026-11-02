@@ -134,6 +134,8 @@ const ROLE_LABELS: Record<string, string> = {
               <td mat-cell *matCellDef="let row">
                 @if (row.roles.includes('admin')) {
                   <span>全事業所</span>
+                } @else if (coversAllOffices(row.officeIds)) {
+                  <span>全事業所</span>
                 } @else if (row.officeIds.length > 0) {
                   @for (id of row.officeIds; track id) { <div>{{ officeName(id) }}</div> }
                 } @else {
@@ -236,6 +238,7 @@ const ROLE_LABELS: Record<string, string> = {
     .error { color: #b3261e; }
     mat-card { overflow-x: auto; }
     td.mat-mdc-cell, th.mat-mdc-header-cell { padding: 12px; }
+    td.mat-mdc-cell:first-child, th.mat-mdc-header-cell:first-child { padding-left: var(--app-space-5); }
   `],
 })
 export class UserManagementComponent implements OnInit {
@@ -300,6 +303,12 @@ export class UserManagementComponent implements OnInit {
     }
   }
   isOfficeRole = (role: string) => ['operator', 'approver', 'viewer'].includes(role);
+
+  /** 今ある事業所をすべて担当している（管理者でない人は、あとで事業所を足すと「全事業所」ではなくなる） */
+  coversAllOffices(officeIds: string[]): boolean {
+    const offices = this.offices();
+    return offices.length > 1 && offices.every(office => officeIds.includes(office.id));
+  }
 
   officeName(id: string): string {
     return this.offices().find(office => office.id === id)?.name

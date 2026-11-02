@@ -91,7 +91,8 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
       @if (total() !== null) { <span class="count" role="status">{{ total() }}名</span> }
     </form>
 
-    @if (loading()) {
+    <!-- 続きの読み込み中は一覧を出したままにする（消すと一覧の先頭に戻ってしまう） -->
+    @if (loading() && employees().length === 0) {
       <div class="loading">
         <mat-spinner diameter="40"></mat-spinner>
       </div>
@@ -147,8 +148,8 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
 
       @if (hasMore()) {
         <div class="load-more">
-          <button mat-stroked-button (click)="loadMore()">
-            さらに読み込む
+          <button mat-stroked-button (click)="loadMore()" [disabled]="loading()">
+            {{ loading() ? '読み込み中…' : 'さらに読み込む' }}
           </button>
         </div>
       }

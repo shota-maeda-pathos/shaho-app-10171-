@@ -115,19 +115,19 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
           @if (hasFilters()) { <button mat-button type="button" (click)="clear()">条件を消す</button> }
           @if (moreFilters()) {
             <div class="more">
-              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select name="status" [(ngModel)]="status" (ngModelChange)="search()" aria-label="状態">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="status-field"><mat-select name="status" [(ngModel)]="status" (ngModelChange)="search()" aria-label="状態">
                 <mat-option value="">すべての状態</mat-option>
                 @for (s of statuses; track s[0]) { <mat-option [value]="s[0]">{{ s[1] }}</mat-option> }
               </mat-select></mat-form-field>
-              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select name="paper" [(ngModel)]="paperStatus" (ngModelChange)="search()" aria-label="紙の提出">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="paper-field"><mat-select name="paper" [(ngModel)]="paperStatus" (ngModelChange)="search()" aria-label="紙の提出">
                 <mat-option value="">紙の提出：すべて</mat-option>
                 <mat-option value="none">紙では出していない</mat-option>
                 <mat-option value="submitted">紙で提出済み</mat-option>
                 <mat-option value="accepted">紙で受理</mat-option>
                 <mat-option value="returned">紙で返戻</mat-option>
               </mat-select></mat-form-field>
-              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>受付番号</mat-label><input matInput name="acceptance" [(ngModel)]="acceptanceNumber" placeholder="MOCK-…"></mat-form-field>
-              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select name="base" [(ngModel)]="periodBase" aria-label="期間の基準">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="acceptance-field"><mat-label>受付番号</mat-label><input matInput name="acceptance" [(ngModel)]="acceptanceNumber" placeholder="MOCK-…"></mat-form-field>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="base-field"><mat-select name="base" [(ngModel)]="periodBase" aria-label="期間の基準">
                 <mat-option value="created">作成日</mat-option>
                 <mat-option value="submitted">提出日</mat-option>
                 <mat-option value="deadline">期限</mat-option>
@@ -200,6 +200,9 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
     .zip-row input:not(.mat-mdc-input-element) { padding: 7px 10px; border: 1px solid var(--app-color-border); border-radius: var(--app-radius); font: inherit; font-size: var(--app-font-sm); background: var(--app-color-surface); }
     .keyword-field { width: 260px; }
     .date-field { width: 168px; }
+    /* 条件を足したときの1行：探すボタンまで横に収まる幅にする（狭い画面では折り返す） */
+    .status-field { width: 150px; } .paper-field { width: 170px; } .acceptance-field { width: 150px; } .base-field { width: 110px; }
+    .more .date-field { width: 160px; }
     .more { display: flex; flex-wrap: wrap; gap: var(--app-space-2); align-items: center; width: 100%; }
     .note { margin: 0; padding: var(--app-space-2) var(--app-space-5); color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
     .sub { margin: 0; color: var(--app-color-text-sub); }

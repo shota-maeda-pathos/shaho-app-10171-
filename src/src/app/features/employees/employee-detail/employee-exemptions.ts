@@ -68,7 +68,7 @@ interface Exemption {
     @if (error()) {
       <p role="alert">{{ error() }}</p>
       <button mat-stroked-button (click)="load()">再読み込み</button>
-    } @else if (loading()) {
+    } @else if (loading() && !exemptions().length) {
       <p>読み込み中...</p>
     } @else {
       @for (exemption of exemptions(); track exemption.id) {
@@ -109,7 +109,7 @@ interface Exemption {
         <p>免除の登録はありません。</p>
       }
       @if (hasMore()) {
-        <button mat-stroked-button (click)="load(true)">さらに読み込む</button>
+        <button mat-stroked-button (click)="load(true)" [disabled]="loading()">{{ loading() ? '読み込み中…' : 'さらに読み込む' }}</button>
       }
     }
   `,

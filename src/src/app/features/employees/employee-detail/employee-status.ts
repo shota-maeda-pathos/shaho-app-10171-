@@ -64,7 +64,7 @@ interface StatusView { today: string; kind: string; label: string; note: string 
                   <mat-option value="personal">私傷病</mat-option>
                 </mat-select></mat-form-field>
               <mat-form-field appearance="outline"><mat-label>開始日</mat-label><input matInput [(ngModel)]="form.startDate" name="absStart" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
-              <mat-form-field appearance="outline"><mat-label>終了日（決まっていなければ空）</mat-label><input matInput [(ngModel)]="form.endDate" name="absEnd" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 /></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>終了日</mat-label><input matInput [(ngModel)]="form.endDate" name="absEnd" [matDatepicker]="dp2" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp2" /><mat-datepicker #dp2 /><mat-hint>決まっていなければ空のまま</mat-hint></mat-form-field>
               <mat-form-field appearance="outline" class="wide"><mat-label>メモ（任意）</mat-label><input matInput [(ngModel)]="form.note" name="absNote"></mat-form-field>
             </div>
             <button mat-flat-button type="button" (click)="save()" [disabled]="busy() || !form.startDate">{{ form.absenceId ? '直す' : '記録する' }}</button>

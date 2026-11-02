@@ -30,7 +30,7 @@ export const LIFE_EVENT_GROUPS: { label: string; events: LifeEvent[] }[] = [
     label: '在籍中の変化',
     events: [
       { type: 'dependent_change', short: '扶養の変更', icon: 'family_restroom', label: '家族が増えた・減った', hint: '被扶養者（異動）届' },
-      { type: 'leave', short: '産休・育休', icon: 'child_friendly', label: '産休・育休に入る／戻る', hint: '申出書・保険料の免除・変更届・終了届' },
+      { type: 'leave', short: '産休・育休', icon: 'child_friendly', label: '産休・育休を取る', hint: '休業に入る・戻る。申出書・保険料の免除・終了届' },
       { type: 'monthly_change', short: '随時改定', icon: 'swap_vert', label: '給料が大きく変わった', hint: '随時改定（月額変更届）' },
       { type: 'transfer', short: '異動', icon: 'apartment', label: '別の事業所へ異動する', hint: '事業所間の異動' },
       { type: 'age_event', short: '70歳・75歳', icon: 'elderly', label: '70歳・75歳になる', hint: '厚生年金・健康保険の資格喪失' },
@@ -41,7 +41,7 @@ export const LIFE_EVENT_GROUPS: { label: string; events: LifeEvent[] }[] = [
     events: [
       { type: 'monthly', short: '毎月の処理', icon: 'event_repeat', label: '毎月の保険料処理', hint: '給与の取り込みから明細の公開・徴収まで', route: '/monthly' },
       { type: 'bonus_payment', short: '賞与', icon: 'card_giftcard', label: '賞与を払った', hint: '賞与の保険料と賞与支払届', route: '/bonus' },
-      { type: 'annual_review', short: '算定基礎', icon: 'assessment', label: '年1回の算定基礎届（7月）', hint: '4〜6月の給与から標準報酬月額を決め直す', route: '/santei' },
+      { type: 'annual_review', short: '算定基礎', icon: 'assessment', label: '算定基礎届（7月）', hint: '年1回。4〜6月の給与から標準報酬月額を決め直す', route: '/santei' },
     ],
   },
 ];
@@ -83,6 +83,8 @@ export const LIFE_EVENTS = LIFE_EVENT_GROUPS.flatMap(g => g.events);
     .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--app-space-3); }
     .card {
       display: grid; grid-template-columns: 32px 1fr; grid-template-rows: auto auto; column-gap: var(--app-space-3); row-gap: var(--app-space-1);
+      /* 見出しが2行になってもカードの高さを変えない：高さをそろえ、見出し＋説明2行が入る高さにする */
+      min-height: 108px; align-content: center;
       align-items: center; text-align: left; padding: var(--app-space-4); border: 1px solid var(--app-color-border); border-radius: var(--app-radius);
       background: var(--app-color-surface); color: var(--app-color-text); font: inherit; cursor: pointer;
     }
@@ -90,7 +92,8 @@ export const LIFE_EVENTS = LIFE_EVENT_GROUPS.flatMap(g => g.events);
     .card:focus-visible { outline: 2px solid var(--app-color-link); outline-offset: 2px; }
     .card.selected { border: 2px solid var(--app-color-link); background: var(--app-status-yours-bg); }
     .card mat-icon { grid-row: 1 / span 2; color: var(--app-color-link); font-size: 28px; width: 28px; height: 28px; }
-    .label { font-size: var(--app-font-lg); font-weight: 600; }
+    .label { font-size: var(--app-font-lg); font-weight: 600; line-height: 1.4; }
+    .hint { line-height: 1.5; }
     .hint { font-size: var(--app-font-sm); color: var(--app-color-text-sub); }
     .start-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .start-list button {

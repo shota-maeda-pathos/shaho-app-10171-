@@ -9,6 +9,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
+import { MatIconModule } from '@angular/material/icon';
 interface Department { id: string; name: string; officeId: string; sortOrder: number; isActive: boolean }
 interface Office { id: string; name: string }
 
@@ -16,26 +17,28 @@ interface Office { id: string; name: string }
 @Component({
   selector: 'app-department-management',
   standalone: true,
-  imports: [MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule, FormsModule, MatButtonModule],
+  imports: [MatCardModule, MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule, FormsModule, MatButtonModule],
   template: `
     <div class="section"><mat-card class="settings-card">
-      <p class="sub">事業所ごとに部署を作ります。従業員の画面で所属部署を選ぶと、保険料の分析の部署別と、帳票の部署での絞り込みに使われます。</p>
+      <p class="sub">事業所ごとに部署を作ります。従業員の画面で所属部署を選ぶと、保険料の分析の部署別と、帳票の部署での絞り込みに使われます。部署を選ぶ欄は、矢印で決めた順番に並びます。</p>
       <div class="add">
         <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>事業所</mat-label><mat-select [(ngModel)]="officeId" name="office">@for (o of offices(); track o.id) { <mat-option [value]="o.id">{{ o.name }}</mat-option> }</mat-select></mat-form-field>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>部署名</mat-label><input matInput [(ngModel)]="name" name="name" maxlength="50" placeholder="例：営業部"></mat-form-field>
-        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>並び順</mat-label><input matInput type="number" [(ngModel)]="sortOrder" name="sortOrder" min="0" max="9999"></mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="name"><mat-label>部署名</mat-label><input matInput [(ngModel)]="name" name="name" maxlength="50" placeholder="例：営業部"></mat-form-field>
         <button mat-flat-button color="primary" type="button" (click)="add()" [disabled]="busy() || !officeId || !name.trim()">部署を作る</button>
       </div>
       @for (o of offices(); track o.id) {
         @if (byOffice().get(o.id); as list) {
           <h3>{{ o.name }}</h3>
-          <table><thead><tr><th>部署名</th><th class="num">並び順</th><th>状態</th><th></th></tr></thead><tbody>
-            @for (d of list; track d.id) {
+          <table><thead><tr><th>部署名</th><th class="state">状態</th><th class="order">表示の順番</th><th class="ops"></th></tr></thead><tbody>
+            @for (d of list; track d.id; let first = $first, last = $last) {
               <tr [class.off]="!d.isActive">
-                <td><input [(ngModel)]="d.name" [name]="'n' + d.id" maxlength="50"></td>
-                <td class="num"><input type="number" class="short" [(ngModel)]="d.sortOrder" [name]="'s' + d.id" min="0" max="9999"></td>
-                <td>{{ d.isActive ? '使う' : '使わない' }}</td>
-                <td>
+                <td><mat-form-field appearance="outline" subscriptSizing="dynamic" class="row-name"><input matInput [(ngModel)]="d.name" [name]="'n' + d.id" maxlength="50" aria-label="部署名"></mat-form-field></td>
+                <td class="state">{{ d.isActive ? '使う' : '使わない' }}</td>
+                <td class="order">
+                  <button mat-icon-button type="button" (click)="move(list, d, -1)" [disabled]="busy() || first" [attr.aria-label]="d.name + 'を上へ'"><mat-icon>arrow_upward</mat-icon></button>
+                  <button mat-icon-button type="button" (click)="move(list, d, 1)" [disabled]="busy() || last" [attr.aria-label]="d.name + 'を下へ'"><mat-icon>arrow_downward</mat-icon></button>
+                </td>
+                <td class="ops">
                   <button mat-button type="button" (click)="save(d)" [disabled]="busy()">保存</button>
                   <button mat-button type="button" (click)="save(d, !d.isActive)" [disabled]="busy()">{{ d.isActive ? '使わないにする' : '使うに戻す' }}</button>
                 </td>
@@ -50,13 +53,16 @@ interface Office { id: string; name: string }
   styles: [`
     .section { padding: 24px 0; }
     .sub { color: var(--app-color-text-sub); font-size: var(--app-font-sm); margin-top: 0; }
-    .add { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin: 12px 0 20px; }
-    .add label { display: flex; flex-direction: column; gap: 2px; font-size: var(--app-font-sm); }
-    input:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; }
-    .short { width: 5em; }
-    table { width: 100%; border-collapse: collapse; font-size: var(--app-font-sm); margin-bottom: 12px; }
-    td, th { padding: 4px 6px; border-bottom: 1px solid var(--app-color-border); text-align: left; }
-    .num { text-align: right; }
+    .add { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0 20px; }
+    .name { width: 260px; max-width: 100%; }
+    /* ほかの一覧（mat-table）と同じ：灰色の小さな見出し・薄い区切り線。カードの幅いっぱいに広げ、部署名の欄が残りの幅を使う */
+    table { width: 100%; border-collapse: collapse; font-size: var(--app-font-md); margin-bottom: 12px; }
+    th { padding: 8px; font-size: var(--app-font-xs); font-weight: 600; color: var(--app-color-muted); text-align: left; border-bottom: 1px solid var(--app-color-border); }
+    td { padding: 4px 8px; border-bottom: 1px solid var(--app-color-border); text-align: left; }
+    .row-name { width: 100%; --mat-form-field-container-height: 36px; --mat-form-field-container-vertical-padding: 6px; }
+    .state { width: 96px; white-space: nowrap; }
+    .order { width: 120px; white-space: nowrap; }
+    .ops { width: 220px; white-space: nowrap; text-align: right; }
     tr.off td { color: var(--app-color-text-sub); }
     h3 { margin: 16px 0 6px; font-size: var(--app-font-md); }
   `],
@@ -71,7 +77,6 @@ export class DepartmentManagementComponent implements OnInit {
   busy = signal(false);
   officeId = '';
   name = '';
-  sortOrder = 0;
 
   byOffice = computed(() => {
     const m = new Map<string, Department[]>();
@@ -91,10 +96,34 @@ export class DepartmentManagementComponent implements OnInit {
     this.departments.set(data.items);
   }
 
-  add() { return this.call({ officeId: this.officeId, name: this.name.trim(), sortOrder: Number(this.sortOrder) || 0, isActive: true }, `「${this.name.trim()}」を作りました`, () => { this.name = ''; }); }
+  /** 新しい部署は、その事業所の一番下に足す */
+  add() {
+    const last = Math.max(0, ...(this.byOffice().get(this.officeId) ?? []).map(d => d.sortOrder));
+    return this.call({ officeId: this.officeId, name: this.name.trim(), sortOrder: last + 10, isActive: true }, `「${this.name.trim()}」を作りました`, () => { this.name = ''; });
+  }
 
   save(d: Department, isActive = d.isActive) {
-    return this.call({ departmentId: d.id, officeId: d.officeId, name: d.name.trim(), sortOrder: Number(d.sortOrder) || 0, isActive }, `「${d.name.trim()}」を保存しました`);
+    return this.call({ departmentId: d.id, officeId: d.officeId, name: d.name.trim(), sortOrder: d.sortOrder, isActive }, `「${d.name.trim()}」を保存しました`);
+  }
+
+  /** 隣の部署と順番を入れ替える。順番は 10, 20, 30… に振り直し、変わった部署だけ保存する */
+  async move(list: Department[], d: Department, step: -1 | 1) {
+    const i = list.indexOf(d);
+    const order = [...list];
+    [order[i], order[i + step]] = [order[i + step], order[i]];
+    const changed = order.map((x, k) => ({ x, sortOrder: (k + 1) * 10 })).filter(c => c.x.sortOrder !== c.sortOrder);
+    this.busy.set(true);
+    try {
+      for (const c of changed) {
+        await httpsCallable(this.functions, 'departmentSave')({ companyId: this.auth.companyId, departmentId: c.x.id, officeId: c.x.officeId, name: c.x.name.trim(), sortOrder: c.sortOrder, isActive: c.x.isActive });
+      }
+      await this.load();
+    } catch (e: unknown) {
+      this.snackBar.open(`順番を変えられませんでした：${e instanceof Error ? e.message : ''}`, '閉じる', { duration: 6000 });
+      await this.load();
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   private async call(payload: object, done: string, after?: () => void) {
