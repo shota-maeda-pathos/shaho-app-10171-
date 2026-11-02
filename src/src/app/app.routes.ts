@@ -273,7 +273,7 @@ export const routes: Routes = [
       {path:'bonus',canActivate:[roleGuard('admin','operator','approver')],data:{title:'賞与'},loadComponent:()=>import('./features/bonus/bonus').then(m=>m.BonusComponent)},
       {
         path: 'simulation',
-        canActivate: [roleGuard('admin', 'operator', 'viewer')],
+        canActivate: [roleGuard('admin', 'operator')],
         data: { title: 'シミュレーション' },
         loadComponent: () =>
           import('./features/simulation/simulation').then((m) => m.SimulationComponent),
