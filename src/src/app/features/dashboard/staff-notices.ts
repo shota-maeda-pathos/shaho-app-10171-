@@ -3,6 +3,7 @@ import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { canOpenRoute } from '../../core/utils/route-access';
 
 interface StaffNotice {
   id: string; title: string; body: string; category: string; isRead: boolean; createdAt: string;
@@ -30,10 +31,10 @@ interface StaffNotice {
           <ul class="card-body list">
             @for (n of list; track n.id) {
               <li [class.unread]="!n.isRead">
-                <button type="button" (click)="open(n)" [attr.aria-label]="(n.isRead ? '' : '未読：') + n.title + (n.link ? '（開く）' : '')">
+                <button type="button" (click)="open(n)" [attr.aria-label]="(n.isRead ? '' : '未読：') + n.title + (canOpen(n) ? '（開く）' : '')">
                   <span class="t">{{ n.title }}</span>
                   <span class="b">{{ n.body }}</span>
-                  <span class="d">{{ n.createdAt | date:'M/d H:mm' }}@if (n.link) {<span class="go">・開く →</span>}</span>
+                  <span class="d">{{ n.createdAt | date:'M/d H:mm' }}@if (canOpen(n)) {<span class="go">・開く →</span>}</span>
                 </button>
               </li>
             }
@@ -93,8 +94,11 @@ export class StaffNoticesComponent implements OnInit {
   /** 既読にして、関係する画面があれば開く（既読にできなくても開く） */
   async open(n: StaffNotice) {
     if (!n.isRead) await this.mark([n.id]).catch(() => undefined);
-    if (n.link) void this.router.navigate([n.link.route], { queryParams: n.link.queryParams });
+    if (n.link && this.canOpen(n)) void this.router.navigate([n.link.route], { queryParams: n.link.queryParams });
   }
+
+  /** 自分のロールで開けない画面（承認者にとっての届出など）は「開く」を出さない */
+  canOpen(n: StaffNotice) { return !!n.link && canOpenRoute(n.link.route, this.auth); }
 
   async markAll() {
     const ids = (this.items() ?? []).filter(n => !n.isRead).map(n => n.id);

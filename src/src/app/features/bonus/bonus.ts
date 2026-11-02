@@ -57,6 +57,8 @@ const STEPS: StepDef[] = [
 export class BonusComponent implements OnInit {
   office = inject(OfficeContextService);
   private auth = inject(AuthService);
+  /** 設定の画面は管理者だけが開ける */
+  readonly isAdmin = this.auth.hasAnyRole('admin');
   private functions = inject(Functions);
   private route = inject(ActivatedRoute);
   private router = inject(Router);

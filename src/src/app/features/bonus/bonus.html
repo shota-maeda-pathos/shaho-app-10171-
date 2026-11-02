@@ -15,7 +15,7 @@
         <ng-container meta>
           <span>{{ d.office.name }}</span>
           <span>支給予定月 {{ d.office.bonusMonths.length ? d.office.bonusMonths.join('・') + '月' : '未登録' }}
-            @if (!d.office.bonusMonths.length) { （<a routerLink="/settings">設定</a>で登録すると不支給を知らせます） }</span>
+            @if (!d.office.bonusMonths.length) { （@if (isAdmin) {<a routerLink="/settings">設定</a>} @else {管理者が設定}で登録すると不支給を知らせます） }</span>
           <span>支給 <b>{{ d.totals.paidCount }}名</b></span>
           @if (d.deadline) { <span>賞与支払届の期限 <b [class]="complete() ? '' : dueClass(d.deadline)">{{ d.deadline }}</b></span> }
         </ng-container>

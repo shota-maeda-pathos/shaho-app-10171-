@@ -11,6 +11,7 @@ import { StatusBadgeComponent, StatusTone, LoadingStateComponent, EmptyStateComp
 import { LifeEventCardsComponent } from '../procedures/life-events';
 import { SummaryCardsComponent } from './summary-cards';
 import { StaffNoticesComponent } from './staff-notices';
+import { canOpenRoute } from '../../core/utils/route-access';
 
 /** サーバーの homeTodos・homeBulkTodo が返す1件 */
 interface HomeTodo {
@@ -29,9 +30,6 @@ interface HomeTodo {
   /** 承認者が承認する番のもの */
   approve?: boolean;
 }
-
-/** 承認者（担当者でない人）も開ける業務の画面。手続きのウィザードは開けないので、承認は承認の画面で行う */
-const APPROVER_ROUTES = ['/monthly', '/santei', '/bonus'];
 
 /** 毎月の処理・算定・賞与のうち、ホームが1件ずつ読むもの（functions/src/home/service.ts の BulkTarget） */
 interface BulkTarget { kind: 'monthly' | 'santei' | 'bonus'; officeId: string; period: string; officeName: string }
@@ -68,7 +66,11 @@ type Group = { key: string; label: string; items: HomeTodo[] };
         <nav class="stats" aria-label="件数">
           <a routerLink="/procedures" [queryParams]="office.queryParams()"><span class="n">{{ mine().length }}<small>件</small></span><span class="l">あなたの対応</span></a>
           <a routerLink="/approvals" [queryParams]="office.queryParams()"><span class="n">{{ approvalBadge.count() }}<small>件</small></span><span class="l">あなたの承認待ち</span></a>
-          <a routerLink="/filings" [class.warn]="dueSoon() > 0"><span class="n">{{ dueSoon() }}<small>件</small></span><span class="l">期限切れ・7日以内</span></a>
+          @if (canOpen('/filings')) {
+            <a routerLink="/filings" [class.warn]="dueSoon() > 0"><span class="n">{{ dueSoon() }}<small>件</small></span><span class="l">期限切れ・7日以内</span></a>
+          } @else {
+            <div class="stat" [class.warn]="dueSoon() > 0"><span class="n">{{ dueSoon() }}<small>件</small></span><span class="l">期限切れ・7日以内</span></div>
+          }
           <a routerLink="/procedures" [queryParams]="office.queryParams()"><span class="n">{{ waiting().length }}<small>件</small></span><span class="l">ほかの人の作業待ち</span></a>
         </nav>
 
@@ -160,13 +162,13 @@ type Group = { key: string; label: string; items: HomeTodo[] };
       background: var(--app-color-surface); border: 1px solid var(--app-color-border); border-radius: var(--app-radius); box-shadow: var(--app-shadow); overflow: hidden;
     }
     @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, 1fr); } }
-    .stats a { display: flex; flex-direction: column; gap: 2px; padding: var(--app-space-3) 18px; text-decoration: none; color: inherit; }
-    .stats a + a { border-left: 1px solid var(--app-color-border-sub); }
+    .stats a, .stats .stat { display: flex; flex-direction: column; gap: 2px; padding: var(--app-space-3) 18px; text-decoration: none; color: inherit; }
+    .stats > * + * { border-left: 1px solid var(--app-color-border-sub); }
     .stats a:hover { background: var(--app-color-bg); }
     .stats .n { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .stats .n small { font-size: var(--app-font-xs); font-weight: 600; margin-left: 3px; color: var(--app-color-muted); }
     .stats .l { font-size: var(--app-font-xs); color: var(--app-color-muted); }
-    .stats a.warn .n { color: var(--app-status-attention-fg); }
+    .stats .warn .n { color: var(--app-status-attention-fg); }
 
     .split { display: grid; grid-template-columns: 1fr 300px; gap: var(--app-space-4); align-items: start; }
     .split.solo { grid-template-columns: 1fr; }
@@ -307,13 +309,16 @@ export class DashboardComponent {
     }
   }
 
+  /** 開けない画面（承認者にとっての手続きのウィザードなど）を指すものは、承認の画面で承認する */
   open(todo: HomeTodo) {
-    if (todo.approve && !this.auth.hasAnyRole('admin', 'operator') && !APPROVER_ROUTES.includes(todo.route)) {
+    if (!canOpenRoute(todo.route, this.auth)) {
       void this.router.navigate(['/approvals'], { queryParams: this.office.queryParams() });
       return;
     }
     void this.router.navigate([todo.route], { queryParams: this.office.openParams(todo.route, todo.queryParams) });
   }
+
+  canOpen(route: string) { return canOpenRoute(route, this.auth); }
 
   private days(deadline: string) {
     return Math.round((Date.parse(deadline) - Date.parse(this.today())) / 86_400_000);

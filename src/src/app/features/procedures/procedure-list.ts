@@ -9,6 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { canOpenRoute } from '../../core/utils/route-access';
 import { OfficeContextService } from '../../core/services/office-context.service';
 import { EmptyStateComponent, ErrorStateComponent, LoadingStateComponent, PageHeadComponent, StatusBadgeComponent, StatusTone } from '../../shared/ui';
 
@@ -266,7 +267,11 @@ export class ProcedureListComponent {
     }
   }
 
-  open(t: Todo) { void this.router.navigate([t.route], { queryParams: this.office.openParams(t.route, t.queryParams) }); }
+  /** 開けない画面（承認者にとっての手続きのウィザードなど）を指すものは、承認の画面で承認する */
+  open(t: Todo) {
+    if (!canOpenRoute(t.route, this.auth)) { void this.router.navigate(['/approvals'], { queryParams: this.office.queryParams() }); return; }
+    void this.router.navigate([t.route], { queryParams: this.office.openParams(t.route, t.queryParams) });
+  }
   /** 完了した手続きは手続きの詳細を開く（ウィザード方式はそこから、それぞれの画面へ移る） */
   openDoneRow(r: DoneRow) { void this.router.navigate(['/procedures', r.id]); }
 
