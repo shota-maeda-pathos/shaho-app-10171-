@@ -10,6 +10,7 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatCardModule } from '@angular/material/card';
 interface AuditLogRow {
   id: string;
   seq: number | null;
@@ -56,9 +57,9 @@ const KINDS: { value: string; label: string }[] = [
 @Component({
   selector: 'app-audit-log',
   standalone: true,
-  imports: [MatDatepickerModule, DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [MatCardModule, MatDatepickerModule, DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   template: `
-    <div class="section">
+    <div class="section"><mat-card class="settings-card">
       <div class="filters">
         <mat-form-field appearance="outline"><mat-label>開始日</mat-label>
           <input matInput name="from" [(ngModel)]="from" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
@@ -110,7 +111,7 @@ const KINDS: { value: string; label: string }[] = [
         <div class="more"><button mat-stroked-button type="button" (click)="load(true)" [disabled]="loading()">さらに読み込む</button></div>
       }
       <p class="note">監査ログは消したり書き換えたりできません（5年以上保存）。個人番号の値は記録せず、登録・閲覧した事実と理由だけを残します。</p>
-    </div>
+    </mat-card></div>
   `,
   styles: [`
     .section { padding: 24px 0; }

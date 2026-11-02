@@ -159,6 +159,8 @@ body {
 
 // 注記（mat-hint）のある入力欄は、下の行のラベルとぶつからないよう下を空ける
 .mat-mdc-form-field:has(.mat-mdc-form-field-hint) { margin-bottom: var(--app-space-2); }
+// グリッド・横並びで隣の欄に注記があっても、枠の高さを伸ばさない（伸ばすとプルダウンだけ縦に大きく見える）
+.mat-mdc-form-field .mat-mdc-text-field-wrapper { flex: none; }
 
 // 一覧の上の検索欄（虫眼鏡つき）の幅をそろえる
 .search-field { width: 280px; max-width: 100%; }
@@ -178,6 +180,10 @@ body {
 
 // カードの影・角を提案（ui-proposals）にそろえる
 .mat-mdc-card { --mat-card-elevated-container-elevation: var(--app-shadow); --mat-card-outlined-outline-color: var(--app-color-border); }
+// 設定のタブの白いカード（会社情報・お知らせ管理と同じ見た目）。カードの中のボタンは横に伸ばさない
+.settings-card.mat-mdc-card { padding: 24px; }
+.settings-card.mat-mdc-card + .settings-card.mat-mdc-card { margin-top: 16px; }
+.settings-card > button, .settings-card > .file, .settings-card > .actions { align-self: flex-start; }
 .num, .tabular { font-variant-numeric: tabular-nums; }
 a { color: var(--app-color-link); }
 

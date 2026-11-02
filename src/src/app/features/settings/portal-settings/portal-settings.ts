@@ -3,27 +3,29 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
+import { MatCardModule } from '@angular/material/card';
 import { AuthService } from '../../../core/services/auth.service';
 
 /** 本人ポータルの公開範囲（カタログ11章）。項目ごとに公開・非公開。既定は全部公開。非公開の項目はサーバーが返さない */
 @Component({
   selector: 'app-portal-settings',
   standalone: true,
-  imports: [MatButtonModule, MatSlideToggleModule],
+  imports: [MatCardModule, MatButtonModule, MatSlideToggleModule],
   template: `
-    <div class="section">
+    <div class="section"><mat-card class="settings-card">
       <p class="sub">従業員の本人ポータルに見せる項目を選びます。オフにした項目は本人の画面に出ません。個人番号はどの設定でも表示しません。</p>
       @for (item of items(); track item.key) {
         <div class="row"><mat-slide-toggle [checked]="!hidden().has(item.key)" (change)="toggle(item.key, $event.checked)">{{ item.label }}</mat-slide-toggle></div>
       }
       <button mat-flat-button color="primary" type="button" (click)="save()" [disabled]="saving() || !dirty()">保存</button>
-    </div>
+    </mat-card></div>
   `,
   styles: [`
     .section { padding: 24px 0; }
     .sub { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
     .row { padding: 8px 0; }
-    button { margin-top: 16px; }
+    button { margin-top: 16px; align-self: flex-start; }
+    .sub { margin-top: 0; }
   `],
 })
 export class PortalSettingsComponent implements OnInit {

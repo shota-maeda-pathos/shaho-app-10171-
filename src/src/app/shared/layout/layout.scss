@@ -28,14 +28,15 @@
 .office-switch {
   position: relative;
   display: block;
-  margin: 0 4px 14px;
+  margin: -10px 4px 10px;
 
+  // ロゴの下に小さく置く（枠と背景はなし。触れたときだけ地の色を付ける）
   select {
     width: 100%;
-    padding: 8px 28px 8px 10px;
-    border: 1px solid var(--app-color-border);
-    border-radius: 8px;
-    background: var(--app-color-bg);
+    padding: 3px 24px 3px 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
     color: var(--app-color-text-sub);
     font: inherit;
     font-size: var(--app-font-xs);
@@ -43,10 +44,12 @@
     cursor: pointer;
     text-overflow: ellipsis;
   }
+  select:hover:not(:disabled) { background: var(--app-color-bg); border-color: var(--app-color-border); }
+  select:focus-visible { outline: 2px solid var(--app-color-link); outline-offset: 1px; }
   select:disabled { cursor: default; opacity: .7; }
   mat-icon {
     position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-    font-size: 18px; width: 18px; height: 18px; color: var(--app-color-muted); pointer-events: none;
+    font-size: 16px; width: 16px; height: 16px; color: var(--app-color-muted); pointer-events: none;
   }
 }
 

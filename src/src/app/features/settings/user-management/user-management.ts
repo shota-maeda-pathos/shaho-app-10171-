@@ -50,7 +50,6 @@ const ROLE_LABELS: Record<string, string> = {
   template: `
     <div class="page-container">
       <div class="page-header">
-        <h1>ユーザー管理</h1>
         <button mat-flat-button color="primary" (click)="showInviteForm.set(!showInviteForm())">
           <mat-icon>person_add</mat-icon>
           ユーザー招待
@@ -218,10 +217,10 @@ const ROLE_LABELS: Record<string, string> = {
     </div>
   `,
   styles: [`
-    .page-container { padding: 24px; }
-    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .page-container { padding: 24px 0; }
+    .page-header { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; }
     .page-header h1 { margin: 0; font-size: 24px; font-weight: 500; }
-    h2 { font-size: 18px; font-weight: 500; margin: 24px 0 12px; }
+    h2 { font-size: 18px; font-weight: 500; margin: 8px 0 12px; }
     .invite-form { padding: 24px; margin-bottom: 24px; }
     .invite-form h3 { margin: 0 0 16px; }
     .form-row { display: flex; gap: 16px; }
@@ -231,8 +230,8 @@ const ROLE_LABELS: Record<string, string> = {
     .loading-container { display: flex; justify-content: center; padding: 48px; }
     .empty-state { text-align: center; padding: 48px; color: #666; }
     .empty-state mat-icon { font-size: 48px; width: 48px; height: 48px; color: #ccc; }
-    .role-chip { padding: 2px 8px; border-radius: 12px; font-size: 11px; background: var(--app-brand-tint); color: var(--app-brand-strong); margin-right: 4px; }
-    .status-chip { padding: 4px 12px; border-radius: 16px; font-size: 12px; background: #e8f5e9; color: #2e7d32; }
+    .role-chip { display: inline-block; white-space: nowrap; margin-bottom: 2px; padding: 2px 8px; border-radius: 12px; font-size: 11px; background: var(--app-brand-tint); color: var(--app-brand-strong); margin-right: 4px; }
+    .status-chip { white-space: nowrap; padding: 4px 12px; border-radius: 16px; font-size: 12px; background: #e8f5e9; color: #2e7d32; }
     .status-chip.suspended { background: #ffebee; color: #c62828; }
     .error { color: #b3261e; }
     mat-card { overflow-x: auto; }

@@ -8,6 +8,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatCardModule } from '@angular/material/card';
 interface Department { id: string; name: string; officeId: string; sortOrder: number; isActive: boolean }
 interface Office { id: string; name: string }
 
@@ -15,9 +16,9 @@ interface Office { id: string; name: string }
 @Component({
   selector: 'app-department-management',
   standalone: true,
-  imports: [MatFormFieldModule, MatInputModule, MatSelectModule, FormsModule, MatButtonModule],
+  imports: [MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule, FormsModule, MatButtonModule],
   template: `
-    <div class="section">
+    <div class="section"><mat-card class="settings-card">
       <p class="sub">事業所ごとに部署を作ります。従業員の画面で所属部署を選ぶと、保険料の分析の部署別と、帳票の部署での絞り込みに使われます。</p>
       <div class="add">
         <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>事業所</mat-label><mat-select [(ngModel)]="officeId" name="office">@for (o of offices(); track o.id) { <mat-option [value]="o.id">{{ o.name }}</mat-option> }</mat-select></mat-form-field>
@@ -44,11 +45,11 @@ interface Office { id: string; name: string }
         }
       }
       @if (!departments().length) { <p class="sub">部署はまだありません。</p> }
-    </div>
+    </mat-card></div>
   `,
   styles: [`
     .section { padding: 24px 0; }
-    .sub { color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
+    .sub { color: var(--app-color-text-sub); font-size: var(--app-font-sm); margin-top: 0; }
     .add { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin: 12px 0 20px; }
     .add label { display: flex; flex-direction: column; gap: 2px; font-size: var(--app-font-sm); }
     input:not(.mat-mdc-input-element) { padding: 6px 8px; font: inherit; }

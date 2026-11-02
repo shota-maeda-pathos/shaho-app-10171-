@@ -6,6 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
+import { MatCardModule } from '@angular/material/card';
 import { AuthService } from '../../../core/services/auth.service';
 import { errorMessage } from '../../onboarding/onboarding.types';
 
@@ -15,9 +16,10 @@ interface MockSettings { auto: boolean; receiveSeconds: number; processSeconds: 
 @Component({
   selector: 'app-mock-submission-settings',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule],
+  imports: [MatCardModule, FormsModule, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule],
   template: `
-    <section class="box">
+    <div class="section">
+    <mat-card class="settings-card box">
       <h2>模擬電子申請の進み方</h2>
       <p class="sub">模擬電子申請は、送信済み → 受付済み → 処理中 → 完了 の順に進みます。自動で進めるときの待ち時間を決めます。
         自動で進めない場合は、管理者が届出の画面の「次の状態へ進める」で進めます。</p>
@@ -40,8 +42,8 @@ interface MockSettings { auto: boolean; receiveSeconds: number; processSeconds: 
       } @else {
         <p class="sub" role="status">{{ error() || '読み込んでいます…' }}</p>
       }
-    </section>
-    <section class="box">
+    </mat-card>
+    <mat-card class="settings-card box">
       <h2>承認待ちの放置</h2>
       <p class="sub">承認を依頼してから、この日数を過ぎても承認されていないものを、承認の画面で強調し、毎朝の通知に入れます。</p>
       <div class="fields">
@@ -49,10 +51,12 @@ interface MockSettings { auto: boolean; receiveSeconds: number; processSeconds: 
           <input matInput type="number" min="1" max="60" [(ngModel)]="staleDays" [disabled]="!isAdmin"></mat-form-field>
       </div>
       @if (isAdmin) { <button mat-flat-button type="button" (click)="saveStale()" [disabled]="busy()">保存する</button> }
-    </section>
+    </mat-card>
+    </div>
   `,
   styles: [`
-    .box { padding: var(--app-space-5) 0; max-width: 760px; }
+    .section { padding: 24px 0; }
+    .box h2:first-child { margin-top: 0; }
     h2 { font-size: 18px; font-weight: 500; margin: 0 0 var(--app-space-2); }
     .sub { color: var(--app-color-text-sub); }
     .fields { display: flex; flex-wrap: wrap; gap: 0 var(--app-space-3); margin-top: var(--app-space-3); }
