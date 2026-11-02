@@ -104,6 +104,8 @@ export class MonthlyComponent implements OnInit {
   csvName = signal('');
   private timer: ReturnType<typeof setInterval> | null = null;
 
+  /** 担当者の操作（取込・計算・依頼・届出の作成など）ができるか。承認者だけの人には「承認する」だけを出す（関数も担当者だけに許す） */
+  readonly isStaff = this.auth.hasAnyRole('admin', 'operator');
   canApprove = computed(() => this.data()?.me.canApprove ?? false);
   /** 自分が依頼した確認は自分では承認できないため、承認のボタンを出さない */
   canApproveReview(kind: 'salary' | 'premium') {
@@ -148,7 +150,7 @@ export class MonthlyComponent implements OnInit {
   current = computed(() => this.selectedStep() ?? this.firstOpen());
   currentDef = computed(() => STEPS.find(s => s.key === this.current())!);
   currentSummary = computed(() => this.summaries().find(s => s.key === this.current())!);
-  actions = computed(() => ACTIONS[this.current()](this));
+  actions = computed(() => { const list = ACTIONS[this.current()](this); return this.isStaff ? list : list.filter(a => a.key.startsWith('approve')); });
   cellHeader = computed(() => ({
     salary: '給与', salaryReview: '給与', calculate: '本人負担', premiumReview: '本人 / 会社（前月比）', publish: '内容', collection: '徴収済み / 集める額',
   })[this.current()]);

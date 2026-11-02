@@ -58,8 +58,10 @@
               <button mat-stroked-button type="button" (click)="nonPaymentPdf(r)" [disabled]="busy()"><mat-icon>picture_as_pdf</mat-icon>公式様式のPDFを作る</button>
               @switch (r.status) {
                 @case ('draft') {
+                  @if (isStaff) {
                   <button mat-flat-button type="button" (click)="updateFiling(r, 'requestApproval')" [disabled]="busy()">承認を依頼する</button>
                   <button mat-button type="button" (click)="updateFiling(r, 'cancel')" [disabled]="busy()">取り消す</button>
+                  }
                 }
                 @case ('pending') {
                   @if (canApprove() && !r.mine) {
@@ -70,9 +72,9 @@
               }
             </div>
             @if (r.status === 'approved' || r.status === 'submitted') {
-              <app-filing-submission [target]="{ source: 'bonus', parentId: runId(), filingId: r.id }" (changed)="load()" />
+              @if (isStaff) { <app-filing-submission [target]="{ source: 'bonus', parentId: runId(), filingId: r.id }" (changed)="load()" /> }
               <details class="attachments"><summary>添付書類</summary>
-                <app-filing-attachments [target]="{ source: 'bonus', parentId: runId(), filingId: r.id }" />
+                @if (isStaff) { <app-filing-attachments [target]="{ source: 'bonus', parentId: runId(), filingId: r.id }" /> }
               </details>
             }
           </section>
@@ -80,9 +82,9 @@
           <div class="complete" role="status">
             <mat-icon aria-hidden="true">check_circle</mat-icon>
             <div>{{ monthLabel(d.payMonth) }}は支給予定月でしたが賞与を支給せず、賞与不支給報告書<app-term key="bonusNonPayment" [showLabel]="false" />を {{ np.reported.reportedOn }} に提出したことを記録しています。
-              <button mat-button type="button" (click)="recordNonPayment(true)" [disabled]="busy()">記録を取り消す</button></div>
+              @if (isStaff) { <button mat-button type="button" (click)="recordNonPayment(true)" [disabled]="busy()">記録を取り消す</button> }</div>
           </div>
-        } @else if (np.ended) {
+        } @else if (np.ended && isStaff) {
           <section class="report" aria-label="賞与不支給報告書を作る">
             <div class="alert" role="alert">
               <mat-icon aria-hidden="true">warning</mat-icon>
@@ -138,6 +140,7 @@
 
         @switch (current()) {
           @case ('entry') {
+            @if (isStaff) {
             <div class="import">
               <div class="import-actions">
                 <label class="file" [class.disabled]="busy()">
@@ -199,6 +202,7 @@
                 </div>
               }
             </div>
+            }
           }
           @case ('premium') {
             <p class="totals" aria-label="事業所の合計">
@@ -225,8 +229,10 @@
                       <button mat-stroked-button type="button" (click)="openFiling(f)" [disabled]="busy()"><mat-icon>description</mat-icon>内容とPDFを見る</button>
                       @switch (f.status) {
                         @case ('draft') {
+                          @if (isStaff) {
                           <button mat-flat-button type="button" (click)="updateFiling(f, 'requestApproval')" [disabled]="busy()">承認を依頼する</button>
                           <button mat-button type="button" (click)="updateFiling(f, 'cancel')" [disabled]="busy()">取り消す</button>
+                          }
                         }
                         @case ('pending') {
                           @if (canApprove() && !f.mine) {
@@ -237,9 +243,9 @@
                       }
                     </div>
                     @if (f.status === 'approved' || f.status === 'submitted') {
-                      <app-filing-submission [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" (changed)="load()" />
+                      @if (isStaff) { <app-filing-submission [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" (changed)="load()" /> }
                       <details class="attachments"><summary>添付書類</summary>
-                        <app-filing-attachments [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" />
+                        @if (isStaff) { <app-filing-attachments [target]="{ source: 'bonus', parentId: runId(), filingId: f.id }" /> }
                       </details>
                     }
                     <app-run-correction source="bonus" [parentId]="runId()" [officeId]="office.selected()" [period]="payMonth" [filing]="f" (changed)="load()" />
@@ -282,11 +288,11 @@
           </ng-template>
           <ng-template appTargetDetail let-t>
             @if (row(t.id); as r) {
-              <app-bonus-person [row]="r" [payMonth]="d.payMonth" [canEdit]="!r.bonus?.confirmed && !r.bonus?.pending" [busy]="busy()"
+              <app-bonus-person [row]="r" [payMonth]="d.payMonth" [canEdit]="isStaff && !r.bonus?.confirmed && !r.bonus?.pending" [busy]="busy()"
                                 (save)="savePerson(r.employeeId, $event)" />
             }
           </ng-template>
-          @if (current() === 'filing' && toFile().length) {
+          @if (current() === 'filing' && toFile().length && isStaff) {
             <ng-container barActions>
               <span class="bar-notice"><mat-icon aria-hidden="true">info</mat-icon>{{ filingCaution() }}</span>
               <button mat-flat-button type="button" (click)="createFiling()" [disabled]="busy()">

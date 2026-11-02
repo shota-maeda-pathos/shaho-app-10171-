@@ -85,6 +85,8 @@ export class BonusComponent implements OnInit {
   private csvText = '';
   private timer: ReturnType<typeof setInterval> | null = null;
 
+  /** 担当者の操作（取込・計算・依頼・届出の作成など）ができるか。承認者だけの人には「承認する」だけを出す（関数も担当者だけに許す） */
+  readonly isStaff = this.auth.hasAnyRole('admin', 'operator');
   canApprove = computed(() => this.data()?.me.canApprove ?? false);
   rowsById = computed(() => new Map((this.data()?.rows ?? []).map(r => [r.employeeId, r])));
   /** 賞与支払届（不支給報告書は別に扱う） */
@@ -178,7 +180,8 @@ export class BonusComponent implements OnInit {
     return this.activeFilings().length > 0 && sums.every(s => s.todo === 0 && s.waiting === 0);
   });
 
-  actions = computed<BulkAction[]>(() => {
+  actions = computed<BulkAction[]>(() => this.isStaff ? this.stepActions() : this.stepActions().filter(a => a.key.startsWith('approve')));
+  private stepActions = computed<BulkAction[]>(() => {
     const month = monthLabel(this.payMonth);
     const approve = (key: BonusAction, what: string): BulkAction[] => this.canApprove() ? [{
       key, label: '承認する', appliesTo: (r: TargetRow) => r.statusLabel === 'あなたの承認待ち',

@@ -57,7 +57,7 @@ export class NoPayDialogComponent {
       @if (r.rejected?.premium) { <p class="bad">保険料が差し戻されました。理由：{{ r.rejected?.premium }}</p> }
       @for (w of r.warnings; track w) { <p class="warn">{{ w }}</p> }
       @if (r.otherEmployer) { <p class="warn">二以上事業所勤務（ほかに「{{ r.otherEmployer }}」）です。本システムでは保険料の按分をしないため、別途確かめてください。</p> }
-      @if (r.revision; as rv) {
+      @if (isStaff && r.revision; as rv) {
         <div class="row-actions">
           @if (rv.procedureId) {
             <a mat-stroked-button [routerLink]="['/revisions', rv.procedureId]">{{ rv.procedureDone ? '随時改定の手続きを見る' : '随時改定の手続きを開く' }}</a>
@@ -80,7 +80,7 @@ export class NoPayDialogComponent {
       } @else {
         <p>この月は在籍していないため、給与はありません。</p>
       }
-      @if (r.salaryRequired && !r.salary?.confirmed && !r.salary?.pending) {
+      @if (isStaff && r.salaryRequired && !r.salary?.confirmed && !r.salary?.pending) {
         <div class="row-actions">
           <a mat-stroked-button [routerLink]="['/salary', r.employeeId]" [queryParams]="{ yearMonth: payMonth(), officeId: officeId() }">給与を1人分入力・修正する</a>
         </div>
@@ -113,6 +113,7 @@ export class NoPayDialogComponent {
             }
           </ul>
         }
+        @if (isStaff) {
         <form class="entry" (ngSubmit)="addEntry()">
           <mat-form-field appearance="outline">
             <mat-label>種類</mat-label>
@@ -136,6 +137,7 @@ export class NoPayDialogComponent {
           </mat-form-field>
           <button mat-flat-button type="submit" [disabled]="saving() || !amount() || amount() < 1 || !date() || !note().trim()">記録する</button>
         </form>
+        }
         @if (error()) { <p class="bad" role="alert">{{ error() }}</p> }
       }
 
@@ -171,6 +173,8 @@ export class MonthlyPersonComponent {
   changed = output<void>();
   private functions = inject(Functions);
   private auth = inject(AuthService);
+  /** 入金の記録・給与の入力・随時改定は担当者の操作（承認者には出さない） */
+  readonly isStaff = this.auth.hasAnyRole('admin', 'operator');
 
   // 別の人に切り替えたとき・読み込み直したときは、その人の集める額などに戻す
   method = linkedSignal<'transfer' | 'payroll' | 'refund'>(() => this.row().collection.status === 'over' ? 'refund' : this.row().collection.plan === 'payroll' ? 'payroll' : 'transfer');

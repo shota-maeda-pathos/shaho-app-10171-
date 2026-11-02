@@ -93,8 +93,10 @@
                   <button mat-stroked-button type="button" (click)="openFiling(f)" [disabled]="busy()"><mat-icon>description</mat-icon>内容とPDFを見る</button>
                   @switch (f.status) {
                     @case ('draft') {
+                      @if (isStaff) {
                       <button mat-flat-button type="button" (click)="updateFiling(f, 'requestApproval')" [disabled]="busy()">承認を依頼する</button>
                       <button mat-button type="button" (click)="updateFiling(f, 'cancel')" [disabled]="busy()">取り消す</button>
+                      }
                     }
                     @case ('pending') {
                       @if (canApprove() && !f.mine) {
@@ -105,9 +107,9 @@
                   }
                 </div>
                 @if (f.status === 'approved' || f.status === 'submitted') {
-                  <app-filing-submission [target]="{ source: 'santei', parentId: runId(), filingId: f.id }" (changed)="load()" />
+                  @if (isStaff) { <app-filing-submission [target]="{ source: 'santei', parentId: runId(), filingId: f.id }" (changed)="load()" /> }
                   <details class="attachments"><summary>添付書類</summary>
-                    <app-filing-attachments [target]="{ source: 'santei', parentId: runId(), filingId: f.id }" />
+                    @if (isStaff) { <app-filing-attachments [target]="{ source: 'santei', parentId: runId(), filingId: f.id }" /> }
                   </details>
                 }
                 <app-run-correction source="santei" [parentId]="runId()" [officeId]="office.selected()" [period]="year" [filing]="f" (changed)="load()" />
@@ -142,7 +144,7 @@
                 <app-santei-person [row]="r" [year]="d.year" [officeId]="d.office.id" [busy]="busy()" (decide)="personDecide(r.employeeId, $event)" />
               }
             </ng-template>
-            @if (current() === 'filing' && toFile().length) {
+            @if (current() === 'filing' && toFile().length && isStaff) {
               <ng-container barActions>
                 <span class="bar-notice"><mat-icon aria-hidden="true">info</mat-icon>{{ filingCaution() }}</span>
                 <button mat-flat-button type="button" (click)="createFiling()" [disabled]="busy()">

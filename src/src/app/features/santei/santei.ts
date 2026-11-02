@@ -78,6 +78,8 @@ export class SanteiComponent implements OnInit {
   selectedStep = signal<StepKey | null>(null);
   private timer: ReturnType<typeof setInterval> | null = null;
 
+  /** 担当者の操作（取込・計算・依頼・届出の作成など）ができるか。承認者だけの人には「承認する」だけを出す（関数も担当者だけに許す） */
+  readonly isStaff = this.auth.hasAnyRole('admin', 'operator');
   canApprove = computed(() => this.data()?.me.canApprove ?? false);
   rowsById = computed(() => new Map((this.data()?.rows ?? []).map(r => [r.employeeId, r])));
   activeFilings = computed(() => (this.data()?.filings ?? []).filter(f => f.status !== 'cancelled'));
@@ -155,7 +157,8 @@ export class SanteiComponent implements OnInit {
     return { total: filed.length, up, down, same: filed.length - up - down };
   });
 
-  actions = computed<BulkAction[]>(() => {
+  actions = computed<BulkAction[]>(() => this.isStaff ? this.stepActions() : this.stepActions().filter(a => a.key.startsWith('approve')));
+  private stepActions = computed<BulkAction[]>(() => {
     const year = `${this.year}年`;
     switch (this.current()) {
       case 'target':

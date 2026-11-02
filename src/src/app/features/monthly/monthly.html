@@ -52,6 +52,7 @@
 
         @switch (current()) {
           @case ('salary') {
+            @if (isStaff) {
             <div class="import">
               <div class="import-actions">
                 <label class="file" [class.disabled]="busy()">
@@ -134,6 +135,7 @@
                 </div>
               }
             </div>
+            }
           }
           @case ('premiumReview') {
             <p class="totals" aria-label="事業所の合計">

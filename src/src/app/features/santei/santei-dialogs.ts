@@ -7,6 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { AuthService } from '../../core/services/auth.service';
 import { FilingDetail, INSURED_CATEGORY_LABELS, SanteiRow, gradeChangeText } from './santei.types';
 
 /** 1人分の4〜6月の内訳と判定（右のパネルの中身）。支払基礎日数が足りない人の決め方はここでも選べる */
@@ -67,10 +68,10 @@ import { FilingDetail, INSURED_CATEGORY_LABELS, SanteiRow, gradeChangeText } fro
       @if (r.status === 'pending') {
         <a mat-stroked-button routerLink="/monthly" [queryParams]="{ officeId: officeId(), payMonth: firstMissing() }">毎月の処理を開く</a>
       }
-      @if (r.status === 'needsAction' && r.current && r.approval.status !== 'pending' && r.approval.status !== 'approved') {
+      @if (isStaff && r.status === 'needsAction' && r.current && r.approval.status !== 'pending' && r.approval.status !== 'approved') {
         <button mat-flat-button type="button" (click)="decide.emit('previous')" [disabled]="busy()">従前の等級で決める</button>
       }
-      @if (r.decision && r.approval.status !== 'pending' && r.approval.status !== 'approved') {
+      @if (isStaff && r.decision && r.approval.status !== 'pending' && r.approval.status !== 'approved') {
         <button mat-stroked-button type="button" (click)="decide.emit('undo')" [disabled]="busy()">決め方を取り消す</button>
       }
       @if (r.approval.status === 'pending') {
@@ -104,6 +105,8 @@ export class SanteiPersonComponent {
   busy = input(false);
   /** previous＝従前の等級で決める、undo＝決め方を取り消す */
   decide = output<'previous' | 'undo'>();
+  /** 決め方は担当者の操作（承認者には出さない） */
+  readonly isStaff = inject(AuthService).hasAnyRole('admin', 'operator');
   categoryLabels = INSURED_CATEGORY_LABELS;
 
   month(ym: string) { const [y, m] = ym.split('-'); return `${y}年${Number(m)}月`; }
