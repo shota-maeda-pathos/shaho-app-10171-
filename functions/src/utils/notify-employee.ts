@@ -7,9 +7,13 @@ type GradeLike = { effectiveMonth: string; healthGradeNumber?: number; healthSta
 const ym = (m: string) => `${m.slice(0, 4)}年${Number(m.slice(5, 7))}月`;
 const man = (n?: number) => (typeof n === 'number' ? `${(n / 10000).toLocaleString('ja-JP')}万円` : '');
 
-/** 等級の変化の文面。変わっていなければ null */
+/**
+ * 等級の変化の文面。変わっていなければ null。
+ * 標準報酬月額が同じで等級の番号だけが変わったとき（番号の付け直し・データの訂正）は、保険料も変わらないので知らせない
+ */
 export function gradeChangeText(before: GradeLike, after: GradeLike): string | null {
   if (before.healthGradeNumber === after.healthGradeNumber && before.pensionGradeNumber === after.pensionGradeNumber) return null;
+  if (before.healthStandardRemuneration === after.healthStandardRemuneration && before.pensionStandardRemuneration === after.pensionStandardRemuneration) return null;
   return `${ym(after.effectiveMonth)}から、健康保険 ${before.healthGradeNumber}→${after.healthGradeNumber}等級（標準報酬月額 ${man(before.healthStandardRemuneration)}→${man(after.healthStandardRemuneration)}）、`
     + `厚生年金 ${before.pensionGradeNumber}→${after.pensionGradeNumber}等級（${man(before.pensionStandardRemuneration)}→${man(after.pensionStandardRemuneration)}）に変わりました。保険料の変わる額はポータルの「等級が変わりました」で確かめられます。`;
 }

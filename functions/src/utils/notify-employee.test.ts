@@ -16,3 +16,9 @@ describe('等級変更のお知らせの文面', () => {
     expect(gradeChangeText(g('2026-04', 22, 19), g('2026-09', 22, 19))).toBeNull();
   });
 });
+
+test('標準報酬月額が同じで等級の番号だけ変わったときは知らせない（番号の付け直し・データの訂正）', () => {
+  const before = { effectiveMonth: '2026-04', healthGradeNumber: 22, healthStandardRemuneration: 300000, pensionGradeNumber: 20, pensionStandardRemuneration: 300000 };
+  expect(gradeChangeText(before, { ...before, pensionGradeNumber: 19 })).toBeNull();
+  expect(gradeChangeText(before, { ...before, pensionGradeNumber: 22, pensionStandardRemuneration: 360000 })).toContain('厚生年金 20→22等級');
+});
