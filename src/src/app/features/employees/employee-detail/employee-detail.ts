@@ -886,8 +886,8 @@ interface OnboardResult {
     .tab-content { padding: 24px 0; }
     .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 0 16px;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: var(--app-space-2) 20px;
     }
     .full-width { width: 100%; }
     .actions {

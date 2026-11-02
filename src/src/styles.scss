@@ -139,21 +139,26 @@ body {
 .main-area > .content > router-outlet + * {
   display: block; box-sizing: border-box; width: 100%; max-width: 1280px; margin: 0 auto; padding: var(--app-space-5) 28px var(--app-space-6);
 }
-.main-area > .content .app-page { padding: 0; max-width: none; }
+// 画面の中に入れ子にした app-page だけ余白を消す（画面そのもの＝router-outlet の次の要素は上の余白と幅を使う）
+.main-area > .content > router-outlet + * .app-page { padding: 0; max-width: none; }
 @media (max-width: 960px) {
   .main-area > .content > router-outlet + * { padding: var(--app-space-4) var(--app-space-4) var(--app-space-6); }
 }
 
-// 画面の共通の枠
-.app-page {
-  padding: var(--app-space-5) 28px var(--app-space-6); max-width: 1280px; margin: 0 auto;
-  // 本文の入力欄・選択肢・ボタンは、画面の文字（14px）に合わせて詰める（Material の既定は1段大きい）
+// 本文の入力欄・選択肢・ボタンは、画面の文字（14px）に合わせて詰める（Material の既定は1段大きい）。
+// app-page を使っていない画面とダイアログも同じ高さにそろえる
+.main-area > .content, .mat-mdc-dialog-container, .app-page {
   @include mat.theme((density: -3));
   @include mat.form-field-overrides((
     container-text-size: var(--app-font-md),
     outlined-label-text-size: var(--app-font-md),
     container-vertical-padding: 10px,
   ));
+}
+
+// 画面の共通の枠
+.app-page {
+  padding: var(--app-space-5) 28px var(--app-space-6); max-width: 1280px; margin: 0 auto;
 }
 .app-page-title { margin: 0 0 var(--app-space-2); font-size: 22px; font-weight: 700; letter-spacing: .01em; }
 .app-page-guide { margin: 0 0 var(--app-space-4); color: var(--app-color-text-sub); line-height: 1.7; max-width: 900px; }

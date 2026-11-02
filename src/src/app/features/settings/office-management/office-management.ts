@@ -208,10 +208,10 @@ const PREFECTURES: Record<string, string> = {
             <ng-container matColumnDef="rounding">
               <th mat-header-cell *matHeaderCellDef>端数処理 <app-term key="rounding" [showLabel]="false" /></th>
               <td mat-cell *matCellDef="let row">
-                <select class="rounding-select" [ngModel]="row.roundingRule ?? 'truncate'" (ngModelChange)="changeRounding(row, $event)"
+                <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select [ngModel]="row.roundingRule ?? 'truncate'" (ngModelChange)="changeRounding(row, $event)"
                         [disabled]="savingId() === row.id || row.version === undefined" [attr.aria-label]="row.name + 'の端数処理'">
-                  @for (r of roundingOptions; track r.value) { <option [value]="r.value">{{ r.label }}</option> }
-                </select>
+                  @for (r of roundingOptions; track r.value) { <mat-option [value]="r.value">{{ r.label }}</mat-option> }
+                </mat-select></mat-form-field>
                 @if (row.version === undefined) { <div class="hint">サーバーの更新後に変更できます</div> }
               </td>
             </ng-container>

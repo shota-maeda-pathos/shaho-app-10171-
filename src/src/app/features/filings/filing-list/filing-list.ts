@@ -7,6 +7,9 @@ import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 import { OfficeContextService } from '../../../core/services/office-context.service';
 import { EmptyStateComponent, ErrorStateComponent, LoadingStateComponent, PageHeadComponent, StatusBadgeComponent } from '../../../shared/ui';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import {
   FILING_STATUS_LABELS, FILING_TYPE_LABELS, FilingStatus, filingTone, filingTypeLabel, PAPER_STATUS_LABELS, PaperStatus,
 } from '../filing-labels';
@@ -51,7 +54,7 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
 @Component({
   selector: 'app-filing-list',
   standalone: true,
-  imports: [
+  imports: [MatFormFieldModule, MatInputModule, MatSelectModule,
     FormsModule, RouterLink, MatButtonModule, MatIconModule,
     StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent, EmptyStateComponent, PageHeadComponent,
   ],
@@ -76,10 +79,10 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
         <section class="zip">
           <p class="sub">承認した届出の保存原本（承認した時点の内容）から公式様式のPDFを作り、ZIPにまとめます。下の「届出の種類」と上の事業所の選択も使います。</p>
           <div class="zip-row">
-            <select [(ngModel)]="zipBase" name="zipBase" aria-label="期間の基準">
-              <option value="submitted">提出日</option>
-              <option value="created">作成日</option>
-            </select>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select [(ngModel)]="zipBase" name="zipBase" aria-label="期間の基準">
+              <mat-option value="submitted">提出日</mat-option>
+              <mat-option value="created">作成日</mat-option>
+            </mat-select></mat-form-field>
             <input type="date" [(ngModel)]="zipFrom" name="zipFrom" aria-label="から"> 〜
             <input type="date" [(ngModel)]="zipTo" name="zipTo" aria-label="まで">
             <button mat-flat-button type="button" (click)="makeZip()" [disabled]="zipBusy() || !zipFrom || !zipTo">ZIPを作る</button>
@@ -103,31 +106,31 @@ type View = 'all' | 'open' | 'overdue' | 'dueSoon';
 
         <form class="toolbar" (ngSubmit)="search()">
           <input name="keyword" [(ngModel)]="keyword" placeholder="氏名・社員番号で探す（Enter）" aria-label="氏名・社員番号">
-          <select name="type" [(ngModel)]="filingType" (ngModelChange)="search()" aria-label="届出の種類">
-            <option value="">すべての届出</option>
-            @for (t of types; track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }
-          </select>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select name="type" [(ngModel)]="filingType" (ngModelChange)="search()" aria-label="届出の種類">
+            <mat-option value="">すべての届出</mat-option>
+            @for (t of types; track t[0]) { <mat-option [value]="t[0]">{{ t[1] }}</mat-option> }
+          </mat-select></mat-form-field>
           <button mat-button type="button" (click)="moreFilters.set(!moreFilters())">{{ moreFilters() ? '条件を閉じる' : '条件を足す' }}</button>
           @if (hasFilters()) { <button mat-button type="button" (click)="clear()">条件を消す</button> }
           @if (moreFilters()) {
             <div class="more">
-              <select name="status" [(ngModel)]="status" (ngModelChange)="search()" aria-label="状態">
-                <option value="">すべての状態</option>
-                @for (s of statuses; track s[0]) { <option [value]="s[0]">{{ s[1] }}</option> }
-              </select>
-              <select name="paper" [(ngModel)]="paperStatus" (ngModelChange)="search()" aria-label="紙の提出">
-                <option value="">紙の提出：すべて</option>
-                <option value="none">紙では出していない</option>
-                <option value="submitted">紙で提出済み</option>
-                <option value="accepted">紙で受理</option>
-                <option value="returned">紙で返戻</option>
-              </select>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select name="status" [(ngModel)]="status" (ngModelChange)="search()" aria-label="状態">
+                <mat-option value="">すべての状態</mat-option>
+                @for (s of statuses; track s[0]) { <mat-option [value]="s[0]">{{ s[1] }}</mat-option> }
+              </mat-select></mat-form-field>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select name="paper" [(ngModel)]="paperStatus" (ngModelChange)="search()" aria-label="紙の提出">
+                <mat-option value="">紙の提出：すべて</mat-option>
+                <mat-option value="none">紙では出していない</mat-option>
+                <mat-option value="submitted">紙で提出済み</mat-option>
+                <mat-option value="accepted">紙で受理</mat-option>
+                <mat-option value="returned">紙で返戻</mat-option>
+              </mat-select></mat-form-field>
               <input name="acceptance" [(ngModel)]="acceptanceNumber" placeholder="受付番号（MOCK-…）" aria-label="受付番号">
-              <select name="base" [(ngModel)]="periodBase" aria-label="期間の基準">
-                <option value="created">作成日</option>
-                <option value="submitted">提出日</option>
-                <option value="deadline">期限</option>
-              </select>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select name="base" [(ngModel)]="periodBase" aria-label="期間の基準">
+                <mat-option value="created">作成日</mat-option>
+                <mat-option value="submitted">提出日</mat-option>
+                <mat-option value="deadline">期限</mat-option>
+              </mat-select></mat-form-field>
               <input type="date" name="from" [(ngModel)]="from" aria-label="から"> 〜
               <input type="date" name="to" [(ngModel)]="to" aria-label="まで">
               <button mat-stroked-button type="submit"><mat-icon>search</mat-icon>探す</button>

@@ -18,9 +18,7 @@
         </ng-container>
       }
       <ng-container actions>
-        <label class="month">支給月
-          <input type="month" [ngModel]="payMonth" (ngModelChange)="changeMonth($event)" [disabled]="busy()">
-        </label>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="month"><mat-label>支給月</mat-label><input matInput type="month" [ngModel]="payMonth" (ngModelChange)="changeMonth($event)" [disabled]="busy()"></mat-form-field>
         <button mat-stroked-button type="button" (click)="load()" [disabled]="loading() || busy()"><mat-icon>refresh</mat-icon>読み込み直す</button>
       </ng-container>
     </app-page-head>
@@ -76,10 +74,10 @@
                   @for (item of list; track $index; let i = $index) {
                     <div class="item-row">
                       <input type="text" [(ngModel)]="item.name" maxlength="30" placeholder="項目名（例：住宅手当）" [attr.aria-label]="'給与項目' + (i + 1) + 'の名前'">
-                      <select [(ngModel)]="item.kind" [attr.aria-label]="'給与項目' + (i + 1) + 'の区分'">
-                        <option value="fixed">固定的</option>
-                        <option value="variable">非固定的</option>
-                      </select>
+                      <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select [(ngModel)]="item.kind" [attr.aria-label]="'給与項目' + (i + 1) + 'の区分'">
+                        <mat-option value="fixed">固定的</mat-option>
+                        <mat-option value="variable">非固定的</mat-option>
+                      </mat-select></mat-form-field>
                       <button mat-icon-button type="button" (click)="removeItem(i)" [attr.aria-label]="(item.name || '項目') + 'を消す'"><mat-icon>delete</mat-icon></button>
                     </div>
                   }

@@ -9,6 +9,9 @@ import { OfficeContextService } from '../../core/services/office-context.service
 import { PageHeadComponent } from '../../shared/ui';
 import { ReportTable, createReportPdf, reportCsv } from './report-pdf';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 type Kind = 'employeePremium' | 'officeMonthly' | 'gradeList' | 'filingStatus' | 'dependents';
 
 const KINDS: { kind: Kind; label: string; note: string; needs: ('month' | 'employee' | 'year')[] }[] = [
@@ -23,23 +26,22 @@ const KINDS: { kind: Kind; label: string; note: string; needs: ('month' | 'emplo
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, PageHeadComponent],
+  imports: [MatFormFieldModule, MatInputModule, MatSelectModule, FormsModule, MatButtonModule, PageHeadComponent],
   template: `
     <app-page-head heading="帳票"><span meta>{{ office.label() }}が対象です（上の事業所の切り替えで絞れます）。</span></app-page-head>
     @if (departments().length) {
-      <p class="form"><label>部署で絞る（事業所別月次一覧・等級一覧・被扶養者一覧）
-        <select [(ngModel)]="departmentId" name="departmentId">
-          <option value="">すべての部署</option>
-          @for (d of departments(); track d.id) { <option [value]="d.id">{{ d.name }}</option> }
-        </select></label></p>
+      <p class="form"><mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>部署で絞る（事業所別月次一覧・等級一覧・被扶養者一覧）</mat-label><mat-select [(ngModel)]="departmentId" name="departmentId">
+          <mat-option value="">すべての部署</mat-option>
+          @for (d of departments(); track d.id) { <mat-option [value]="d.id">{{ d.name }}</mat-option> }
+        </mat-select></mat-form-field></p>
     }
     @for (k of kinds; track k.kind) {
       <section class="card">
         <div class="head"><h2>{{ k.label }}</h2><span class="sub">{{ k.note }}</span></div>
         <div class="form">
-          @if (k.needs.includes('employee')) { <label>従業員ID <input [(ngModel)]="employeeId" [name]="'e' + k.kind" placeholder="例：sample-bonus-0003"></label> }
-          @if (k.needs.includes('month')) { <label>{{ k.kind === 'employeePremium' ? '年度に含まれる月' : '月' }} <input type="month" [(ngModel)]="yearMonth" [name]="'m' + k.kind"></label> }
-          @if (k.needs.includes('year')) { <label>作成した年 <input type="number" min="2000" max="2100" [(ngModel)]="year" [name]="'y' + k.kind"></label> }
+          @if (k.needs.includes('employee')) { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>従業員ID</mat-label><input matInput [(ngModel)]="employeeId" [name]="'e' + k.kind" placeholder="例：sample-bonus-0003"></mat-form-field> }
+          @if (k.needs.includes('month')) { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>{{ k.kind === 'employeePremium' ? '年度に含まれる月' : '月' }}</mat-label><input matInput type="month" [(ngModel)]="yearMonth" [name]="'m' + k.kind"></mat-form-field> }
+          @if (k.needs.includes('year')) { <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>作成した年</mat-label><input matInput type="number" min="2000" max="2100" [(ngModel)]="year" [name]="'y' + k.kind"></mat-form-field> }
           <button mat-flat-button color="primary" type="button" (click)="output(k.kind, 'pdf')" [disabled]="busy()">PDF</button>
           <button mat-stroked-button type="button" (click)="output(k.kind, 'csv')" [disabled]="busy()">CSV</button>
         </div>

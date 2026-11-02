@@ -15,6 +15,9 @@ import { ConfirmService } from '../../../shared/confirm-dialog/confirm-dialog';
 import { filingTypeLabel } from '../../filings/filing-labels';
 import { errorMessage } from '../../onboarding/onboarding.types';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 type Kind = 'request' | 'runFiling';
 interface ApprovalItem {
   id: string; kind: Kind; requestId: string; employeeId: string | null; employeeName: string; employeeNumber: string;
@@ -48,7 +51,7 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
 @Component({
   selector: 'app-approval-list',
   standalone: true,
-  imports: [
+  imports: [MatFormFieldModule, MatInputModule, MatSelectModule,
     DatePipe, FormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatIconModule,
     StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent, EmptyStateComponent, PageHeadComponent,
   ],
@@ -89,16 +92,16 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
 
         <div class="toolbar">
           <input class="search" type="search" [(ngModel)]="keyword" (keydown.enter)="load()" placeholder="氏名・内容で探す（Enter）" aria-label="氏名・内容で探す">
-          <select [(ngModel)]="requestType" (ngModelChange)="load()" aria-label="種類">
-            <option value="">すべての種類</option>
-            @for (t of types; track t[0]) { <option [value]="t[0]">{{ t[1] }}</option> }
-          </select>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select [(ngModel)]="requestType" (ngModelChange)="load()" aria-label="種類">
+            <mat-option value="">すべての種類</mat-option>
+            @for (t of types; track t[0]) { <mat-option [value]="t[0]">{{ t[1] }}</mat-option> }
+          </mat-select></mat-form-field>
           @if (view === 'pending') {
-            <select [(ngModel)]="sort" (ngModelChange)="load()" aria-label="並べ方">
-              <option value="deadline">届出の期限の近い順</option>
-              <option value="requestedAt">依頼の古い順</option>
-              <option value="office">事業所の順</option>
-            </select>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-select [(ngModel)]="sort" (ngModelChange)="load()" aria-label="並べ方">
+              <mat-option value="deadline">届出の期限の近い順</mat-option>
+              <mat-option value="requestedAt">依頼の古い順</mat-option>
+              <mat-option value="office">事業所の順</mat-option>
+            </mat-select></mat-form-field>
           }
           <span class="grow"></span>
           @if (view === 'pending' && summary(); as s) {

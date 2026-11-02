@@ -18,6 +18,9 @@ import {
 import { ACTION_STEP, ImportResult, JobSummary, MonthlyAction, MonthlyRow, Overview, SalaryItem, StepKey, stepState } from './monthly.types';
 import { MonthlyPersonComponent, NoPayDialogComponent } from './monthly-dialogs';
 
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 /** ステップ。what は本体の見出しの横に出す1行。注意は操作バーの主ボタンの横に出す（BulkAction の caution） */
 interface StepDef { key: StepKey; label: string; what: string }
 
@@ -68,7 +71,7 @@ const ACTIONS: Record<StepKey, (c: MonthlyComponent) => BulkAction[]> = {
 @Component({
   selector: 'app-monthly',
   standalone: true,
-  imports: [
+  imports: [MatFormFieldModule, MatInputModule, MatSelectModule,
     DecimalPipe, FormsModule, MatButtonModule, MatIconModule, MatProgressBarModule,
     TargetListComponent, TargetCellDirective, TargetDetailDirective, ErrorStateComponent, LoadingStateComponent, TermComponent,
     PageHeadComponent, StepperComponent, StepLeadComponent, MonthlyPersonComponent,
