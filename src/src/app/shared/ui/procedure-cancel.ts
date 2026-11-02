@@ -78,6 +78,8 @@ interface ProcedureSummary { title: string; status: string; version: number; cre
 })
 export class ProcedureCancelComponent {
   procedureId = input<string | null>(null);
+  /** 手続きの進み具合（変わったら読み直す。完了・取消になったら消す） */
+  stateKey = input('');
   private functions = inject(Functions);
   private auth = inject(AuthService);
   private router = inject(Router);
@@ -88,7 +90,7 @@ export class ProcedureCancelComponent {
   state = signal<{ can: boolean; note: string | null; own: boolean; creatorName: string; proc: ProcedureSummary } | null>(null);
 
   constructor() {
-    effect(() => { const id = this.procedureId(); if (id) void this.load(id); else this.state.set(null); });
+    effect(() => { const id = this.procedureId(); this.stateKey(); if (id) void this.load(id); else this.state.set(null); });
   }
 
   private async load(id: string) {

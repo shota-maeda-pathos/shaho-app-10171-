@@ -46,7 +46,7 @@ export interface WizardStep {
         @if (subtitle()) { <span>{{ subtitle() }}</span> }
         <ng-content select="[meta]" />
       </ng-container>
-      <ng-container ngProjectAs="[actions]"><ng-content select="[headActions]" /><app-procedure-cancel [procedureId]="procedureId()" /></ng-container>
+      <ng-container ngProjectAs="[actions]"><ng-content select="[headActions]" /><app-procedure-cancel [procedureId]="procedureId()" [stateKey]="stateKey()" /></ng-container>
     </app-page-head>
 
     <app-stepper [steps]="items()" [current]="step().key" [label]="displayHeading() + 'のステップ'" (select)="jump($event)" />
@@ -96,6 +96,8 @@ export class WizardComponent {
   backQuery = input<Record<string, string> | null>(null);
   backLabel = input('戻る');
   steps = input.required<WizardStep[]>();
+  /** ステップの進み具合が変わったら「この手続きをやめる」を読み直す（完了したら消える） */
+  stateKey = computed(() => this.steps().map(s => `${s.key}:${s.done ? 1 : 0}${s.waitingFor ? 'w' : ''}`).join('|'));
   /** 表示中のステップ番号（0始まり） */
   current = model(0);
   /** 主ボタンの文字。次に起こることが分かる文言にする（例：「台帳に登録して雇用条件へ」）。省略時は「次へ」（最後は「完了する」） */
