@@ -9,6 +9,8 @@ export const EmployeeListSchema = z.object({
   keyword: z.string().max(50).optional(),
   /** 今の雇用条件の雇用形態で絞る */
   employmentType: EmploymentTypeSchema.optional(),
+  /** 今日の在籍ステータスで絞る */
+  status: z.enum(['active', 'sickLeave', 'maternityLeave', 'childcareLeave', 'careLeave', 'resigned']).optional(),
   limit: z.number().int().min(1).max(100).optional(),
   lastDocId: z.string().optional(),
 });

@@ -2,6 +2,7 @@ import { EmployeeExemptionsComponent } from './employee-exemptions';
 import { EmployeeLeavesComponent } from './employee-leaves';
 import { EmployeeBonusComponent } from './employee-bonus';
 import { EmployeeMyNumberComponent } from './employee-my-number';
+import { EmployeeStatusComponent } from './employee-status';
 import { Component, inject, signal, OnInit, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
@@ -152,7 +153,7 @@ interface OnboardResult {
   standalone: true,
   imports: [
     PageHeadComponent, StatusBadgeComponent,
-    EmployeeLeavesComponent, EmployeeExemptionsComponent, EmployeeBonusComponent, EmployeeMyNumberComponent,
+    EmployeeLeavesComponent, EmployeeExemptionsComponent, EmployeeBonusComponent, EmployeeMyNumberComponent, EmployeeStatusComponent,
     DecimalPipe, FormsModule, RouterLink, MatCardModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatButtonModule, MatIconModule, MatDatepickerModule,
     MatNativeDateModule, MatProgressSpinnerModule, MatSnackBarModule,
@@ -441,6 +442,7 @@ interface OnboardResult {
           <div class="tab-content">
             <mat-card>
               <mat-card-content>
+                @if (!isNew) { <app-employee-status [employeeId]="employeeId" /> }
                 <div class="form-grid">
                   <mat-form-field appearance="outline">
                     <mat-label>社員番号</mat-label>

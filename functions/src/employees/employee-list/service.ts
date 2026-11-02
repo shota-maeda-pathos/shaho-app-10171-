@@ -5,6 +5,7 @@ import { EmployeeResponse, ListResponse } from '../../types/response';
 import { toEmployeeResponse } from '../../utils/firestore';
 import { EmployeeListInput } from './schema';
 import { mapConcurrent } from '../../utils/parallel';
+import { currentStatusOf } from '../employee-status/service';
 
 /** 今の雇用条件（適用開始日のある最新の版）の雇用形態。承認待ちの下書き（適用開始日なし）は除く */
 async function employmentTypeOf(companyId: string, employeeId: string): Promise<string | null> {
@@ -13,8 +14,11 @@ async function employmentTypeOf(companyId: string, employeeId: string): Promise<
 }
 
 async function withEmploymentType(companyId: string, items: EmployeeResponse[]): Promise<EmployeeResponse[]> {
-  const types = await mapConcurrent(items, 20, e => employmentTypeOf(companyId, e.id));
-  return items.map((e, i) => ({ ...e, employmentType: types[i] }));
+  const [types, statuses] = await Promise.all([
+    mapConcurrent(items, 20, e => employmentTypeOf(companyId, e.id)),
+    mapConcurrent(items, 20, e => currentStatusOf(companyId, e.id, e.resignationDate)),
+  ]);
+  return items.map((e, i) => ({ ...e, employmentType: types[i], employmentStatus: statuses[i] }));
 }
 
 export async function listEmployees(
@@ -34,7 +38,7 @@ export async function listEmployees(
   }
 
   // 名前・社員番号の検索と雇用形態の絞り込みは、複合索引に頼らずメモリで絞る
-  if (input.keyword?.trim() || input.employmentType) {
+  if (input.keyword?.trim() || input.employmentType || input.status) {
     return searchByKeyword(collRef, input, targetOfficeIds, companyId);
   }
 
@@ -84,7 +88,7 @@ export async function listEmployees(
 /** 検索で読む項目（絞り込みと並べ替えに使うものだけ。返す1ページ分は後で全項目を読む） */
 const SEARCH_FIELDS = [
   'employeeNumber', 'lastName', 'firstName', 'lastNameKana', 'firstNameKana',
-  'officeId', 'departmentId', 'isActive', 'deletedAt',
+  'officeId', 'departmentId', 'isActive', 'deletedAt', 'resignationDate',
 ] as const;
 
 type SearchRow = Pick<EmployeeDoc, (typeof SEARCH_FIELDS)[number]> & { id: string };
@@ -139,12 +143,17 @@ async function searchByKeyword(
     .flatMap((snap) => snap.docs.map((d) => ({ ...(d.data() as Omit<SearchRow, 'id'>), id: d.id })))
     .filter((row) => row.deletedAt === null)
     .filter((row) => !input.departmentId || row.departmentId === input.departmentId)
-    .filter((row) => input.includeResigned || row.isActive === true)
+    .filter((row) => input.includeResigned || input.status === 'resigned' || row.isActive === true)
     .filter((row) => matchesKeyword(row, input.keyword ?? ''))
     .sort(compareByKana);
   if (input.employmentType) {
     const types = await mapConcurrent(rows, 30, row => employmentTypeOf(companyId, row.id));
     const keep = new Set(rows.filter((_, i) => types[i] === input.employmentType).map(row => row.id));
+    rows.splice(0, rows.length, ...rows.filter(row => keep.has(row.id)));
+  }
+  if (input.status) {
+    const statuses = await mapConcurrent(rows, 30, row => currentStatusOf(companyId, row.id, row.resignationDate));
+    const keep = new Set(rows.filter((_, i) => statuses[i] === input.status).map(row => row.id));
     rows.splice(0, rows.length, ...rows.filter(row => keep.has(row.id)));
   }
 

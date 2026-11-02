@@ -28,7 +28,12 @@ interface Employee {
   hireDate: string;
   resignationDate: string | null;
   employmentType?: string | null;
+  employmentStatus?: string;
 }
+
+const STATUS_LABELS: Record<string, string> = {
+  active: '在籍中', sickLeave: '休職中', maternityLeave: '産前産後休業中', childcareLeave: '育児休業中', careLeave: '介護休業中', resigned: '退職済み',
+};
 
 const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
   regular: '正社員', contract: '契約社員', partTime: 'パート', arbeit: 'アルバイト', executiveFull: '役員（常勤）', executivePart: '役員（非常勤）',
@@ -76,9 +81,10 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>在籍状態</mat-label>
-        <mat-select name="status" [(ngModel)]="includeResigned" (selectionChange)="search()">
-          <mat-option [value]="false">在籍中のみ</mat-option>
-          <mat-option [value]="true">退職者も含める</mat-option>
+        <mat-select name="status" [(ngModel)]="statusFilter" (selectionChange)="search()">
+          <mat-option value="">退職者を除く</mat-option>
+          <mat-option value="all">退職者も含める</mat-option>
+          @for (s of statuses; track s[0]) { <mat-option [value]="s[0]">{{ s[1] }}</mat-option> }
         </mat-select>
       </mat-form-field>
       <button mat-stroked-button type="submit"><mat-icon>search</mat-icon> 探す</button>
@@ -122,15 +128,7 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
         <ng-container matColumnDef="status">
           <th mat-header-cell *matHeaderCellDef>状態</th>
           <td mat-cell *matCellDef="let e">
-            @if (e.resignationDate) {
-              <mat-chip-set>
-                <mat-chip color="warn" highlighted>退職済</mat-chip>
-              </mat-chip-set>
-            } @else {
-              <mat-chip-set>
-                <mat-chip color="primary" highlighted>在籍</mat-chip>
-              </mat-chip-set>
-            }
+            <span class="state" [attr.data-kind]="e.employmentStatus ?? (e.resignationDate ? 'resigned' : 'active')">{{ statusLabel(e) }}</span>
           </td>
         </ng-container>
 
@@ -171,6 +169,9 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
     .filters { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: center; margin-bottom: 8px; }
     .filters mat-form-field { width: 220px; }
     .filters .count { color: var(--app-color-text-sub); }
+    .state { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; background: var(--app-status-done-bg); color: var(--app-status-done-fg); }
+    .state[data-kind=resigned] { background: var(--app-status-waiting-bg); color: var(--app-status-waiting-fg); }
+    .state[data-kind=sickLeave], .state[data-kind=maternityLeave], .state[data-kind=childcareLeave], .state[data-kind=careLeave] { background: var(--app-status-yours-bg); color: var(--app-status-yours-fg); }
     @media (max-width: 600px) { .filters mat-form-field { width: 100%; } }
   `],
 })
@@ -193,7 +194,9 @@ export class EmployeeListComponent implements OnInit {
   employmentTypes = Object.entries(EMPLOYMENT_TYPE_LABELS);
   keyword = '';
   employmentType = '';
-  includeResigned = false;
+  statusFilter = '';
+  statuses = Object.entries(STATUS_LABELS);
+  statusLabel = (e: Employee) => STATUS_LABELS[e.employmentStatus ?? (e.resignationDate ? 'resigned' : 'active')] ?? '—';
   total = signal<number | null>(null);
   typeLabel = (t: string | null | undefined) => (t ? EMPLOYMENT_TYPE_LABELS[t] ?? t : '—');
 
@@ -222,7 +225,7 @@ export class EmployeeListComponent implements OnInit {
         ...this.office.params(),
         ...(this.keyword.trim() ? { keyword: this.keyword.trim() } : {}),
         ...(this.employmentType ? { employmentType: this.employmentType } : {}),
-        ...(this.includeResigned ? { includeResigned: true } : {}),
+        ...(this.statusFilter === 'all' ? { includeResigned: true } : this.statusFilter ? { status: this.statusFilter } : {}),
       });
       this.total.set(result.data.total ?? null);
       const items: Employee[] = result.data.items;

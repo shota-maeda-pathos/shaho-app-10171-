@@ -21,6 +21,8 @@ export interface EmployeeResponse {
   otherEmployer?: { name: string; since: string | null; note: string } | null;
   /** 今の雇用条件の雇用形態（一覧で返す） */
   employmentType?: string | null;
+  /** 今日の在籍ステータス（一覧で返す） */
+  employmentStatus?: string;
   /** 台帳の追加項目（カタログ2章） */
   formerLastName?: string | null;
   postalCode?: string | null;
