@@ -25,6 +25,8 @@ export interface FilingPdfDataResponse {
   companyName: string;
   officeName: string;
   officeNumber: string;
+  /** 届出を出す事業所（PDFの所在地・電話などはこの事業所の値を書く） */
+  officeId: string;
   employeeName: string;
   employeeNumber: string;
   effectiveDate: string;
@@ -57,7 +59,14 @@ export async function getFilingPdfData(
   if (!filingSnap.exists) throw new HttpsError('not-found', '届出が見つかりません');
   const filing = filingSnap.data()!;
 
-  const officeSnap = await db.doc(`${base}/offices/${emp.officeId}`).get();
+  // 異動の資格喪失届は元の事業所の届出。事業所を持たない古い届出は、記入した事業所整理記号から元の事業所を探す
+  let officeId: string = filing.officeId ?? emp.officeId;
+  let officeSnap = await db.doc(`${base}/offices/${officeId}`).get();
+  const symbol = filing.formData?.['事業所整理記号'];
+  if (!filing.officeId && symbol && officeSnap.data()?.officeNumber !== symbol) {
+    const match = await db.collection(`${base}/offices`).where('officeNumber', '==', symbol).limit(1).get();
+    if (!match.empty) { officeSnap = match.docs[0]; officeId = match.docs[0].id; }
+  }
   const office = officeSnap.exists ? officeSnap.data()! : {};
 
   const companySnap = await db.doc(base).get();
@@ -72,6 +81,7 @@ export async function getFilingPdfData(
     companyName: company.name ?? '',
     officeName: office.name ?? '',
     officeNumber: office.officeNumber ?? '',
+    officeId,
     employeeName: `${emp.lastName} ${emp.firstName}`,
     employeeNumber: emp.employeeNumber ?? '',
     effectiveDate: filing.effectiveDate,

@@ -211,17 +211,17 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
         '生年月日': employee.birthDate ? toDateString(employee.birthDate) : '', '性別': employee.gender === 'male' ? '男' : '女', '個人番号': '', '基礎年金番号': employee.basicPensionNumber ?? '',
       };
       const remuneration = grade.basisRemuneration ?? grade.healthStandardRemuneration;
-      const draft = (filingType: string, formData: Record<string, unknown>) => ({
-        filingType, workflowStatus: 'draft' as const, mockStatus: 'notStarted' as const, submissionStatus: 'notSubmitted' as const,
+      const draft = (filingType: string, officeId: string, formData: Record<string, unknown>) => ({
+        filingType, officeId, workflowStatus: 'draft' as const, mockStatus: 'notStarted' as const, submissionStatus: 'notSubmitted' as const,
         effectiveDate: t.transferDate!, formData, submittedAt: null, resultReceivedAt: null, resultNote: null, version: 1, createdAt: now, updatedAt: now,
       } satisfies FilingDoc);
-      tx.set(lossRef, draft('lossNotification', {
+      tx.set(lossRef, draft('lossNotification', t.fromOfficeId, {
         '事業所整理記号': from.officeNumber, '事業所名称': from.name, ...person, '届出区分': '資格喪失届',
         '資格喪失年月日': t.transferDate, '喪失原因': '退職等', '退職年月日': addDays(t.transferDate!, -1), '喪失する保険': '健保・厚年',
         '最終標準報酬月額_健康保険': grade.healthStandardRemuneration, '最終標準報酬月額_厚生年金': grade.pensionStandardRemuneration,
         '保険証回収_添付': 0, '保険証回収_返不能': 0, '備考': `転勤（${to.name}へ）`,
       }));
-      tx.set(acqRef, draft('acquisitionNotification', {
+      tx.set(acqRef, draft('acquisitionNotification', t.toOfficeId!, {
         '事業所整理記号': to.officeNumber, '事業所名称': to.name, ...person, '届出区分': '資格取得届',
         '資格取得年月日': t.transferDate, '取得区分': '健保・厚年', '被保険者種別': '一般',
         '報酬月額_通貨': remuneration, '報酬月額_現物': 0, '報酬月額_合計': remuneration,

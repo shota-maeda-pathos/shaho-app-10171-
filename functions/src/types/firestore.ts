@@ -291,6 +291,8 @@ export interface FilingDoc {
   mockStatus: 'notStarted' | 'processing' | 'completed' | 'failed';
   submissionStatus: 'notSubmitted' | 'submitted' | 'accepted' | 'returned';
   effectiveDate: string;
+  /** 届出を出す事業所。異動の資格喪失届のように、本人の今の所属と違う事業所の届出だけに入れる */
+  officeId?: string;
   formData: Record<string, unknown>;
   submittedAt: Timestamp | null;
   resultReceivedAt: Timestamp | null;
