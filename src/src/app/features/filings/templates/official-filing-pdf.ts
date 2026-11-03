@@ -170,6 +170,8 @@ interface HeaderLayout {
   number?: Box;
   /** 事業所所在地の〒（印刷の「-」の前の3桁・後ろの4桁）。原票の〒と「-」の位置から測った */
   postal?: [Box, Box];
+  /** 〒の欄がない様式（70歳以上被用者該当届）は、所在地の頭に「〒100-0001」と書く */
+  postalInAddress?: boolean;
   address: Box;
   name: Box;
   representative: Box;
@@ -189,9 +191,9 @@ const HEADERS: Record<string, HeaderLayout> = {
   bonus: { date:[[59,83,26,13],[109,83,27,13],[161,83,34,13]], symbol:[[107.5,97.16,93.7,39.55],[226.54,97.16,90.82,39.55]], address:[113,180,367,65], name:[113,270,367,29], representative:[113,312,367,26], phone:[[125,342,67,19],[213,342,76,19],[317,342,80,19]] },
   dependent: { date:[[85,83,34,13],[141,83,33,13],[194,83,30,13]], symbol:[[155.6,97.74,101.57,32.26],[281.36,97.74,94.46,32.26]], postal:[[171.5,159.8,37,14.8],[223.6,159.8,60,14.8]], address:[160,181,346,35], name:[160,229,346,29], representative:[160,277,346,24], phone:[[163,307,59,19],[246,307,69,19],[336,307,74,19]] },
   maternity: { date:[[122,146,28,13],[167,146,28,13],[210,146,28,13]], symbol:[[156.46,163.4,87.56,32.26],[265.9,163.4,87.56,32.26]], postal:[[175,212.7,44,15.3],[227.6,212.7,60,15.3]], address:[161,235,321,40], name:[161,289,321,28], representative:[161,339,321,28], phone:[[178,374,53,19],[250,374,66,19],[345,374,63,19]] },
-  'pension-loss-70': { date:[[108,145,55,14],[175,145,32,14],[218,145,30,14]], symbol:[[167,164,88,30],[277,164,85,30]], number:[408,164,109,30], address:[168,215,348,45], name:[168,285,348,35], representative:[168,345,348,30], phone:[[170,392,70,16],[252,392,80,16],[340,392,70,16]] },
-  'maternity-end-change': { date:[[130,151,37,13],[181,151,28,13],[224,151,26,13]], symbol:[[175,172,83,26],[280,172,82,26]], address:[176,232,305,30], name:[176,288,305,28], representative:[176,340,305,28], phone:[[180,380,55,19],[262,380,65,19],[345,380,60,19]] },
-  'childcare-end-change': { date:[[120,151,37,13],[172,151,28,13],[214,151,26,13]], symbol:[[165,172,83,26],[270,172,82,26]], address:[166,232,305,30], name:[166,288,305,28], representative:[166,340,305,28], phone:[[170,380,55,19],[252,380,65,19],[335,380,60,19]] },
+  'pension-loss-70': { date:[[108,145,55,14],[175,145,32,14],[218,145,30,14]], symbol:[[167,164,88,30],[277,164,85,30]], number:[408,164,109,30], postalInAddress:true, address:[168,215,348,45], name:[168,285,348,35], representative:[168,345,348,30], phone:[[170,392,70,16],[252,392,80,16],[340,392,70,16]] },
+  'maternity-end-change': { date:[[130,151,37,13],[181,151,28,13],[224,151,26,13]], symbol:[[175,172,83,26],[280,172,82,26]], postal:[[191,222.4,40.8,15.6],[244.3,222.4,60,15.6]], address:[176,232,305,30], name:[176,288,305,28], representative:[176,340,305,28], phone:[[180,380,55,19],[262,380,65,19],[345,380,60,19]] },
+  'childcare-end-change': { date:[[120,151,37,13],[172,151,28,13],[214,151,26,13]], symbol:[[165,172,83,26],[270,172,82,26]], postal:[[181.4,222.4,40.8,15.6],[234.7,222.4,60,15.6]], address:[166,232,305,30], name:[166,288,305,28], representative:[166,340,305,28], phone:[[170,380,55,19],[252,380,65,19],[335,380,60,19]] },
   // 賞与不支給報告書：日付の欄は罫線がないため「令和」「年」「月」「日」の文字の間に書く。整理記号は4マス×2、事業所番号は5マス
   'bonus-non-payment': { date:[[80,127,38,15],[138,127,36,15],[194,127,36,15]], symbol:[[150.5,147.3,90.1,36.7],[261.7,147.3,90.5,36.7]], number:[420.6,147.3,117,36.7], address:[152,215,380,48], name:[152,276,380,40], representative:[152,323,380,24], phone:[[158,381,70,16],[240,381,68,16],[318,381,80,16]] },
   childcare: { date:[[86,145,37,13],[143,145,31,13],[190,145,30,13]], symbol:[[133.42,163.4,94.47,36.1],[251.5,163.4,94.47,36.1]], postal:[[153.5,222.8,46,16.3],[212,222.8,60,16.3]], address:[140,238,345,41], name:[140,300,345,28], representative:[140,348,345,26], phone:[[157,386,52,19],[237,386,63,19],[322,386,69,19]] },
@@ -213,12 +215,12 @@ function header(w: Writer, key: string, fd: Data, meta: FilingPrintMeta) {
     } else w.warnings.add('事業所整理記号は「01-イロハ」のように、ハイフンで2つに分けて登録してください。現在の値は記入していません。');
   } else w.warnings.add('事業所整理記号が未登録です。');
   if (h.number) w.digits(fd['事業所番号'] || meta.officeCode,h.number,5,'事業所番号',true);
-  if (h.postal) {
-    const postal = String(fd['事業所郵便番号'] ?? meta.officePostalCode ?? '').replace(/[^0-9]/g, '');
-    if (postal.length === 7) { w.text(postal.slice(0, 3), h.postal[0], '事業所の郵便番号', { size: 9, center: true }); w.text(postal.slice(3), h.postal[1], '事業所の郵便番号', { size: 9, center: true }); }
-    else w.warnings.add(postal ? '事業所の郵便番号は7桁で登録してください。現在の値は記入していません。' : '事業所の郵便番号が未登録です（設定の事業所管理で登録できます）。');
-  }
-  w.text(fd['事業所所在地'] ?? meta.officeAddress,h.address,'事業所所在地',{ required:true });
+  const postal = String(fd['事業所郵便番号'] ?? meta.officePostalCode ?? '').replace(/[^0-9]/g, '');
+  if ((h.postal || h.postalInAddress) && postal.length !== 7)
+    w.warnings.add(postal ? '事業所の郵便番号は7桁で登録してください。現在の値は記入していません。' : '事業所の郵便番号が未登録です（設定の事業所管理で登録できます）。');
+  if (h.postal && postal.length === 7) { w.text(postal.slice(0, 3), h.postal[0], '事業所の郵便番号', { size: 9, center: true }); w.text(postal.slice(3), h.postal[1], '事業所の郵便番号', { size: 9, center: true }); }
+  const address = fd['事業所所在地'] ?? meta.officeAddress;
+  w.text(h.postalInAddress && postal.length === 7 && address ? `〒${postal.slice(0, 3)}-${postal.slice(3)}　${address}` : address,h.address,'事業所所在地',{ required:true });
   w.text(officeTitle(fd, meta),h.name,'事業所名称',{ required:true });
   w.text(fd['事業主氏名'] ?? meta.representativeName,h.representative,'事業主氏名',{ required:true });
   const phone = String(fd['電話番号'] ?? meta.officePhone ?? '').split('-');
