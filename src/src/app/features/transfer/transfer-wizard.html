@@ -18,7 +18,7 @@
 
       @switch (key()) {
         @case ('entry') {
-          @if (v.applied) { <p class="note">台帳の所属事業所を変えたあとは、異動先・異動日は直せません。</p> }
+          @if (v.applied) { <p class="note">届出を作ったあとは、異動先・異動日は直せません。</p> }
           <fieldset class="form-grid" [disabled]="v.applied">
             <mat-form-field appearance="outline"><mat-label>今の事業所</mat-label>
               <input matInput [value]="v.from.name" disabled></mat-form-field>
@@ -49,7 +49,7 @@
 
         @case ('apply') {
           @if (v.applied) {
-            <p><app-status-badge tone="done" label="変更済み" /> 台帳の所属事業所を{{ v.to?.name }}に変えました。</p>
+            <p><app-status-badge tone="done" label="作成済み" /> {{ v.facts?.filingRequired ? '届出を作りました。' : '異動を登録しました。' }}台帳の所属は{{ moved() ? v.to?.name + 'に変わっています。' : '完了の確認で' + v.to?.name + 'に変えます。' }}</p>
           } @else if (v.facts; as f) {
             <table class="summary">
               <tbody>
@@ -57,7 +57,7 @@
                 <tr><th>届出</th><td>{{ f.filingRequired ? '資格喪失届（' + v.from.name + '）と資格取得届（' + v.to?.name + '）を作り、承認を依頼します。等級は今の等級を引き継ぎます' : 'なし' }}</td></tr>
               </tbody>
             </table>
-            <p class="sub">毎月の処理は、台帳を変えたあとは異動先の事業所に出ます。異動日より前の月の処理が残っていれば、先に済ませてください。</p>
+            <p class="sub">台帳の所属はまだ変えません。異動日の前の月までの毎月の処理は元の事業所に出ます。異動日を過ぎ、前の月の保険料を元の事業所で計算し終えたら、完了の確認で所属を変えます。</p>
           }
         }
 
@@ -90,8 +90,13 @@
             <tbody>
               <tr><th>異動</th><td>{{ v.from.name }} → {{ v.to?.name }}（{{ v.transferDate | date:'yyyy年M月d日' }}）</td></tr>
               @if (v.facts; as f) { <tr><th>保険料</th><td>{{ f.notes[f.notes.length - 1] }}</td></tr> }
+              <tr><th>台帳の所属</th><td>{{ moved() ? v.to?.name : v.from.name + '（完了すると' + v.to?.name + 'に変わります）' }}</td></tr>
             </tbody>
           </table>
+          @if (!isDone() && !moved()) {
+            <p class="sub">所属は異動日（{{ v.transferDate | date:'yyyy年M月d日' }}）から変えられます。異動日の前の月の保険料を、元の事業所の毎月の処理で計算し終えてから完了にしてください。</p>
+            <mat-checkbox [(ngModel)]="skipPremiumCheck" name="skipPremiumCheck">前の月の保険料を計算せずに進める（保険料の対象でない人など）</mat-checkbox>
+          }
           <a mat-stroked-button [routerLink]="['/employees', v.employee.id]">従業員の画面を開く</a>
         }
       }

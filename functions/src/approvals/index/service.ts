@@ -124,6 +124,8 @@ export interface ApprovalSearchItem extends ApprovalIndexEntry {
   id: string;
   mine: boolean;
   canApprove: boolean;
+  /** 依頼した人のほかに承認できる人（管理者、またはこの事業所を担当する承認者）がいない */
+  noApprover: boolean;
   overdue: boolean;
   dueSoon: boolean;
   stale: boolean;
@@ -140,11 +142,17 @@ export async function searchApprovals(input: ApprovalSearchInput, auth: AuthCont
     ? await col.orderBy('indexedAt', 'desc').limit(800).get()
     : await col.where('status', '==', 'pending').limit(5000).get();
   const keyword = input.keyword?.replace(/\s+/g, '') ?? '';
+  // 承認できる人のいない事業所の依頼は止まったままになるので、一覧で知らせる（承認者の担当に足し忘れたときなど）
+  const approvers = input.view === 'processed' ? [] : (await db.collection(`companies/${auth.companyId}/users`).select('roles', 'officeIds', 'isLoginDisabled').get())
+    .docs.map(d => ({ uid: d.id, ...(d.data() as { roles?: string[]; officeIds?: string[]; isLoginDisabled?: boolean }) }))
+    .filter(u => !u.isLoginDisabled && (u.roles?.includes('admin') || u.roles?.includes('approver')));
+  const noApprover = (e: ApprovalIndexEntry) => e.status === 'pending'
+    && !approvers.some(u => u.uid !== e.requestedBy && (u.roles?.includes('admin') || u.officeIds?.includes(e.officeId)));
   const all: ApprovalSearchItem[] = snap.docs.map(d => {
     const e = d.data() as ApprovalIndexEntry;
     const mine = e.requestedBy === auth.uid;
     return {
-      ...e, id: d.id, mine, canApprove: e.status === 'pending' && canApproveRole(auth) && !mine,
+      ...e, id: d.id, mine, canApprove: e.status === 'pending' && canApproveRole(auth) && !mine, noApprover: noApprover(e),
       overdue: isOverdue(e, today), dueSoon: isDueSoon(e, today), stale: isStale(e, now, staleDays),
     };
   }).filter(e => visible(auth, e) && (input.view === 'processed' ? e.status !== 'pending' : true));

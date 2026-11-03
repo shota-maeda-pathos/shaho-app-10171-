@@ -16,6 +16,8 @@ export async function rejectApprovalRequest(
     `companies/${auth.companyId}/employees/${input.employeeId}`,
   );
 
+  // 依頼した本人が承認待ちの依頼を取り下げたとき（承認の画面の「取り下げる」）。中身は差し戻しと同じで、手続きの画面から作り直せる
+  let withdrawn = false;
   const result = await db.runTransaction(async (tx) => {
     const empSnap = await tx.get(empRef);
     if (!empSnap.exists || empSnap.data()!.deletedAt !== null) {
@@ -39,6 +41,7 @@ export async function rejectApprovalRequest(
     if (reqData.status !== 'pending') {
       throw invalidArg(`この承認リクエストは既に処理済みです（状態: ${reqData.status}）`);
     }
+    withdrawn = reqData.requestedBy === auth.uid;
 
     validateApprovalTarget(reqData.targetPath,reqData.requestType,auth.companyId,input.employeeId);
     if (['salary','monthlyInsurance', 'bonus', 'bonusInsurance'].includes(reqData.requestType)) {
@@ -101,8 +104,8 @@ export async function rejectApprovalRequest(
     companyId: auth.companyId,
     officeId: who.officeId,
     link,
-    title: '差し戻されました',
-    body: `${who.name}さんの承認の依頼が差し戻されました。理由：${input.comment}`,
+    title: withdrawn ? '依頼を取り下げました' : '差し戻されました',
+    body: `${who.name}さんの承認の依頼が${withdrawn ? '依頼した人により取り下げられました' : '差し戻されました'}。理由：${input.comment}`,
     category: 'approval',
     targetType: 'approvalRequest',
     targetId: result,

@@ -237,8 +237,18 @@ export class LeaveWizardComponent implements OnInit, OnDestroy {
   // ── 期間 ──
 
   changed() {
+    this.suggestChildcareStart();
     this.dirty.set(true);
     this.schedulePreview();
+  }
+
+  /** 本人が出産した子なら、育休は産後休業（出産の翌日から8週間）の翌日から。始める日が空のときだけ入れる */
+  private suggestChildcareStart() {
+    const f = this.form;
+    if (!f.bornByEmployee || !/^\d{4}-\d{2}-\d{2}$/.test(f.childBirthDate) || f.startDate) return;
+    const start = new Date(`${f.childBirthDate}T00:00:00Z`);
+    start.setUTCDate(start.getUTCDate() + 57);
+    f.startDate = start.toISOString().slice(0, 10);
   }
 
   private schedulePreview() {

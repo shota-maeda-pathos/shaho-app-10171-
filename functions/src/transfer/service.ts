@@ -4,7 +4,8 @@ import { AuthContext, requireOffice } from '../middleware/auth';
 import { EmployeeDoc, FilingDoc, GradeDoc, OfficeDoc, ProcedureDoc, TransferState } from '../types/firestore';
 import { invalidArg, notFound } from '../utils/errors';
 import { toDateString } from '../utils/firestore';
-import { addDays, fiveDayDeadline } from '../insurance/calculator';
+import { addDays, addMonths, fiveDayDeadline } from '../insurance/calculator';
+import { insuredCounterPath, nextInsuredNumber } from '../offices/insured-number';
 import { buildTransferWizardSteps } from '../procedures/templates';
 import { requireProcedureAccess } from '../procedures/access';
 import { completed, requireVersion, setStep, statusReasonOf, stepOf } from '../procedures/wizard';
@@ -164,7 +165,10 @@ export async function saveTransferEntry(input: { companyId: string; procedureId:
 
 // ── 台帳の付け替えと届出 ──────────────────────────────────
 
-/** 台帳の所属事業所を変え、別の適用事業所への異動なら資格喪失届（旧）と資格取得届（新）を作って承認を依頼する */
+/**
+ * 別の適用事業所への異動なら資格喪失届（旧）と資格取得届（新）を作って承認を依頼する。
+ * 台帳の所属はまだ変えない（異動日の前の月の保険料を元の事業所で計算するため。所属は完了のときに変える）
+ */
 export async function applyTransfer(input: { companyId: string; procedureId: string; expectedVersion: number }, auth: AuthContext) {
   const { ref, proc } = await loadProcedure(input.companyId, input.procedureId, auth);
   requireVersion(proc, input.expectedVersion);
@@ -189,22 +193,23 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
   const acqRef = t.filingRequired ? filings.doc() : null;
   // 資格取得届の住所・被扶養者の有無（台帳の値。異動では変わらない）
   const ledger = t.filingRequired ? await acquisitionLedgerFields(input.companyId, proc.employeeId!, (await empRef.get()).data() as EmployeeDoc) : {};
+  // 被保険者整理番号は事業所ごとの番号。異動先が自動で付ける設定なら、入社と同じ付け方で次の番号を取っておく
+  const autoNumber = t.filingRequired && to.raw.insuredNumberMode === 'auto';
+  const usedNumbers = autoNumber
+    ? (await db.collection(`${base}/employees`).where('officeId', '==', t.toOfficeId).select('insuredPersonNumber').get()).docs.map(d => d.data().insuredPersonNumber as string | null | undefined)
+    : [];
+  const counterRef = db.doc(insuredCounterPath(input.companyId, t.toOfficeId));
   let employee!: EmployeeDoc;
+  let newInsuredNumber: string | null = null;
   await db.runTransaction(async tx => {
     const latest = (await tx.get(ref)).data() as TransferProc;
     requireVersion(latest, input.expectedVersion);
     const empSnap = await tx.get(empRef);
     employee = empSnap.data() as EmployeeDoc;
     if (employee.officeId !== t.fromOfficeId) throw invalidArg('所属事業所が手続きを始めたときから変わっています。画面を読み込み直してください');
-    tx.update(empRef, { officeId: t.toOfficeId, updatedAt: now, version: employee.version + 1 });
-    tx.set(db.collection(`${empRef.path}/transferHistory`).doc(), {
-      fromOfficeId: t.fromOfficeId, toOfficeId: t.toOfficeId, transferDate: Timestamp.fromDate(new Date(`${t.transferDate}T00:00:00Z`)),
-      reason: t.reason || null, procedureId: input.procedureId, performedBy: auth.uid, createdAt: now,
-    });
-    tx.set(db.collection(`${base}/auditLogs`).doc(), {
-      entity: 'employee', entityId: proc.employeeId, action: 'transfer', changes: { officeId: { from: t.fromOfficeId, to: t.toOfficeId } },
-      performedBy: auth.uid, performedAt: now, version: employee.version + 1,
-    });
+    const counter = autoNumber ? await tx.get(counterRef) : null;
+    newInsuredNumber = counter ? nextInsuredNumber(usedNumbers, Number(counter.data()?.last ?? 0)) : null;
+    if (newInsuredNumber) tx.set(counterRef, { last: Number(newInsuredNumber), updatedAt: now }, { merge: true });
     if (lossRef && acqRef && grade) {
       const person = {
         '被保険者整理番号': employee.insuredPersonNumber ?? '', '被保険者氏名': nameOf(employee), '被保険者氏名フリガナ': `${employee.lastNameKana} ${employee.firstNameKana}`,
@@ -222,7 +227,8 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
         '保険証回収_添付': 0, '保険証回収_返不能': 0, '備考': `転勤（${to.name}へ）`,
       }));
       tx.set(acqRef, draft('acquisitionNotification', t.toOfficeId!, {
-        '事業所整理記号': to.officeNumber, '事業所名称': to.name, ...person, '届出区分': '資格取得届',
+        // 整理番号は異動先の番号（自動で付けない事業所は空。年金事務所から届いた番号を台帳に入れる）
+        '事業所整理記号': to.officeNumber, '事業所名称': to.name, ...person, '被保険者整理番号': newInsuredNumber ?? '', '届出区分': '資格取得届',
         '資格取得年月日': t.transferDate, '取得区分': '健保・厚年', '被保険者種別': '一般',
         '報酬月額_通貨': remuneration, '報酬月額_現物': 0, '報酬月額_合計': remuneration,
         '健康保険_等級': grade.healthGradeNumber, '健康保険_標準報酬月額': grade.healthStandardRemuneration,
@@ -232,11 +238,11 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
         ...ledger,
       }));
     }
-    let steps = setStep(latest.steps, 'apply', { ...completed(auth.uid), statusDetail: `${to.name}に変更` });
+    let steps = setStep(latest.steps, 'apply', { ...completed(auth.uid), statusDetail: t.filingRequired ? '届出を作成（所属は完了のときに変更）' : '所属は完了のときに変更' });
     steps = setStep(steps, 'filings', t.filingRequired ? { status: 'in_progress', statusDetail: '承認と提出を待っています' } : { status: 'skipped', statusDetail: '届出は不要' });
     steps = setStep(steps, 'confirm', { status: t.filingRequired ? 'blocked' : 'available' });
     tx.update(ref, {
-      officeId: t.toOfficeId, 'transfer.applied': true,
+      'transfer.applied': true, 'transfer.newInsuredNumber': newInsuredNumber,
       'transfer.lossFilingId': lossRef?.id ?? null, 'transfer.acquisitionFilingId': acqRef?.id ?? null,
       steps, statusReason: statusReasonOf(steps), version: latest.version + 1, updatedAt: now,
     });
@@ -267,16 +273,47 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
 
 // ── 完了 ────────────────────────────────────────────
 
-export async function completeTransfer(input: { companyId: string; procedureId: string; expectedVersion: number }, auth: AuthContext) {
+/** 台帳の所属を異動先に変えて完了にする。異動日を過ぎ、異動日の前の月の保険料を元の事業所で計算し終えてから */
+export async function completeTransfer(input: { companyId: string; procedureId: string; expectedVersion: number; skipPremiumCheck?: boolean }, auth: AuthContext) {
   const { ref, proc } = await loadProcedure(input.companyId, input.procedureId, auth);
   requireVersion(proc, input.expectedVersion);
   if (stepOf(proc, 'confirm').status !== 'available') throw invalidArg('届出の提出が済んでから完了にしてください');
+  const t = proc.transfer;
+  const base = `companies/${input.companyId}`;
+  const empRef = db.doc(`${base}/employees/${proc.employeeId}`);
+  const lastMonth = addMonths(t.transferDate!.slice(0, 7), -1);
+  const [empSnap, lastPremium] = await Promise.all([empRef.get(), db.doc(`${empRef.path}/monthlyInsurance/${lastMonth}`).get()]);
+  // 以前の作りで届出を作ったときに所属を変えた手続きは、変えずに完了にする
+  const move = (empSnap.data() as EmployeeDoc).officeId === t.fromOfficeId;
+  if (move) {
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+    if (today < t.transferDate!) throw invalidArg(`所属は異動日（${t.transferDate}）に変えます。異動日になってから完了にしてください`);
+    if (!lastPremium.exists && !input.skipPremiumCheck) {
+      throw invalidArg(`${lastMonth}分の保険料が、まだ元の事業所で計算されていません。毎月の処理で計算してから完了にしてください（保険料の対象でない人は「計算せずに進める」に印を付けます）`);
+    }
+  }
   const now = Timestamp.now();
   const steps = setStep(proc.steps, 'confirm', completed(auth.uid));
   await db.runTransaction(async tx => {
     const latest = (await tx.get(ref)).data() as TransferProc;
     requireVersion(latest, input.expectedVersion);
-    tx.update(ref, { steps, status: 'completed', statusReason: '異動を完了した', completedAt: now, updatedAt: now, version: latest.version + 1 });
+    const employee = (await tx.get(empRef)).data() as EmployeeDoc;
+    if (move) {
+      if (employee.officeId !== t.fromOfficeId) throw invalidArg('所属事業所が手続きを始めたときから変わっています。画面を読み込み直してください');
+      // 整理番号は異動先の番号に変える（自動で付けない事業所は空にして、年金事務所から届いた番号を入れてもらう）
+      const insured = t.filingRequired ? { insuredPersonNumber: t.newInsuredNumber ?? null } : {};
+      tx.update(empRef, { officeId: t.toOfficeId, ...insured, updatedAt: now, version: employee.version + 1 });
+      tx.set(db.collection(`${empRef.path}/transferHistory`).doc(), {
+        fromOfficeId: t.fromOfficeId, toOfficeId: t.toOfficeId, transferDate: Timestamp.fromDate(new Date(`${t.transferDate}T00:00:00Z`)),
+        reason: t.reason || null, procedureId: input.procedureId, performedBy: auth.uid, createdAt: now,
+      });
+      tx.set(db.collection(`${base}/auditLogs`).doc(), {
+        entity: 'employee', entityId: proc.employeeId, action: 'transfer',
+        changes: { officeId: { from: t.fromOfficeId, to: t.toOfficeId }, ...(t.filingRequired ? { insuredPersonNumber: { from: employee.insuredPersonNumber ?? null, to: t.newInsuredNumber ?? null } } : {}) },
+        performedBy: auth.uid, performedAt: now, version: employee.version + 1,
+      });
+    }
+    tx.update(ref, { officeId: t.toOfficeId, steps, status: 'completed', statusReason: '異動を完了した', completedAt: now, updatedAt: now, version: latest.version + 1 });
   });
   return { success: true };
 }

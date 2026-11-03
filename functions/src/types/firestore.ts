@@ -495,10 +495,12 @@ export interface TransferState {
   reason: string;
   /** 別の適用事業所への異動で、資格喪失届・資格取得届が要る */
   filingRequired: boolean;
-  /** 台帳の所属事業所を付け替えた */
+  /** 届出を作った（名前は以前の「台帳を付け替えた」のまま。所属は完了のときに変える） */
   applied: boolean;
   lossFilingId: string | null;
   acquisitionFilingId: string | null;
+  /** 異動先で付けた被保険者整理番号（事業所が自動で付ける設定のとき。台帳には完了のときに入れる） */
+  newInsuredNumber?: string | null;
 }
 
 /** 雇用条件の変更の手続き（ウィザード）の状態。承認されたら台帳に反映し、加入・喪失が切り替われば届出を作る */

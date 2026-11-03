@@ -26,7 +26,7 @@ interface ApprovalItem {
   parentId: string | null; filingId: string | null; year: number | null; payMonth: string | null; personCount: number;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requestedBy: string | null; requestedByName: string; requestedAt: string | null;
   reviewedAt: string | null; comment: string | null; targetVersion: number; deadline: string | null; deadlineNote: string | null;
-  summary: string; mine: boolean; canApprove: boolean; overdue: boolean; dueSoon: boolean; stale: boolean;
+  summary: string; mine: boolean; canApprove: boolean; noApprover?: boolean; overdue: boolean; dueSoon: boolean; stale: boolean;
 }
 interface SearchResult { items: ApprovalItem[]; total: number; summary: { pending: number; forMe: number; overdue: number; stale: number; mine: number; elsewhere: number }; staleDays: number }
 interface Detail {
@@ -217,9 +217,9 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
                   @if (act(); as a) {
                     @if (a.kind === 'reject' || a.kind === 'cancel') {
                       <div class="reason">
-                        <input type="text" [(ngModel)]="note" [placeholder]="a.kind === 'reject' ? '差し戻す理由（依頼した人に届きます）' : '承認を取り消す理由'" [attr.aria-label]="a.kind === 'reject' ? '差し戻す理由' : '取り消す理由'">
+                        <input type="text" [(ngModel)]="note" [placeholder]="a.kind === 'cancel' ? '承認を取り消す理由' : a.item.mine ? '取り下げる理由（例：内容を直すため）' : '差し戻す理由（依頼した人に届きます）'" [attr.aria-label]="a.kind === 'cancel' ? '取り消す理由' : a.item.mine ? '取り下げる理由' : '差し戻す理由'">
                         <button mat-button type="button" (click)="act.set(null)" [disabled]="busy()">やめる</button>
-                        <button mat-flat-button type="button" (click)="runReason(a)" [disabled]="busy() || !note.trim()">{{ a.kind === 'reject' ? '差し戻す' : '承認を取り消す' }}</button>
+                        <button mat-flat-button type="button" (click)="runReason(a)" [disabled]="busy() || !note.trim()">{{ a.kind === 'cancel' ? '承認を取り消す' : a.item.mine ? '取り下げる' : '差し戻す' }}</button>
                       </div>
                     }
                   } @else {
@@ -228,6 +228,9 @@ const STATUS: Record<string, { label: string; tone: StatusTone }> = {
                       @if (i.canApprove) {
                         <button mat-stroked-button type="button" (click)="ask({ kind: 'reject', item: i })" [disabled]="busy()">差し戻す</button>
                         <button mat-flat-button type="button" (click)="approveOne(i)" [disabled]="busy() || detail()?.changedSinceRequest">承認する</button>
+                      }
+                      @if (i.status === 'pending' && i.mine && i.kind === 'request') {
+                        <button mat-stroked-button type="button" (click)="ask({ kind: 'reject', item: i })" [disabled]="busy()">依頼を取り下げる</button>
                       }
                       @if (i.status === 'approved' && i.requestType === 'filing') {
                         <button mat-stroked-button type="button" (click)="ask({ kind: 'cancel', item: i })" [disabled]="busy()">承認を取り消す</button>
@@ -414,17 +417,18 @@ export class ApprovalListComponent {
   }
 
   toneOf(i: ApprovalItem): StatusTone {
-    if (i.status === 'pending') return i.canApprove ? 'yours' : 'waiting';
+    if (i.status === 'pending') return i.canApprove ? 'yours' : i.noApprover ? 'attention' : 'waiting';
     return this.statusOf(i).tone;
   }
   labelOf(i: ApprovalItem) {
-    if (i.status === 'pending') return i.canApprove ? 'あなたの番' : i.mine ? '自分の依頼' : '承認待ち';
+    if (i.status === 'pending') return i.canApprove ? 'あなたの番' : i.noApprover ? '承認できる人がいません' : i.mine ? '自分の依頼' : '承認待ち';
     return this.statusOf(i).label;
   }
   /** 右下の注意の1行（押す前に知っておくべきこと） */
   footNote(i: ApprovalItem) {
     if (i.canApprove) return i.requestType === 'filing' || i.kind === 'runFiling' ? '承認すると、届出を提出できる状態になります。' : '承認すると確定し、差し戻さないと直せません。';
-    if (i.status === 'pending' && i.mine) return '自分の依頼は自分では承認できません。ほかの承認者が承認します。';
+    if (i.status === 'pending' && i.noApprover) return `${i.officeName}を担当する承認者がいないため、このままでは承認されません。管理者が設定のユーザー管理で、承認者の担当事業所に足してください。`;
+    if (i.status === 'pending' && i.mine) return '自分の依頼は自分では承認できません。直すときは取り下げます。';
     if (i.status === 'approved' && i.requestType === 'filing') return '提出の前なら、承認を取り消して下書きに戻せます。';
     return '';
   }
@@ -515,7 +519,7 @@ export class ApprovalListComponent {
             filingId: i.filingId, expectedVersion: i.targetVersion, action: 'reject', comment: this.note.trim(),
           });
         }
-        this.snackBar.open('差し戻しました', '閉じる', { duration: 4000 });
+        this.snackBar.open(i.mine ? '依頼を取り下げました。手続きの画面から直して、もう一度依頼できます' : '差し戻しました', '閉じる', { duration: 5000 });
         handled.push(i.id);
       } else {
         await httpsCallable(this.functions, 'approvalCancel')({ companyId, target: this.target(a.item), reason: this.note.trim() });

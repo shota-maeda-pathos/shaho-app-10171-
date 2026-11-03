@@ -7,6 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
@@ -41,7 +42,7 @@ interface TransferView {
 @Component({
   selector: 'app-transfer-wizard',
   standalone: true,
-  imports: [MatDatepickerModule, DatePipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule,
+  imports: [MatDatepickerModule, DatePipe, FormsModule, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule, MatCheckboxModule,
     WizardComponent, StatusBadgeComponent, LoadingStateComponent, ErrorStateComponent],
   templateUrl: './transfer-wizard.html',
   styleUrls: ['../onboarding/onboarding-wizard.scss'],
@@ -63,6 +64,8 @@ export class TransferWizardComponent implements OnInit {
   toOfficeId = '';
   transferDate = '';
   reason = '';
+  /** 異動日の前の月の保険料が元の事業所にない人（保険料の対象でない など）を、そのまま完了にする */
+  skipPremiumCheck = false;
   dirty = signal(false);
   facts = signal<Facts | null>(null);
   factsError = signal('');
@@ -84,18 +87,23 @@ export class TransferWizardComponent implements OnInit {
     return [
       { key: 'entry', label: '異動の内容', done: done || cur > 0,
         what: '異動先の事業所と異動日を入れます。保険料率・届出・新しい料率を使う月をシステムが判定します。',
-        why: '都道府県が変わると健康保険の料率が変わり、別の適用事業所なら届出が要るためです。', next: '台帳の所属事業所を変えます。' },
-      { key: 'apply', label: '所属の変更', done: done || cur > 1,
-        what: '台帳の所属事業所を異動先に変え、異動の履歴を残します。届出が要る場合は、資格喪失届と資格取得届を作って承認を依頼します。',
-        why: 'その月の保険料から異動先の事業所で計算するためです。', next: filing ? '2件の届出を承認・提出します。' : '完了を確認します。' },
+        why: '都道府県が変わると健康保険の料率が変わり、別の適用事業所なら届出が要るためです。', next: filing ? '資格喪失届と資格取得届を作ります。' : '異動を登録します。' },
+      { key: 'apply', label: filing ? '届出の作成' : '異動の登録', done: done || cur > 1,
+        what: filing
+          ? '資格喪失届（元の事業所）と資格取得届（異動先。整理番号は異動先の番号）を作って承認を依頼します。台帳の所属はまだ変えません。'
+          : '異動を登録します。台帳の所属はまだ変えません。',
+        why: '届出は異動日から5日以内に出すので先に作り、所属は異動日の前の月の保険料を元の事業所で計算してから変えるためです。', next: filing ? '2件の届出を承認・提出します。' : '完了の確認で所属を変えます。' },
       { key: 'filings', label: filing ? '届出の提出' : '届出（不要）', done: done || cur > 2,
         what: '届出の画面で、2件の届出の承認と提出（模擬電子申請または紙）を行います。',
         why: '異動日から5日以内に届け出る決まりがあるためです。', next: '2件とも提出すると完了を確認できます。' },
       { key: 'confirm', label: '完了の確認', done,
-        what: '異動の内容と、異動先の事業所で計算を始める月を確かめて、手続きを完了にします。',
-        why: '毎月の処理で、異動した月から異動先の事業所に出るためです。', next: 'これで手続きは完了です。' },
+        what: '異動日を過ぎ、異動日の前の月の保険料を元の事業所で計算し終えたら、台帳の所属を異動先に変えて完了にします。',
+        why: '毎月の処理で、異動した月から異動先の事業所に出るためです（前の月までは元の事業所で計算します）。', next: 'これで手続きは完了です。' },
     ];
   });
+
+  /** 台帳の所属がもう異動先になっている（完了したとき。以前の作りでは届出を作ったときに変えていた） */
+  moved = computed(() => { const v = this.view(); return !!v?.to && v.employee.currentOfficeId === v.to.id; });
 
   nextLabel(): string | undefined {
     const k = this.key();
@@ -103,8 +111,8 @@ export class TransferWizardComponent implements OnInit {
     if (k === 'entry' && (this.dirty() || this.index() === this.currentIndex())) return '保存して所属の変更へ';
     if (this.index() < this.currentIndex()) return undefined;
     switch (k) {
-      case 'apply': return this.view()!.facts?.filingRequired ? '台帳を変えて届出を作る' : '台帳を変える';
-      case 'confirm': return '手続きを完了する';
+      case 'apply': return this.view()!.facts?.filingRequired ? '届出を作って承認を依頼する' : '異動を登録する';
+      case 'confirm': return this.moved() ? '手続きを完了する' : '所属を変えて完了する';
       default: return undefined;
     }
   }
@@ -219,8 +227,8 @@ export class TransferWizardComponent implements OnInit {
       this.index.set(this.index() + 1);
       return;
     }
-    if (k === 'apply') return this.run('apply', {}, '台帳の所属事業所を変えました');
-    if (k === 'confirm') return this.run('complete', {}, '手続きを完了にしました');
+    if (k === 'apply') return this.run('apply', {}, this.view()!.facts?.filingRequired ? '届出を作って承認を依頼しました' : '異動を登録しました');
+    if (k === 'confirm') return this.run('complete', { skipPremiumCheck: this.skipPremiumCheck }, this.moved() ? '手続きを完了にしました' : '台帳の所属を変えて、手続きを完了にしました');
   }
 
   private async run(step: string, payload: object, done: string, after?: () => void) {

@@ -9,9 +9,11 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { ConfirmService } from '../../shared/confirm-dialog/confirm-dialog';
 
 import { MatDatepickerModule } from '@angular/material/datepicker';
 type RequestType = 'address' | 'name' | 'dependentAdd' | 'dependentRemove' | 'leave';
+const TYPE_NAMES: Record<RequestType, string> = { address: '住所の変更', name: '氏名の変更', dependentAdd: '扶養に入れる', dependentRemove: '扶養から外す', leave: '産休・育休' };
 
 interface MyRequest { id: string; typeLabel: string; status: string; createdAt: string | null; comment: string | null; attachments: { name: string }[] }
 
@@ -129,6 +131,7 @@ export class PortalRequestsComponent implements OnInit {
   private functions = inject(Functions);
   private auth = inject(AuthService);
   private snackBar = inject(MatSnackBar);
+  private confirm = inject(ConfirmService);
 
   canRequest = !this.auth.profile()?.isSuspended;
   type: RequestType | '' = '';
@@ -162,6 +165,14 @@ export class PortalRequestsComponent implements OnInit {
   }
 
   async submit() {
+    if (!this.type) return;
+    const ok = await this.confirm.ask({
+      title: `${TYPE_NAMES[this.type]}を申請しますか`,
+      message: '担当者に届き、確かめてから手続きします。送ったあとは、直すときは担当者に差し戻してもらいます。',
+      ...(this.files.length ? { items: this.files.map(file => `添付：${file.name}`) } : {}),
+      confirmLabel: '申請する',
+    });
+    if (!ok) return;
     this.busy.set(true);
     try {
       const { data } = await httpsCallable<object, { id: string }>(this.functions, 'portalRequestCreate')({
