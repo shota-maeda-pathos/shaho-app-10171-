@@ -84,7 +84,7 @@ export async function buildReport(auth: AuthContext, input: ReportInput): Promis
       const e = emp.data()!;
       table = {
         title: '従業員別保険料明細書', subtitle: `${e.lastName} ${e.firstName}（${e.employeeNumber}）・${fy}年度（${months[0]}〜${months[11]}）`, landscape: false,
-        columns: [{ label: '月', width: 50 }, { label: '標準報酬月額', align: 'right', width: 62 }, { label: '等級 健保／厚年', width: 54 }, { label: '健康保険', align: 'right', width: 48 }, { label: '介護保険', align: 'right', width: 44 }, { label: '支援金', align: 'right', width: 40 }, { label: '厚生年金', align: 'right', width: 48 }, { label: '本人計', align: 'right', width: 50 }, { label: '会社計', align: 'right', width: 50 }, { label: '', width: 28 }],
+        columns: [{ label: '月', width: 50 }, { label: '標準報酬月額', align: 'right', width: 62 }, { label: '等級 健保／厚年', width: 54 }, { label: '健康保険', align: 'right', width: 48 }, { label: '介護保険', align: 'right', width: 44 }, { label: '支援金', align: 'right', width: 40 }, { label: '厚生年金', align: 'right', width: 48 }, { label: '本人計', align: 'right', width: 50 }, { label: '会社計', align: 'right', width: 50 }, { label: '免除', width: 28 }],
         rows, totals: ['年度合計', '', '', '', '', '', '', yen(sum('totalEmployeeAmount')), yen(sum('totalEmployerAmount')), ''],
       };
       break;
