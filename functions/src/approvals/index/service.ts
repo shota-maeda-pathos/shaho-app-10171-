@@ -249,7 +249,7 @@ export async function approvalDetail(input: ApprovalDetailInput, auth: AuthConte
   };
 }
 
-/** 一括承認。1件ずつ同じ確かめ方で承認し、できなかったものは理由を返す。監査ログと通知は1件にまとめる */
+/** 一括承認。1件ずつ同じ確かめ方で承認し、できなかったものは理由を返す。依頼した人には1件ずつ「承認されました」を知らせ（カタログ8章）、監査ログと承認した人向けのまとめは1件にする */
 export async function bulkApprove(input: ApprovalBulkInput, auth: AuthContext) {
   if (!canApproveRole(auth)) throw invalidArg('承認できるのは管理者・承認者です');
   const { approveApprovalRequest } = await import('../approval-request-approve/service');
@@ -260,7 +260,7 @@ export async function bulkApprove(input: ApprovalBulkInput, auth: AuthContext) {
     try {
       if (t.kind === 'request') {
         const req = (await db.doc(`companies/${auth.companyId}/employees/${t.employeeId}/approvalRequests/${t.requestId}`).get()).data();
-        await approveApprovalRequest({ companyId: auth.companyId, employeeId: t.employeeId, requestId: t.requestId, comment: input.comment }, auth, { notify: false });
+        await approveApprovalRequest({ companyId: auth.companyId, employeeId: t.employeeId, requestId: t.requestId, comment: input.comment }, auth, { notify: true });
         if (req?.requestType === 'filing' || req?.requestType === 'employment' || req?.requestType === 'grade') touched.add(t.employeeId);
       } else {
         await approveRunFiling(t, auth, input.comment);
@@ -279,7 +279,7 @@ export async function bulkApprove(input: ApprovalBulkInput, auth: AuthContext) {
     items: results.map(r => ({ ...r.target, ok: r.ok, message: r.message })),
     note: input.comment ?? null, performedBy: auth.uid, performedAt: now, version: 1,
   });
-  if (ok) {
+  if (ok > 1) {
     const { notify } = await import('../../utils/notify');
     await notify({
       companyId: auth.companyId, category: 'approval', targetType: 'approvalBulk', createdBy: auth.uid,

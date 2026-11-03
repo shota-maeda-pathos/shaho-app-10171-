@@ -8,6 +8,7 @@ import { ApprovalRequestApproveInput } from './schema';
 import { validateApprovalTarget } from '../target';
 import { filingContentHash } from '../../utils/hash';
 import { buildArchive } from '../../filings/archive/rules';
+import { procedureLinkForRequest } from '../procedure-link';
 
 export async function approveApprovalRequest(
   input: ApprovalRequestApproveInput,
@@ -199,9 +200,12 @@ export async function approveApprovalRequest(
   const { notify } = await import('../../utils/notify');
   const { employeeNoticeContext, REQUEST_TYPE_LABELS } = await import('../../utils/notice-context');
   const who = await employeeNoticeContext(auth.companyId, input.employeeId);
+  // 押すと依頼を出した手続きの画面が開く（担当者が直す・提出するのはそこ）。見つからなければ種類から決める（承認の画面）
+  const link = await procedureLinkForRequest(auth.companyId, input.employeeId, input.requestId);
   await notify({
     companyId: auth.companyId,
     officeId: who.officeId,
+    link,
     title: '承認されました',
     body: `${who.name}さんの${REQUEST_TYPE_LABELS[requestType] ?? requestType}が承認されました`,
     category: 'approval',

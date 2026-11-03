@@ -6,6 +6,7 @@ import { MutationResponse } from '../../types/response';
 import { notFound, invalidArg } from '../../utils/errors';
 import { ApprovalRequestRejectInput } from './schema';
 import { validateApprovalTarget } from '../target';
+import { procedureLinkForRequest } from '../procedure-link';
 
 export async function rejectApprovalRequest(
   input: ApprovalRequestRejectInput,
@@ -94,9 +95,12 @@ export async function rejectApprovalRequest(
   const { notify } = await import('../../utils/notify');
   const { employeeNoticeContext } = await import('../../utils/notice-context');
   const who = await employeeNoticeContext(auth.companyId, input.employeeId);
+  // 押すと依頼を出した手続きの画面が開く（担当者が直す・提出するのはそこ）。見つからなければ種類から決める（承認の画面）
+  const link = await procedureLinkForRequest(auth.companyId, input.employeeId, input.requestId);
   await notify({
     companyId: auth.companyId,
     officeId: who.officeId,
+    link,
     title: '差し戻されました',
     body: `${who.name}さんの承認の依頼が差し戻されました。理由：${input.comment}`,
     category: 'approval',
