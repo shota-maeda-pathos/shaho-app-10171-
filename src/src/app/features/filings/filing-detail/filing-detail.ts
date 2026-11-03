@@ -411,13 +411,10 @@ export class FilingDetailComponent implements OnInit {
         filingId: this.filingId,
       });
       const d = result.data;
-      const [companyResult, { data: officeData }] = await Promise.all([
-        httpsCallable<{ companyId: string }, { representativeName: string; laborConsultant?: { name: string; registrationNumber: string } | null }>(this.functions, 'companyGet')({ companyId: this.auth.companyId }),
-        httpsCallable<object, { items: { id: string; name: string; officeNumber: string; officeCode?: string | null; address: string; postalCode?: string | null; phone: string }[] }>(this.functions, 'officeList')({ companyId: this.auth.companyId, includeInactive: true }),
-      ]);
+      const companyResult = await httpsCallable<{ companyId: string }, { representativeName: string; laborConsultant?: { name: string; registrationNumber: string } | null }>(this.functions, 'companyGet')({ companyId: this.auth.companyId });
       // 届出を出す事業所（異動の資格喪失届は元の事業所）の所在地・電話などを書く
-      const office = officeData.items.find(item => item.id === d.officeId);
-      if (!office) throw new Error('届出の事業所情報を取得できませんでした。');
+      const office = d.office;
+      if (!office?.name) throw new Error('届出の事業所情報を取得できませんでした。');
       const meta: FilingPrintMeta = {
         companyName: d.companyName,
         officeName: office.name,

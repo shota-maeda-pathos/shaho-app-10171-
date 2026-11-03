@@ -25,8 +25,8 @@ export interface FilingPdfDataResponse {
   companyName: string;
   officeName: string;
   officeNumber: string;
-  /** 届出を出す事業所（PDFの所在地・電話などはこの事業所の値を書く） */
-  officeId: string;
+  /** 届出を出す事業所（PDFの所在地・電話などはこの事業所の値を書く。承認者の担当外の元の事業所でも返す） */
+  office: { name: string; officeNumber: string; officeCode: string; address: string; postalCode: string; phone: string };
   employeeName: string;
   employeeNumber: string;
   effectiveDate: string;
@@ -60,12 +60,11 @@ export async function getFilingPdfData(
   const filing = filingSnap.data()!;
 
   // 異動の資格喪失届は元の事業所の届出。事業所を持たない古い届出は、記入した事業所整理記号から元の事業所を探す
-  let officeId: string = filing.officeId ?? emp.officeId;
-  let officeSnap = await db.doc(`${base}/offices/${officeId}`).get();
+  let officeSnap = await db.doc(`${base}/offices/${filing.officeId ?? emp.officeId}`).get();
   const symbol = filing.formData?.['事業所整理記号'];
   if (!filing.officeId && symbol && officeSnap.data()?.officeNumber !== symbol) {
     const match = await db.collection(`${base}/offices`).where('officeNumber', '==', symbol).limit(1).get();
-    if (!match.empty) { officeSnap = match.docs[0]; officeId = match.docs[0].id; }
+    if (!match.empty) officeSnap = match.docs[0];
   }
   const office = officeSnap.exists ? officeSnap.data()! : {};
 
@@ -81,7 +80,7 @@ export async function getFilingPdfData(
     companyName: company.name ?? '',
     officeName: office.name ?? '',
     officeNumber: office.officeNumber ?? '',
-    officeId,
+    office: { name: office.name ?? '', officeNumber: office.officeNumber ?? '', officeCode: office.officeCode ?? '', address: office.address ?? '', postalCode: office.postalCode ?? '', phone: office.phone ?? '' },
     employeeName: `${emp.lastName} ${emp.firstName}`,
     employeeNumber: emp.employeeNumber ?? '',
     effectiveDate: filing.effectiveDate,
