@@ -7,6 +7,7 @@ import { AuthContext, requireNotSuspended, requireOffice } from '../middleware/a
 import { attachmentError, safeFileName, sniffContentType } from '../filings/attachments/rules';
 import { invalidArg, notFound } from '../utils/errors';
 import { self } from './service';
+import { notify } from '../utils/notify';
 
 /**
  * 本人からの申請（カタログ11章）。本人が申請 → 担当者のやることに入る → 担当者が確かめて取り込む。
@@ -103,6 +104,14 @@ export async function createRequest(input: z.infer<typeof RequestCreateInput>, a
     entity: 'portalRequest', entityId: ref.id, action: 'create', changes: { type }, performedBy: auth.uid, performedAt: now, version: 1,
   });
   await batch.commit();
+  // 担当者に知らせる（カタログ11章：本人が申請すると担当者に通知する）。その事業所の担当者・承認者と管理者に見える
+  await notify({
+    companyId: auth.companyId, officeId: employee.data.officeId,
+    title: '本人からの申請',
+    body: `${employee.data.lastName} ${employee.data.firstName}さんから「${REQUEST_TYPES[type as keyof typeof REQUEST_TYPES] ?? type}」の申請が届きました`,
+    category: type === 'leave' ? 'leave' : 'system', targetType: 'portalRequest', targetId: ref.id, createdBy: auth.uid,
+    link: { route: '/portal-requests' },
+  });
   return { id: ref.id };
 }
 
