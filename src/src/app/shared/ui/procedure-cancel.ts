@@ -21,7 +21,7 @@ interface CancelDialogData { title: string; own: boolean; creatorName: string }
   template: `
     <h2 mat-dialog-title>この手続きをやめる</h2>
     <mat-dialog-content>
-      <p>「{{ data.title }}」をやめます。手続きは消さずに「取消」として残り、進行中の一覧とやることには出なくなります。作りかけの届出の下書きも一緒に取り下げます。</p>
+      <p>「{{ data.title }}」をやめます。手続きは消さずに「取消」として残り、進行中の一覧からは外れます。作りかけの届出の下書きも一緒に取り下げます。70歳到達のように決まりで要る手続きは、ホームのやることにまた出るので、あとから始め直せます。</p>
       @if (!data.own) { <p class="warn">{{ data.creatorName }}さんが始めた手続きです。やめると、その事業所のスタッフにお知らせが出ます。</p> }
       <mat-form-field appearance="outline" class="reason">
         <mat-label>やめる理由{{ data.own ? '（任意）' : '' }}</mat-label>

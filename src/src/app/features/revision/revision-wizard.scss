@@ -7,3 +7,5 @@ fieldset.form-grid { margin-bottom: var(--app-space-3); }
 .months th { font-weight: 500; color: var(--app-color-text-sub); font-size: var(--app-font-sm); }
 .months .num { text-align: right; font-variant-numeric: tabular-nums; }
 .summary thead th { width: auto; }
+/* 「改定しないことを確かめました」の印とボタンの間をあける */
+.row-actions { display: flex; flex-wrap: wrap; gap: var(--app-space-2); margin-top: var(--app-space-3); }

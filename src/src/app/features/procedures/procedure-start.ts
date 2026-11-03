@@ -37,15 +37,15 @@ interface Employee { id: string; lastName: string; firstName: string; employeeNu
       </div>
       <section class="employee" aria-labelledby="employee-heading">
         <h2 id="employee-heading">対象の従業員を選ぶ</h2>
-        <mat-form-field appearance="outline"><mat-label>社員番号・氏名で探す</mat-label><input matInput [(ngModel)]="keyword" (ngModelChange)="employeeId = ''"></mat-form-field>
-        @if (loading()) { <p role="status">従業員を読み込んでいます…</p> }
+        <mat-form-field appearance="outline"><mat-label>社員番号・氏名で探す</mat-label><input matInput [(ngModel)]="keyword" (ngModelChange)="employeeId = ''; search()"></mat-form-field>
+        @if (loading() || searching()) { <p role="status">従業員を読み込んでいます…</p> }
         <ul class="matches" role="listbox" aria-label="対象の従業員">
           @for (employee of matches(); track employee.id) {
             <li><button type="button" role="option" [attr.aria-selected]="employeeId === employee.id" [class.selected]="employeeId === employee.id" (click)="employeeId = employee.id">{{employee.employeeNumber}}　{{employee.lastName}} {{employee.firstName}}</button></li>
           }
         </ul>
-        @if (!loading() && keyword && !matches().length) { <p>見つかりません。{{hasMore() ? '続きを読み込んでから探してください。' : ''}}</p> }
-        @if (hasMore()) { <button mat-stroked-button (click)="loadEmployees()" [disabled]="loading()">従業員をさらに読み込む</button> }
+        @if (!loading() && !searching() && keyword && !matches().length) { <p>見つかりません。</p> }
+        @if (hasMore() && !keyword.trim()) { <button mat-stroked-button (click)="loadEmployees()" [disabled]="loading()">従業員をさらに読み込む</button> }
         @if (error()) { <p role="alert">{{error()}}</p><button mat-stroked-button (click)="loadEmployees()">再読み込み</button> }
         @if (type() === 'leave') {
           <h3>休業の種類</h3>
@@ -118,6 +118,8 @@ export class ProcedureStartComponent implements OnInit {
   employeeId = ''; keyword = ''; leaveKind: 'maternity' | 'childcare' = 'maternity'; revisionKind: 'occasional' | 'maternityEnd' | 'childcareEnd' = 'occasional'; ageKind: 'pension70' | 'health75' = 'pension70';
   employees = signal<Employee[]>([]); loading = signal(false); error = signal(''); hasMore = signal(true); private cursor = '';
   starting = signal(false);
+  /** 入力した言葉で全員から探した結果（読み込み済みの人だけでなく、まだ読み込んでいない人も探す） */
+  searched = signal<Employee[] | null>(null); searching = signal(false); private searchTimer?: ReturnType<typeof setTimeout>;
 
   ngOnInit() {
     const params = this.route.snapshot.queryParamMap;
@@ -136,7 +138,7 @@ export class ProcedureStartComponent implements OnInit {
 
   /** ①に戻って手続きを選び直す */
   reset() {
-    this.type.set(''); this.employeeId = ''; this.keyword = ''; this.error.set('');
+    this.type.set(''); this.employeeId = ''; this.keyword = ''; this.searched.set(null); this.error.set('');
     void this.router.navigate([], { queryParams: { type: null, employeeId: null }, queryParamsHandling: 'merge', replaceUrl: true });
     this.scrollTop();
   }
@@ -144,8 +146,26 @@ export class ProcedureStartComponent implements OnInit {
   /** 切り替えた画面を上から見せる（画面の本文は .content の中でスクロールする） */
   private scrollTop() { document.querySelector('.content')?.scrollTo({ top: 0 }); }
 
+  search() {
+    clearTimeout(this.searchTimer);
+    const keyword = this.keyword.trim();
+    if (!keyword) { this.searched.set(null); this.searching.set(false); return; }
+    this.searching.set(true);
+    this.searchTimer = setTimeout(async () => {
+      try {
+        const {data} = await httpsCallable<object,{items:Employee[]}>(this.functions,'employeeList')({companyId:this.auth.companyId,...this.office.params(),keyword,limit:100});
+        if (this.keyword.trim() !== keyword) return;
+        // 選んだ人で始められるように、読み込み済みの一覧にも足しておく
+        this.employees.update(rows => [...rows, ...data.items.filter(item => !rows.some(row => row.id === item.id))]);
+        this.searched.set(data.items);
+      } catch (e: any) { this.error.set(e.message ?? '従業員を探せませんでした'); }
+      finally { if (this.keyword.trim() === keyword) this.searching.set(false); }
+    }, 300);
+  }
+
   matches() {
     const term = this.keyword.replace(/\s/g, '');
+    if (term && this.searched()) return this.searched()!;
     const rows = this.employees().filter(e => `${e.employeeNumber}${e.lastName}${e.firstName}`.includes(term));
     return term ? rows : rows.slice(0, 50);
   }

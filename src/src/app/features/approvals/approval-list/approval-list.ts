@@ -563,9 +563,13 @@ export class ApprovalListComponent {
       const now = Date.now();
       for (const [id, until] of this.handled) if (until < now) this.handled.delete(id);
       // 処理したばかりの案件は、索引が追いつくまで承認待ちに出さない
+      const hidden = this.view === 'pending' ? data.items.filter(i => this.handled.has(i.id)) : [];
       this.items.set(this.view === 'pending' ? data.items.filter(i => !this.handled.has(i.id)) : data.items);
-      this.total.set(data.total);
-      this.summary.set(data.summary);
+      this.total.set(data.total - hidden.length);
+      // 件数も、外した案件の分を引いておく（索引が追いつくと元の数え方に戻る）
+      const count = (f: (i: ApprovalItem) => boolean) => hidden.filter(f).length;
+      this.summary.set({ ...data.summary, pending: data.summary.pending - hidden.length,
+        forMe: data.summary.forMe - count(i => i.canApprove), mine: data.summary.mine - count(i => i.mine) });
       this.staleDays.set(data.staleDays);
       const ids = new Set(data.items.map(i => i.id));
       this.selected.set(new Set([...this.selected()].filter(id => ids.has(id))));
