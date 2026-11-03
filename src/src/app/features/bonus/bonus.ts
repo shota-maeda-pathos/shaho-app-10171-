@@ -408,7 +408,7 @@ export class BonusComponent implements OnInit {
       const value = await firstValueFrom(this.dialog.open(SanteiInputDialogComponent, {
         width: '460px',
         data: { title: '賞与不支給報告書を提出した日を記録する', label: '提出した日', type: 'date', button: '記録する', required: true,
-          text: `${monthLabel(this.payMonth)}は賞与を支給しなかったものとして記録します。報告書は年金事務所に提出してください（この画面での作成は今後対応します）。` },
+          text: `${monthLabel(this.payMonth)}は賞与を支給しなかったものとして記録します。別の方法で提出した報告書の提出日を記録します（この画面で報告書を作るときは「賞与不支給報告書を作る」を使います）。` },
       }).afterClosed());
       if (!value) return;
       reportedOn = value;
