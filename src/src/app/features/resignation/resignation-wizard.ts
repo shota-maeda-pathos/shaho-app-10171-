@@ -106,7 +106,7 @@ export class ResignationWizardComponent implements OnInit, OnDestroy {
         what: '退職後に本人がポータルで明細を見られる期間を確かめます。必要なら延ばしたり縮めたりします。',
         why: '退職日の翌日から申請はできなくなり、閲覧だけになります。期間が過ぎるとログインできなくなります。',
         next: f?.needsFiling === false ? '届出は不要です。完了を確認します。' : '資格喪失届を作ります。' },
-      { key: 'filing', caution: '承認を依頼すると、差し戻されるまで内容を直せません。', label: '届出の作成', done: done || cur > 3,
+      { key: 'filing', caution: '承認を依頼すると、差し戻されるか、承認の画面で取り下げるまで内容を直せません。', label: '届出の作成', done: done || cur > 3,
         what: this.filingSkipped() ? noFiling : '被保険者証の回収状況を入れて資格喪失届を作り、承認者に確認を依頼します。',
         why: `資格喪失届は喪失日から5日以内${f?.filingDeadline ? `（${this.monthDay(f.filingDeadline)}まで）` : ''}に出す決まりがあるためです。`,
         next: '承認者が届出を確認します。' },

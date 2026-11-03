@@ -101,7 +101,7 @@ export class EmploymentChangeWizardComponent implements OnInit, OnDestroy {
         why: '雇用条件の変更は、別の担当者の承認で確定する決まりのためです。',
         next: skipped || v.effect === 'none' ? '加入が変わらないため、届出はありません。' : `${filing}を作ります。`,
         ...(v.current === 'change_approval' && v.changeApproval?.status === 'pending' ? { waitingFor: '承認者' } : {}) },
-      { key: 'filing', caution: '承認を依頼すると、差し戻されるまで内容を直せません。', label: skipped ? '届出（不要）' : '届出の作成', done: done || cur > 2,
+      { key: 'filing', caution: '承認を依頼すると、差し戻されるか、承認の画面で取り下げるまで内容を直せません。', label: skipped ? '届出（不要）' : '届出の作成', done: done || cur > 2,
         what: '新しい雇用条件から届出を作り、承認者に確認を依頼します。',
         why: '社会保険の加入・喪失は5日以内に届け出る決まりがあるためです。',
         next: '承認者が届出を確認します。' },

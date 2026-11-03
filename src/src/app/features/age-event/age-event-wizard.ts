@@ -89,7 +89,7 @@ export class AgeEventWizardComponent implements OnInit, OnDestroy {
           ? '厚生年金は70歳に達する日に資格を失い、70歳以上被用者になります。報酬が変わらなければ届出は原則いりません。'
           : '健康保険の資格喪失届を5日以内に出す決まりがあるためです。',
         next: p70 ? '届出が要る場合は届出を作ります。要らなければ完了を確認します。' : '資格喪失届を作ります。' },
-      { key: 'filing', caution: '承認を依頼すると、差し戻されるまで内容を直せません。', label: skipped ? '届出（不要）' : '届出の作成', done: done || cur > 1,
+      { key: 'filing', caution: '承認を依頼すると、差し戻されるか、承認の画面で取り下げるまで内容を直せません。', label: skipped ? '届出（不要）' : '届出の作成', done: done || cur > 1,
         what: '確かめた内容から届出を作り、承認者に確認を依頼します。',
         why: `${Number(v.facts.deadline.slice(5, 7))}月${Number(v.facts.deadline.slice(8))}日までに出す決まりがあるためです。`,
         next: '承認者が届出を確認します。' },

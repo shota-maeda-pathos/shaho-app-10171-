@@ -78,7 +78,7 @@ export class DependentChangeWizardComponent implements OnInit, OnDestroy {
         what: '扶養に入れる人・外す人・氏名などが変わった人を入れます。収入の基準はシステムが判定します。',
         why: '扶養に入れるかは、続柄・年齢・年間収入の見込みで決まるためです。',
         next: '被扶養者（異動）届を作ります。' },
-      { key: 'filing', caution: '承認を依頼すると、差し戻されるまで内容を直せません。', label: '届出の作成', done: done || cur > 1,
+      { key: 'filing', caution: '承認を依頼すると、差し戻されるか、承認の画面で取り下げるまで内容を直せません。', label: '届出の作成', done: done || cur > 1,
         what: '入れた内容から届出を作り、承認者に確認を依頼します。添える書類も確かめます。',
         why: `被扶養者（異動）届は事実の発生から5日以内${deadline ? `（${this.monthDay(deadline)}まで）` : ''}に出す決まりがあるためです。`,
         next: '承認者が届出を確認します。' },

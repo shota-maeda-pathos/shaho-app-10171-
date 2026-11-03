@@ -108,7 +108,7 @@ export class TransferWizardComponent implements OnInit {
   nextLabel(): string | undefined {
     const k = this.key();
     if (!this.view() || this.isDone()) return undefined;
-    if (k === 'entry' && (this.dirty() || this.index() === this.currentIndex())) return '保存して所属の変更へ';
+    if (k === 'entry' && (this.dirty() || this.index() === this.currentIndex())) return this.view()!.facts?.filingRequired === false ? '保存して異動の登録へ' : '保存して届出の作成へ';
     if (this.index() < this.currentIndex()) return undefined;
     switch (k) {
       case 'apply': return this.view()!.facts?.filingRequired ? '届出を作って承認を依頼する' : '異動を登録する';
@@ -251,6 +251,9 @@ export class TransferWizardComponent implements OnInit {
   filingStatus(f: FilingState) {
     if (f.done) return '提出済み';
     if (f.workflowStatus === 'approved') return '承認済み（提出前）';
+    // 差し戻し・取り下げのあとは、届出の画面で直して承認を依頼し直す
+    if (f.workflowStatus === 'rejected') return '差し戻し（届出の画面で依頼し直す）';
+    if (f.workflowStatus === 'draft') return '下書き（届出の画面で承認を依頼する）';
     return '承認待ち';
   }
 }

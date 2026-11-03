@@ -176,7 +176,7 @@ interface ArchiveRow { id: string; approvedAt: string | null; approvedByName: st
           }
 
           @if (isStaff && (f.workflowStatus === 'draft' || f.workflowStatus === 'rejected')) {
-            <app-action-bar [info]="f.workflowStatus === 'rejected' ? '差し戻された内容を直したら、もう一度依頼します。' : ''" notice="依頼中は届出を直せません。直すときは差し戻してもらいます。">
+            <app-action-bar [info]="f.workflowStatus === 'rejected' ? '差し戻された内容を直したら、もう一度依頼します。' : ''" notice="依頼中は届出を直せません。直すときは、承認の画面で依頼を取り下げます。">
               <button mat-flat-button type="button" (click)="requestApproval()" [disabled]="processing()">承認を依頼する<mat-icon iconPositionEnd>arrow_forward</mat-icon></button>
             </app-action-bar>
           }
@@ -357,7 +357,7 @@ export class FilingDetailComponent implements OnInit {
   async requestApproval() {
     const ok = await this.confirm.ask({
       title: `${this.filingTypeLabel(this.filing()?.filingType)}の承認を依頼する`, message: `${this.filing()?.employeeName ?? ''}さんの届出の承認を、別の担当者（管理者・承認者）に依頼します。`,
-      notice: '依頼中は届出を直せません。直すときは差し戻してもらいます。', confirmLabel: '承認を依頼する',
+      notice: '依頼中は届出を直せません。直すときは、承認の画面で依頼を取り下げます。', confirmLabel: '承認を依頼する',
     });
     if (!ok) return;
     this.processing.set(true);

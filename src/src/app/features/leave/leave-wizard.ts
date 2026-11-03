@@ -89,7 +89,7 @@ export class LeaveWizardComponent implements OnInit, OnDestroy {
           : '養育する子と、育休を始める日・終える予定の日を入れます。',
         why: '休業の期間から、保険料が免除される月が決まるためです。',
         next: `${filing}を作ります。` },
-      { key: 'filing', caution: '承認を依頼すると、差し戻されるまで内容を直せません。', label: '届出の作成', done: done || cur > 1,
+      { key: 'filing', caution: '承認を依頼すると、差し戻されるか、承認の画面で取り下げるまで内容を直せません。', label: '届出の作成', done: done || cur > 1,
         what: '入れた期間から届出を作り、承認者に確認を依頼します。',
         why: maternity
           ? `産休の届出は、産休中か産休を終えてから1か月以内${deadline ? `（${this.monthDay(deadline)}まで）` : ''}に出す決まりがあるためです。`

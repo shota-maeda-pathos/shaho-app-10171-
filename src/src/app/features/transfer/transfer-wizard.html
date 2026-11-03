@@ -69,11 +69,11 @@
             <table class="summary">
               <tbody>
                 @if (v.lossFiling; as f) {
-                  <tr><th>資格喪失届（{{ v.from.name }}）</th><td><app-status-badge [tone]="f.done ? 'done' : 'waiting'" [label]="filingStatus(f)" />
+                  <tr><th>資格喪失届（{{ v.from.name }}）</th><td><app-status-badge [tone]="f.done ? 'done' : f.workflowStatus === 'rejected' || f.workflowStatus === 'draft' ? 'attention' : 'waiting'" [label]="filingStatus(f)" />
                     <a [routerLink]="['/filings', f.id]" [queryParams]="{ employeeId: v.employee.id }">届出を開く</a></td></tr>
                 }
                 @if (v.acquisitionFiling; as f) {
-                  <tr><th>資格取得届（{{ v.to?.name }}）</th><td><app-status-badge [tone]="f.done ? 'done' : 'waiting'" [label]="filingStatus(f)" />
+                  <tr><th>資格取得届（{{ v.to?.name }}）</th><td><app-status-badge [tone]="f.done ? 'done' : f.workflowStatus === 'rejected' || f.workflowStatus === 'draft' ? 'attention' : 'waiting'" [label]="filingStatus(f)" />
                     <a [routerLink]="['/filings', f.id]" [queryParams]="{ employeeId: v.employee.id }">届出を開く</a></td></tr>
                 }
               </tbody>
