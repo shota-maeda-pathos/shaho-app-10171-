@@ -4,13 +4,13 @@ import { AuthContext, requireOffice } from '../middleware/auth';
 import { EmployeeDoc, FilingDoc, GradeDoc, OfficeDoc, ProcedureDoc, TransferState } from '../types/firestore';
 import { invalidArg, notFound } from '../utils/errors';
 import { toDateString } from '../utils/firestore';
-import { addDays, addMonths, fiveDayDeadline } from '../insurance/calculator';
+import { addDays, fiveDayDeadline } from '../insurance/calculator';
 import { insuredCounterPath, nextInsuredNumber } from '../offices/insured-number';
 import { buildTransferWizardSteps } from '../procedures/templates';
 import { requireProcedureAccess } from '../procedures/access';
 import { completed, requireVersion, setStep, statusReasonOf, stepOf } from '../procedures/wizard';
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
-import { OfficeFacts, transferFacts } from './rules';
+import { lastMonthBeforeTransfer, OfficeFacts, transferFacts, transferMoveBlocker } from './rules';
 import { assertAssignable } from '../offices/lifecycle';
 import { acquisitionLedgerFields, acquisitionRemarkItems } from '../filings/acquisition-fields';
 
@@ -281,17 +281,15 @@ export async function completeTransfer(input: { companyId: string; procedureId: 
   const t = proc.transfer;
   const base = `companies/${input.companyId}`;
   const empRef = db.doc(`${base}/employees/${proc.employeeId}`);
-  const lastMonth = addMonths(t.transferDate!.slice(0, 7), -1);
+  const lastMonth = lastMonthBeforeTransfer(t.transferDate!);
   const [empSnap, lastPremium] = await Promise.all([empRef.get(), db.doc(`${empRef.path}/monthlyInsurance/${lastMonth}`).get()]);
   // 以前の作りで届出を作ったときに所属を変えた手続きは、変えずに完了にする
   const move = (empSnap.data() as EmployeeDoc).officeId === t.fromOfficeId;
-  if (move) {
-    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
-    if (today < t.transferDate!) throw invalidArg(`所属は異動日（${t.transferDate}）に変えます。異動日になってから完了にしてください`);
-    if (!lastPremium.exists && !input.skipPremiumCheck) {
-      throw invalidArg(`${lastMonth}分の保険料が、まだ元の事業所で計算されていません。毎月の処理で計算してから完了にしてください（保険料の対象でない人は「計算せずに進める」に印を付けます）`);
-    }
-  }
+  const blocker = move && transferMoveBlocker({
+    today: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }), transferDate: t.transferDate!,
+    hasLastMonthPremium: lastPremium.exists, skipPremiumCheck: !!input.skipPremiumCheck,
+  });
+  if (blocker) throw invalidArg(blocker);
   const now = Timestamp.now();
   const steps = setStep(proc.steps, 'confirm', completed(auth.uid));
   await db.runTransaction(async tx => {

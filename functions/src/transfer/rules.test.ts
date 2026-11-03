@@ -1,4 +1,4 @@
-import { transferFacts, OfficeFacts } from './rules';
+import { transferFacts, transferMoveBlocker, lastMonthBeforeTransfer, OfficeFacts } from './rules';
 
 const office = (o: Partial<OfficeFacts>): OfficeFacts => ({
   id: 'a', name: '本社', officeNumber: '12-アイ', prefectureCode: '13', insurerId: '01130012', pensionOfficeName: '新宿', ...o,
@@ -15,5 +15,23 @@ describe('事業所間異動の影響', () => {
   });
   it('事業所整理記号が未登録なら、別の適用事業所として届け出る', () => {
     expect(transferFacts(office({ officeNumber: '' }), office({ id: 'b' }), '2026-12-01').filingRequired).toBe(true);
+  });
+});
+
+describe('異動の完了で所属を変えてよいか', () => {
+  const base = { transferDate: '2026-12-01', hasLastMonthPremium: true, skipPremiumCheck: false };
+  it('異動日より前は変えない', () => {
+    expect(transferMoveBlocker({ ...base, today: '2026-11-30' })).toContain('異動日（2026-12-01）');
+  });
+  it('異動日を過ぎ、前の月の保険料があれば変えられる', () => {
+    expect(transferMoveBlocker({ ...base, today: '2026-12-01' })).toBeNull();
+  });
+  it('前の月の保険料がまだなら変えない（印を付ければ進める）', () => {
+    expect(transferMoveBlocker({ ...base, today: '2026-12-10', hasLastMonthPremium: false })).toContain('2026-11分の保険料');
+    expect(transferMoveBlocker({ ...base, today: '2026-12-10', hasLastMonthPremium: false, skipPremiumCheck: true })).toBeNull();
+  });
+  it('前の月は年をまたぐ', () => {
+    expect(lastMonthBeforeTransfer('2027-01-15')).toBe('2026-12');
+    expect(lastMonthBeforeTransfer('2026-12-01')).toBe('2026-11');
   });
 });

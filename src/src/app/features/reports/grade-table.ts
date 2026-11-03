@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { OfficeContextService } from '../../core/services/office-context.service';
 import { PageHeadComponent } from '../../shared/ui';
 
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -58,6 +59,7 @@ interface Table { yearMonth: string; prefectureCode: string; rates: { health: nu
 export class GradeTableComponent implements OnInit {
   private functions = inject(Functions);
   private auth = inject(AuthService);
+  private office = inject(OfficeContextService);
   prefs = PREFS;
   pref = '13';
   yearMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }).slice(0, 7);
@@ -66,7 +68,17 @@ export class GradeTableComponent implements OnInit {
   error = signal('');
 
   code(i: number) { return String(i + 1).padStart(2, '0'); }
-  ngOnInit() { void this.load(); }
+  ngOnInit() { void this.start(); }
+
+  /** 最初は選んでいる事業所（全事業所のときは最初の事業所）の都道府県の表を出す */
+  private async start() {
+    try {
+      const { data } = await httpsCallable<object, { items: { id: string; prefectureCode?: string }[] }>(this.functions, 'officeList')({ companyId: this.auth.companyId });
+      const office = data.items.find(o => o.id === this.office.selected()) ?? data.items[0];
+      if (office?.prefectureCode) this.pref = office.prefectureCode;
+    } catch { /* 事業所が読めなくても東京の表を出す */ }
+    await this.load();
+  }
 
   async load() {
     this.loading.set(true);

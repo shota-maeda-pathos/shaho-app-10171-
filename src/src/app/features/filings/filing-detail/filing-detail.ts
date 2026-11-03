@@ -333,6 +333,12 @@ export class FilingDetailComponent implements OnInit {
     const f = this.filing();
     if (!f) return [];
     const ws = f.workflowStatus as string;
+    // 取り下げた届出（手続きをやめたときの下書きなど）は、作成を「完了」と見せない
+    if (ws === 'cancelled') return [
+      { key: 'correction', label: '作成', state: 'waiting', note: '取消' },
+      { key: 'approval', label: '社内承認', state: 'todo', note: '—' },
+      { key: 'submit', label: '提出', state: 'todo', note: '—' },
+    ];
     return [
       { key: 'correction', label: '作成', state: ws === 'rejected' ? 'attention' : ws === 'draft' ? 'todo' : 'done', note: ws === 'rejected' ? '差し戻し' : ws === 'draft' ? '下書き' : '完了' },
       { key: 'approval', label: '社内承認', state: ws === 'approved' ? 'done' : ws === 'pending' ? 'waiting' : 'todo', note: ws === 'approved' ? '承認済み' : ws === 'pending' ? '承認者待ち' : '—' },

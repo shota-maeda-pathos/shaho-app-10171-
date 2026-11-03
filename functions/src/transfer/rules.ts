@@ -1,4 +1,4 @@
-import { monthOf } from '../insurance/calculator';
+import { addMonths, monthOf } from '../insurance/calculator';
 
 /**
  * 事業所間異動の影響（純粋関数）。カタログ：都道府県が変わり保険料率が変わるか、届出が要るか（管轄年金事務所が変わるか）、
@@ -42,4 +42,22 @@ export function transferFacts(from: OfficeFacts, to: OfficeFacts, transferDate: 
   if (pensionOfficeChanges) notes.push(`管轄の年金事務所が変わります（${from.pensionOfficeName} → ${to.pensionOfficeName}）`);
   notes.push(`${Number(newRateMonth.slice(0, 4))}年${Number(newRateMonth.slice(5, 7))}月分の保険料から${to.name}で計算します`);
   return { healthRateChanges, filingRequired, pensionOfficeChanges, newRateMonth, notes };
+}
+
+/**
+ * 異動を完了にして台帳の所属を変えてよいか。変えられないときは理由を返す（純粋関数）。
+ * 所属は異動日から変える。異動日の前の月の保険料は元の事業所で計算するので、それが済んでから
+ * （保険料の対象でない人などは skipPremiumCheck で省ける）
+ */
+export function transferMoveBlocker(p: { today: string; transferDate: string; hasLastMonthPremium: boolean; skipPremiumCheck: boolean }): string | null {
+  if (p.today < p.transferDate) return `所属は異動日（${p.transferDate}）に変えます。異動日になってから完了にしてください`;
+  if (!p.hasLastMonthPremium && !p.skipPremiumCheck) {
+    return `${lastMonthBeforeTransfer(p.transferDate)}分の保険料が、まだ元の事業所で計算されていません。毎月の処理で計算してから完了にしてください（保険料の対象でない人は「計算せずに進める」に印を付けます）`;
+  }
+  return null;
+}
+
+/** 元の事業所で保険料を計算する最後の月（異動日の前の月。資格喪失日の属する月の前の月まで） */
+export function lastMonthBeforeTransfer(transferDate: string): string {
+  return addMonths(transferDate.slice(0, 7), -1);
 }
