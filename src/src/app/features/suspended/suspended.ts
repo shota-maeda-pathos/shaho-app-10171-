@@ -12,7 +12,7 @@ import { AuthService } from '../../core/services/auth.service';
     <div class="suspended-container">
       <mat-icon class="suspended-icon">lock</mat-icon>
       <h1>アカウントが停止されています</h1>
-      <p>このアカウントは管理者により停止されています。</p>
+      <p>退職や管理者の操作により、このアカウントでは管理の画面を使えなくなっています。</p>
       <p>ポータルへのアクセスが必要な場合は、管理者にお問い合わせください。</p>
       <div class="actions">
         <button mat-flat-button color="primary" (click)="goToPortal()">マイポータル</button>

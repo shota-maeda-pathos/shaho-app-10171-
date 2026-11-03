@@ -1091,7 +1091,10 @@ export class EmployeeDetailComponent implements OnInit {
       });
       const data = result.data;
       this.version = data.version;
-      this.employeeStatus.set(data.status ?? 'active');
+      // employeeGet は status を返さない。退職日を過ぎた（喪失日が今日以前）か在籍でない人は退職済みとして、手続きの操作を出さない
+      const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
+      const resigned = data.isActive === false || (!!data.resignationDate && data.resignationDate < today);
+      this.employeeStatus.set(data.status ?? (resigned ? 'resigned' : 'active'));
       this.contract.set(data.contract ?? null);
       this.otherEmployer.set(data.otherEmployer ?? null);
       this.form = {

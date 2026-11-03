@@ -39,12 +39,12 @@ import { AuthService } from '../../core/services/auth.service';
             <div class="line-item total"><span>支給合計</span><span>{{ slip.totalSalary === null ? '未登録' : (slip.totalSalary | number) + ' 円' }}</span></div>
           </div>
           <mat-divider />
-          <div class="section"><h3>同月分の社会保険料（本人負担・承認済み計算額）</h3>
+          <div class="section"><h3>この給与から控除する社会保険料{{ slip.insurance ? '（' + monthLabel(slip.insurance.yearMonth) + '分）' : '' }}（本人負担・承認済み計算額）</h3>
             @if (slip.insurance; as premium) {
               <div class="line-item"><span>健康保険料</span><span>{{ premium.health === null ? '未登録' : (premium.health | number) + ' 円' }}</span></div>
               <div class="line-item"><span>厚生年金保険料</span><span>{{ premium.pension === null ? '未登録' : (premium.pension | number) + ' 円' }}</span></div>
               <div class="line-item"><span>介護保険料</span><span>{{ premium.longTermCare === null ? '未登録' : (premium.longTermCare | number) + ' 円' }}</span></div>
-              @if (yearMonth() >= '2026-04') {
+              @if (premium.yearMonth >= '2026-04') {
                 <div class="line-item"><span>子ども・子育て支援金</span><span>{{ premium.childSupportPayment == null ? '未計算' : (premium.childSupportPayment | number) + ' 円' }}</span></div>
                 @if (premium.childSupportPayment == null) {
                   <p role="alert">この計算結果には子ども・子育て支援金が含まれていません。担当者による再計算・再承認が必要です。本人負担合計は再計算前の金額です。</p>
@@ -52,7 +52,7 @@ import { AuthService } from '../../core/services/auth.service';
               }
               <div class="line-item total"><span>本人負担合計</span><span>{{ premium.totalEmployee === null ? '未登録' : (premium.totalEmployee | number) + ' 円' }}</span></div>
               @if (premium.isExempted) { <p>この発生月には免除が適用されています。</p> }
-            } @else { <p>同月分の社会保険料は未計算または未承認です。</p> }
+            } @else { <p>この給与から控除する社会保険料は、未計算・未承認か、控除がありません。</p> }
             <p>表示額は保険料の発生月の計算結果です。給与からの実際の控除額・差引支給額を示すものではありません。</p>
           </div>
         </mat-card>
@@ -82,6 +82,8 @@ import { AuthService } from '../../core/services/auth.service';
   `],
 })
 export class PortalDetailComponent implements OnInit {
+  /** '2026-09' → '2026年9月' */
+  monthLabel(ym: string) { return `${ym.slice(0, 4)}年${Number(ym.slice(5, 7))}月`; }
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private functions = inject(Functions);

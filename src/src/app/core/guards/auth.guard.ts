@@ -43,7 +43,8 @@ export function roleGuard(...requiredRoles: Role[]): CanActivateFn {
           auth.logout();
           return router.createUrlTree(['/login']);
         }
-        if (profile?.isSuspended) return router.createUrlTree(['/suspended']);
+        // 退職などで閲覧のみになった本人は、ポータルだけ使える（停止の画面ではなくポータルへ戻す）
+        if (profile?.isSuspended) return router.createUrlTree([profile.employeeId ? '/portal' : '/suspended']);
         return auth.hasAnyRole(...requiredRoles) ? true : router.createUrlTree(['/']);
       }),
     );

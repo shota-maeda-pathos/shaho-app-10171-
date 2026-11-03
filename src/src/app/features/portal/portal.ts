@@ -69,7 +69,7 @@ import { PortalRequestsComponent } from './portal-requests';
           </mat-card>
           <mat-card class="payslip-card">
             <h2>給与・社会保険料</h2>
-            <p>承認済みの給与を表示します。社会保険料は同じ発生月の承認済み計算額で、給与からの実際の控除額とは異なる場合があります。</p>
+            <p>承認済みの給与を表示します。社会保険料は、その月の給与から控除する保険料（翌月控除の事業所は前の月の分）の承認済み計算額で、実際の控除額とは異なる場合があります。</p>
             @if (payslips().length === 0 && !loading()) { <p>表示できる承認済み給与はありません。</p> }
             @for (group of payslipYears(); track group.year) {
               <details class="year" [open]="$first">
@@ -79,7 +79,7 @@ import { PortalRequestsComponent } from './portal-requests';
                     <mat-list-item class="payslip-item" (click)="viewPayslip(slip.yearMonth)">
                       <mat-icon matListItemIcon>description</mat-icon>
                       <div matListItemTitle>{{ slip.yearMonth }}</div>
-                      <div matListItemLine>支給：{{ slip.totalSalary === null ? '未登録' : (slip.totalSalary | number) + ' 円' }} ／ 同月分社会保険料：{{ slip.insurance?.totalEmployee == null ? '未確定' : (slip.insurance!.totalEmployee | number) + ' 円' }}</div>
+                      <div matListItemLine>支給：{{ slip.totalSalary === null ? '未登録' : (slip.totalSalary | number) + ' 円' }} ／ 控除する保険料{{ slip.insurance ? '（' + premiumMonthLabel(slip.insurance.yearMonth) + '分）' : '' }}：{{ slip.insurance?.totalEmployee == null ? '未確定' : (slip.insurance!.totalEmployee | number) + ' 円' }}</div>
                     </mat-list-item>
                   }
                 </mat-list>
@@ -167,6 +167,8 @@ export class PortalComponent implements OnInit {
   unreadCount = signal(0);
   private lastDocId: string | null = null;
   ngOnInit() { void this.load(); void this.loadNotifications(); }
+  /** '2026-09' → '9月'（年が違うときは '2025年12月'） */
+  premiumMonthLabel(ym: string) { return ym.slice(0, 4) === new Date().getFullYear().toString() ? `${Number(ym.slice(5, 7))}月` : `${ym.slice(0, 4)}年${Number(ym.slice(5, 7))}月`; }
   viewPayslip(yearMonth: string) { this.router.navigate(['/portal/payslip', yearMonth]); }
 
   async loadNotifications() {
