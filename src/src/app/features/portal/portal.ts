@@ -97,9 +97,14 @@ import { PortalRequestsComponent } from './portal-requests';
     .page-container { padding: 24px; }
     .page-header { margin-bottom: 24px; }
     .page-header h1 { margin: 0; font-size: 24px; font-weight: 500; }
-    .portal-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 16px; }
-    /* スマートフォン（カタログ11章：レスポンシブ） */
-    @media (max-width: 720px) { .page-container { padding: 12px; } .portal-grid { grid-template-columns: 1fr; } }
+    /* minmax(0, …)：折り返さない明細の行でカードが画面より広がらないように */
+    .portal-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; margin-bottom: 16px; }
+    /* スマートフォン（カタログ11章：レスポンシブ）。明細の行は折り返して金額まで見せる */
+    @media (max-width: 720px) {
+      .page-container { padding: 12px; } .portal-grid { grid-template-columns: minmax(0, 1fr); }
+      .year .payslip-item { height: auto; padding-top: 8px; padding-bottom: 8px; }
+      .year .payslip-item [matListItemLine] { white-space: normal; }
+    }
     .profile-card { padding: 24px; }
     .profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
     .profile-icon { font-size: 56px; width: 56px; height: 56px; color: var(--app-brand-strong); }
@@ -146,7 +151,7 @@ import { PortalRequestsComponent } from './portal-requests';
     .notif-body { color: #666; font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .notif-date { color: #999; font-size: 12px; margin-top: 4px; }
     @media (max-width: 768px) {
-      .portal-grid { grid-template-columns: 1fr; }
+      .portal-grid { grid-template-columns: minmax(0, 1fr); }
       .info-cards { flex-direction: column; }
     }
   `],
