@@ -1,5 +1,5 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -57,7 +57,7 @@ const KINDS: { value: string; label: string }[] = [
 @Component({
   selector: 'app-audit-log',
   standalone: true,
-  imports: [MatCardModule, MatDatepickerModule, DatePipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [MatCardModule, MatDatepickerModule, DatePipe, DecimalPipe, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
   template: `
     <div class="section"><mat-card class="settings-card">
       <div class="filters">
@@ -85,7 +85,7 @@ const KINDS: { value: string; label: string }[] = [
       @if (verifyResult(); as v) {
         <p class="verify" [class.ng]="!v.ok" data-testid="verify-result">
           @if (v.ok) { {{ v.checked }}件の記録をたどり、書き換え・抜けはありませんでした。 } @else { 問題が見つかりました：{{ v.problems.join('／') }} }
-          @if (v.unsealed > 0) { （通し番号を振る前の記録が{{ v.unsealed }}件あります。段階8より前の記録です） }
+          @if (v.unsealed > 0) { （改ざん防止の仕組みを入れる前の記録 {{ v.unsealed | number }}件は、この確認の対象外です） }
         </p>
       }
       @if (error()) { <p class="error">{{ error() }}</p> }
