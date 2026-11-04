@@ -1,4 +1,4 @@
-import { transferAcquisitionGrade, transferFacts, transferMoveBlocker, lastMonthBeforeTransfer, OfficeFacts } from './rules';
+import { insuranceLabel, transferAcquisitionGrade, transferCoverage, transferFacts, transferMoveBlocker, lastMonthBeforeTransfer, OfficeFacts } from './rules';
 
 const office = (o: Partial<OfficeFacts>): OfficeFacts => ({
   id: 'a', name: '本社', officeNumber: '12-アイ', prefectureCode: '13', insurerId: '01130012', pensionOfficeName: '新宿', ...o,
@@ -46,5 +46,38 @@ describe('異動先での資格取得時決定', () => {
     const g = transferAcquisitionGrade({ currency: 290000, inKind: 30000 });
     expect(g.remuneration).toBe(320000);
     expect(g.health.standardRemuneration).toBe(320000);
+  });
+});
+
+describe('異動日に入っている保険', () => {
+  const osaka = office({ id: 'b', name: '大阪支社', officeNumber: '27-ウエ', prefectureCode: '27', insurerId: '01270019', pensionOfficeName: '天満' });
+  const both = { health: true, pension: true };
+  it('社会保険に加入していない人は、別の適用事業所への異動でも届出なし', () => {
+    const c = transferCoverage({ enrolled: { health: false, pension: false }, applicable: false, birthDate: '1990-05-10', transferDate: '2026-12-01' });
+    const f = transferFacts(office({}), osaka, '2026-12-01', c);
+    expect(f.filingRequired).toBe(false);
+    expect(f.notes).toContain('社会保険に加入していないため、別の適用事業所への異動でも届出はいりません');
+    expect(f.notes[f.notes.length - 1]).toBe('2026年12月分の保険料から大阪支社で計算します');
+  });
+  it('70歳以上は厚生年金に入らず、70歳以上被用者として届け出る', () => {
+    // 1956-06-15 生まれは 2026-06-14 に70歳到達
+    const c = transferCoverage({ enrolled: { health: true, pension: false }, applicable: true, birthDate: '1956-06-15', transferDate: '2026-12-01' });
+    expect(c).toEqual({ health: true, pension: false, over70Worker: true });
+    expect(insuranceLabel(c, '該当')).toBe('健保のみ');
+    expect(transferFacts(office({}), osaka, '2026-12-01', c).filingRequired).toBe(true);
+  });
+  it('雇用条件で厚生年金に入っていても、異動日に70歳を過ぎていれば入らない', () => {
+    const c = transferCoverage({ enrolled: both, applicable: true, birthDate: '1956-06-15', transferDate: '2026-12-01' });
+    expect(c.pension).toBe(false);
+    expect(c.over70Worker).toBe(true);
+  });
+  it('75歳以上は健康保険もなく、70歳以上被用者の該当だけ', () => {
+    const c = transferCoverage({ enrolled: both, applicable: true, birthDate: '1950-04-10', transferDate: '2026-12-01' });
+    expect(c).toEqual({ health: false, pension: false, over70Worker: true });
+    expect(insuranceLabel(c, '不該当')).toBe('なし（70歳以上被用者の不該当のみ）');
+    expect(transferFacts(office({}), osaka, '2026-12-01', c).filingRequired).toBe(true);
+  });
+  it('生年月日がなければ雇用条件どおり', () => {
+    expect(transferCoverage({ enrolled: both, applicable: true, birthDate: null, transferDate: '2026-12-01' })).toEqual({ health: true, pension: true, over70Worker: false });
   });
 });

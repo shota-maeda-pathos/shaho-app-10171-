@@ -11,7 +11,7 @@ import { buildTransferWizardSteps } from '../procedures/templates';
 import { requireProcedureAccess } from '../procedures/access';
 import { completed, requireVersion, setStep, statusReasonOf, stepOf } from '../procedures/wizard';
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
-import { lastMonthBeforeTransfer, OfficeFacts, transferAcquisitionGrade, transferFacts, transferMoveBlocker } from './rules';
+import { insuranceLabel, lastMonthBeforeTransfer, OfficeFacts, transferAcquisitionGrade, transferCoverage, transferFacts, transferMoveBlocker } from './rules';
 import { assertAssignable } from '../offices/lifecycle';
 import { acquisitionLedgerFields, acquisitionRemarkItems } from '../filings/acquisition-fields';
 
@@ -28,17 +28,39 @@ async function officeFacts(companyId: string, officeId: string): Promise<OfficeF
   };
 }
 
+/** いちばん新しい雇用条件 */
+async function latestEmployment(empPath: string) {
+  const snap = await db.collection(`${empPath}/employments`).orderBy('effectiveDate', 'desc').limit(1).get();
+  return snap.empty ? null : snap.docs[0].data() as EmploymentDoc;
+}
+
+/** 異動日に入っている保険。雇用条件がない旧データは加入しているものとして扱う（退職と同じ） */
+async function coverageOf(empPath: string, transferDate: string) {
+  const [empSnap, doc] = await Promise.all([db.doc(empPath).get(), latestEmployment(empPath)]);
+  const employee = empSnap.data() as EmployeeDoc;
+  const n = doc ? normalizeEmployment(doc) : null;
+  return {
+    coverage: transferCoverage({
+      enrolled: { health: n?.healthInsuranceEnrolled ?? true, pension: n?.pensionEnrolled ?? true },
+      applicable: !doc || doc.socialInsuranceEnrolled !== false,
+      birthDate: employee.birthDate ? toDateString(employee.birthDate) : null, transferDate,
+    }),
+    insuredCategory: n?.insuredCategory ?? 'general',
+  };
+}
+
+const INSURED_TYPE = { general: '一般', partTimer: 'パート', shortTime: '短時間労働者' } as const;
+
 /**
  * 報酬月額の欄の最初の値：今の雇用条件の固定的賃金（手当・残業代の見込みは入っていないので、画面で足してもらう）。
  * 雇用条件から出せないときは今の等級の基になった額
  */
 async function remunerationDefault(empPath: string): Promise<number | null> {
-  const [emp, grade] = await Promise.all([
-    db.collection(`${empPath}/employments`).orderBy('effectiveDate', 'desc').limit(1).get(),
+  const [doc, grade] = await Promise.all([
+    latestEmployment(empPath),
     db.collection(`${empPath}/grades`).orderBy('effectiveMonth', 'desc').limit(1).get(),
   ]);
-  if (!emp.empty) {
-    const doc = emp.docs[0].data() as EmploymentDoc;
+  if (doc) {
     const wageType = normalizeEmployment(doc).wageType;
     try {
       return acquisitionRemuneration({
@@ -116,8 +138,11 @@ type RemunerationInput = { remunerationCurrency?: number; remunerationInKind?: n
 export async function previewTransfer(input: { companyId: string; procedureId: string; toOfficeId: string; transferDate: string } & RemunerationInput, auth: AuthContext) {
   const { proc } = await loadProcedure(input.companyId, input.procedureId, auth);
   if (input.toOfficeId === proc.transfer.fromOfficeId) throw invalidArg('異動先は今の事業所と違う事業所を選んでください');
-  const [from, to] = await Promise.all([officeFacts(input.companyId, proc.transfer.fromOfficeId), officeFacts(input.companyId, input.toOfficeId)]);
-  const facts = transferFacts(from, to, input.transferDate);
+  const [from, to, { coverage }] = await Promise.all([
+    officeFacts(input.companyId, proc.transfer.fromOfficeId), officeFacts(input.companyId, input.toOfficeId),
+    coverageOf(`companies/${input.companyId}/employees/${proc.employeeId}`, input.transferDate),
+  ]);
+  const facts = transferFacts(from, to, input.transferDate, coverage);
   const grade = facts.filingRequired && input.remunerationCurrency
     ? transferAcquisitionGrade({ currency: input.remunerationCurrency, inKind: input.remunerationInKind ?? 0 }) : null;
   return { ...facts, grade };
@@ -129,13 +154,14 @@ export async function getTransfer(companyId: string, procedureId: string, auth: 
   const t = proc.transfer;
   const base = `companies/${companyId}`;
   const empPath = `${base}/employees/${proc.employeeId}`;
-  const [empSnap, from, to, lossSnap, acqSnap, defaultRemuneration] = await Promise.all([
+  const [empSnap, from, to, lossSnap, acqSnap, defaultRemuneration, cov] = await Promise.all([
     db.doc(empPath).get(),
     officeFacts(companyId, t.fromOfficeId),
     t.toOfficeId ? officeFacts(companyId, t.toOfficeId) : null,
     t.lossFilingId ? db.doc(`${empPath}/filings/${t.lossFilingId}`).get() : null,
     t.acquisitionFilingId ? db.doc(`${empPath}/filings/${t.acquisitionFilingId}`).get() : null,
     t.remuneration || t.applied ? null : remunerationDefault(empPath),
+    t.transferDate ? coverageOf(empPath, t.transferDate) : null,
   ]);
   const loss = lossSnap?.exists ? lossSnap.data() as FilingDoc : null;
   const acq = acqSnap?.exists ? acqSnap.data() as FilingDoc : null;
@@ -165,7 +191,8 @@ export async function getTransfer(companyId: string, procedureId: string, auth: 
     remuneration: proc.transfer.remuneration ?? null,
     defaultRemuneration,
     grade: proc.transfer.remuneration ? transferAcquisitionGrade(proc.transfer.remuneration) : null,
-    facts: to && proc.transfer.transferDate ? transferFacts(from, to, proc.transfer.transferDate) : null,
+    // 届出を作ったあとは、作ったときの判定（filingRequired）を出す
+    facts: to && proc.transfer.transferDate ? { ...transferFacts(from, to, proc.transfer.transferDate, cov?.coverage), ...(proc.transfer.applied ? { filingRequired: proc.transfer.filingRequired } : {}) } : null,
     applied: proc.transfer.applied,
     lossFiling: filing(proc.transfer.lossFilingId, loss),
     acquisitionFiling: filing(proc.transfer.acquisitionFilingId, acq),
@@ -214,12 +241,17 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
   if (t.applied) throw invalidArg('台帳は変更済みです');
   const base = `companies/${input.companyId}`;
   const empRef = db.doc(`${base}/employees/${proc.employeeId}`);
-  const [from, to, gradeSnap] = await Promise.all([
+  const [from, to, { coverage, insuredCategory }, gradeSnap] = await Promise.all([
     officeFacts(input.companyId, t.fromOfficeId),
     officeFacts(input.companyId, t.toOfficeId),
+    coverageOf(empRef.path, t.transferDate),
     db.collection(`${empRef.path}/grades`).where('effectiveMonth', '<=', t.transferDate.slice(0, 7)).orderBy('effectiveMonth', 'desc').limit(1).get(),
   ]);
   const grade = gradeSnap.empty ? null : gradeSnap.docs[0].data() as GradeDoc;
+  // 保存したあとに雇用条件や年齢で届出の要否が変わっていたら、「異動の内容」を保存し直してもらう
+  if (transferFacts(from, to, t.transferDate, coverage).filingRequired !== t.filingRequired) {
+    throw invalidArg('「異動の内容」を保存したあとに、届出が要るかどうかが変わりました（雇用条件・年齢）。「異動の内容」を保存し直してください');
+  }
   if (t.filingRequired && !grade) throw invalidArg('今の等級がないため、資格取得届を作れません。等級を決めてから進めてください');
   const effectiveMonth = t.transferDate.slice(0, 7);
   if (t.filingRequired && !t.remuneration) throw invalidArg('異動日現在の報酬月額がありません。「異動の内容」で報酬月額を入れて保存し直してください');
@@ -261,19 +293,23 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
       } satisfies FilingDoc);
       tx.set(lossRef, draft('lossNotification', t.fromOfficeId, {
         '事業所整理記号': from.officeNumber, '事業所名称': from.name, ...person, '届出区分': '資格喪失届',
-        '資格喪失年月日': t.transferDate, '喪失原因': '退職等', '退職年月日': addDays(t.transferDate!, -1), '喪失する保険': '健保・厚年',
-        '最終標準報酬月額_健康保険': grade.healthStandardRemuneration, '最終標準報酬月額_厚生年金': grade.pensionStandardRemuneration,
+        '資格喪失年月日': t.transferDate, '喪失原因': '退職等', '退職年月日': addDays(t.transferDate!, -1), '喪失する保険': insuranceLabel(coverage, '不該当'),
+        '70歳以上被用者不該当': coverage.over70Worker ? `該当（転勤 ${addDays(t.transferDate!, -1)}）` : '',
+        '最終標準報酬月額_健康保険': coverage.health ? grade.healthStandardRemuneration : null,
+        '最終標準報酬月額_厚生年金': coverage.pension || coverage.over70Worker ? grade.pensionStandardRemuneration : null,
         '保険証回収_添付': 0, '保険証回収_返不能': 0, '備考': `転勤（${to.name}へ）`,
       }));
       tx.set(acqRef, draft('acquisitionNotification', t.toOfficeId!, {
         // 整理番号は異動先の番号（自動で付けない事業所は空。年金事務所から届いた番号を台帳に入れる）
         '事業所整理記号': to.officeNumber, '事業所名称': to.name, ...person, '被保険者整理番号': newInsuredNumber ?? '', '届出区分': '資格取得届',
-        '資格取得年月日': t.transferDate, '取得区分': '健保・厚年', '被保険者種別': '一般',
+        '資格取得年月日': t.transferDate, '取得区分': insuranceLabel(coverage, '該当'), '被保険者種別': INSURED_TYPE[insuredCategory],
         '報酬月額_通貨': t.remuneration!.currency, '報酬月額_現物': t.remuneration!.inKind, '報酬月額_合計': acquired.remuneration,
-        '健康保険_等級': acquired.health.gradeNumber, '健康保険_標準報酬月額': acquired.health.standardRemuneration,
-        '厚生年金_等級': acquired.pension.gradeNumber, '厚生年金_標準報酬月額': acquired.pension.standardRemuneration,
-        '備考': `転勤（${from.name}から）`,
-        '備考項目': acquisitionRemarkItems({ age70: false, otherEmployer: !!employee.otherEmployer, shortTime: false }),
+        '健康保険_等級': coverage.health ? acquired.health.gradeNumber : null, '健康保険_標準報酬月額': coverage.health ? acquired.health.standardRemuneration : null,
+        // 70歳以上被用者は厚生年金の標準報酬月額に相当する額を書く
+        '厚生年金_等級': coverage.pension || coverage.over70Worker ? acquired.pension.gradeNumber : null,
+        '厚生年金_標準報酬月額': coverage.pension || coverage.over70Worker ? acquired.pension.standardRemuneration : null,
+        '備考': [`転勤（${from.name}から）`, insuredCategory === 'shortTime' ? '短時間労働者' : ''].filter(Boolean).join('／'),
+        '備考項目': acquisitionRemarkItems({ age70: coverage.over70Worker, otherEmployer: !!employee.otherEmployer, shortTime: insuredCategory === 'shortTime' }),
         ...ledger,
       }));
     }

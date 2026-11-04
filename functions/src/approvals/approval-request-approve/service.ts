@@ -86,9 +86,11 @@ export async function approveApprovalRequest(
       if (existing.exists && existing.data()!.isConfirmed === true) throw invalidArg('この月の等級は既に確定しています');
     }
 
-    // 届出の保存原本に残す事業所・会社の情報（承認時点の値）。トランザクションの書き込みより前に読む
+    // 届出の保存原本に残す事業所・会社の情報（承認時点の値）。トランザクションの書き込みより前に読む。
+    // 事業所は届出の事業所（異動の取得届は、所属を変える前に異動先の事業所で出す）
+    const archiveOfficeId = (targetData.officeId as string | undefined) || employee.officeId;
     const [archiveCompany, archiveOffice] = reqData.requestType === 'filing'
-      ? await Promise.all([tx.get(db.doc(`companies/${auth.companyId}`)), tx.get(db.doc(`companies/${auth.companyId}/offices/${employee.officeId}`))])
+      ? await Promise.all([tx.get(db.doc(`companies/${auth.companyId}`)), tx.get(db.doc(`companies/${auth.companyId}/offices/${archiveOfficeId}`))])
       : [null, null];
 
     const now = Timestamp.now();
