@@ -224,16 +224,22 @@ export class TransferWizardComponent implements OnInit {
     }
   }
 
+  /** 判定を呼んだ回数。続けて入力したとき、前の判定の答えがあとから届いても使わない */
+  private previewSeq = 0;
+
   async changed() {
     this.dirty.set(true);
     if (!this.toOfficeId || !this.transferDate) return;
+    const seq = ++this.previewSeq;
     try {
       const { data } = await httpsCallable<object, Facts>(this.functions, 'transferPreview')({
         companyId: this.auth.companyId, procedureId: this.procedureId, ...this.entryInput(),
       });
+      if (seq !== this.previewSeq) return;
       this.facts.set(data);
       this.factsError.set('');
     } catch (e) {
+      if (seq !== this.previewSeq) return;
       this.facts.set(null);
       this.factsError.set(errorMessage(e, '判定できませんでした'));
     }
