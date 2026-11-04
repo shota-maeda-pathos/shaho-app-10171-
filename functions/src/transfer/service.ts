@@ -1,16 +1,17 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { db } from '../config';
 import { AuthContext, requireOffice } from '../middleware/auth';
-import { EmployeeDoc, FilingDoc, GradeDoc, OfficeDoc, ProcedureDoc, TransferState } from '../types/firestore';
+import { EmployeeDoc, EmploymentDoc, FilingDoc, GradeDoc, OfficeDoc, ProcedureDoc, TransferState } from '../types/firestore';
 import { invalidArg, notFound } from '../utils/errors';
 import { toDateString } from '../utils/firestore';
-import { addDays, fiveDayDeadline } from '../insurance/calculator';
+import { acquisitionRemuneration, addDays, fiveDayDeadline, monthlyHoursFromWeekly } from '../insurance/calculator';
+import { normalizeEmployment } from '../utils/employment';
 import { insuredCounterPath, nextInsuredNumber } from '../offices/insured-number';
 import { buildTransferWizardSteps } from '../procedures/templates';
 import { requireProcedureAccess } from '../procedures/access';
 import { completed, requireVersion, setStep, statusReasonOf, stepOf } from '../procedures/wizard';
 import { createApprovalRequest } from '../approvals/approval-request-create/service';
-import { lastMonthBeforeTransfer, OfficeFacts, transferFacts, transferMoveBlocker } from './rules';
+import { lastMonthBeforeTransfer, OfficeFacts, transferAcquisitionGrade, transferFacts, transferMoveBlocker } from './rules';
 import { assertAssignable } from '../offices/lifecycle';
 import { acquisitionLedgerFields, acquisitionRemarkItems } from '../filings/acquisition-fields';
 
@@ -25,6 +26,31 @@ async function officeFacts(companyId: string, officeId: string): Promise<OfficeF
     id: officeId, name: o.name ?? '', officeNumber: o.officeNumber ?? '', prefectureCode: o.prefectureCode ?? '', insurerId: o.insurerId ?? '',
     pensionOfficeName: o.pensionOfficeName ?? null, raw: o,
   };
+}
+
+/**
+ * 報酬月額の欄の最初の値：今の雇用条件の固定的賃金（手当・残業代の見込みは入っていないので、画面で足してもらう）。
+ * 雇用条件から出せないときは今の等級の基になった額
+ */
+async function remunerationDefault(empPath: string): Promise<number | null> {
+  const [emp, grade] = await Promise.all([
+    db.collection(`${empPath}/employments`).orderBy('effectiveDate', 'desc').limit(1).get(),
+    db.collection(`${empPath}/grades`).orderBy('effectiveMonth', 'desc').limit(1).get(),
+  ]);
+  if (!emp.empty) {
+    const doc = emp.docs[0].data() as EmploymentDoc;
+    const wageType = normalizeEmployment(doc).wageType;
+    try {
+      return acquisitionRemuneration({
+        wageType, wageAmount: wageType === 'monthly' ? doc.baseSalary : doc.wageAmount ?? 0, monthlyDays: doc.monthlyDays,
+        monthlyHours: doc.monthlyHours ?? (doc.weeklyHours ? monthlyHoursFromWeekly(doc.weeklyHours) : null),
+      });
+    } catch {
+      // 日数・時間が足りないときは等級の額にする
+    }
+  }
+  const g = grade.empty ? null : grade.docs[0].data() as GradeDoc;
+  return g ? g.basisRemuneration ?? g.healthStandardRemuneration : null;
 }
 
 // ── 開始 ────────────────────────────────────────────
@@ -85,11 +111,16 @@ export function currentTransferStep(proc: ProcedureDoc): TransferStepKey {
 
 const filingDone = (f: FilingDoc | null) => !!f && (f.mockStatus === 'completed' || f.submissionStatus === 'accepted');
 
-export async function previewTransfer(input: { companyId: string; procedureId: string; toOfficeId: string; transferDate: string }, auth: AuthContext) {
+type RemunerationInput = { remunerationCurrency?: number; remunerationInKind?: number };
+
+export async function previewTransfer(input: { companyId: string; procedureId: string; toOfficeId: string; transferDate: string } & RemunerationInput, auth: AuthContext) {
   const { proc } = await loadProcedure(input.companyId, input.procedureId, auth);
   if (input.toOfficeId === proc.transfer.fromOfficeId) throw invalidArg('異動先は今の事業所と違う事業所を選んでください');
   const [from, to] = await Promise.all([officeFacts(input.companyId, proc.transfer.fromOfficeId), officeFacts(input.companyId, input.toOfficeId)]);
-  return transferFacts(from, to, input.transferDate);
+  const facts = transferFacts(from, to, input.transferDate);
+  const grade = facts.filingRequired && input.remunerationCurrency
+    ? transferAcquisitionGrade({ currency: input.remunerationCurrency, inKind: input.remunerationInKind ?? 0 }) : null;
+  return { ...facts, grade };
 }
 
 export async function getTransfer(companyId: string, procedureId: string, auth: AuthContext) {
@@ -98,12 +129,13 @@ export async function getTransfer(companyId: string, procedureId: string, auth: 
   const t = proc.transfer;
   const base = `companies/${companyId}`;
   const empPath = `${base}/employees/${proc.employeeId}`;
-  const [empSnap, from, to, lossSnap, acqSnap] = await Promise.all([
+  const [empSnap, from, to, lossSnap, acqSnap, defaultRemuneration] = await Promise.all([
     db.doc(empPath).get(),
     officeFacts(companyId, t.fromOfficeId),
     t.toOfficeId ? officeFacts(companyId, t.toOfficeId) : null,
     t.lossFilingId ? db.doc(`${empPath}/filings/${t.lossFilingId}`).get() : null,
     t.acquisitionFilingId ? db.doc(`${empPath}/filings/${t.acquisitionFilingId}`).get() : null,
+    t.remuneration || t.applied ? null : remunerationDefault(empPath),
   ]);
   const loss = lossSnap?.exists ? lossSnap.data() as FilingDoc : null;
   const acq = acqSnap?.exists ? acqSnap.data() as FilingDoc : null;
@@ -130,6 +162,9 @@ export async function getTransfer(companyId: string, procedureId: string, auth: 
     to: to ? { id: to.id, name: to.name } : null,
     transferDate: proc.transfer.transferDate,
     reason: proc.transfer.reason,
+    remuneration: proc.transfer.remuneration ?? null,
+    defaultRemuneration,
+    grade: proc.transfer.remuneration ? transferAcquisitionGrade(proc.transfer.remuneration) : null,
     facts: to && proc.transfer.transferDate ? transferFacts(from, to, proc.transfer.transferDate) : null,
     applied: proc.transfer.applied,
     lossFiling: filing(proc.transfer.lossFilingId, loss),
@@ -139,7 +174,7 @@ export async function getTransfer(companyId: string, procedureId: string, auth: 
 
 // ── 異動先と異動日 ─────────────────────────────────────
 
-export async function saveTransferEntry(input: { companyId: string; procedureId: string; expectedVersion: number; toOfficeId: string; transferDate: string; reason: string }, auth: AuthContext) {
+export async function saveTransferEntry(input: { companyId: string; procedureId: string; expectedVersion: number; toOfficeId: string; transferDate: string; reason: string } & RemunerationInput, auth: AuthContext) {
   const { ref, proc } = await loadProcedure(input.companyId, input.procedureId, auth);
   requireVersion(proc, input.expectedVersion);
   if (proc.transfer.applied) throw invalidArg('台帳の所属事業所を変えたあとは、異動先・異動日は直せません');
@@ -147,6 +182,8 @@ export async function saveTransferEntry(input: { companyId: string; procedureId:
   // 設定が終わっていない事業所・廃止した事業所には異動できない（カタログ1章 事業所ライフサイクル）
   await assertAssignable(input.companyId, input.toOfficeId);
   const facts = await previewTransfer(input, auth);
+  if (facts.filingRequired && !input.remunerationCurrency) throw invalidArg('異動日現在の報酬月額を入れてください（異動先で等級を決め直します）');
+  const remuneration = facts.filingRequired ? { currency: input.remunerationCurrency!, inKind: input.remunerationInKind ?? 0 } : null;
   await db.runTransaction(async tx => {
     const latest = (await tx.get(ref)).data() as TransferProc;
     requireVersion(latest, input.expectedVersion);
@@ -154,7 +191,7 @@ export async function saveTransferEntry(input: { companyId: string; procedureId:
     steps = setStep(steps, 'apply', { status: 'available' });
     tx.update(ref, {
       'transfer.toOfficeId': input.toOfficeId, 'transfer.transferDate': input.transferDate, 'transfer.reason': input.reason,
-      'transfer.filingRequired': facts.filingRequired, targetOfficeId: input.toOfficeId,
+      'transfer.filingRequired': facts.filingRequired, 'transfer.remuneration': remuneration, targetOfficeId: input.toOfficeId,
       effectiveDate: Timestamp.fromDate(new Date(`${input.transferDate}T00:00:00Z`)),
       deadline: facts.filingRequired ? Timestamp.fromDate(new Date(`${fiveDayDeadline(input.transferDate)}T00:00:00Z`)) : null,
       steps, statusReason: statusReasonOf(steps), version: latest.version + 1, updatedAt: Timestamp.now(),
@@ -185,6 +222,9 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
   const grade = gradeSnap.empty ? null : gradeSnap.docs[0].data() as GradeDoc;
   if (t.filingRequired && !grade) throw invalidArg('今の等級がないため、資格取得届を作れません。等級を決めてから進めてください');
   const effectiveMonth = t.transferDate.slice(0, 7);
+  if (t.filingRequired && !t.remuneration) throw invalidArg('異動日現在の報酬月額がありません。「異動の内容」で報酬月額を入れて保存し直してください');
+  // 異動先では資格取得時決定。前の等級は引き継がず、異動日現在の報酬月額から決め直す
+  const acquired = t.remuneration ? transferAcquisitionGrade(t.remuneration) : null;
   if (t.filingRequired && grade?.effectiveMonth === effectiveMonth) throw invalidArg(`${effectiveMonth}の等級がすでにあります。異動日の月に新しい等級は作れないため、等級を確かめてください`);
 
   const now = Timestamp.now();
@@ -210,12 +250,11 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
     const counter = autoNumber ? await tx.get(counterRef) : null;
     newInsuredNumber = counter ? nextInsuredNumber(usedNumbers, Number(counter.data()?.last ?? 0)) : null;
     if (newInsuredNumber) tx.set(counterRef, { last: Number(newInsuredNumber), updatedAt: now }, { merge: true });
-    if (lossRef && acqRef && grade) {
+    if (lossRef && acqRef && grade && acquired) {
       const person = {
         '被保険者整理番号': employee.insuredPersonNumber ?? '', '被保険者氏名': nameOf(employee), '被保険者氏名フリガナ': `${employee.lastNameKana} ${employee.firstNameKana}`,
         '生年月日': employee.birthDate ? toDateString(employee.birthDate) : '', '性別': employee.gender === 'male' ? '男' : '女', '個人番号': '', '基礎年金番号': employee.basicPensionNumber ?? '',
       };
-      const remuneration = grade.basisRemuneration ?? grade.healthStandardRemuneration;
       const draft = (filingType: string, officeId: string, formData: Record<string, unknown>) => ({
         filingType, officeId, workflowStatus: 'draft' as const, mockStatus: 'notStarted' as const, submissionStatus: 'notSubmitted' as const,
         effectiveDate: t.transferDate!, formData, submittedAt: null, resultReceivedAt: null, resultNote: null, version: 1, createdAt: now, updatedAt: now,
@@ -230,9 +269,9 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
         // 整理番号は異動先の番号（自動で付けない事業所は空。年金事務所から届いた番号を台帳に入れる）
         '事業所整理記号': to.officeNumber, '事業所名称': to.name, ...person, '被保険者整理番号': newInsuredNumber ?? '', '届出区分': '資格取得届',
         '資格取得年月日': t.transferDate, '取得区分': '健保・厚年', '被保険者種別': '一般',
-        '報酬月額_通貨': remuneration, '報酬月額_現物': 0, '報酬月額_合計': remuneration,
-        '健康保険_等級': grade.healthGradeNumber, '健康保険_標準報酬月額': grade.healthStandardRemuneration,
-        '厚生年金_等級': grade.pensionGradeNumber, '厚生年金_標準報酬月額': grade.pensionStandardRemuneration,
+        '報酬月額_通貨': t.remuneration!.currency, '報酬月額_現物': t.remuneration!.inKind, '報酬月額_合計': acquired.remuneration,
+        '健康保険_等級': acquired.health.gradeNumber, '健康保険_標準報酬月額': acquired.health.standardRemuneration,
+        '厚生年金_等級': acquired.pension.gradeNumber, '厚生年金_標準報酬月額': acquired.pension.standardRemuneration,
         '備考': `転勤（${from.name}から）`,
         '備考項目': acquisitionRemarkItems({ age70: false, otherEmployer: !!employee.otherEmployer, shortTime: false }),
         ...ledger,
@@ -248,8 +287,8 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
     });
   });
 
-  if (lossRef && acqRef && grade) {
-    // 取得届の承認で、新しい事業所での等級（今の等級を引き継ぐ）も確定する
+  if (lossRef && acqRef && grade && acquired) {
+    // 取得届の承認で、異動先での等級（資格取得時決定）も確定する
     await createApprovalRequest({
       companyId: input.companyId, employeeId: proc.employeeId!, targetPath: lossRef.path, targetVersion: 1, requestType: 'filing',
       comment: `${proc.employeeName}さんの資格喪失届（転勤、${from.name}）`, metadata: { source: 'transfer', procedureId: input.procedureId },
@@ -261,9 +300,9 @@ export async function applyTransfer(input: { companyId: string; procedureId: str
         source: 'transfer', procedureId: input.procedureId,
         grade: {
           path: `${empRef.path}/grades/${effectiveMonth}`, effectiveMonth, determinationType: 'initial',
-          healthGradeNumber: grade.healthGradeNumber, healthStandardRemuneration: grade.healthStandardRemuneration,
-          pensionGradeNumber: grade.pensionGradeNumber, pensionStandardRemuneration: grade.pensionStandardRemuneration,
-          basisRemuneration: grade.basisRemuneration ?? null, reason: `転勤による資格取得（${from.name}の等級を引き継ぐ）`,
+          healthGradeNumber: acquired.health.gradeNumber, healthStandardRemuneration: acquired.health.standardRemuneration,
+          pensionGradeNumber: acquired.pension.gradeNumber, pensionStandardRemuneration: acquired.pension.standardRemuneration,
+          basisRemuneration: acquired.remuneration, reason: `資格取得時決定（転勤、${from.name}から） 報酬月額${acquired.remuneration.toLocaleString('ja-JP')}円`,
         },
       },
     }, auth);

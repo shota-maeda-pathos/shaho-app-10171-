@@ -1,4 +1,4 @@
-import { addMonths, monthOf } from '../insurance/calculator';
+import { addMonths, lookupGrade, monthOf, resolveGradeTable } from '../insurance/calculator';
 
 /**
  * 事業所間異動の影響（純粋関数）。カタログ：都道府県が変わり保険料率が変わるか、届出が要るか（管轄年金事務所が変わるか）、
@@ -60,4 +60,19 @@ export function transferMoveBlocker(p: { today: string; transferDate: string; ha
 /** 元の事業所で保険料を計算する最後の月（異動日の前の月。資格喪失日の属する月の前の月まで） */
 export function lastMonthBeforeTransfer(transferDate: string): string {
   return addMonths(transferDate.slice(0, 7), -1);
+}
+
+/**
+ * 異動先での資格取得時決定（純粋関数）。別の適用事業所への異動は資格を取り直すので、標準報酬月額は前の等級を引き継がず、
+ * 異動日現在の報酬月額（通貨＋現物。残業代などは見込みで入れる）から決め直す（健保法42条・厚年法22条）
+ */
+export function transferAcquisitionGrade(p: { currency: number; inKind: number }) {
+  const remuneration = Math.floor(p.currency + p.inKind);
+  const health = lookupGrade(resolveGradeTable('health'), remuneration);
+  const pension = lookupGrade(resolveGradeTable('pension'), remuneration);
+  return {
+    remuneration,
+    health: { gradeNumber: health.gradeNumber, standardRemuneration: health.standardRemuneration },
+    pension: { gradeNumber: pension.gradeNumber, standardRemuneration: pension.standardRemuneration },
+  };
 }

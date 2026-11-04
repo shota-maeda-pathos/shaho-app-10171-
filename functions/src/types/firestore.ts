@@ -501,6 +501,8 @@ export interface TransferState {
   acquisitionFilingId: string | null;
   /** 異動先で付けた被保険者整理番号（事業所が自動で付ける設定のとき。台帳には完了のときに入れる） */
   newInsuredNumber?: string | null;
+  /** 異動日現在の報酬月額（届出が要る異動。異動先の資格取得時決定に使う）。以前の作りの手続きにはない */
+  remuneration?: { currency: number; inKind: number } | null;
 }
 
 /** 雇用条件の変更の手続き（ウィザード）の状態。承認されたら台帳に反映し、加入・喪失が切り替われば届出を作る */

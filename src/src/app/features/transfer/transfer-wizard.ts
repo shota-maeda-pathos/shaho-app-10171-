@@ -18,7 +18,10 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 type Key = 'entry' | 'apply' | 'filings' | 'confirm' | 'done';
 const KEYS: Key[] = ['entry', 'apply', 'filings', 'confirm'];
 
-interface Facts { healthRateChanges: boolean; filingRequired: boolean; pensionOfficeChanges: boolean; newRateMonth: string; notes: string[] }
+interface Grade { gradeNumber: number; standardRemuneration: number }
+/** 異動先での資格取得時決定（異動日現在の報酬月額から決め直した等級） */
+interface AcquiredGrade { remuneration: number; health: Grade; pension: Grade }
+interface Facts { healthRateChanges: boolean; filingRequired: boolean; pensionOfficeChanges: boolean; newRateMonth: string; notes: string[]; grade?: AcquiredGrade | null }
 interface FilingState { id: string; workflowStatus: string; mockStatus: string; submissionStatus: string; done: boolean }
 interface TransferView {
   procedure: { id: string; version: number; status: string; title: string; officeName: string; employeeName: string };
@@ -29,6 +32,10 @@ interface TransferView {
   to: { id: string; name: string } | null;
   transferDate: string | null;
   reason: string;
+  remuneration: { currency: number; inKind: number } | null;
+  /** 報酬月額の欄の最初の値（今の雇用条件の固定的賃金） */
+  defaultRemuneration: number | null;
+  grade: AcquiredGrade | null;
   facts: Facts | null;
   applied: boolean;
   lossFiling: FilingState | null;
@@ -64,6 +71,9 @@ export class TransferWizardComponent implements OnInit {
   toOfficeId = '';
   transferDate = '';
   reason = '';
+  /** 異動日現在の報酬月額（通貨・現物）。届出が要る異動で、異動先の等級を決め直すのに使う */
+  remunerationCurrency: number | null = null;
+  remunerationInKind = 0;
   /** 異動日の前の月の保険料が元の事業所にない人（保険料の対象でない など）を、そのまま完了にする */
   skipPremiumCheck = false;
   dirty = signal(false);
@@ -86,11 +96,11 @@ export class TransferWizardComponent implements OnInit {
     const filing = v.facts?.filingRequired ?? true;
     return [
       { key: 'entry', label: '異動の内容', done: done || cur > 0,
-        what: '異動先の事業所と異動日を入れます。保険料率・届出・新しい料率を使う月をシステムが判定します。',
+        what: '異動先の事業所と異動日を入れます。保険料率・届出・新しい料率を使う月をシステムが判定します。別の適用事業所なら、異動日現在の報酬月額も入れます。',
         why: '都道府県が変わると健康保険の料率が変わり、別の適用事業所なら届出が要るためです。', next: filing ? '資格喪失届と資格取得届を作ります。' : '異動を登録します。' },
       { key: 'apply', label: filing ? '届出の作成' : '異動の登録', done: done || cur > 1,
         what: filing
-          ? '資格喪失届（元の事業所）と資格取得届（異動先。整理番号は異動先の番号）を作って承認を依頼します。台帳の所属はまだ変えません。'
+          ? '資格喪失届（元の事業所）と資格取得届（異動先。整理番号は異動先の番号、等級は報酬月額から決め直す）を作って承認を依頼します。台帳の所属はまだ変えません。'
           : '異動を登録します。台帳の所属はまだ変えません。',
         why: '届出は異動日から5日以内に出すので先に作り、所属は異動日の前の月の保険料を元の事業所で計算してから変えるためです。', next: filing ? '2件の届出を承認・提出します。' : '完了の確認で所属を変えます。' },
       { key: 'filings', label: filing ? '届出の提出' : '届出（不要）', done: done || cur > 2,
@@ -127,7 +137,8 @@ export class TransferWizardComponent implements OnInit {
 
   nextDisabled() {
     if (this.key() === 'entry' && (this.dirty() || this.index() === this.currentIndex())) {
-      return !this.toOfficeId || !this.transferDate || !!this.factsError() || !!this.view()?.applied;
+      return !this.toOfficeId || !this.transferDate || !!this.factsError() || !!this.view()?.applied
+        || (!!this.facts()?.filingRequired && !this.remunerationCurrency);
     }
     return false;
   }
@@ -137,8 +148,15 @@ export class TransferWizardComponent implements OnInit {
     procedureId: () => this.procedureId,
     baseline: false,
     step: () => 'entry',
-    read: () => this.key() === 'entry' && this.dirty() && !this.busy() ? { toOfficeId: this.toOfficeId, transferDate: this.transferDate, reason: this.reason } : null,
+    read: () => this.key() === 'entry' && this.dirty() && !this.busy() ? this.entryInput() : null,
   });
+
+  private entryInput() {
+    return {
+      toOfficeId: this.toOfficeId, transferDate: this.transferDate, reason: this.reason,
+      remunerationCurrency: this.remunerationCurrency ?? undefined, remunerationInKind: this.remunerationInKind || 0,
+    };
+  }
 
   /** 前回の下書きを戻す（「異動の内容」がまだ確定していないときだけ） */
   private async restoreDraft() {
@@ -147,8 +165,9 @@ export class TransferWizardComponent implements OnInit {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const x = d.data as any;
     this.toOfficeId = x.toOfficeId ?? ''; this.transferDate = x.transferDate ?? ''; this.reason = x.reason ?? '';
+    this.remunerationCurrency = x.remunerationCurrency ?? this.remunerationCurrency; this.remunerationInKind = x.remunerationInKind ?? 0;
     this.dirty.set(true);
-    this.autosave.restored('entry', { toOfficeId: this.toOfficeId, transferDate: this.transferDate, reason: this.reason }, d.savedAt);
+    this.autosave.restored('entry', this.entryInput(), d.savedAt);
     void this.changed();
   }
 
@@ -193,7 +212,9 @@ export class TransferWizardComponent implements OnInit {
         this.toOfficeId = data.to?.id ?? '';
         this.transferDate = data.transferDate ?? '';
         this.reason = data.reason ?? '';
-        this.facts.set(data.facts);
+        this.remunerationCurrency = data.remuneration?.currency ?? data.defaultRemuneration;
+        this.remunerationInKind = data.remuneration?.inKind ?? 0;
+        this.facts.set(data.facts ? { ...data.facts, grade: data.grade } : null);
       }
       if (moveToCurrent) this.index.set(this.currentIndex());
     } catch (e) {
@@ -208,7 +229,7 @@ export class TransferWizardComponent implements OnInit {
     if (!this.toOfficeId || !this.transferDate) return;
     try {
       const { data } = await httpsCallable<object, Facts>(this.functions, 'transferPreview')({
-        companyId: this.auth.companyId, procedureId: this.procedureId, toOfficeId: this.toOfficeId, transferDate: this.transferDate,
+        companyId: this.auth.companyId, procedureId: this.procedureId, ...this.entryInput(),
       });
       this.facts.set(data);
       this.factsError.set('');
@@ -221,7 +242,7 @@ export class TransferWizardComponent implements OnInit {
   async advance() {
     const k = this.key();
     if (k === 'entry' && (this.dirty() || this.index() === this.currentIndex())) {
-      return this.run('entry', { toOfficeId: this.toOfficeId, transferDate: this.transferDate, reason: this.reason }, '保存しました', () => this.dirty.set(false));
+      return this.run('entry', this.entryInput(), '保存しました', () => this.dirty.set(false));
     }
     if (this.index() < this.currentIndex()) {
       this.index.set(this.index() + 1);

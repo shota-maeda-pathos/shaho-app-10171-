@@ -1,4 +1,4 @@
-import { transferFacts, transferMoveBlocker, lastMonthBeforeTransfer, OfficeFacts } from './rules';
+import { transferAcquisitionGrade, transferFacts, transferMoveBlocker, lastMonthBeforeTransfer, OfficeFacts } from './rules';
 
 const office = (o: Partial<OfficeFacts>): OfficeFacts => ({
   id: 'a', name: '本社', officeNumber: '12-アイ', prefectureCode: '13', insurerId: '01130012', pensionOfficeName: '新宿', ...o,
@@ -33,5 +33,18 @@ describe('異動の完了で所属を変えてよいか', () => {
   it('前の月は年をまたぐ', () => {
     expect(lastMonthBeforeTransfer('2027-01-15')).toBe('2026-12');
     expect(lastMonthBeforeTransfer('2026-12-01')).toBe('2026-11');
+  });
+});
+
+describe('異動先での資格取得時決定', () => {
+  it('前の等級は引き継がず、異動日現在の報酬月額から決め直す', () => {
+    expect(transferAcquisitionGrade({ currency: 300000, inKind: 0 })).toEqual({
+      remuneration: 300000, health: { gradeNumber: 22, standardRemuneration: 300000 }, pension: { gradeNumber: 19, standardRemuneration: 300000 },
+    });
+  });
+  it('現物給与も足して決める', () => {
+    const g = transferAcquisitionGrade({ currency: 290000, inKind: 30000 });
+    expect(g.remuneration).toBe(320000);
+    expect(g.health.standardRemuneration).toBe(320000);
   });
 });

@@ -30,6 +30,13 @@
               <input matInput [(ngModel)]="transferDate" (ngModelChange)="changed()" name="transferDate" [matDatepicker]="dp1" placeholder="YYYY/MM/DD"><mat-datepicker-toggle matIconSuffix [for]="dp1" /><mat-datepicker #dp1 /></mat-form-field>
             <mat-form-field appearance="outline"><mat-label>異動の理由（任意）</mat-label>
               <input matInput [(ngModel)]="reason" (ngModelChange)="dirty.set(true)" name="reason" maxlength="200"></mat-form-field>
+            @if (facts()?.filingRequired) {
+              <mat-form-field appearance="outline"><mat-label>異動日現在の報酬月額（通貨、円）</mat-label>
+                <input matInput type="number" min="0" [(ngModel)]="remunerationCurrency" (ngModelChange)="changed()" name="remunerationCurrency" required>
+                <mat-hint>基本給・手当に、残業代などの見込みを足した額</mat-hint></mat-form-field>
+              <mat-form-field appearance="outline"><mat-label>報酬月額（現物、円）</mat-label>
+                <input matInput type="number" min="0" [(ngModel)]="remunerationInKind" (ngModelChange)="changed()" name="remunerationInKind"></mat-form-field>
+            }
           </fieldset>
           <section class="result" aria-live="polite">
             <h3>異動の影響</h3>
@@ -41,6 +48,13 @@
                 <app-status-badge [tone]="f.healthRateChanges ? 'yours' : 'done'" [label]="f.healthRateChanges ? '健康保険の料率が変わります' : '料率は変わりません'" />
               </p>
               <ul class="plain">@for (n of f.notes; track n) { <li>{{ n }}</li> }</ul>
+              @if (f.filingRequired) {
+                @if (f.grade; as g) {
+                  <p>異動先では資格取得時決定になり、報酬月額{{ g.remuneration.toLocaleString() }}円から等級を決め直します：健康保険 {{ g.health.gradeNumber }}級（{{ g.health.standardRemuneration.toLocaleString() }}円）・厚生年金 {{ g.pension.gradeNumber }}級（{{ g.pension.standardRemuneration.toLocaleString() }}円）。</p>
+                } @else {
+                  <p class="sub">異動先では前の等級を引き継がず、異動日現在の報酬月額から等級を決め直します（資格取得時決定）。報酬月額を入れてください。</p>
+                }
+              }
             } @else {
               <p class="sub">異動先と異動日を入れると判定します。</p>
             }
@@ -54,7 +68,16 @@
             <table class="summary">
               <tbody>
                 <tr><th>異動</th><td>{{ v.from.name }} → {{ v.to?.name }}（{{ v.transferDate | date:'yyyy年M月d日' }}）</td></tr>
-                <tr><th>届出</th><td>{{ f.filingRequired ? '資格喪失届（' + v.from.name + '）と資格取得届（' + v.to?.name + '）を作り、承認を依頼します。等級は今の等級を引き継ぎます' : 'なし' }}</td></tr>
+                <tr><th>届出</th><td>{{ f.filingRequired ? '資格喪失届（' + v.from.name + '）と資格取得届（' + v.to?.name + '）を作り、承認を依頼します' : 'なし' }}</td></tr>
+                @if (f.filingRequired) {
+                  <tr><th>異動先の等級</th><td>
+                    @if (v.grade; as g) {
+                      報酬月額{{ g.remuneration.toLocaleString() }}円から決め直し（資格取得時決定）：健康保険 {{ g.health.gradeNumber }}級・厚生年金 {{ g.pension.gradeNumber }}級。取得届の承認で確定します
+                    } @else {
+                      <span class="error">報酬月額がありません。「異動の内容」で入れて保存し直してください</span>
+                    }
+                  </td></tr>
+                }
               </tbody>
             </table>
             <p class="sub">台帳の所属はまだ変えません。異動日の前の月までの毎月の処理は元の事業所に出ます。異動日を過ぎ、前の月の保険料を元の事業所で計算し終えたら、完了の確認で所属を変えます。</p>
