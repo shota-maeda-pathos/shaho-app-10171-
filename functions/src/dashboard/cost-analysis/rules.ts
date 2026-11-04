@@ -7,7 +7,10 @@ export interface MonthRecord {
   pensionGrade: number;
   health: { employee: number; employer: number };
   care: { employee: number; employer: number };
-  childSupport: { employee: number; employer: number };
+  /** 子ども・子育て支援金（本人・会社で負担。健康保険と一緒に集める） */
+  childSupportPayment: { employee: number; employer: number };
+  /** 子ども・子育て拠出金（会社だけが負担） */
+  childSupportContribution: { employee: number; employer: number };
   pension: { employee: number; employer: number };
   totalEmployee: number;
   totalEmployer: number;
@@ -31,11 +34,11 @@ export function fiscalYearOf(ym: string): number {
 
 /** 保険の種類ごとの内訳（本人・会社） */
 export function breakdown(records: MonthRecord[]) {
-  const sum = (k: 'health' | 'care' | 'childSupport' | 'pension') => ({
+  const sum = (k: 'health' | 'care' | 'childSupportPayment' | 'childSupportContribution' | 'pension') => ({
     employee: records.reduce((a, r) => a + r[k].employee, 0),
     employer: records.reduce((a, r) => a + r[k].employer, 0),
   });
-  return { health: sum('health'), care: sum('care'), childSupport: sum('childSupport'), pension: sum('pension') };
+  return { health: sum('health'), care: sum('care'), childSupportPayment: sum('childSupportPayment'), childSupportContribution: sum('childSupportContribution'), pension: sum('pension') };
 }
 
 export type ChangeFactor = 'joined' | 'left' | 'grade' | 'exemption' | 'other';

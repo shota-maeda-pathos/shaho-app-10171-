@@ -14,7 +14,7 @@ interface Annual { actualMonthly: number; bonusEmployer: number; actual: number;
 interface Analysis {
   fiscalYear: number; latestMonth: string | null; previousMonth: string | null;
   monthly: { yearMonth: string; employee: number; employer: number; people: number }[];
-  breakdown: { health: Pair; care: Pair; childSupport: Pair; pension: Pair };
+  breakdown: { health: Pair; care: Pair; childSupportPayment: Pair; childSupportContribution: Pair; pension: Pair };
   changeFactors: Record<'joined' | 'left' | 'grade' | 'exemption' | 'other', number> | null;
   departments: { name: string; employee: number; employer: number; people: number }[];
   gradeHistogram: { grade: number; count: number }[];
@@ -23,7 +23,8 @@ interface Analysis {
 
 const KIND_LABELS: [keyof Analysis['breakdown'], string, string][] = [
   ['health', '健康保険', 'var(--app-color-link)'], ['care', '介護保険', 'var(--app-status-attention-fg)'],
-  ['childSupport', '子ども・子育て支援金', 'var(--app-status-done-fg)'], ['pension', '厚生年金', 'var(--app-color-text-sub)'],
+  ['childSupportPayment', '子ども・子育て支援金', 'var(--app-status-done-fg)'],
+  ['childSupportContribution', '子ども・子育て拠出金（会社のみ）', 'var(--app-color-muted)'], ['pension', '厚生年金', 'var(--app-color-text-sub)'],
 ];
 const FACTOR_LABELS: Record<string, string> = { joined: '入社', left: '退職', grade: '等級の変更', exemption: '産休・育休の免除', other: '料率など' };
 

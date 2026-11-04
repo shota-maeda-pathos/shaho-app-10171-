@@ -7,11 +7,10 @@ const amt = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0
 const pair = (b: { employeeAmount?: number; employerAmount?: number } | null | undefined) => ({ employee: amt(b?.employeeAmount), employer: amt(b?.employerAmount) });
 
 function toRecord(employeeId: string, d: FirebaseFirestore.DocumentData): MonthRecord {
-  const cs = pair(d.childSupportContribution), cp = pair(d.childSupportPayment);
   return {
     employeeId, yearMonth: d.yearMonth, healthGrade: d.healthGradeNumber, pensionGrade: d.pensionGradeNumber,
     health: pair(d.healthInsurance), care: pair(d.longTermCareInsurance), pension: pair(d.pensionInsurance),
-    childSupport: { employee: cs.employee + cp.employee, employer: cs.employer + cp.employer },
+    childSupportPayment: pair(d.childSupportPayment), childSupportContribution: pair(d.childSupportContribution),
     totalEmployee: amt(d.totalEmployeeAmount), totalEmployer: amt(d.totalEmployerAmount), isExempted: d.isExempted === true,
   };
 }
