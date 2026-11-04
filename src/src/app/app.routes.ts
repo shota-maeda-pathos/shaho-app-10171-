@@ -323,6 +323,8 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/account/account').then((m) => m.AccountComponent),
       },
+      // 存在しない URL はホームへ（本人はホームからポータルへ移る）
+      { path: '**', redirectTo: 'home' },
     ],
   },
 ];
