@@ -110,6 +110,7 @@ export const routes: Routes = [
         data: { title: '保険料' },
         children: [
           // 旧い月額保険料・徴収の画面は、毎月の処理（一括型）に移した
+          { path: '', redirectTo: '/monthly', pathMatch: 'full' },
           { path: 'monthly', redirectTo: '/monthly', pathMatch: 'full' },
           { path: 'collection', redirectTo: '/monthly', pathMatch: 'full' },
           // 旧い賞与保険料の画面は、賞与（一括型）に移した
