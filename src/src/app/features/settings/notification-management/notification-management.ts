@@ -155,7 +155,7 @@ export class NotificationManagementComponent implements OnInit {
       const empFn = httpsCallable<any, any>(this.functions, 'employeeList');
       const { data: eData } = await empFn({ companyId: this.auth.companyId, limit: 100 });
       this.employees.set((eData.items ?? []).map((e: any) => ({
-        id: e.employeeId, name: `${e.lastName} ${e.firstName}`, number: e.employeeNumber || '-',
+        id: e.id, name: `${e.lastName} ${e.firstName}`, number: e.employeeNumber || '-',
       })));
     } catch { /* silent */ }
   }
