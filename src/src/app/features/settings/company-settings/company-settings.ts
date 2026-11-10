@@ -25,8 +25,8 @@ interface CompanyInfo {
   /** 届出を委託している社会保険労務士（委託していなければ空） */
   consultantName: string;
   consultantNumber: string;
-  /** 特定適用事業所か。null は未登録 */
-  specificApplicableOffice: boolean | null;
+  /** 特定適用事業所か（選択欄は null を「選んでいない」と扱うので、文字で持つ） */
+  specificApplicableOffice: 'yes' | 'no' | 'unset';
 }
 
 interface CompanyHistoryItem {
@@ -101,9 +101,9 @@ const FIELD_LABELS: Record<string, string> = {
           <mat-form-field appearance="outline" class="domains">
             <mat-label>特定適用事業所か</mat-label>
             <mat-select [(ngModel)]="company.specificApplicableOffice" [disabled]="!editing()" data-testid="specific-office">
-              <mat-option [value]="true">はい（厚生年金の被保険者が51人以上）</mat-option>
-              <mat-option [value]="false">いいえ（50人以下）</mat-option>
-              <mat-option [value]="null">未登録</mat-option>
+              <mat-option value="yes">はい（厚生年金の被保険者が51人以上）</mat-option>
+              <mat-option value="no">いいえ（50人以下）</mat-option>
+              <mat-option value="unset">未登録</mat-option>
             </mat-select>
             <mat-hint>週の時間・日数が正社員の4分の3に満たない人を、加入させるかの判定に使います。未登録のあいだは、担当者が判断します</mat-hint>
           </mat-form-field>
@@ -197,7 +197,7 @@ export class CompanySettingsComponent implements OnInit {
     name: '', corporateNumber: '', representativeName: '',
     address: '', phone: '', email: '',
     healthInsurerId: '', pensionCode: '', allowedGoogleDomains: '',
-    consultantName: '', consultantNumber: '', specificApplicableOffice: null,
+    consultantName: '', consultantNumber: '', specificApplicableOffice: 'unset',
   };
 
   history = signal<CompanyHistoryItem[]>([]);
@@ -250,7 +250,7 @@ export class CompanySettingsComponent implements OnInit {
         allowedGoogleDomains: (data.allowedGoogleDomains ?? []).join(', '),
         consultantName: data.laborConsultant?.name ?? '',
         consultantNumber: data.laborConsultant?.registrationNumber ?? '',
-        specificApplicableOffice: typeof data.specificApplicableOffice === 'boolean' ? data.specificApplicableOffice : null,
+        specificApplicableOffice: data.specificApplicableOffice === true ? 'yes' : data.specificApplicableOffice === false ? 'no' : 'unset',
       };
     } catch {
       this.snackBar.open('会社情報の取得に失敗しました', '閉じる', { duration: 3000 });
@@ -286,7 +286,7 @@ export class CompanySettingsComponent implements OnInit {
   async onSave() {
     this.saving.set(true);
     try {
-      const { consultantName, consultantNumber, ...company } = this.company;
+      const { consultantName, consultantNumber, specificApplicableOffice, ...company } = this.company;
       if (consultantName.trim() && !consultantNumber.trim()) throw new Error('社会保険労務士の登録番号を入れてください');
       const fn = httpsCallable<any, any>(this.functions, 'companyUpdate');
       await fn({
@@ -294,6 +294,7 @@ export class CompanySettingsComponent implements OnInit {
         expectedVersion: this.version,
         ...company,
         allowedGoogleDomains: this.company.allowedGoogleDomains.split(/[,、\s]+/).map(d => d.trim()).filter(Boolean),
+        specificApplicableOffice: specificApplicableOffice === 'yes' ? true : specificApplicableOffice === 'no' ? false : null,
         laborConsultant: consultantName.trim() ? { name: consultantName.trim(), registrationNumber: consultantNumber.trim() } : null,
       });
       this.version++;
