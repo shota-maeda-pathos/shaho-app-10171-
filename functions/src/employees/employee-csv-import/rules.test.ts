@@ -66,6 +66,19 @@ describe('planEmployeeCsv', () => {
     expect(line3).toContain('性別');
   });
 
+  it('入社日が生年月日より前の行は断る。更新で片方だけ書いた行は、台帳の値と比べる', () => {
+    const plan = planEmployeeCsv(csv(
+      '5,伊藤,三郎,イトウ,サブロウ,2000-05-05,男,本社,,1999-04-01,,,',
+      '1,,,,,,,,,1986-11-01,,,',
+      '1,,,,,2021-01-01,,,,,,,',
+    ), ctx());
+    expect(plan.creates).toHaveLength(0);
+    expect(plan.updates).toHaveLength(0);
+    expect(plan.errors.find(e => e.line === 2)?.message).toContain('入社日（1999-04-01）が生年月日（2000-05-05）より前');
+    expect(plan.errors.find(e => e.line === 3)?.message).toContain('入社日（1986-11-01）が生年月日（1990-04-01）より前');
+    expect(plan.errors.filter(e => e.line === 4).map(e => e.message).join()).toContain('入社日（2020-04-01）が生年月日（2021-01-01）より前');
+  });
+
   it('ファイルの中の重複（社員番号・氏名＋生年月日・個人番号）は2行目以降を誤りにする', () => {
     const plan = planEmployeeCsv(csv(
       `5,伊藤,一,イトウ,ハジメ,1980-01-01,男,本社,,2026-04-01,,,${A}`,

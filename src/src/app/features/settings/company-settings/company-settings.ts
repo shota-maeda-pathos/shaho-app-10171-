@@ -7,6 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatSelectModule } from '@angular/material/select';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -24,6 +25,8 @@ interface CompanyInfo {
   /** 届出を委託している社会保険労務士（委託していなければ空） */
   consultantName: string;
   consultantNumber: string;
+  /** 特定適用事業所か。null は未登録 */
+  specificApplicableOffice: boolean | null;
 }
 
 interface CompanyHistoryItem {
@@ -41,7 +44,7 @@ const FIELD_LABELS: Record<string, string> = {
     FormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule,
     MatButtonModule, MatIconModule, MatProgressSpinnerModule,
-    MatSnackBarModule,
+    MatSnackBarModule, MatSelectModule,
   ],
   template: `
     <div class="section">
@@ -93,6 +96,16 @@ const FIELD_LABELS: Record<string, string> = {
             <mat-label>Google ログインを許可するドメイン</mat-label>
             <input matInput [(ngModel)]="company.allowedGoogleDomains" [readonly]="!editing()" placeholder="example.com, example.co.jp">
             <mat-hint>カンマで区切る。空欄なら、招待された人はどの Google アカウントでもログインできます</mat-hint>
+          </mat-form-field>
+          <h3 class="consultant">短時間で働く人の加入の判定</h3>
+          <mat-form-field appearance="outline" class="domains">
+            <mat-label>特定適用事業所か</mat-label>
+            <mat-select [(ngModel)]="company.specificApplicableOffice" [disabled]="!editing()" data-testid="specific-office">
+              <mat-option [value]="true">はい（厚生年金の被保険者が51人以上）</mat-option>
+              <mat-option [value]="false">いいえ（50人以下）</mat-option>
+              <mat-option [value]="null">未登録</mat-option>
+            </mat-select>
+            <mat-hint>週の時間・日数が正社員の4分の3に満たない人を、加入させるかの判定に使います。未登録のあいだは、担当者が判断します</mat-hint>
           </mat-form-field>
           <h3 class="consultant">社会保険労務士（届出を委託している場合）</h3>
           <div class="form-grid">
@@ -184,7 +197,7 @@ export class CompanySettingsComponent implements OnInit {
     name: '', corporateNumber: '', representativeName: '',
     address: '', phone: '', email: '',
     healthInsurerId: '', pensionCode: '', allowedGoogleDomains: '',
-    consultantName: '', consultantNumber: '',
+    consultantName: '', consultantNumber: '', specificApplicableOffice: null,
   };
 
   history = signal<CompanyHistoryItem[]>([]);
@@ -237,6 +250,7 @@ export class CompanySettingsComponent implements OnInit {
         allowedGoogleDomains: (data.allowedGoogleDomains ?? []).join(', '),
         consultantName: data.laborConsultant?.name ?? '',
         consultantNumber: data.laborConsultant?.registrationNumber ?? '',
+        specificApplicableOffice: typeof data.specificApplicableOffice === 'boolean' ? data.specificApplicableOffice : null,
       };
     } catch {
       this.snackBar.open('会社情報の取得に失敗しました', '閉じる', { duration: 3000 });

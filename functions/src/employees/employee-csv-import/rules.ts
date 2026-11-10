@@ -286,6 +286,9 @@ export function planEmployeeCsv(text: string, ctx: CsvContext): CsvPlan {
       const other = byNameBirth.get(key);
       if (other && other.id !== current?.id) errs.push(`氏名と生年月日が同じ従業員がもう登録されています（社員番号 ${other.employeeNumber}）`);
     }
+    // 入社日は生年月日より後（CSV にない方は今の台帳の値と比べる）
+    const hire = val.hireDate ?? current?.values.hireDate ?? '';
+    if (birth && hire && hire <= birth) errs.push(`入社日（${hire}）が生年月日（${birth}）より前になっています`);
     if (val.myNumber) {
       if (seenMyNumber.has(val.myNumber)) errs.push(`同じ個人番号の行がもう1つあります（${seenMyNumber.get(val.myNumber)}行目）`);
       else seenMyNumber.set(val.myNumber, row.line);

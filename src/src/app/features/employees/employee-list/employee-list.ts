@@ -148,7 +148,11 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
       @if (employees().length === 0) {
         <div class="empty-state">
           <mat-icon>person_off</mat-icon>
-          <p>{{ keyword || employmentType ? '条件に合う従業員はいません' : '従業員が登録されていません' }}</p>
+          <p>{{ keyword || employmentType || statusFilter ? '条件に合う従業員はいません' : '従業員が登録されていません' }}</p>
+          @if (keyword.trim() && statusFilter === '') {
+            <p class="hint">退職した人は、ふだんの検索には出てきません。</p>
+            <button mat-stroked-button type="button" (click)="includeResigned()">退職者も含めて探す</button>
+          }
         </div>
       }
 
@@ -172,6 +176,7 @@ const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
       color: rgba(0, 0, 0, 0.54);
       mat-icon { font-size: 48px; width: 48px; height: 48px; }
     }
+    .empty-state .hint { margin: 0 0 12px; font-size: 13px; }
     .load-more { text-align: center; margin-top: 16px; }
     .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
     .filters .keyword { width: 300px; }
@@ -220,6 +225,12 @@ export class EmployeeListComponent implements OnInit {
     void this.loadEmployees();
   }
 
+  /** 検索で見つからなかったとき、退職者も含めて同じ条件で探し直す */
+  includeResigned() {
+    this.statusFilter = 'all';
+    this.search();
+  }
+
   ngOnInit() {
     this.loadEmployees();
     httpsCallable<object, { items: { id: string; name: string }[] }>(this.functions, 'departmentList')({ companyId: this.auth.companyId, includeInactive: true })
@@ -251,6 +262,8 @@ export class EmployeeListComponent implements OnInit {
       this.employees.update((prev) => [...prev, ...items]);
     } catch (e) {
       this.loadError.set(true);
+      // 前の条件の人数を残さない（今の条件の人数と取り違えないように）
+      this.total.set(null);
       console.error('Failed to load employees', e);
     } finally {
       this.loading.set(false);

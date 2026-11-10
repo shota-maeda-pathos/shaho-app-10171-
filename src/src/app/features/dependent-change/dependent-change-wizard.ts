@@ -213,7 +213,8 @@ export class DependentChangeWizardComponent implements OnInit, OnDestroy {
       const { data } = await httpsCallable<object, Summary>(this.functions, 'dependentChangePreview')({
         companyId: this.auth.companyId, procedureId: this.procedureId,
         items: this.items.map(i => ({
-          kind: i.kind, eventDate: i.eventDate, birthDate: i.birthDate, relationship: i.relationship,
+          // 日付の欄は打ちかけだと null になる。判定には空として渡す
+          kind: i.kind, eventDate: i.eventDate ?? '', birthDate: i.birthDate ?? '', relationship: i.relationship,
           income: Math.max(0, Math.floor(Number(i.income) || 0)), coResident: i.coResident, isDisabled: i.isDisabled, reason: i.reason,
         })),
       });

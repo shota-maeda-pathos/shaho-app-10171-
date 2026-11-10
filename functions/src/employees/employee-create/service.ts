@@ -17,6 +17,9 @@ export async function createEmployee(
   if (!auth.roles.includes('admin')) {
     requireOffice(auth, input.officeId);
   }
+  if (input.birthDate && input.hireDate.slice(0, 10) <= input.birthDate.slice(0, 10)) {
+    throw invalidArg('入社日が生年月日より前になっています');
+  }
 
   const officeDoc = await db
     .doc(`companies/${auth.companyId}/offices/${input.officeId}`)

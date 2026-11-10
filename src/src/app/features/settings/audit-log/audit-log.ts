@@ -30,6 +30,13 @@ const ENTITY_LABELS: Record<string, string> = {
   auth: 'ログイン', employee: '従業員', employeeMyNumber: '個人番号', company: '会社情報', filing: '届出',
   filingArchive: '保存原本', approvalRequest: '承認', invitation: '招待', user: '利用者', auditLog: '監査ログ',
   salary: '給与', bonus: '賞与', grade: '等級', dependent: '扶養', report: '帳票', procedure: '手続き', office: '事業所',
+  employment: '雇用条件', monthlyInsurance: '毎月の保険料', bonusInsurance: '賞与の保険料', department: '部署',
+  portalSettings: '本人ポータルの設定', approvalBulk: '一括承認', employeeCsvImport: '従業員のCSV取込',
+  leave: '休業', absence: '休職', premiumExemption: '保険料の免除', portalRequest: '本人からの申請',
+  insuranceRate: '保険料率', filingAttachment: '添付書類', bonusFiling: '賞与支払届', bonusRun: '賞与の処理',
+  santeiRun: '算定の処理', santeiFiling: '算定基礎届', monthlyRun: '毎月の処理', monthlyOperation: '毎月の処理の保留',
+  collectionReceipt: '保険料の回収', salaryItems: '給与の項目', sampleSet: 'サンプルデータ', sample: 'サンプルデータ',
+  registration: 'サンプルの利用者',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -39,6 +46,10 @@ const ACTION_LABELS: Record<string, string> = {
   invitationAccept: '招待の受諾', invitationReissue: '招待の再発行', invite: '招待',
   pdfGenerate: 'PDF出力', zipDownload: 'ZIP出力', csvExport: 'CSV出力', search: '検索',
   approve: '承認', reject: '差戻し', submit: '提出',
+  resign: '退職', publish: '公開', import: '取込', transfer: '異動', start: '開始', end: '終了',
+  cancelApproval: '承認の取消', requestApproval: '承認の依頼', calculate: '計算', suspend: '利用停止',
+  unsuspend: '利用再開', disableLogin: 'ログインの停止', skip: 'スキップ', register: '登録', abolish: '廃止',
+  correctionStart: '訂正の開始', gradeCorrectionApply: '等級の遡及訂正', gradeCorrectionSettle: '遡及訂正の精算',
 };
 
 /** 絞り込みの「種類」の選択肢（entity か entity.action） */

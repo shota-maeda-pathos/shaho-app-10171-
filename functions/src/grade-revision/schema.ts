@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 const id = z.string().min(1).regex(/^[^/]+$/);
 const month = z.string().regex(/^\d{4}-\d{2}$/);
-const optionalDate = z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default('');
+/** 空の日付は空文字。日付の入力欄は打ち間違いの途中で null を送るので、null も空として受ける */
+const optionalDate = z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).nullish().transform(v => v ?? '');
 
 /**
  * 随時改定・終了時改定の手続きを始める。

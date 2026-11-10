@@ -14,6 +14,8 @@ export interface CompanyResponse {
   allowedGoogleDomains: string[];
   /** 届出を委託している社会保険労務士（届出の社労士欄に書く）。委託していなければ null */
   laborConsultant: { name: string; registrationNumber: string } | null;
+  /** 特定適用事業所（厚生年金の被保険者が51人以上）か。null は未登録（短時間の人の加入は担当者が判断） */
+  specificApplicableOffice: boolean | null;
   version: number;
 }
 
@@ -35,6 +37,7 @@ export async function getCompany(
     pensionCode: d.pensionCode ?? '',
     allowedGoogleDomains: d.allowedGoogleDomains ?? [],
     laborConsultant: d.laborConsultant?.name ? { name: d.laborConsultant.name, registrationNumber: d.laborConsultant.registrationNumber ?? '' } : null,
+    specificApplicableOffice: typeof d.specificApplicableOffice === 'boolean' ? d.specificApplicableOffice : null,
     version: d.version ?? 1,
   };
 }

@@ -4,7 +4,8 @@ import { db } from '../../config';
 import { AuthContext, requireOffice } from '../../middleware/auth';
 import { EmployeeDoc } from '../../types/firestore';
 import { MutationResponse } from '../../types/response';
-import { notFound } from '../../utils/errors';
+import { invalidArg, notFound } from '../../utils/errors';
+import { toDateString } from '../../utils/employment';
 import { toTimestamp } from '../../utils/firestore';
 import { EmployeeUpdateInput } from './schema';
 import { EMPLOYEE_PROFILE_KEYS } from '../../types/catalog-schemas';
@@ -47,6 +48,10 @@ export async function updateEmployee(
     if (!auth.roles.includes('admin')) {
       requireOffice(auth, current.officeId);
     }
+    // 入社日は生年月日より後（片方だけ直すときは、今の値と比べる）
+    const birth = input.birthDate?.slice(0, 10) ?? toDateString(current.birthDate);
+    const hire = input.hireDate?.slice(0, 10) ?? toDateString(current.hireDate);
+    if (birth && hire && hire <= birth) throw invalidArg('入社日が生年月日より前になっています');
     // 所属部署は同じ事業所の、使っている部署だけ（カタログ1章 部署の管理）
     if (input.departmentId && input.departmentId !== current.departmentId) await assertDepartment(auth.companyId, input.departmentId, current.officeId);
 

@@ -35,7 +35,8 @@ export const ItemSchema = z.object({
 });
 
 /** 入力中の内容の判定（保存しない）。入れかけの内容でも判定できるよう、判定に使う項目だけ受ける */
-const date = z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default('');
+/** 日付の入力欄は打ち間違いの途中で null を送るので、null も空として受ける */
+const date = z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).nullish().transform(v => v ?? '');
 export const PreviewSchema = z.object({
   companyId: id, procedureId: id,
   items: z.array(z.object({
