@@ -6,7 +6,7 @@ import {
 } from '../types/firestore';
 import { invalidArg, notFound } from '../utils/errors';
 import { toDateString, toTimestamp } from '../utils/firestore';
-import { normalizeEmployment, qualificationDates } from '../utils/employment';
+import { normalizeEmployment, qualificationDates, stillEmployedOn } from '../utils/employment';
 import { findAllRates } from '../utils/insurance-rate';
 import { calculateChildSupportPayment } from '../utils/child-support-payment';
 import { isHealthExcluded, isLongTermCareAge, isPensionExcluded } from '../utils/age';
@@ -321,7 +321,8 @@ export async function saveEntry(input: EntryInput, auth: AuthContext) {
     tx.update(empRef, {
       resignationDate: toTimestamp(input.resignationDate),
       qualificationLostDate: facts.needsFiling ? facts.lossDate : null,
-      isActive: false,
+      // 退職日までは在籍中のまま（退職日を過ぎたら毎朝の処理で外す）
+      isActive: stillEmployedOn(input.resignationDate, todayJst()),
       portalAccessUntil: endOfDayJst(accessUntil),
       updatedAt: now, version: emp.version + 1,
     });
@@ -363,7 +364,7 @@ export async function saveEntry(input: EntryInput, auth: AuthContext) {
       changes: {
         resignationDate: { from: proc.resignation.resignationDate, to: input.resignationDate },
         qualificationLostDate: { from: emp.qualificationLostDate ?? null, to: facts.needsFiling ? facts.lossDate : null },
-        isActive: { from: emp.isActive, to: false },
+        isActive: { from: emp.isActive, to: stillEmployedOn(input.resignationDate, todayJst()) },
         suspendFrom: { from: ctx.user?.data.suspendFrom ?? null, to: userRef ? facts.account.viewOnlyFrom : null },
       },
       note: input.note || null, performedBy: auth.uid, performedAt: now, version: emp.version + 1,

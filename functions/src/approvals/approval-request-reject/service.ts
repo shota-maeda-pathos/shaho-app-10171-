@@ -82,6 +82,7 @@ export async function rejectApprovalRequest(
     tx.set(auditRef, {
       entity: 'approvalRequest',
       entityId: input.requestId,
+      employeeId: input.employeeId,
       action: 'reject',
       changes: { status: { from: 'pending', to: 'rejected' } },
       performedBy: auth.uid,

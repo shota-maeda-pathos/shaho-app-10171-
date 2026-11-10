@@ -388,7 +388,7 @@ export async function cancelApproval(input: ApprovalCancelInput, auth: AuthConte
     if (gradeRef) tx.delete(gradeRef);
     for (const ex of activeExemptions) tx.update(ex.ref, { status: 'pending', approvedAt: null, updatedAt: now });
     tx.set(db.collection(`companies/${auth.companyId}/auditLogs`).doc(), {
-      entity: 'approvalRequest', entityId: t.requestId, action: 'cancelApproval',
+      entity: 'approvalRequest', entityId: t.requestId, employeeId: t.employeeId, action: 'cancelApproval',
       changes: { status: { from: 'approved', to: 'cancelled' }, ...(gradeRef ? { grade: { from: gradeRef.path, to: null } } : {}), ...(activeExemptions.length ? { exemption: { from: activeExemptions.length, to: 0 } } : {}) },
       note: reason, performedBy: auth.uid, performedAt: now, version: filing.version + 1,
     });

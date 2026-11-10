@@ -15,6 +15,10 @@ export interface AuditLogItem {
   action: string;
   changes: Record<string, unknown>;
   ip: string;
+  /** IP を記録した操作ではなく、その人のセッションの IP で補ったもの（同じ人が別の端末も使っていると違うことがある） */
+  ipEstimated: boolean;
+  /** 対象の従業員（社員番号と氏名）。従業員にひもづかない記録は空 */
+  targetEmployee: string;
 }
 
 export interface AuditLogListResponse {
@@ -51,7 +55,48 @@ async function namesOf(companyId: string): Promise<Map<string, string>> {
   return new Map(snap.docs.map((u) => [u.id, u.data().displayName ?? '']));
 }
 
-function toItem(d: FirebaseFirestore.QueryDocumentSnapshot, names: Map<string, string>): AuditLogItem {
+const EMPLOYEE_ENTITIES = new Set(['employee', 'employeeMyNumber']);
+
+/** 記録から読み取れる従業員の ID（記録にない手続きは、手続きの ID を返して後で引く） */
+function employeeRef(x: FirebaseFirestore.DocumentData): { employeeId?: string; procedureId?: string } {
+  if (typeof x.employeeId === 'string' && x.employeeId) return { employeeId: x.employeeId };
+  const entityId = typeof x.entityId === 'string' ? x.entityId : '';
+  if (EMPLOYEE_ENTITIES.has(x.entity) && entityId) return { employeeId: entityId };
+  // 給与・保険料などは「従業員ID/年月」の形
+  if (entityId.includes('/')) return { employeeId: entityId.split('/')[0] };
+  if (x.entity === 'procedure' && entityId) return { procedureId: entityId };
+  return {};
+}
+
+/** 1ページ分の記録の対象の従業員を「社員番号 氏名」にする（そのページに出てくる人だけ読む） */
+async function targetEmployees(companyId: string, docs: FirebaseFirestore.QueryDocumentSnapshot[]): Promise<Map<string, string>> {
+  const refs = new Map(docs.map((d) => [d.id, employeeRef(d.data())]));
+  const procIds = [...new Set([...refs.values()].map((r) => r.procedureId).filter((v): v is string => !!v))];
+  const procEmployee = new Map<string, string>();
+  if (procIds.length) {
+    const procs = await db.getAll(...procIds.map((id) => db.doc(`companies/${companyId}/procedures/${id}`)));
+    for (const p of procs) if (p.exists && typeof p.data()?.employeeId === 'string') procEmployee.set(p.id, p.data()!.employeeId);
+  }
+  const employeeIdOf = (r: { employeeId?: string; procedureId?: string }) => r.employeeId ?? (r.procedureId ? procEmployee.get(r.procedureId) : undefined);
+  const empIds = [...new Set([...refs.values()].map(employeeIdOf).filter((v): v is string => !!v && !v.includes('/')))];
+  const label = new Map<string, string>();
+  if (empIds.length) {
+    const emps = await db.getAll(...empIds.map((id) => db.doc(`companies/${companyId}/employees/${id}`)));
+    for (const e of emps) {
+      if (!e.exists) continue;
+      const v = e.data()!;
+      label.set(e.id, [v.employeeNumber, `${v.lastName ?? ''} ${v.firstName ?? ''}`.trim()].filter(Boolean).join(' '));
+    }
+  }
+  const out = new Map<string, string>();
+  for (const [docId, r] of refs) {
+    const id = employeeIdOf(r);
+    if (id && label.has(id)) out.set(docId, label.get(id)!);
+  }
+  return out;
+}
+
+function toItem(d: FirebaseFirestore.QueryDocumentSnapshot, names: Map<string, string>, targets: Map<string, string> = new Map()): AuditLogItem {
   const x = d.data();
   return {
     id: d.id,
@@ -64,6 +109,8 @@ function toItem(d: FirebaseFirestore.QueryDocumentSnapshot, names: Map<string, s
     action: x.action ?? '',
     changes: x.changes ?? {},
     ip: x.ip ?? '',
+    ipEstimated: x.ipSource === 'session',
+    targetEmployee: targets.get(d.id) ?? '',
   };
 }
 
@@ -87,7 +134,8 @@ export async function listAuditLogs(input: AuditLogListInput, auth: AuthContext)
     if (hits.length === limit) break;
   }
   const hasMore = hits.length === limit || snap.docs.length === SCAN_PAGE;
-  return { items: hits.map((d) => toItem(d, names)), hasMore, lastDocId: hasMore ? lastScanned : undefined };
+  const targets = await targetEmployees(auth.companyId, hits);
+  return { items: hits.map((d) => toItem(d, names, targets)), hasMore, lastDocId: hasMore ? lastScanned : undefined };
 }
 
 const CSV_MAX = 5000;
@@ -100,11 +148,13 @@ function csvCell(v: unknown): string {
 /** 絞り込んだ監査ログを CSV にする（出力したことも監査ログに残す） */
 export async function exportAuditLogs(f: AuditLogFilter, auth: AuthContext): Promise<{ csv: string; count: number; truncated: boolean }> {
   const [snap, names] = await Promise.all([baseQuery(auth.companyId, f).limit(CSV_MAX * 2).get(), namesOf(auth.companyId)]);
-  const rows = snap.docs.filter((d) => matches(d.data(), f)).slice(0, CSV_MAX).map((d) => toItem(d, names));
-  const header = ['通し番号', '日時', '操作者ID', '操作者', '対象の種類', '対象ID', '操作', '内容', 'IP'];
+  const hits = snap.docs.filter((d) => matches(d.data(), f)).slice(0, CSV_MAX);
+  const targets = await targetEmployees(auth.companyId, hits);
+  const rows = hits.map((d) => toItem(d, names, targets));
+  const header = ['通し番号', '日時', '操作者ID', '操作者', '対象の種類', '対象ID', '対象の従業員', '操作', '内容', 'IP', 'IPの記録'];
   const lines = rows.map((r) => [
     r.seq ?? '', new Date(r.performedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }), r.performedBy, r.performedByName,
-    r.entity, r.entityId, r.action, r.changes, r.ip,
+    r.entity, r.entityId, r.targetEmployee, r.action, r.changes, r.ip, r.ip ? (r.ipEstimated ? '推定（セッションの IP）' : '操作の記録') : '',
   ].map(csvCell).join(','));
   await db.collection(`companies/${auth.companyId}/auditLogs`).add({
     entity: 'auditLog', entityId: 'export', action: 'csvExport',

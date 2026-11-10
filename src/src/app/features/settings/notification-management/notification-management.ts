@@ -75,6 +75,12 @@ interface Notification {
             }
             @if (targetType === 'employee') {
               <mat-form-field appearance="outline">
+                <mat-label>氏名・カナ・社員番号で探す</mat-label>
+                <input matInput name="employeeKeyword" [(ngModel)]="employeeKeyword" (keydown.enter)="$event.preventDefault(); searchEmployees()">
+                <button mat-icon-button matSuffix type="button" (click)="searchEmployees()" aria-label="従業員を探す"><mat-icon>search</mat-icon></button>
+                <mat-hint>{{ employeeHint() }}</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
                 <mat-label>対象従業員</mat-label>
                 <mat-select name="targetId" [(ngModel)]="targetId" required>
                   @for (emp of employees(); track emp.id) {
@@ -139,6 +145,8 @@ export class NotificationManagementComponent implements OnInit {
   loadingList = signal(false);
   offices = signal<{ id: string; name: string }[]>([]);
   employees = signal<{ id: string; name: string; number: string }[]>([]);
+  employeeKeyword = '';
+  employeeHint = signal('');
 
   ngOnInit() {
     void this.loadNotifications();
@@ -151,13 +159,29 @@ export class NotificationManagementComponent implements OnInit {
       const { data: oData } = await officeFn({ companyId: this.auth.companyId });
       this.offices.set((oData.items ?? []).map((o: any) => ({ id: o.id, name: o.name })));
     } catch { /* silent */ }
+    await this.searchEmployees();
+  }
+
+  /**
+   * 個人指定の対象の候補を探す。全員を読み込むと人数が多い会社で重いので、
+   * 検索語で絞って最大50人を出す（検索語が空なら社員番号順の先頭から）
+   */
+  async searchEmployees() {
+    const keyword = this.employeeKeyword.trim();
     try {
       const empFn = httpsCallable<any, any>(this.functions, 'employeeList');
-      const { data: eData } = await empFn({ companyId: this.auth.companyId, limit: 100 });
-      this.employees.set((eData.items ?? []).map((e: any) => ({
+      const { data: eData } = await empFn({ companyId: this.auth.companyId, limit: 50, ...(keyword ? { keyword } : {}) });
+      const found = (eData.items ?? []).map((e: any) => ({
         id: e.id, name: `${e.lastName} ${e.firstName}`, number: e.employeeNumber || '-',
-      })));
-    } catch { /* silent */ }
+      }));
+      // 選んでいる人は、探し直しても候補に残す
+      const selected = this.employees().find(e => e.id === this.targetId);
+      this.employees.set(selected && !found.some((e: { id: string }) => e.id === selected.id) ? [selected, ...found] : found);
+      const total = eData.total ?? found.length;
+      this.employeeHint.set(total > found.length ? `${total}人のうち${found.length}人を表示しています。氏名や社員番号で絞り込んでください` : `${found.length}人が見つかりました`);
+    } catch {
+      this.employeeHint.set('従業員を読み込めませんでした');
+    }
   }
 
   async create() {

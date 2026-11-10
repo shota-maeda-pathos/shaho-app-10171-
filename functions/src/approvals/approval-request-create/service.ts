@@ -90,6 +90,7 @@ export async function createApprovalRequest(
     tx.set(auditRef, {
       entity: 'approvalRequest',
       entityId: reqRef.id,
+      employeeId: input.employeeId,
       action: 'create',
       changes: {},
       performedBy: auth.uid,

@@ -22,6 +22,8 @@ interface AuditLogRow {
   action: string;
   changes: Record<string, unknown>;
   ip: string;
+  ipEstimated?: boolean;
+  targetEmployee?: string;
 }
 
 interface VerifyResult { checked: number; ok: boolean; problems: string[]; unsealed: number }
@@ -107,11 +109,11 @@ const KINDS: { value: string; label: string }[] = [
           @for (row of logs(); track row.id) {
             <tr>
               <td class="nowrap">{{ row.performedAt | date: 'yyyy/MM/dd HH:mm:ss' }}</td>
-              <td>{{ row.performedByName || (row.performedBy === 'anonymous' ? '（ログイン前）' : row.performedBy) }}</td>
+              <td>{{ row.performedByName || (row.performedBy === 'anonymous' ? '（ログイン前）' : row.performedBy === 'system' ? '（自動の処理）' : row.performedBy) }}</td>
               <td class="nowrap">{{ operationLabel(row) }}</td>
               <td class="small">{{ targetLabel(row) }}</td>
               <td class="small">{{ summary(row.changes) }}</td>
-              <td class="small">{{ row.ip }}</td>
+              <td class="small">{{ row.ip }}@if (row.ip && row.ipEstimated) {<span class="estimated" title="この操作では IP を記録していないため、操作した人のセッションの IP を表示しています。同じ人が別の端末も使っていると、実際とは違うことがあります">（推定）</span>}</td>
             </tr>
           } @empty {
             <tr><td colspan="6" class="empty">{{ loading() ? '読み込み中…' : '当てはまる記録はありません' }}</td></tr>
@@ -121,7 +123,7 @@ const KINDS: { value: string; label: string }[] = [
       @if (hasMore()) {
         <div class="more"><button mat-stroked-button type="button" (click)="load(true)" [disabled]="loading()">さらに読み込む</button></div>
       }
-      <p class="note">監査ログは消したり書き換えたりできません（5年以上保存）。個人番号の値は記録せず、登録・閲覧した事実と理由だけを残します。</p>
+      <p class="note">監査ログは消したり書き換えたりできません（5年以上保存）。個人番号の値は記録せず、登録・閲覧した事実と理由だけを残します。IP の「（推定）」は、その操作では IP を記録していないため、操作した人のセッションの IP で補ったものです。</p>
     </mat-card></div>
   `,
   styles: [`
@@ -138,6 +140,7 @@ const KINDS: { value: string; label: string }[] = [
     .verify { padding: 8px 12px; border-radius: var(--app-radius); background: var(--app-status-done-bg); color: var(--app-status-done-fg); }
     .verify.ng { background: var(--app-status-error-bg); color: var(--app-status-error-fg); }
     .error { color: var(--app-status-error-fg); }
+    .estimated { display: block; color: var(--app-color-text-sub); }
     .note { margin-top: 12px; font-size: var(--app-font-xs); color: var(--app-color-text-sub); }
   `],
 })
@@ -176,6 +179,7 @@ export class AuditLogComponent implements OnInit {
   /** 対象が利用者のIDなら名前を出す（ログイン前の失敗は「—」） */
   targetLabel(row: AuditLogRow) {
     if (row.entityId === 'anonymous') return '—';
+    if (row.targetEmployee) return row.targetEmployee;
     const user = this.users().find(u => u.id === row.entityId);
     return user ? user.displayName : row.entityId;
   }

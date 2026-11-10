@@ -7,6 +7,7 @@ import { getAuthContext, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validation';
 import { computeSummary, markSummaryStale, readSummary } from './service';
 import { sendDeadlineReminders } from '../calendar/service';
+import { deactivateResignedEmployees } from '../../employees/employee-resign/deactivate';
 
 const input = z.object({ companyId: z.string().min(1), officeId: z.string().regex(/^[^/]+$/).optional() }).strict();
 const readInput = input.extend({ ifStale: z.boolean().optional() }).strict();
@@ -40,10 +41,12 @@ export const dashboardSummaryRefresh = onCall({ timeoutSeconds: 300, memory: '51
   return readSummary(auth, data.officeId);
 });
 
-/** 毎朝6時（東京）：全社の数字を数え直して保存し、期限の近い届出をお知らせにする */
+/** 毎朝6時（東京）：退職日を過ぎた人を在籍から外し、全社の数字を数え直して保存し、期限の近い届出をお知らせにする */
 export const dashboardSummaryDaily = onSchedule({ schedule: 'every day 06:00', timeZone: 'Asia/Tokyo', region: 'asia-northeast1', timeoutSeconds: 540, memory: '512MiB' }, async () => {
   const companies = await db.collection('companies').select().get();
   for (const c of companies.docs) {
+    // 退職日を過ぎた人を在籍から外してから数える
+    await deactivateResignedEmployees(c.id);
     await computeSummary(c.id);
     await sendDeadlineReminders(c.id);
   }

@@ -33,8 +33,8 @@ export class LayoutComponent {
 
   constructor() {
     this.approvalBadge.start();
-    // 画面を移るたびに件数を読み直す（承認したあとに古い件数が残らないように）
-    this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => void this.approvalBadge.refresh());
+    // 画面を移ったら件数を読み直す（承認したあとに古い件数が残らないように）。続けて移るときは15秒に1回まで
+    this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => this.approvalBadge.refreshOnNavigation());
   }
 
   /** 今のURL（パスだけ）。画面を移動するたびに選択表示を描き直す */

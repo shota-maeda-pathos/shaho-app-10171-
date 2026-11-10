@@ -5,7 +5,8 @@ import { AuthContext, requireOffice } from '../../middleware/auth';
 import { EmployeeDoc, OfficeDoc, EmploymentDoc, GradeDoc, UserDoc } from '../../types/firestore';
 import { notFound } from '../../utils/errors';
 import { toTimestamp, toDateString } from '../../utils/firestore';
-import { normalizeEmployment, NormalizedEmployment, qualificationDates } from '../../utils/employment';
+import { normalizeEmployment, NormalizedEmployment, qualificationDates, stillEmployedOn } from '../../utils/employment';
+import { todayJst } from '../../procedures/wizard';
 import { findAllRates } from '../../utils/insurance-rate';
 import { isHealthExcluded, isLongTermCareAge, isPensionExcluded } from '../../utils/age';
 import { addMonths, lossDateFromResignation, monthOf, normalizeRoundingRule, splitPremium } from '../../insurance/calculator';
@@ -72,7 +73,7 @@ export async function resignEmployee(
       );
     }
 
-    if (!current.isActive) {
+    if (!current.isActive || current.resignationDate) {
       throw new HttpsError(
         'failed-precondition',
         'この従業員はすでに退職済みです',
@@ -126,7 +127,8 @@ export async function resignEmployee(
     tx.update(docRef, {
       resignationDate: resignDateTs,
       qualificationLostDate: isSocialInsured ? lossDate : null,
-      isActive: false,
+      // 退職日までは在籍中のまま（退職日を過ぎたら毎朝の処理で外す）
+      isActive: stillEmployedOn(resignationDate, todayJst()),
       updatedAt: now,
       version: current.version + 1,
     });

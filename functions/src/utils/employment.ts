@@ -45,3 +45,11 @@ export function qualificationDates(employee: EmployeeDoc): { acquisitionDate: st
   const lossDate = employee.qualificationLostDate ?? (resignation ? lossDateFromResignation(resignation) : null);
   return { acquisitionDate, lossDate };
 }
+
+/**
+ * 退職を登録したときの在籍の扱い。退職日までは在籍中（一覧や検索に出る）で、退職日の翌日から在籍でなくなる。
+ * 退職日を過ぎた人は、毎朝の処理（deactivateResignedEmployees）が在籍から外す
+ */
+export function stillEmployedOn(resignationDate: string, today: string): boolean {
+  return resignationDate.slice(0, 10) >= today;
+}
