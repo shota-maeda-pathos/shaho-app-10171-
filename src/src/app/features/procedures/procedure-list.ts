@@ -1,3 +1,4 @@
+import { BulkTodoCacheService } from '../../core/services/bulk-todo-cache.service';
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -163,6 +164,7 @@ export class ProcedureListComponent {
   office = inject(OfficeContextService);
   auth = inject(AuthService);
   private functions = inject(Functions);
+  private bulkCache = inject(BulkTodoCacheService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -233,9 +235,7 @@ export class ProcedureListComponent {
       this.todos.set(data.items);
       this.bulkPending.set(data.bulk.length);
       for (const b of data.bulk) {
-        httpsCallable<object, { item: Todo | null }>(this.functions, 'homeBulkTodo', { timeout: 60_000 })({
-          companyId: this.auth.companyId, kind: b.kind, officeId: b.officeId, period: b.period,
-        }).then(({ data: r }) => {
+        this.bulkCache.get<Todo>(b).then((r) => {
           if (sequence === this.sequence && r.item) this.todos.update(list => [...(list ?? []), r.item!]);
         }).catch(() => undefined) // 読めなかった月はホームで「読み込めませんでした」と出る
           .finally(() => { if (sequence === this.sequence) this.bulkPending.update(n => n - 1); });

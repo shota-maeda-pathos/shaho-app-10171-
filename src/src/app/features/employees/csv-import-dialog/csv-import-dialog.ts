@@ -126,6 +126,9 @@ type Step = 'upload' | 'checking' | 'preview' | 'importing' | 'done';
                 </div>
               </section>
             }
+            @if (p.created > 0) {
+              <p class="next" data-testid="csv-next-grade">新しく登録した人は、まだ等級がありません。従業員の画面の「等級・報酬」タブの「今の等級を登録する」から、今の等級を登録してください（承認されると確定し、保険料を計算できます）。これから入社する人は、取込ではなく「手続きを始める」の入社から登録すると、等級と資格取得届もあわせて作れます。</p>
+            }
             <p class="hint">CSV ファイルの中身はシステムに残していません。個人番号を含むファイルは、手元でも不要になったら消してください。</p>
           }
         }
@@ -154,6 +157,7 @@ type Step = 'upload' | 'checking' | 'preview' | 'importing' | 'done';
     .upload-area mat-icon { font-size: 48px; width: 48px; height: 48px; color: var(--app-brand-strong); }
     .upload-area p { margin: 8px 0; }
     .hint { font-size: 12px; color: var(--app-color-text-sub, #666); }
+    .next { font-size: 13px; line-height: 1.7; padding: 8px 12px; border-radius: 8px; background: var(--app-status-yours-bg, #fff8e1); }
     .rules { font-size: 13px; line-height: 1.7; padding-left: 20px; margin: 16px 0 8px; }
     .template-link { text-align: center; margin-top: 12px; }
     .progress { text-align: center; padding: 24px; }

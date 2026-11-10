@@ -5,6 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Functions, httpsCallable } from '@angular/fire/functions';
 import { AuthService } from '../../core/services/auth.service';
+import { BulkTodoCacheService } from '../../core/services/bulk-todo-cache.service';
 import { ApprovalBadgeService } from '../../core/services/approval-badge.service';
 import { OfficeContextService } from '../../core/services/office-context.service';
 import { StatusBadgeComponent, StatusTone, LoadingStateComponent, EmptyStateComponent, ErrorStateComponent, PageHeadComponent } from '../../shared/ui';
@@ -84,11 +85,11 @@ type Group = { key: string; label: string; items: HomeTodo[] };
             @if (bulkPending()) {
               <span class="pending"><mat-spinner diameter="14"></mat-spinner>毎月の処理・賞与・算定を確かめています（残り {{ bulkPending() }}件）</span>
             }
-            <button mat-button type="button" class="refresh" (click)="load()" [disabled]="loading()"><mat-icon>refresh</mat-icon>最新にする</button>
+            <button mat-button type="button" class="refresh" (click)="load(true)" [disabled]="loading()"><mat-icon>refresh</mat-icon>最新にする</button>
           </div>
 
           @if (loading() && !todos()) { <app-loading-state message="やることを集めています…" /> }
-          @if (error()) { <app-error-state heading="やることを読み込めませんでした" [message]="error()" (retry)="load()" /> }
+          @if (error()) { <app-error-state heading="やることを読み込めませんでした" [message]="error()" (retry)="load(true)" /> }
 
           @if (todos()) {
             @if (!mine().length && !bulkPending()) {
@@ -214,6 +215,7 @@ export class DashboardComponent {
   approvalBadge = inject(ApprovalBadgeService);
   private router = inject(Router);
   private functions = inject(Functions);
+  private bulkCache = inject(BulkTodoCacheService);
 
   todos = signal<HomeTodo[] | null>(null);
   /** サーバーの今日（東京）。期限の残り日数に使う */
@@ -268,7 +270,8 @@ export class DashboardComponent {
     return 'お疲れさまです';
   }
 
-  async load() {
+  /** force（「最新にする」）なら、毎月の処理・算定・賞与も覚えた結果を使わずに数え直す */
+  async load(force = false) {
     const sequence = ++this.sequence;
     this.loading.set(true);
     this.error.set('');
@@ -279,7 +282,7 @@ export class DashboardComponent {
       if (sequence !== this.sequence) return;
       this.today.set(data.today);
       this.todos.set(data.items);
-      this.loadBulk(sequence, data.bulk ?? []);
+      this.loadBulk(sequence, data.bulk ?? [], force);
     } catch (e: any) {
       if (sequence === this.sequence) this.error.set(e.message === 'INTERNAL' || !e.message ? '少し待ってから、もう一度試してください。' : e.message);
     } finally {
@@ -288,12 +291,10 @@ export class DashboardComponent {
   }
 
   /** 毎月の処理・算定・賞与を1件ずつ同時に読み、届いたものからやることに足す。読めなかったものは要確認の行にする */
-  private loadBulk(sequence: number, targets: BulkTarget[]) {
+  private loadBulk(sequence: number, targets: BulkTarget[], force: boolean) {
     this.bulkPending.set(targets.length);
     for (const t of targets) {
-      httpsCallable<object, { item: HomeTodo | null }>(this.functions, 'homeBulkTodo', { timeout: 60_000 })({
-        companyId: this.auth.companyId, kind: t.kind, officeId: t.officeId, period: t.period,
-      }).then(({ data }) => {
+      this.bulkCache.get<HomeTodo>(t, force).then((data) => {
         if (sequence === this.sequence && data.item) this.todos.update(list => [...(list ?? []), data.item!]);
       }).catch((e: any) => {
         if (sequence !== this.sequence) return;

@@ -82,6 +82,18 @@ const DETERMINATION_TYPES: { value: string; label: string }[] = [
           </div>
 
           <mat-divider></mat-divider>
+          <h3>報酬月額から等級を求める</h3>
+          <div class="form-row">
+            <mat-form-field appearance="outline">
+              <mat-label>報酬月額（通勤手当などを含む1か月の報酬）</mat-label>
+              <input matInput type="number" [(ngModel)]="remuneration" min="0" (keydown.enter)="applyRemuneration()" data-testid="grade-remuneration">
+              <span matSuffix>円</span>
+              <mat-hint>入れると、等級表から健康保険と厚生年金の等級を下に入れます。等級がわかっていれば、下に直接入れてもかまいません</mat-hint>
+            </mat-form-field>
+            <div class="lookup"><button mat-stroked-button type="button" (click)="applyRemuneration()" [disabled]="!remuneration || lookingUp()">等級を求める</button></div>
+          </div>
+          @if (lookupNote()) { <p class="lookup-note">{{ lookupNote() }}</p> }
+
           <h3>健康保険</h3>
           <div class="form-row">
             <mat-form-field appearance="outline">
@@ -142,6 +154,8 @@ const DETERMINATION_TYPES: { value: string; label: string }[] = [
     .full-width { width: 100%; }
     .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
     mat-divider { margin: 16px 0; }
+    .lookup { display: flex; align-items: flex-start; padding-top: 8px; }
+    .lookup-note { font-size: 13px; color: var(--app-color-text-sub, #666); margin: 20px 0 0; }
   `],
 })
 export class GradeDecideComponent implements OnInit {
@@ -164,6 +178,10 @@ export class GradeDecideComponent implements OnInit {
   pensionStandardRemuneration = 0;
   reason = '';
   isEdit = false;
+  remuneration: number | null = null;
+  lookingUp = signal(false);
+  lookupNote = signal('');
+  private officeId = '';
 
   determinationTypes = DETERMINATION_TYPES;
   private employeeId = '';
@@ -220,6 +238,34 @@ export class GradeDecideComponent implements OnInit {
     }
   }
 
+  /** 報酬月額から、その月の等級表で健康保険と厚生年金の等級を求めて入れる（等級の区切りは全国共通） */
+  async applyRemuneration() {
+    const amount = Number(this.remuneration);
+    if (!amount || amount < 0) return;
+    this.lookingUp.set(true);
+    try {
+      const { data: offices } = await httpsCallable<object, { items: { id: string; prefectureCode?: string }[] }>(this.functions, 'officeList')({ companyId: this.auth.companyId });
+      const pref = offices.items.find(o => o.id === this.officeId)?.prefectureCode ?? '13';
+      const yearMonth = /^\d{4}-\d{2}$/.test(this.effectiveMonth) ? this.effectiveMonth : new Date().toISOString().slice(0, 7);
+      type Row = { healthGrade: number; pensionGrade: number | null; standardRemuneration: number; lowerBound: number; upperBound: number | null };
+      const { data } = await httpsCallable<object, { rows: Row[] }>(this.functions, 'gradeTableGet')({ companyId: this.auth.companyId, prefectureCode: pref, yearMonth });
+      const rows = [...data.rows].sort((a, b) => a.lowerBound - b.lowerBound);
+      const health = rows.find(r => amount >= r.lowerBound && (r.upperBound === null || amount < r.upperBound)) ?? rows[rows.length - 1];
+      const pensionRows = rows.filter(r => r.pensionGrade !== null);
+      const pension = health.pensionGrade !== null ? health
+        : amount < pensionRows[0].lowerBound ? pensionRows[0] : pensionRows[pensionRows.length - 1];
+      this.healthGradeNumber = health.healthGrade;
+      this.healthStandardRemuneration = health.standardRemuneration;
+      this.pensionGradeNumber = pension.pensionGrade!;
+      this.pensionStandardRemuneration = pension.standardRemuneration;
+      this.lookupNote.set(`報酬月額 ${amount.toLocaleString()}円 → 健康保険 ${health.healthGrade}等級（${health.standardRemuneration.toLocaleString()}円）、厚生年金 ${pension.pensionGrade}等級（${pension.standardRemuneration.toLocaleString()}円）`);
+    } catch (e: any) {
+      this.lookupNote.set(`等級表を読めませんでした：${e?.message ?? ''}`);
+    } finally {
+      this.lookingUp.set(false);
+    }
+  }
+
   goBack() {
     this.router.navigate(['/employees', this.employeeId]);
   }
@@ -234,6 +280,7 @@ export class GradeDecideComponent implements OnInit {
       });
       const emp = result.data;
       this.employeeName.set(`${emp.lastName} ${emp.firstName}`);
+      this.officeId = emp.officeId ?? '';
     } catch {
       this.employeeName.set(this.employeeId);
     } finally {

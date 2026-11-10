@@ -766,6 +766,9 @@ interface OnboardResult {
               } @else {
                 <div class="empty-state">
                   <p>等級情報が登録されていません</p>
+                  <!-- CSV で取り込んだ人や、入社の手続きを通さずに登録した人は、今の等級をここから入れる（承認されると確定） -->
+                  <p class="grade-hint">CSV で取り込んだ人など、入社の手続きを通さずに登録した人は、今の等級を登録してください。承認されると確定し、その月から保険料を計算できます。</p>
+                  <a mat-flat-button color="primary" [routerLink]="['/employees', employeeId, 'grade']" data-testid="grade-register">今の等級を登録する</a>
                 </div>
               }
             </div>
@@ -908,6 +911,7 @@ interface OnboardResult {
       padding: 32px;
       color: rgba(0, 0, 0, 0.54);
     }
+    .empty-state .grade-hint { max-width: 520px; margin: 0 auto 16px; font-size: 13px; line-height: 1.7; }
     table { width: 100%; }
     .spacer { flex: 1; }
     .action-panel { margin-bottom: 16px; border-left: 4px solid var(--app-brand-strong); }
